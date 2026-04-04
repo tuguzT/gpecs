@@ -1,14 +1,15 @@
-use std::{
+use core::{
     error::Error,
     fmt::{self, Display},
 };
 
-pub use crate::archetype::erased::alloc::error::{
+use gpecs_component::registry::ComponentId;
+
+#[cfg(feature = "alloc")]
+pub use crate::erased::alloc::error::{
     ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
     IncompatibleArchetypeExactError,
 };
-
-use crate::component::registry::ComponentId;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct MissingComponentError {

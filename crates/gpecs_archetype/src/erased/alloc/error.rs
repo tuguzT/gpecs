@@ -1,13 +1,12 @@
-use std::{
+use core::{
     error::Error,
     fmt::{self, Display},
 };
 
-use crate::{
-    archetype::erased::error::{
-        IncompatibleArchetypeViewExactError, MissingComponentError, TooFewComponentsError,
-    },
-    component::{erased::error::NotRegisteredError, registry::ComponentId},
+use gpecs_component::{erased::error::NotRegisteredError, registry::ComponentId};
+
+use crate::erased::error::{
+    IncompatibleArchetypeViewExactError, MissingComponentError, TooFewComponentsError,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -1,10 +1,10 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     slice::Iter,
 };
 
-use crate::component::registry::ComponentId;
+use gpecs_component::registry::ComponentId;
 
 #[derive(Clone)]
 #[repr(transparent)]

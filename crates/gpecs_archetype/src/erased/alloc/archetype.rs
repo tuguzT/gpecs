@@ -1,33 +1,36 @@
-use std::{
-    borrow::Cow,
+use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
 };
+use core_alloc::borrow::Cow;
 
+use gpecs_component::{
+    erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
+    registry::{
+        ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
+        traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+    },
+};
 use gpecs_soa_erased::CovariantFieldDescriptors;
-use gpecs_sparse::{arena::EpochSparseArena, item::SparseItem};
+use gpecs_sparse::{
+    arena::EpochSparseArena,
+    item::SparseItem,
+    soa::{
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        identity::Identity,
+    },
+};
 
 use crate::{
-    archetype::erased::{
+    bundle::{Bundle, NewBundle},
+    erased::{
         ComponentIdOrderedIter, ComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeView, Iter,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, IncompatibleArchetypeExactError,
             IncompatibleArchetypeViewExactError, MissingComponentError,
         },
-    },
-    bundle::{Bundle, NewBundle},
-    component::{
-        erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
-        registry::{
-            ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
-        },
-    },
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
-        identity::Identity,
     },
 };
 

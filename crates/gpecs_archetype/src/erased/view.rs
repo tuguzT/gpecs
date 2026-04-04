@@ -6,26 +6,24 @@ use core::{
     ptr, slice,
 };
 
+use gpecs_component::registry::{ComponentId, ComponentInfo};
 use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::{
     error::FromPartsError,
     item::{DenseSlices, SparseItem},
-    view::EpochSparseView,
-};
-
-use crate::{
-    archetype::erased::{
-        ComponentIdOrderedIter, ComponentIds, Iter,
-        error::{
-            AlreadyHasComponentError, IncompatibleArchetypeViewExactError, MissingComponentError,
-            TooFewComponentsError,
-        },
-    },
-    component::registry::{ComponentId, ComponentInfo},
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlices,
+    },
+    view::EpochSparseView,
+};
+
+use crate::erased::{
+    ComponentIdOrderedIter, ComponentIds, Iter,
+    error::{
+        AlreadyHasComponentError, IncompatibleArchetypeViewExactError, MissingComponentError,
+        TooFewComponentsError,
     },
 };
 

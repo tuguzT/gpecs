@@ -681,6 +681,7 @@ version = "0.0.0"
 dependencies = [
  "gpecs_component",
  "gpecs_soa_erased",
+ "gpecs_sparse",
 ]
 
 [[package]]

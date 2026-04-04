@@ -1,73 +1,56 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
 };
 
-use gpecs_sparse::iter::{IntoIter as SparseIntoIter, Iter as SparseIter};
-
-use crate::{
-    archetype::erased::Iter,
-    component::registry::{ComponentId, ComponentInfo},
+use gpecs_component::registry::{ComponentId, ComponentInfo};
+use gpecs_soa_erased::CovariantFieldDescriptors;
+use gpecs_sparse::{
+    iter::Iter as SparseIter,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors},
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         identity::Identity,
     },
 };
 
-type Inner<Meta> = SparseIntoIter<u32, Identity<Meta>, Identity<Meta>>;
+type Inner<'a, Meta> = SparseIter<'a, 'a, u32, Identity<Meta>>;
 
-pub struct ErasedArchetypeIntoIter<Meta> {
-    inner: Inner<Meta>,
+#[repr(transparent)]
+pub struct Iter<'a, Meta>
+where
+    Meta: 'a,
+{
+    inner: Inner<'a, Meta>,
 }
 
-impl<Meta> ErasedArchetypeIntoIter<Meta> {
+impl<'a, Meta> Iter<'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: Inner<Meta>) -> Self {
+    pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, Meta> {
-        let Self { inner } = self;
-
-        let (context, components, metas) = inner.as_slices_with_context();
-        let inner = SparseIter::new(context, components, metas);
-        Iter::from_inner(inner)
-    }
 }
 
-impl<Meta> Debug for ErasedArchetypeIntoIter<Meta>
+impl<Meta> Debug for Iter<'_, Meta>
 where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.iter().fmt(f)
+        let entries = self.clone().map(From::from);
+        f.debug_map().entries(entries).finish()
     }
 }
 
-impl<Meta> Clone for ErasedArchetypeIntoIter<Meta>
-where
-    Meta: Clone,
-{
+impl<Meta> Clone for Iter<'_, Meta> {
     fn clone(&self) -> Self {
         let Self { inner } = self;
+
         let inner = inner.clone();
         Self { inner }
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a ErasedArchetypeIntoIter<Meta> {
+impl<'a, Meta> Iterator for Iter<'a, Meta> {
     type Item = ComponentInfo<&'a Meta>;
-    type IntoIter = Iter<'a, Meta>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
-    type Item = ComponentInfo<Meta>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -115,7 +98,7 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
+impl<Meta> DoubleEndedIterator for Iter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
@@ -129,7 +112,7 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> ExactSizeIterator for ErasedArchetypeIntoIter<Meta> {
+impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -137,25 +120,37 @@ impl<Meta> ExactSizeIterator for ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> FusedIterator for ErasedArchetypeIntoIter<Meta> {}
+impl<Meta> FusedIterator for Iter<'_, Meta> {}
 
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeIntoIter<Meta>
+impl<'a, Meta> FieldDescriptors<'a> for Iter<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'a,
+    Meta: AsRef<FieldDescriptor>,
 {
-    type Output = Iter<'a, Meta>;
+    type Output = Self;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        self.into_iter()
+        self.clone()
+    }
+}
+
+impl<Meta> CovariantFieldDescriptors for Iter<'_, Meta>
+where
+    Meta: AsRef<FieldDescriptor>,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
+        from
     }
 }
 
 #[inline]
-fn inner_item_to_info<Meta>(item: (u32, Identity<Meta>)) -> ComponentInfo<Meta> {
-    let (id, meta) = item;
+fn inner_item_to_info<'a, Meta>(item: (&'a u32, &'a Identity<Meta>)) -> ComponentInfo<&'a Meta> {
+    let (&id, meta) = item;
 
     let component_id = unsafe { ComponentId::from_u32(id) };
-    let meta = meta.into_inner();
+    let meta = meta.as_inner();
     ComponentInfo::new(component_id, meta)
 }

@@ -10,10 +10,15 @@ rust-version.workspace = true
 [dependencies]
 gpecs_component = { workspace = true }
 gpecs_soa_erased = { workspace = true }
+gpecs_sparse = { workspace = true }
 
 [features]
 default = ["alloc"]
-alloc = ["gpecs_component/alloc", "gpecs_soa_erased/alloc"]
+alloc = [
+    "gpecs_component/alloc",
+    "gpecs_soa_erased/alloc",
+    "gpecs_sparse/alloc",
+]
 
 [lints]
 workspace = true

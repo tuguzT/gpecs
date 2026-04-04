@@ -1,4 +1,4 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::{Enumerate, FusedIterator},
     slice::Iter,
@@ -6,7 +6,7 @@ use std::{
 
 use gpecs_sparse::item::SparseItem;
 
-use crate::component::registry::{ComponentId, ComponentInfo};
+use gpecs_component::registry::{ComponentId, ComponentInfo};
 
 pub struct ComponentIdOrderedIter<'a, Meta> {
     dense: &'a [Meta],

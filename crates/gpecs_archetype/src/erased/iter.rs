@@ -6,14 +6,14 @@ use core::{
 use gpecs_component::registry::{ComponentId, ComponentInfo};
 use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::{
-    iter::Iter as SparseIter,
+    iter::RawIter,
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         identity::Identity,
     },
 };
 
-type Inner<'a, Meta> = SparseIter<'a, 'a, u32, Identity<Meta>>;
+type Inner<'a, Meta> = RawIter<'a, u32, Identity<Meta>>;
 
 #[repr(transparent)]
 pub struct Iter<'a, Meta>
@@ -55,7 +55,7 @@ impl<'a, Meta> Iterator for Iter<'a, Meta> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(inner_item_to_info)
+        inner.next().map(inner_item_to_info_trusted)
     }
 
     #[inline]
@@ -76,7 +76,7 @@ impl<'a, Meta> Iterator for Iter<'a, Meta> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(inner_item_to_info)
+        inner.nth(n).map(inner_item_to_info_trusted)
     }
 
     #[inline]
@@ -85,7 +85,7 @@ impl<'a, Meta> Iterator for Iter<'a, Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(inner_item_to_info)
+        inner.last().map(inner_item_to_info_trusted)
     }
 
     #[inline]
@@ -94,7 +94,7 @@ impl<'a, Meta> Iterator for Iter<'a, Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.map(inner_item_to_info).collect()
+        inner.map(inner_item_to_info_trusted).collect()
     }
 }
 
@@ -102,13 +102,13 @@ impl<Meta> DoubleEndedIterator for Iter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(inner_item_to_info)
+        inner.next_back().map(inner_item_to_info_trusted)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(inner_item_to_info)
+        inner.nth_back(n).map(inner_item_to_info_trusted)
     }
 }
 
@@ -147,10 +147,10 @@ where
 }
 
 #[inline]
-fn inner_item_to_info<'a, Meta>(item: (&'a u32, &'a Identity<Meta>)) -> ComponentInfo<&'a Meta> {
-    let (&id, meta) = item;
-
-    let component_id = unsafe { ComponentId::from_u32(id) };
-    let meta = meta.as_inner();
+fn inner_item_to_info_trusted<'a, Meta>(
+    (component_id, meta): (*const u32, *const Identity<Meta>),
+) -> ComponentInfo<&'a Meta> {
+    let component_id = unsafe { ComponentId::from_u32(*component_id) };
+    let meta = unsafe { &*meta }.as_inner();
     ComponentInfo::new(component_id, meta)
 }

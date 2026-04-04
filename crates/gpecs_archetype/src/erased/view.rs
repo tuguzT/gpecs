@@ -16,7 +16,7 @@ use gpecs_sparse::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlices,
     },
-    view::EpochSparseView,
+    view::{EpochSparseView, EpochSparseViewPtr},
 };
 
 use crate::erased::{
@@ -27,7 +27,7 @@ use crate::erased::{
     },
 };
 
-type Inner<'a, Meta> = EpochSparseView<'a, 'a, u32, Identity<Meta>>;
+type Inner<'a, Meta> = EpochSparseViewPtr<'a, u32, Identity<Meta>>;
 
 #[repr(transparent)]
 pub struct ErasedArchetypeView<'a, Meta>
@@ -54,7 +54,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
             DenseSlices::new(context, keys, values),
         );
 
-        let inner = Inner::new(dense, sparse)?;
+        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
         let me = Self::from_inner(inner);
         Ok(me)
     }
@@ -75,7 +75,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
             )
         };
 
-        let inner = unsafe { Inner::from_parts(dense, sparse) };
+        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();
         Self::from_inner(inner)
     }
 
@@ -101,9 +101,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
 
     #[inline]
     pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.as_view();
+        let Self { inner } = *self;
         ErasedArchetypeView::from_inner(inner)
     }
 
@@ -162,7 +160,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let key = component_id.into_u32();
-        inner.contains_key(key)
+        unsafe { inner.deref() }.contains_key(key)
     }
 
     #[inline]
@@ -191,10 +189,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
 
     #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<&Meta> {
-        let Self { inner } = self;
-
-        let key = component_id.into_u32();
-        inner.get(key).map(Identity::as_inner)
+        self.into_get(component_id)
     }
 
     #[inline]
@@ -202,7 +197,9 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let key = component_id.into_u32();
-        inner.into_get(key).map(Identity::as_inner)
+        unsafe { inner.deref() }
+            .into_get(key)
+            .map(Identity::as_inner)
     }
 
     #[inline]
@@ -210,7 +207,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let key = component_id.into_u32();
-        inner.into_index(key)
+        unsafe { inner.deref() }.into_index(key)
     }
 
     #[inline]
@@ -218,20 +215,14 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let index: usize = component_id.into_u32().try_into().ok()?;
-        let sparse_item = inner.as_sparse_slice().get(index)?;
+        let sparse_item = unsafe { inner.deref() }.into_sparse_slice().get(index)?;
         let index_of = sparse_item.dense_index().copied()?;
         index_of.try_into().ok()
     }
 
     #[inline]
     pub fn get_by_index(&self, index: usize) -> Option<(ComponentId, &Meta)> {
-        let Self { inner } = self;
-
-        let index = index.try_into().ok()?;
-        let (id, meta) = inner.get_with_key(index)?;
-
-        let id = unsafe { ComponentId::from_u32(id) };
-        Some((id, meta))
+        self.into_get_by_index(index)
     }
 
     #[inline]
@@ -239,7 +230,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let index = index.try_into().ok()?;
-        let (id, meta) = inner.into_get_with_key(index)?;
+        let (id, meta) = unsafe { inner.deref() }.into_get_with_key(index)?;
 
         let id = unsafe { ComponentId::from_u32(id) };
         Some((id, meta))
@@ -268,31 +259,24 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        Iter::from_inner(inner)
+        (*self).into_iter()
     }
 
     #[inline]
     pub fn component_ids(&self) -> ComponentIds<'_> {
-        let Self { inner } = self;
-
-        let inner = inner.as_key_slice().iter();
-        ComponentIds::from_inner(inner)
+        self.into_component_ids()
     }
 
     #[inline]
     pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta> {
-        let (_, dense, sparse) = self.as_slices();
-        ComponentIdOrderedIter::from_inner(dense, sparse)
+        self.into_component_id_ordered_iter()
     }
 
     #[inline]
     pub fn into_component_ids(self) -> ComponentIds<'a> {
         let Self { inner } = self;
 
-        let inner = inner.into_key_slice().iter();
+        let inner = unsafe { inner.deref() }.into_key_slice().iter();
         ComponentIds::from_inner(inner)
     }
 
@@ -386,8 +370,7 @@ impl<Meta> Index<ComponentId> for ErasedArchetypeView<'_, Meta> {
 
     #[inline]
     fn index(&self, component_id: ComponentId) -> &Self::Output {
-        let Self { inner } = self;
-        inner.index(component_id.into_u32())
+        self.into_index(component_id)
     }
 }
 
@@ -395,6 +378,7 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
     type Item = ComponentInfo<&'a Meta>;
     type IntoIter = Iter<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -404,6 +388,7 @@ impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
     type Item = ComponentInfo<&'a Meta>;
     type IntoIter = Iter<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 

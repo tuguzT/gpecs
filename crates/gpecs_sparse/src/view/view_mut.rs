@@ -1911,6 +1911,18 @@ where
     }
 }
 
+impl<'ctx, K, V> Default for EpochSparseViewMut<'ctx, '_, K, V>
+where
+    K: Key,
+    V: RawSoa + ?Sized,
+    &'ctx V::Context: Default,
+{
+    fn default() -> Self {
+        let context: &V::Context = Default::default();
+        Self::from(context)
+    }
+}
+
 impl<'ctx, 'a, K, V> PartialEq for EpochSparseViewMut<'ctx, 'a, K, V>
 where
     K: Key,

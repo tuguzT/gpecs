@@ -248,7 +248,7 @@ impl<Meta> ErasedArchetype<Meta> {
     pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
         let Self { components } = self;
 
-        let inner = components.as_view();
+        let inner = components.as_view_ptr();
         ErasedArchetypeView::from_inner(inner)
     }
 

@@ -12,7 +12,7 @@ use gpecs_sparse::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlicesMut,
     },
-    view::EpochSparseViewMut,
+    view::{EpochSparseViewMut, EpochSparseViewMutPtr},
 };
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
     registry::{EntityRegistryView, Iter, IterMut},
 };
 
-type Inner<'a, Meta> = EpochSparseViewMut<'a, 'a, Entity, Identity<Meta>>;
+type Inner<'a, Meta> = EpochSparseViewMutPtr<'a, Entity, Identity<Meta>>;
 
 #[repr(transparent)]
 pub struct EntityRegistryViewMut<'a, Meta>
@@ -45,7 +45,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
             DenseSlicesMut::new(context, entities, metas.as_identity_slice_mut()),
         );
 
-        let inner = Inner::new(dense, sparse)?;
+        let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptr();
         let me = Self::from_inner(inner);
         Ok(me)
     }
@@ -64,7 +64,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
             )
         };
 
-        let inner = unsafe { Inner::from_parts(dense, sparse) };
+        let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) }.into_mut_view_ptr();
         Self::from_inner(inner)
     }
 
@@ -97,15 +97,13 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     pub fn as_view(&self) -> EntityRegistryView<'_, Meta> {
         let Self { inner } = self;
 
-        let inner = inner.as_view();
+        let inner = inner.cast_const();
         EntityRegistryView::from_inner(inner)
     }
 
     #[inline]
     pub fn as_mut_view(&mut self) -> EntityRegistryViewMut<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.as_mut_view();
+        let Self { inner } = *self;
         EntityRegistryViewMut::from_inner(inner)
     }
 
@@ -193,19 +191,25 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
-        inner.contains_key(entity)
+        unsafe { inner.deref() }.contains_key(entity)
     }
 
     #[inline]
     pub fn get(&self, entity: Entity) -> Option<&Meta> {
         let Self { inner } = self;
-        inner.get(entity).map(Identity::as_inner)
+
+        unsafe { inner.deref() }
+            .into_get(entity)
+            .map(Identity::as_inner)
     }
 
     #[inline]
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut Meta> {
         let Self { inner } = self;
-        inner.get_mut(entity).map(Identity::as_inner_mut)
+
+        unsafe { inner.deref_mut() }
+            .into_get_mut(entity)
+            .map(Identity::as_inner_mut)
     }
 
     #[inline]
@@ -213,7 +217,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let sparse_index = sparse_index.try_into().ok()?;
-        inner.get_epoch(sparse_index)
+        unsafe { inner.deref() }.get_epoch(sparse_index)
     }
 
     #[inline]
@@ -221,6 +225,8 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let world = entity.world();
+        let mut inner = unsafe { inner.deref_mut() };
+
         let entity = inner.invalidate_epoch(entity)?;
         let entity = inner
             .replace_key(Entity::new(entity.index(), entity.epoch(), world))
@@ -231,25 +237,31 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<&'a Meta> {
         let Self { inner } = self;
-        inner.into_get(entity).map(Identity::as_inner)
+
+        unsafe { inner.deref() }
+            .into_get(entity)
+            .map(Identity::as_inner)
     }
 
     #[inline]
     pub fn into_get_mut(self, entity: Entity) -> Option<&'a mut Meta> {
         let Self { inner } = self;
-        inner.into_get_mut(entity).map(Identity::as_inner_mut)
+
+        unsafe { inner.deref_mut() }
+            .into_get_mut(entity)
+            .map(Identity::as_inner_mut)
     }
 
     #[inline]
     pub fn into_index(self, entity: Entity) -> &'a Meta {
         let Self { inner } = self;
-        inner.into_index(entity)
+        unsafe { inner.deref() }.into_index(entity)
     }
 
     #[inline]
     pub fn into_index_mut(self, entity: Entity) -> &'a mut Meta {
         let Self { inner } = self;
-        inner.into_index_mut(entity)
+        unsafe { inner.deref_mut() }.into_index_mut(entity)
     }
 
     #[inline]
@@ -345,7 +357,7 @@ impl<Meta> Index<Entity> for EntityRegistryViewMut<'_, Meta> {
     #[inline]
     fn index(&self, entity: Entity) -> &Self::Output {
         let Self { inner } = self;
-        inner.index(entity)
+        unsafe { inner.deref() }.into_index(entity)
     }
 }
 
@@ -353,7 +365,7 @@ impl<Meta> IndexMut<Entity> for EntityRegistryViewMut<'_, Meta> {
     #[inline]
     fn index_mut(&mut self, entity: Entity) -> &mut Self::Output {
         let Self { inner } = self;
-        inner.index_mut(entity)
+        unsafe { inner.deref_mut() }.into_index_mut(entity)
     }
 }
 
@@ -361,6 +373,7 @@ impl<'a, Meta> IntoIterator for &'a EntityRegistryViewMut<'_, Meta> {
     type Item = (Entity, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -370,6 +383,7 @@ impl<'a, Meta> IntoIterator for &'a mut EntityRegistryViewMut<'_, Meta> {
     type Item = (Entity, &'a mut Meta);
     type IntoIter = IterMut<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
@@ -379,6 +393,7 @@ impl<'a, Meta> IntoIterator for EntityRegistryViewMut<'a, Meta> {
     type Item = (Entity, &'a mut Meta);
     type IntoIter = IterMut<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 

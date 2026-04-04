@@ -12,7 +12,7 @@ use gpecs_sparse::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlices,
     },
-    view::EpochSparseView,
+    view::{EpochSparseView, EpochSparseViewPtr},
 };
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
     registry::Iter,
 };
 
-type Inner<'a, Meta> = EpochSparseView<'a, 'a, Entity, Identity<Meta>>;
+type Inner<'a, Meta> = EpochSparseViewPtr<'a, Entity, Identity<Meta>>;
 
 #[repr(transparent)]
 pub struct EntityRegistryView<'a, Meta>
@@ -45,7 +45,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
             DenseSlices::new(context, entities, metas.as_identity_slice()),
         );
 
-        let inner = Inner::new(dense, sparse)?;
+        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
         let me = Self::from_inner(inner);
         Ok(me)
     }
@@ -64,7 +64,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
             )
         };
 
-        let inner = unsafe { Inner::from_parts(dense, sparse) };
+        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();
         Self::from_inner(inner)
     }
 
@@ -89,9 +89,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
 
     #[inline]
     pub fn as_view(&self) -> EntityRegistryView<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.as_view();
+        let Self { inner } = *self;
         EntityRegistryView::from_inner(inner)
     }
 
@@ -147,13 +145,12 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
-        inner.contains_key(entity)
+        unsafe { inner.deref() }.contains_key(entity)
     }
 
     #[inline]
     pub fn get(&self, entity: Entity) -> Option<&Meta> {
-        let Self { inner } = self;
-        inner.get(entity).map(Identity::as_inner)
+        self.into_get(entity)
     }
 
     #[inline]
@@ -161,27 +158,27 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let Self { inner } = self;
 
         let sparse_index = sparse_index.try_into().ok()?;
-        inner.get_epoch(sparse_index)
+        unsafe { inner.deref() }.get_epoch(sparse_index)
     }
 
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<&'a Meta> {
         let Self { inner } = self;
-        inner.into_get(entity).map(Identity::as_inner)
+
+        unsafe { inner.deref() }
+            .into_get(entity)
+            .map(Identity::as_inner)
     }
 
     #[inline]
     pub fn into_index(self, entity: Entity) -> &'a Meta {
         let Self { inner } = self;
-        inner.into_index(entity)
+        unsafe { inner.deref() }.into_index(entity)
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        Iter::from_inner(inner)
+        (*self).into_iter()
     }
 }
 
@@ -268,8 +265,7 @@ impl<Meta> Index<Entity> for EntityRegistryView<'_, Meta> {
 
     #[inline]
     fn index(&self, entity: Entity) -> &Self::Output {
-        let Self { inner } = self;
-        inner.index(entity)
+        self.into_index(entity)
     }
 }
 
@@ -277,6 +273,7 @@ impl<'a, Meta> IntoIterator for &'a EntityRegistryView<'_, Meta> {
     type Item = (Entity, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -286,6 +283,7 @@ impl<'a, Meta> IntoIterator for EntityRegistryView<'a, Meta> {
     type Item = (Entity, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 

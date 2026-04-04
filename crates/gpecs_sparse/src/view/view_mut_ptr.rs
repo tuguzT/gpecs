@@ -977,6 +977,18 @@ where
     }
 }
 
+impl<'ctx, K, V> Default for EpochSparseViewMutPtr<'ctx, K, V>
+where
+    K: Key,
+    V: RawSoa + ?Sized,
+    &'ctx V::Context: Default,
+{
+    fn default() -> Self {
+        let context: &V::Context = Default::default();
+        Self::from(context)
+    }
+}
+
 impl<K, V> Debug for EpochSparseViewMutPtr<'_, K, V>
 where
     K: Key,

@@ -922,6 +922,18 @@ where
     }
 }
 
+impl<'ctx, K, V> Default for EpochSparseView<'ctx, '_, K, V>
+where
+    K: Key,
+    V: RawSoa + ?Sized,
+    &'ctx V::Context: Default,
+{
+    fn default() -> Self {
+        let context: &V::Context = Default::default();
+        Self::from(context)
+    }
+}
+
 impl<K, V> Clone for EpochSparseView<'_, '_, K, V>
 where
     K: Key,

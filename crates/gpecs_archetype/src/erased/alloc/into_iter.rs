@@ -1,11 +1,12 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    ptr,
 };
 
 use gpecs_component::registry::{ComponentId, ComponentInfo};
 use gpecs_sparse::{
-    iter::{IntoIter as SparseIntoIter, Iter as SparseIter},
+    iter::{IntoIter as SparseIntoIter, RawIter},
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         identity::Identity,
@@ -31,7 +32,7 @@ impl<Meta> ErasedArchetypeIntoIter<Meta> {
         let Self { inner } = self;
 
         let (context, components, metas) = inner.as_slices_with_context();
-        let inner = SparseIter::new(context, components, metas);
+        let inner = RawIter::new(context, components, ptr::from_ref(metas));
         Iter::from_inner(inner)
     }
 }

@@ -4,7 +4,9 @@ pub use self::{
 };
 
 #[cfg(feature = "alloc")]
-pub use self::alloc::{ErasedArchetype, ErasedArchetypeIntoIter, FromComponentInfo};
+pub use self::alloc::{
+    ErasedArchetype, ErasedArchetypeIntoIter, ErasedArchetypeViewExt, FromComponentInfo,
+};
 
 pub mod error;
 

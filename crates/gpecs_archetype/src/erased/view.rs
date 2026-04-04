@@ -168,7 +168,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn has_components(
         &self,
-        of: &ErasedArchetypeView<impl Sized>,
+        of: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), MissingComponentError> {
         if let Some(id) = of.component_ids().find(|&id| !self.contains(id)) {
             let error = MissingComponentError::new(id);
@@ -180,7 +180,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn has_no_components(
         &self,
-        of: &ErasedArchetypeView<impl Sized>,
+        of: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), AlreadyHasComponentError> {
         if let Some(id) = of.component_ids().find(|&id| self.contains(id)) {
             let error = AlreadyHasComponentError::new(id);
@@ -248,7 +248,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn check_compatibility(
         &self,
-        other: &ErasedArchetypeView<impl Sized>,
+        other: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), MissingComponentError> {
         self.has_components(other)
     }
@@ -256,7 +256,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn check_exact_compatibility(
         &self,
-        other: &ErasedArchetypeView<impl Sized>,
+        other: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), IncompatibleArchetypeViewExactError> {
         self.check_compatibility(other)?;
 

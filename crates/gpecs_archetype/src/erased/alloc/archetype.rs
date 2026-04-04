@@ -25,7 +25,8 @@ use gpecs_sparse::{
 use crate::{
     bundle::{Bundle, NewBundle},
     erased::{
-        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeView, Iter,
+        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeView,
+        ErasedArchetypeViewExt, Iter,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, IncompatibleArchetypeExactError,
@@ -288,19 +289,17 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn has_components(
         &self,
-        of: &ErasedArchetype<impl Sized>,
+        of: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), MissingComponentError> {
-        let of = of.as_view();
-        self.as_view().has_components(&of)
+        self.as_view().has_components(of)
     }
 
     #[inline]
     pub fn has_no_components(
         &self,
-        of: &ErasedArchetype<impl Sized>,
+        of: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), AlreadyHasComponentError> {
-        let of = of.as_view();
-        self.as_view().has_no_components(&of)
+        self.as_view().has_no_components(of)
     }
 
     #[inline]
@@ -321,10 +320,9 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_compatibility(
         &self,
-        other: &ErasedArchetype<impl Sized>,
+        other: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), MissingComponentError> {
-        let other = other.as_view();
-        self.as_view().check_compatibility(&other)
+        self.as_view().check_compatibility(other)
     }
 
     #[inline]
@@ -336,9 +334,8 @@ impl<Meta> ErasedArchetype<Meta> {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let other = ErasedArchetype::<()>::new(components, component_ids)?;
-        self.check_compatibility(&other)?;
-        Ok(())
+        self.as_view()
+            .check_compatibility_for(components, component_ids)
     }
 
     #[inline]
@@ -350,18 +347,15 @@ impl<Meta> ErasedArchetype<Meta> {
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
-        self.check_compatibility(&other)?;
-        Ok(())
+        self.as_view().check_compatibility_of::<B, T>(components)
     }
 
     #[inline]
     pub fn check_exact_compatibility(
         &self,
-        other: &ErasedArchetype<impl Sized>,
+        other: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), IncompatibleArchetypeViewExactError> {
-        let other = other.as_view();
-        self.as_view().check_exact_compatibility(&other)
+        self.as_view().check_exact_compatibility(other)
     }
 
     #[inline]
@@ -373,9 +367,8 @@ impl<Meta> ErasedArchetype<Meta> {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let other = ErasedArchetype::<()>::new(components, component_ids)?;
-        self.check_exact_compatibility(&other)?;
-        Ok(())
+        self.as_view()
+            .check_exact_compatibility_for(components, component_ids)
     }
 
     #[inline]
@@ -387,9 +380,8 @@ impl<Meta> ErasedArchetype<Meta> {
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
-        self.check_exact_compatibility(&other)?;
-        Ok(())
+        self.as_view()
+            .check_exact_compatibility_of::<B, T>(components)
     }
 
     #[inline]

@@ -1481,7 +1481,7 @@ impl ArchetypeRegistry {
             let info = unwrap_archetype_info(archetypes, archetype_id);
             info.storage()
                 .archetype()
-                .has_no_components(components_to_insert)?;
+                .has_no_components(components_to_insert.as_view())?;
         }
 
         let new_archetype = Self::register_archetype_with_components(
@@ -1539,7 +1539,7 @@ impl ArchetypeRegistry {
         let info = unwrap_archetype_info(archetypes, old_archetype);
         info.storage()
             .archetype()
-            .has_components(components_to_remove)?;
+            .has_components(components_to_remove.as_view())?;
 
         let new_archetype = Self::register_archetype_without_components(
             graph,

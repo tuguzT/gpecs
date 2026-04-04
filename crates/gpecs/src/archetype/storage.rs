@@ -459,7 +459,7 @@ impl ArchetypeStorage {
         T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         let archetype = self.archetype();
-        archetype.check_exact_compatibility(bundle.archetype())?;
+        archetype.check_exact_compatibility(bundle.archetype().as_view())?;
 
         let entity = entity.into();
         let bundle = bundle

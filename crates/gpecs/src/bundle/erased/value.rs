@@ -375,7 +375,7 @@ where
     {
         let this = self.archetype();
         let other = archetype.field_descriptors();
-        if let Err(error) = this.check_exact_compatibility(other) {
+        if let Err(error) = this.check_exact_compatibility(other.as_view()) {
             let error = ShuffleError {
                 bundle: self,
                 archetype,

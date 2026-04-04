@@ -48,9 +48,10 @@ pub type ContextParts = (Worlds, Entities, Components, Archetypes);
 
 pub type TrySpawnError = entities::TrySpawnError<EntityLocation>;
 
-pub type Bundles<'a, B> = archetypes::Bundles<'a, 'a, B, ComponentDescriptor, ComponentTypeIdMap>;
+pub type Bundles<'a, B> =
+    archetypes::Bundles<'a, 'a, B, ComponentDescriptor, &'a ComponentTypeIdMap>;
 pub type BundlesMut<'a, B> =
-    archetypes::BundlesMut<'a, 'a, B, ComponentDescriptor, ComponentTypeIdMap>;
+    archetypes::BundlesMut<'a, 'a, B, ComponentDescriptor, &'a ComponentTypeIdMap>;
 
 #[derive(Debug, Default)]
 pub struct Context {
@@ -253,6 +254,8 @@ impl Context {
             archetypes,
             ..
         } = self;
+
+        let components = &components.as_view();
         archetypes.archetype_id_of::<B, _>(components)
     }
 
@@ -279,6 +282,7 @@ impl Context {
         };
 
         let location = archetype_id.into();
+        let components = &components.as_view();
         let bundle = archetypes
             .get_bundle_at::<B, _>(components, entity, location)
             .map_err(GetAtError::with_valid_location)?
@@ -309,6 +313,7 @@ impl Context {
         };
 
         let location = archetype_id.into();
+        let components = &components.as_view();
         let bundle = archetypes
             .get_bundle_mut_at::<B, _>(components, entity, location)
             .map_err(GetAtError::with_valid_location)?
@@ -326,6 +331,8 @@ impl Context {
             archetypes,
             ..
         } = self;
+
+        let components = components.as_view();
         archetypes.bundles::<B, _, _>(components)
     }
 
@@ -339,6 +346,8 @@ impl Context {
             archetypes,
             ..
         } = self;
+
+        let components = components.as_view();
         archetypes.bundles_mut::<B, _, _>(components)
     }
 

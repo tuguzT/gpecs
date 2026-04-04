@@ -97,6 +97,7 @@ impl GpuArchetypeRegistry {
     where
         I: IntoIterator<Item = GpuComponentId>,
     {
+        let components = &components.as_view();
         let component_ids = component_ids.into_iter().map(ComponentId::from);
         let archetype_id = archetypes.register_archetype_from(components, component_ids)?;
 

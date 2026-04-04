@@ -4,7 +4,7 @@ use crate::{
             ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
         },
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistry, ComponentRegistryView,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
         },
     },
@@ -48,7 +48,7 @@ pub unsafe trait Bundle:
     type GetComponents: IntoIterator<Item = Option<ComponentId>>;
 
     /// Retrieves identifiers of all already registered components of this bundle.
-    fn get_components<T>(components: &ComponentRegistry<impl Sized, T>) -> Self::GetComponents
+    fn get_components<T>(components: &ComponentRegistryView<impl Sized, T>) -> Self::GetComponents
     where
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
 
@@ -64,7 +64,7 @@ pub unsafe trait Bundle:
     /// - some of the components of this bundle were not registered,
     /// - some of the input pointers cannot be converted to the component of this bundle.
     fn ptrs_from_erased<I, T>(
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
     ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
@@ -83,7 +83,7 @@ pub unsafe trait Bundle:
     /// - some of the components of this bundle were not registered,
     /// - some of the input pointers cannot be converted to the component of this bundle.
     fn mut_ptrs_from_erased<I, T>(
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
     ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
@@ -102,7 +102,7 @@ pub unsafe trait Bundle:
     /// - some of the components of this bundle were not registered,
     /// - some of the input components cannot be converted to the component of this bundle.
     fn from_erased<I, T>(
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
     ) -> Result<Self, DowncastErrorKind>
     where

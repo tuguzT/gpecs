@@ -22,7 +22,7 @@ use crate::{
     component::{
         erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
         registry::{
-            ComponentId, ComponentInfo, ComponentRegistry,
+            ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
         },
     },
@@ -42,7 +42,7 @@ pub struct ErasedArchetype<Meta = ()> {
 impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn from_iter<I>(
-        components: &ComponentRegistry<impl Sized, impl ?Sized>,
+        components: &ComponentRegistryView<impl Sized, impl ?Sized>,
         iter: I,
     ) -> Result<Self, ArchetypeError>
     where
@@ -132,7 +132,7 @@ where
 impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn new<'a, I, T>(
-        components: &'a ComponentRegistry<T, impl ?Sized>,
+        components: &'a ComponentRegistryView<T, impl ?Sized>,
         component_ids: I,
     ) -> Result<Self, ArchetypeError>
     where
@@ -154,7 +154,9 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn of<'a, B, M, T>(components: &'a ComponentRegistry<M, T>) -> Result<Self, ArchetypeError>
+    pub fn of<'a, B, M, T>(
+        components: &'a ComponentRegistryView<M, T>,
+    ) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
         Meta: FromComponentInfo<'a, M>,
@@ -205,7 +207,7 @@ impl<Meta> ErasedArchetype<Meta> {
 impl<T, U> ErasedArchetype<(T, U)> {
     #[inline]
     pub fn new_with<'a, I, W>(
-        components: &'a ComponentRegistry<W, impl ?Sized>,
+        components: &'a ComponentRegistryView<W, impl ?Sized>,
         with: I,
     ) -> Result<Self, ArchetypeError>
     where
@@ -326,7 +328,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_compatibility_for<I>(
         &self,
-        components: &ComponentRegistry<impl Sized, impl ?Sized>,
+        components: &ComponentRegistryView<impl Sized, impl ?Sized>,
         component_ids: I,
     ) -> Result<(), IncompatibleArchetypeError>
     where
@@ -340,7 +342,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_compatibility_of<B, T>(
         &self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<(), IncompatibleArchetypeError>
     where
         B: Bundle,
@@ -363,7 +365,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_exact_compatibility_for<I>(
         &self,
-        components: &ComponentRegistry<impl Sized, impl ?Sized>,
+        components: &ComponentRegistryView<impl Sized, impl ?Sized>,
         component_ids: I,
     ) -> Result<(), IncompatibleArchetypeExactError>
     where
@@ -377,7 +379,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_exact_compatibility_of<B, T>(
         &self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<(), IncompatibleArchetypeExactError>
     where
         B: Bundle,

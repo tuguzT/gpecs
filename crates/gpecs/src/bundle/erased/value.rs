@@ -33,7 +33,7 @@ use crate::{
     component::{
         erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistry, ComponentRegistryView,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
         },
     },
@@ -141,7 +141,7 @@ where
 {
     #[inline]
     pub fn from_components<I>(
-        components: &ComponentRegistry<impl Sized, impl ?Sized>,
+        components: &ComponentRegistryView<impl Sized, impl ?Sized>,
         iter: I,
     ) -> Result<Self, FromComponentsError>
     where
@@ -187,7 +187,7 @@ where
     #[inline]
     pub fn downcast<B, U>(
         self,
-        registry: &ComponentRegistry<impl Sized, U>,
+        registry: &ComponentRegistryView<impl Sized, U>,
     ) -> Result<B, DowncastError<Self>>
     where
         B: Bundle,
@@ -206,7 +206,7 @@ where
     #[inline]
     pub fn downcast_ref<B, U>(
         &self,
-        registry: &ComponentRegistry<impl Sized, U>,
+        registry: &ComponentRegistryView<impl Sized, U>,
     ) -> Result<BundleRefs<'_, B>, DowncastError<&Self>>
     where
         B: Bundle,
@@ -220,7 +220,7 @@ where
     #[inline]
     pub fn downcast_mut<B, U>(
         &mut self,
-        registry: &ComponentRegistry<impl Sized, U>,
+        registry: &ComponentRegistryView<impl Sized, U>,
     ) -> Result<BundleRefsMut<'_, B>, DowncastError<&mut Self>>
     where
         B: Bundle,

@@ -23,7 +23,7 @@ use crate::{
             error::NotRegisteredError,
         },
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistryView,
             traits::{ComponentIdFrom, FromComponentType},
         },
     },
@@ -134,7 +134,7 @@ where
     #[inline]
     pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<BundleSliceMutPtrs<B>, IncompatibleArchetypeError>
     where
         B: Bundle,
@@ -177,7 +177,7 @@ where
     #[inline]
     pub unsafe fn drop_in_place(
         self,
-        components: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
+        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
         self.iter()
             .map(ErasedComponentSlicePtr::component_id)

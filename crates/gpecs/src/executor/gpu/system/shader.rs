@@ -66,6 +66,7 @@ impl GpuSystemShader {
             min_binding_size: ENTITY_MIN_BINDING_SIZE,
         });
 
+        let components = &components.as_view();
         let with = bind_components
             .into_iter()
             .map(|(id, access)| (id.into(), access));

@@ -12,7 +12,7 @@ use crate::{
     component::{
         erased::ErasedComponentSlice,
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistryView,
             traits::{ComponentIdFrom, FromComponentType},
         },
     },
@@ -100,7 +100,7 @@ where
     #[inline]
     pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<BundleSlices<'data, B>, IncompatibleArchetypeError>
     where
         B: Bundle,

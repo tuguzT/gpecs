@@ -16,7 +16,7 @@ use crate::{
     component::{
         erased::{ErasedComponentMutRef, ErasedComponentRef},
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistryView,
             traits::{ComponentIdFrom, FromComponentType},
         },
     },
@@ -99,7 +99,7 @@ where
     #[inline]
     pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<BundleRefsMut<'data, B>, IncompatibleArchetypeError>
     where
         B: Bundle,

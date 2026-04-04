@@ -7,7 +7,7 @@ use crate::{
             error::{DowncastErrorKind, NotRegisteredError},
         },
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistry, ComponentRegistryView,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
         },
     },
@@ -26,7 +26,7 @@ where
     type GetComponents = [Option<ComponentId>; 1];
 
     #[inline]
-    fn get_components<U>(components: &ComponentRegistry<impl Sized, U>) -> Self::GetComponents
+    fn get_components<U>(components: &ComponentRegistryView<impl Sized, U>) -> Self::GetComponents
     where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
@@ -36,7 +36,7 @@ where
 
     #[inline]
     fn ptrs_from_erased<I, U>(
-        components: &ComponentRegistry<impl Sized, U>,
+        components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
     ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
@@ -57,7 +57,7 @@ where
 
     #[inline]
     fn mut_ptrs_from_erased<I, U>(
-        components: &ComponentRegistry<impl Sized, U>,
+        components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
     ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
@@ -78,7 +78,7 @@ where
 
     #[inline]
     fn from_erased<I, U>(
-        components: &ComponentRegistry<impl Sized, U>,
+        components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
     ) -> Result<Self, DowncastErrorKind>
     where
@@ -128,7 +128,7 @@ macro_rules! bundle_tuple_impl {
             type GetComponents = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
-            fn get_components<U>(components: &ComponentRegistry<impl Sized, U>) -> Self::GetComponents
+            fn get_components<U>(components: &ComponentRegistryView<impl Sized, U>) -> Self::GetComponents
             where
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
@@ -141,7 +141,7 @@ macro_rules! bundle_tuple_impl {
 
             #[inline]
             fn ptrs_from_erased<Iter, U>(
-                components: &ComponentRegistry<impl Sized, U>,
+                components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
             ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
             where
@@ -167,7 +167,7 @@ macro_rules! bundle_tuple_impl {
 
             #[inline]
             fn mut_ptrs_from_erased<Iter, U>(
-                components: &ComponentRegistry<impl Sized, U>,
+                components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
             ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
             where
@@ -193,7 +193,7 @@ macro_rules! bundle_tuple_impl {
 
             #[inline]
             fn from_erased<Iter, U>(
-                components: &ComponentRegistry<impl Sized, U>,
+                components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
             ) -> Result<Self, DowncastErrorKind>
             where

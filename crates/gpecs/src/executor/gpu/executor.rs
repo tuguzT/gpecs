@@ -500,13 +500,14 @@ impl ScheduleCache {
             };
 
             let shader = system_info.shader();
+            let components = &context.components().as_view();
             let component_ids = shader
                 .bind_group_layout_entries()
                 .components
                 .map(|(component_id, _)| component_id.into());
             let Ok(compatible_archetypes) = context
                 .archetypes()
-                .compatible_archetypes_from(context.components(), component_ids)
+                .compatible_archetypes_from(components, component_ids)
             else {
                 unreachable!("{system_id} should have compatible archetypes");
             };

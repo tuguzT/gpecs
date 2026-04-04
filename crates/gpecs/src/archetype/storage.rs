@@ -25,7 +25,7 @@ use crate::{
     component::{
         erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
         registry::{
-            ComponentId, ComponentInfo, ComponentRegistry,
+            ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
         },
     },
@@ -128,7 +128,7 @@ pub struct ArchetypeStorage {
 impl ArchetypeStorage {
     #[inline]
     pub fn new<I, T>(
-        components: &ComponentRegistry<T, impl ?Sized>,
+        components: &ComponentRegistryView<T, impl ?Sized>,
         component_ids: I,
     ) -> Result<Self, ArchetypeError>
     where
@@ -141,7 +141,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn of<B, M, T>(components: &ComponentRegistry<M, T>) -> Result<Self, ArchetypeError>
+    pub fn of<B, M, T>(components: &ComponentRegistryView<M, T>) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -307,7 +307,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn bundles<B, T>(
         &self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<(&[Entity], BundleSlices<'_, B>), IncompatibleArchetypeError>
     where
         B: Bundle,
@@ -321,7 +321,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn bundles_mut<B, T>(
         &mut self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<(&[Entity], BundleSlicesMut<'_, B>), IncompatibleArchetypeError>
     where
         B: Bundle,
@@ -335,7 +335,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn get_bundle<B, T>(
         &self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
     ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
@@ -353,7 +353,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn get_bundle_mut<B, T>(
         &mut self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
     ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
@@ -371,7 +371,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn insert_bundle<B, T>(
         &mut self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
         value: B,
     ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
@@ -412,7 +412,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn remove_bundle<B, T>(
         &mut self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
     ) -> Result<Option<B>, IncompatibleArchetypeExactError>
     where

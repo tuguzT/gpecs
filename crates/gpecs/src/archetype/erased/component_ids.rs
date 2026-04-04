@@ -8,25 +8,25 @@ use crate::component::registry::ComponentId;
 
 #[derive(Clone)]
 #[repr(transparent)]
-pub struct ErasedArchetypeComponentIds<'a> {
+pub struct ComponentIds<'a> {
     inner: Iter<'a, u32>,
 }
 
-impl<'a> ErasedArchetypeComponentIds<'a> {
+impl<'a> ComponentIds<'a> {
     #[inline]
     pub(super) fn from_inner(inner: Iter<'a, u32>) -> Self {
         Self { inner }
     }
 }
 
-impl Debug for ErasedArchetypeComponentIds<'_> {
+impl Debug for ComponentIds<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.clone();
         f.debug_set().entries(entries).finish()
     }
 }
 
-impl Iterator for ErasedArchetypeComponentIds<'_> {
+impl Iterator for ComponentIds<'_> {
     type Item = ComponentId;
 
     #[inline]
@@ -77,7 +77,7 @@ impl Iterator for ErasedArchetypeComponentIds<'_> {
     }
 }
 
-impl DoubleEndedIterator for ErasedArchetypeComponentIds<'_> {
+impl DoubleEndedIterator for ComponentIds<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
@@ -95,7 +95,7 @@ impl DoubleEndedIterator for ErasedArchetypeComponentIds<'_> {
     }
 }
 
-impl ExactSizeIterator for ErasedArchetypeComponentIds<'_> {
+impl ExactSizeIterator for ComponentIds<'_> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -103,4 +103,4 @@ impl ExactSizeIterator for ErasedArchetypeComponentIds<'_> {
     }
 }
 
-impl FusedIterator for ErasedArchetypeComponentIds<'_> {}
+impl FusedIterator for ComponentIds<'_> {}

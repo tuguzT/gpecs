@@ -7,7 +7,7 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaSlices, ErasedSoaSlicesIter};
 
 use crate::{
-    archetype::erased::{ErasedArchetype, ErasedArchetypeIter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetype, Iter, error::IncompatibleArchetypeError},
     bundle::{Bundle, BundleSlices, erased::ErasedBundleSlicePtrs},
     component::{
         erased::ErasedComponentSlice,
@@ -189,7 +189,7 @@ where
 }
 
 type InnerIter<'data, 'a, Meta> =
-    ErasedSoaSlicesIter<'data, ErasedArchetypeIter<'a, Meta>, *const MaybeUninit<u8>>;
+    ErasedSoaSlicesIter<'data, Iter<'a, Meta>, *const MaybeUninit<u8>>;
 
 pub struct ErasedBundleSlicesIter<'data, 'a, Meta> {
     inner: InnerIter<'data, 'a, Meta>,
@@ -220,7 +220,7 @@ impl<'data, 'a, Meta> ErasedBundleSlicesIter<'data, 'a, Meta> {
     }
 
     #[inline]
-    pub fn descriptors(&self) -> ErasedArchetypeIter<'a, Meta> {
+    pub fn descriptors(&self) -> Iter<'a, Meta> {
         let Self { inner, .. } = self;
         inner.descriptors().clone()
     }
@@ -287,7 +287,7 @@ impl<'me, 'a, Meta> FieldDescriptors<'me> for ErasedBundleSlicesIter<'_, 'a, Met
 where
     Meta: AsRef<FieldDescriptor>,
 {
-    type Output = ErasedArchetypeIter<'a, Meta>;
+    type Output = Iter<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'me self) -> Self::Output {

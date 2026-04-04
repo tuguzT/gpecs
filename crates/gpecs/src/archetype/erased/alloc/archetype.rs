@@ -10,8 +10,7 @@ use gpecs_sparse::{arena::EpochSparseArena, item::SparseItem};
 
 use crate::{
     archetype::erased::{
-        ErasedArchetypeComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeIter,
-        ErasedArchetypeSortedIter, ErasedArchetypeView,
+        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeView, Iter,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, IncompatibleArchetypeExactError,
@@ -391,18 +390,18 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
+    pub fn iter(&self) -> Iter<'_, Meta> {
         self.as_view().into_iter()
     }
 
     #[inline]
-    pub fn component_ids(&self) -> ErasedArchetypeComponentIds<'_> {
+    pub fn component_ids(&self) -> ComponentIds<'_> {
         self.as_view().into_component_ids()
     }
 
     #[inline]
-    pub fn sorted_iter(&self) -> ErasedArchetypeSortedIter<'_, Meta> {
-        self.as_view().into_sorted_iter()
+    pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta> {
+        self.as_view().into_component_id_ordered_iter()
     }
 }
 
@@ -494,7 +493,7 @@ where
 
 impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
     type Item = ComponentInfo<&'a Meta>;
-    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+    type IntoIter = Iter<'a, Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

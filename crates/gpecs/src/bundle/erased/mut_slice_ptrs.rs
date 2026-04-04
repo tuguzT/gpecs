@@ -9,7 +9,7 @@ use gpecs_soa_erased::{
 };
 
 use crate::{
-    archetype::erased::{ErasedArchetype, ErasedArchetypeIter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetype, Iter, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleSliceMutPtrs,
         erased::{
@@ -272,8 +272,7 @@ where
     }
 }
 
-type InnerIter<'a, Meta> =
-    ErasedSoaMutSlicePtrsIter<ErasedArchetypeIter<'a, Meta>, *mut MaybeUninit<u8>>;
+type InnerIter<'a, Meta> = ErasedSoaMutSlicePtrsIter<Iter<'a, Meta>, *mut MaybeUninit<u8>>;
 
 pub struct ErasedBundleMutSlicePtrsIter<'a, Meta> {
     inner: InnerIter<'a, Meta>,
@@ -310,7 +309,7 @@ impl<'a, Meta> ErasedBundleMutSlicePtrsIter<'a, Meta> {
     }
 
     #[inline]
-    pub fn descriptors(&self) -> ErasedArchetypeIter<'a, Meta> {
+    pub fn descriptors(&self) -> Iter<'a, Meta> {
         let Self { inner, .. } = self;
         inner.descriptors().clone()
     }
@@ -380,7 +379,7 @@ impl<'me, 'a, Meta> FieldDescriptors<'me> for ErasedBundleMutSlicePtrsIter<'a, M
 where
     Meta: AsRef<FieldDescriptor>,
 {
-    type Output = ErasedArchetypeIter<'a, Meta>;
+    type Output = Iter<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'me self) -> Self::Output {

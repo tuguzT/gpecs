@@ -4,7 +4,7 @@ use std::{
 };
 
 use gpecs_soa_erased::CovariantFieldDescriptors;
-use gpecs_sparse::iter::Iter;
+use gpecs_sparse::iter::Iter as SparseIter;
 
 use crate::{
     component::registry::{ComponentId, ComponentInfo},
@@ -14,24 +14,24 @@ use crate::{
     },
 };
 
-type Inner<'a, Meta> = Iter<'a, 'a, u32, Identity<Meta>>;
+type Inner<'a, Meta> = SparseIter<'a, 'a, u32, Identity<Meta>>;
 
 #[repr(transparent)]
-pub struct ErasedArchetypeIter<'a, Meta>
+pub struct Iter<'a, Meta>
 where
     Meta: 'a,
 {
     inner: Inner<'a, Meta>,
 }
 
-impl<'a, Meta> ErasedArchetypeIter<'a, Meta> {
+impl<'a, Meta> Iter<'a, Meta> {
     #[inline]
     pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
 }
 
-impl<Meta> Debug for ErasedArchetypeIter<'_, Meta>
+impl<Meta> Debug for Iter<'_, Meta>
 where
     Meta: Debug,
 {
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<Meta> Clone for ErasedArchetypeIter<'_, Meta> {
+impl<Meta> Clone for Iter<'_, Meta> {
     fn clone(&self) -> Self {
         let Self { inner } = self;
 
@@ -50,7 +50,7 @@ impl<Meta> Clone for ErasedArchetypeIter<'_, Meta> {
     }
 }
 
-impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
+impl<'a, Meta> Iterator for Iter<'a, Meta> {
     type Item = ComponentInfo<&'a Meta>;
 
     #[inline]
@@ -99,7 +99,7 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for ErasedArchetypeIter<'_, Meta> {
+impl<Meta> DoubleEndedIterator for Iter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
@@ -113,7 +113,7 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIter<'_, Meta> {
     }
 }
 
-impl<Meta> ExactSizeIterator for ErasedArchetypeIter<'_, Meta> {
+impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -121,9 +121,9 @@ impl<Meta> ExactSizeIterator for ErasedArchetypeIter<'_, Meta> {
     }
 }
 
-impl<Meta> FusedIterator for ErasedArchetypeIter<'_, Meta> {}
+impl<Meta> FusedIterator for Iter<'_, Meta> {}
 
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeIter<'_, Meta>
+impl<'a, Meta> FieldDescriptors<'a> for Iter<'_, Meta>
 where
     Meta: AsRef<FieldDescriptor>,
 {
@@ -135,7 +135,7 @@ where
     }
 }
 
-impl<Meta> CovariantFieldDescriptors for ErasedArchetypeIter<'_, Meta>
+impl<Meta> CovariantFieldDescriptors for Iter<'_, Meta>
 where
     Meta: AsRef<FieldDescriptor>,
 {

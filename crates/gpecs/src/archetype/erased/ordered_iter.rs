@@ -4,20 +4,16 @@ use std::{
     slice::Iter,
 };
 
-use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::item::SparseItem;
 
-use crate::{
-    component::registry::{ComponentId, ComponentInfo},
-    soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
-};
+use crate::component::registry::{ComponentId, ComponentInfo};
 
-pub struct ErasedArchetypeSortedIter<'a, Meta> {
+pub struct ComponentIdOrderedIter<'a, Meta> {
     dense: &'a [Meta],
     sparse: Enumerate<Iter<'a, SparseItem<u32>>>,
 }
 
-impl<'a, Meta> ErasedArchetypeSortedIter<'a, Meta> {
+impl<'a, Meta> ComponentIdOrderedIter<'a, Meta> {
     #[inline]
     pub(super) fn from_inner(dense: &'a [Meta], sparse: &'a [SparseItem<u32>]) -> Self {
         let sparse = sparse.iter().enumerate();
@@ -40,7 +36,7 @@ impl<'a, Meta> ErasedArchetypeSortedIter<'a, Meta> {
     }
 }
 
-impl<Meta> Debug for ErasedArchetypeSortedIter<'_, Meta>
+impl<Meta> Debug for ComponentIdOrderedIter<'_, Meta>
 where
     Meta: Debug,
 {
@@ -50,7 +46,7 @@ where
     }
 }
 
-impl<Meta> Clone for ErasedArchetypeSortedIter<'_, Meta> {
+impl<Meta> Clone for ComponentIdOrderedIter<'_, Meta> {
     fn clone(&self) -> Self {
         let Self { dense, sparse } = self;
         let sparse = sparse.clone();
@@ -58,7 +54,7 @@ impl<Meta> Clone for ErasedArchetypeSortedIter<'_, Meta> {
     }
 }
 
-impl<'a, Meta> Iterator for ErasedArchetypeSortedIter<'a, Meta> {
+impl<'a, Meta> Iterator for ComponentIdOrderedIter<'a, Meta> {
     type Item = ComponentInfo<&'a Meta>;
 
     #[inline]
@@ -86,7 +82,7 @@ impl<'a, Meta> Iterator for ErasedArchetypeSortedIter<'a, Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for ErasedArchetypeSortedIter<'_, Meta> {
+impl<Meta> DoubleEndedIterator for ComponentIdOrderedIter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self {
@@ -104,28 +100,4 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeSortedIter<'_, Meta> {
     }
 }
 
-impl<Meta> FusedIterator for ErasedArchetypeSortedIter<'_, Meta> {}
-
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeSortedIter<'_, Meta>
-where
-    Meta: AsRef<FieldDescriptor>,
-{
-    type Output = Self;
-
-    #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
-        self.clone()
-    }
-}
-
-impl<Meta> CovariantFieldDescriptors for ErasedArchetypeSortedIter<'_, Meta>
-where
-    Meta: AsRef<FieldDescriptor>,
-{
-    #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        from
-    }
-}
+impl<Meta> FusedIterator for ComponentIdOrderedIter<'_, Meta> {}

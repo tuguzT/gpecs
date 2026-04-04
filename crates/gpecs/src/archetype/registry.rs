@@ -143,7 +143,7 @@ impl<Meta> ArchetypeKey<Meta> {
     #[inline]
     fn component_ids(&self) -> impl Iterator<Item = ComponentId> {
         let Self { archetype } = self;
-        archetype.sorted_iter().map(From::from)
+        archetype.component_id_ordered_iter().map(From::from)
     }
 
     #[inline]

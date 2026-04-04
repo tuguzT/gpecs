@@ -15,7 +15,7 @@ use gpecs_sparse::{
 
 use crate::{
     archetype::erased::{
-        ErasedArchetypeComponentIds, ErasedArchetypeIter, ErasedArchetypeSortedIter,
+        ComponentIdOrderedIter, ComponentIds, Iter,
         error::{
             AlreadyHasComponentError, IncompatibleArchetypeViewExactError, MissingComponentError,
             TooFewComponentsError,
@@ -269,39 +269,39 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
+    pub fn iter(&self) -> Iter<'_, Meta> {
         let Self { inner } = self;
 
         let inner = inner.iter();
-        ErasedArchetypeIter::from_inner(inner)
+        Iter::from_inner(inner)
     }
 
     #[inline]
-    pub fn component_ids(&self) -> ErasedArchetypeComponentIds<'_> {
+    pub fn component_ids(&self) -> ComponentIds<'_> {
         let Self { inner } = self;
 
         let inner = inner.as_key_slice().iter();
-        ErasedArchetypeComponentIds::from_inner(inner)
+        ComponentIds::from_inner(inner)
     }
 
     #[inline]
-    pub fn sorted_iter(&self) -> ErasedArchetypeSortedIter<'_, Meta> {
+    pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta> {
         let (_, dense, sparse) = self.as_slices();
-        ErasedArchetypeSortedIter::from_inner(dense, sparse)
+        ComponentIdOrderedIter::from_inner(dense, sparse)
     }
 
     #[inline]
-    pub fn into_component_ids(self) -> ErasedArchetypeComponentIds<'a> {
+    pub fn into_component_ids(self) -> ComponentIds<'a> {
         let Self { inner } = self;
 
         let inner = inner.into_key_slice().iter();
-        ErasedArchetypeComponentIds::from_inner(inner)
+        ComponentIds::from_inner(inner)
     }
 
     #[inline]
-    pub fn into_sorted_iter(self) -> ErasedArchetypeSortedIter<'a, Meta> {
+    pub fn into_component_id_ordered_iter(self) -> ComponentIdOrderedIter<'a, Meta> {
         let (_, dense, sparse) = self.into_parts();
-        ErasedArchetypeSortedIter::from_inner(dense, sparse)
+        ComponentIdOrderedIter::from_inner(dense, sparse)
     }
 }
 
@@ -395,7 +395,7 @@ impl<Meta> Index<ComponentId> for ErasedArchetypeView<'_, Meta> {
 
 impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
     type Item = ComponentInfo<&'a Meta>;
-    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+    type IntoIter = Iter<'a, Meta>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -404,13 +404,13 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
 
 impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
     type Item = ComponentInfo<&'a Meta>;
-    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+    type IntoIter = Iter<'a, Meta>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        ErasedArchetypeIter::from_inner(inner)
+        Iter::from_inner(inner)
     }
 }
 

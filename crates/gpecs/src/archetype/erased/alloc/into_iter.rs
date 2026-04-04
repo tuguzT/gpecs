@@ -3,10 +3,10 @@ use std::{
     iter::FusedIterator,
 };
 
-use gpecs_sparse::iter::{IntoIter, Iter};
+use gpecs_sparse::iter::{IntoIter as SparseIntoIter, Iter as SparseIter};
 
 use crate::{
-    archetype::erased::ErasedArchetypeIter,
+    archetype::erased::Iter,
     component::registry::{ComponentId, ComponentInfo},
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-type Inner<Meta> = IntoIter<u32, Identity<Meta>, Identity<Meta>>;
+type Inner<Meta> = SparseIntoIter<u32, Identity<Meta>, Identity<Meta>>;
 
 pub struct ErasedArchetypeIntoIter<Meta> {
     inner: Inner<Meta>,
@@ -27,12 +27,12 @@ impl<Meta> ErasedArchetypeIntoIter<Meta> {
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
+    pub fn iter(&self) -> Iter<'_, Meta> {
         let Self { inner } = self;
 
         let (context, components, metas) = inner.as_slices_with_context();
-        let inner = Iter::new(context, components, metas);
-        ErasedArchetypeIter::from_inner(inner)
+        let inner = SparseIter::new(context, components, metas);
+        Iter::from_inner(inner)
     }
 }
 
@@ -58,7 +58,7 @@ where
 
 impl<'a, Meta> IntoIterator for &'a ErasedArchetypeIntoIter<Meta> {
     type Item = ComponentInfo<&'a Meta>;
-    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+    type IntoIter = Iter<'a, Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -143,7 +143,7 @@ impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeIntoIter<Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = ErasedArchetypeIter<'a, Meta>;
+    type Output = Iter<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {

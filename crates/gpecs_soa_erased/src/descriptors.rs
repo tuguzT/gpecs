@@ -85,7 +85,7 @@ where
 
 impl<T> CovariantFieldDescriptors for slice::Iter<'_, T>
 where
-    T: AsRef<FieldDescriptor>,
+    T: AsRef<FieldDescriptor> + 'static,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(

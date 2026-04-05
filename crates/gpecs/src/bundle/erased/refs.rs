@@ -153,21 +153,21 @@ where
     }
 }
 
-impl<'me, 'a, Meta> FieldDescriptors<'me> for ErasedBundleRefs<'_, 'a, Meta>
+impl<'a, Meta> FieldDescriptors<'a> for ErasedBundleRefs<'_, '_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'a,
 {
     type Output = &'a ErasedArchetype<Meta>;
 
     #[inline]
-    fn field_descriptors(&'me self) -> Self::Output {
+    fn field_descriptors(&'a self) -> Self::Output {
         self.archetype()
     }
 }
 
 impl<Meta> CovariantFieldDescriptors for ErasedBundleRefs<'_, '_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'static,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -271,21 +271,21 @@ where
 
 impl<Meta> FusedIterator for ErasedBundleRefsIter<'_, '_, Meta> where Meta: AsRef<FieldDescriptor> {}
 
-impl<'me, 'a, Meta> FieldDescriptors<'me> for ErasedBundleRefsIter<'_, 'a, Meta>
+impl<'a, Meta> FieldDescriptors<'a> for ErasedBundleRefsIter<'_, '_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'a,
 {
     type Output = Iter<'a, Meta>;
 
     #[inline]
-    fn field_descriptors(&'me self) -> Self::Output {
+    fn field_descriptors(&'a self) -> Self::Output {
         self.descriptors()
     }
 }
 
 impl<Meta> CovariantFieldDescriptors for ErasedBundleRefsIter<'_, '_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'static,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(

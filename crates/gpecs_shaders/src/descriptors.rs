@@ -27,10 +27,16 @@ impl<'a, T> FieldDescriptors<'a> for GpuFieldDescriptors<T>
 where
     T: AsRef<[FieldDescriptor]> + Clone,
 {
-    type Output = Self;
+    type Output = GpuFieldDescriptors<&'a [FieldDescriptor]>;
 
     fn field_descriptors(&'a self) -> Self::Output {
-        self.clone()
+        let Self {
+            ref descriptors,
+            next,
+        } = *self;
+
+        let descriptors = descriptors.as_ref();
+        GpuFieldDescriptors { next, descriptors }
     }
 }
 

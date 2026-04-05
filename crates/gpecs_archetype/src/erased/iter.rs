@@ -124,9 +124,9 @@ impl<Meta> FusedIterator for Iter<'_, Meta> {}
 
 impl<'a, Meta> FieldDescriptors<'a> for Iter<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = Self;
+    type Output = Iter<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
@@ -136,7 +136,7 @@ where
 
 impl<Meta> CovariantFieldDescriptors for Iter<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'static,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(

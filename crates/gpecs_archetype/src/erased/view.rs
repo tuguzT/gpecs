@@ -405,9 +405,9 @@ impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
 
 impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeView<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = Self;
+    type Output = ErasedArchetypeView<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
@@ -417,7 +417,7 @@ where
 
 impl<Meta> CovariantFieldDescriptors for ErasedArchetypeView<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor>,
+    Meta: AsRef<FieldDescriptor> + 'static,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(

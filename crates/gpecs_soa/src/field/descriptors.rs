@@ -79,7 +79,7 @@ where
     T: ?Sized,
 {
     /// Collection of items which could be converted into a [field descriptor](FieldDescriptor).
-    type Output: IntoIterator<Item: AsRef<FieldDescriptor>>;
+    type Output: IntoIterator<Item: AsRef<FieldDescriptor>> + 'a;
 
     /// Returns [field descriptors](FieldDescriptors::Output) from self.
     fn field_descriptors(&'a self) -> Self::Output;
@@ -138,9 +138,9 @@ where
 
 impl<'a, T> FieldDescriptors<'a> for slice::Iter<'_, T>
 where
-    T: AsRef<FieldDescriptor>,
+    T: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = Self;
+    type Output = slice::Iter<'a, T>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {

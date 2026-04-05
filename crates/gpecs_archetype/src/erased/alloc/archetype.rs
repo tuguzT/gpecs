@@ -14,8 +14,8 @@ use gpecs_component::{
 };
 use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::{
-    arena::EpochSparseArena,
     item::SparseItem,
+    set::EpochSparseSet,
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         identity::Identity,
@@ -35,7 +35,7 @@ use crate::{
     },
 };
 
-type Inner<Meta> = EpochSparseArena<u32, Identity<Meta>>;
+type Inner<Meta> = EpochSparseSet<u32, Identity<Meta>>;
 
 #[derive(Clone)]
 pub struct ErasedArchetype<Meta = ()> {
@@ -463,6 +463,32 @@ impl<Meta> AsMut<Self> for ErasedArchetype<Meta> {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
+    }
+}
+
+impl<Meta> From<ErasedArchetypeView<'_, Meta>> for ErasedArchetype<Meta>
+where
+    Meta: Clone,
+{
+    #[inline]
+    fn from(archetype: ErasedArchetypeView<'_, Meta>) -> Self {
+        let (dense, _) = unsafe { archetype.into_inner().deref() }.into_parts();
+        let dense = dense.to_vec();
+        let sparse = archetype.as_sparse().to_vec();
+
+        let components = unsafe { Inner::from_parts_unchecked(dense, sparse) };
+        Self { components }
+    }
+}
+
+impl<Meta> From<ErasedArchetypeView<'_, Meta>> for Cow<'_, ErasedArchetype<Meta>>
+where
+    Meta: Clone,
+{
+    #[inline]
+    fn from(archetype: ErasedArchetypeView<'_, Meta>) -> Self {
+        let archetype = ErasedArchetype::from(archetype);
+        Self::Owned(archetype)
     }
 }
 

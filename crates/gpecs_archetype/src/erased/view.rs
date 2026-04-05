@@ -85,6 +85,12 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
+    pub(super) fn into_inner(self) -> Inner<'a, Meta> {
+        let Self { inner } = self;
+        inner
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (&'a [ComponentId], &'a [Meta], &'a [SparseItem<u32>]) {
         let Self { inner } = self;
 

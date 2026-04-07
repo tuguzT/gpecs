@@ -10,7 +10,10 @@ use crate::{
     archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleSlices,
-        erased::{ErasedArchetypeKind, ErasedBundleSlicePtrs},
+        erased::{
+            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleSlicePtrs,
+            IntoErasedArchetypeIterator,
+        },
     },
     component::{
         erased::ErasedComponentSlice,
@@ -21,8 +24,7 @@ use crate::{
     },
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsIter,
-            FieldDescriptorsOutput, FieldDescriptorsOwned,
+            FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
         },
         traits::SoaContext,
     },
@@ -179,8 +181,7 @@ where
 
 impl<'a, D> IntoIterator for ErasedBundleSlices<'a, D>
 where
-    D: IntoIterator<Item: AsRef<FieldDescriptor>, IntoIter: FieldDescriptorsOwned>,
-    for<'b> FieldDescriptorsItem<'b, D::IntoIter>: Into<ComponentId>,
+    D: IntoErasedArchetypeIterator,
 {
     type Item = ErasedComponentSlice<'a>;
     type IntoIter = ErasedBundleSlicesIter<'a, D::IntoIter>;
@@ -272,9 +273,7 @@ where
 
 impl<'a, D> ErasedBundleSlicesIter<'_, D>
 where
-    D: FieldDescriptors<'a> + ?Sized,
-    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
-    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedBundleSlicesIter<'a, FieldDescriptorsIter<'a, D>> {
@@ -287,9 +286,7 @@ where
 
 impl<'a, D> IntoIterator for &'a ErasedBundleSlicesIter<'_, D>
 where
-    D: FieldDescriptors<'a> + ?Sized,
-    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
-    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentSlice<'a>;
     type IntoIter = ErasedBundleSlicesIter<'a, FieldDescriptorsIter<'a, D>>;
@@ -302,9 +299,7 @@ where
 
 impl<D> Debug for ErasedBundleSlicesIter<'_, D>
 where
-    D: FieldDescriptorsOwned + ?Sized,
-    for<'a> FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
-    for<'a, 'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+    D: FieldDescriptorsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -327,8 +322,7 @@ where
 
 impl<'a, D> Iterator for ErasedBundleSlicesIter<'a, D>
 where
-    D: Iterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
-    for<'b> FieldDescriptorsItem<'b, D>: Into<ComponentId>,
+    D: ErasedArchetypeIterator + ?Sized,
 {
     type Item = ErasedComponentSlice<'a>;
 
@@ -351,8 +345,7 @@ where
 
 impl<D> ExactSizeIterator for ErasedBundleSlicesIter<'_, D>
 where
-    D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
-    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
+    D: ErasedArchetypeIterator + ExactSizeIterator + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -361,10 +354,8 @@ where
     }
 }
 
-impl<D> FusedIterator for ErasedBundleSlicesIter<'_, D>
-where
-    D: FusedIterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
-    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
+impl<D> FusedIterator for ErasedBundleSlicesIter<'_, D> where
+    D: ErasedArchetypeIterator + FusedIterator + ?Sized
 {
 }
 

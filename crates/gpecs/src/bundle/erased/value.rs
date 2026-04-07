@@ -23,7 +23,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, NewBundle,
         erased::{
             ErasedArchetypeKind, ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter,
-            ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleRefsIter,
+            ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleRefsIter, IntoErasedArchetypeIterator,
             error::{
                 DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
                 RemoveErrorKind, ReplaceError, ShuffleError,
@@ -38,10 +38,7 @@ use crate::{
         },
     },
     soa::{
-        field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsOutput,
-            FieldDescriptorsOwned,
-        },
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsOutput},
         traits::{RawSoaContext, ReadSoaContext},
     },
 };
@@ -747,10 +744,9 @@ where
 
 impl<T> IntoIterator for ErasedBundleKind<T>
 where
-    T: ErasedArchetypeKind<Meta: WithErasedDrop> + IntoIterator,
+    T: ErasedArchetypeKind<Meta: WithErasedDrop> + IntoErasedArchetypeIterator,
     T::Item: AsRef<FieldDescriptor>,
-    T::IntoIter: FieldDescriptorsOwned,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop + Into<ComponentId>,
+    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent, AllocError>;
     type IntoIter = ErasedBundleIntoIterKind<T>;
@@ -810,10 +806,9 @@ type InnerIter<T> = ErasedSoaIntoFields<
 
 impl<T> Iterator for ErasedBundleIntoIterKind<T>
 where
-    T: ErasedArchetypeKind + IntoIterator,
+    T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     T::Item: AsRef<FieldDescriptor>,
-    T::IntoIter: FieldDescriptorsOwned,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop + Into<ComponentId>,
+    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent, AllocError>;
 
@@ -849,10 +844,10 @@ where
 
 impl<T> ExactSizeIterator for ErasedBundleIntoIterKind<T>
 where
-    T: ErasedArchetypeKind + IntoIterator,
+    T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     T::Item: AsRef<FieldDescriptor>,
-    T::IntoIter: FieldDescriptorsOwned + ExactSizeIterator,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop + Into<ComponentId>,
+    T::IntoIter: ExactSizeIterator,
+    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -863,9 +858,9 @@ where
 
 impl<T> FusedIterator for ErasedBundleIntoIterKind<T>
 where
-    T: ErasedArchetypeKind + IntoIterator,
+    T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     T::Item: AsRef<FieldDescriptor>,
-    T::IntoIter: FieldDescriptorsOwned + FusedIterator,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop + Into<ComponentId>,
+    T::IntoIter: FusedIterator,
+    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
 }

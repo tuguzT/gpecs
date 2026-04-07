@@ -1,5 +1,5 @@
 pub use self::{
-    archetype::ErasedArchetypeKind,
+    archetype::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
     mut_ptrs::{ErasedBundleMutPtrs, ErasedBundleMutPtrsIter},
     mut_refs::{ErasedBundleMutRefs, ErasedBundleMutRefsIter},
     mut_slice_ptrs::{ErasedBundleMutSlicePtrs, ErasedBundleMutSlicePtrsIter},

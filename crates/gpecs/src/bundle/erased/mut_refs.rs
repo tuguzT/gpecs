@@ -11,7 +11,8 @@ use crate::{
     bundle::{
         Bundle, BundleRefsMut,
         erased::{
-            ErasedArchetypeKind, ErasedBundleMutPtrs, ErasedBundleRefs, ErasedBundleRefsIter,
+            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleMutPtrs, ErasedBundleRefs,
+            ErasedBundleRefsIter, IntoErasedArchetypeIterator,
         },
     },
     component::{
@@ -23,8 +24,7 @@ use crate::{
     },
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsIter,
-            FieldDescriptorsOutput, FieldDescriptorsOwned,
+            FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
         },
         traits::SoaContext,
     },
@@ -188,8 +188,7 @@ where
 
 impl<'a, D> IntoIterator for ErasedBundleMutRefs<'a, D>
 where
-    D: IntoIterator<Item: AsRef<FieldDescriptor>, IntoIter: FieldDescriptorsOwned>,
-    for<'b> FieldDescriptorsItem<'b, D::IntoIter>: Into<ComponentId>,
+    D: IntoErasedArchetypeIterator,
 {
     type Item = ErasedComponentMutRef<'a>;
     type IntoIter = ErasedBundleMutRefsIter<'a, D::IntoIter>;
@@ -290,9 +289,7 @@ where
 
 impl<'a, D> ErasedBundleMutRefsIter<'_, D>
 where
-    D: FieldDescriptors<'a> + ?Sized,
-    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
-    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>> {
@@ -305,9 +302,7 @@ where
 
 impl<'a, D> IntoIterator for &'a ErasedBundleMutRefsIter<'_, D>
 where
-    D: FieldDescriptors<'a> + ?Sized,
-    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
-    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentMutRef<'a>;
     type IntoIter = ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>>;
@@ -320,9 +315,7 @@ where
 
 impl<D> Debug for ErasedBundleMutRefsIter<'_, D>
 where
-    D: FieldDescriptorsOwned + ?Sized,
-    for<'a> FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
-    for<'a, 'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+    D: FieldDescriptorsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -332,8 +325,7 @@ where
 
 impl<'a, D> Iterator for ErasedBundleMutRefsIter<'a, D>
 where
-    D: Iterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
-    for<'b> FieldDescriptorsItem<'b, D>: Into<ComponentId>,
+    D: ErasedArchetypeIterator + ?Sized,
 {
     type Item = ErasedComponentMutRef<'a>;
 
@@ -356,8 +348,7 @@ where
 
 impl<D> ExactSizeIterator for ErasedBundleMutRefsIter<'_, D>
 where
-    D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
-    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
+    D: ErasedArchetypeIterator + ExactSizeIterator + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -366,10 +357,8 @@ where
     }
 }
 
-impl<D> FusedIterator for ErasedBundleMutRefsIter<'_, D>
-where
-    D: FusedIterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
-    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
+impl<D> FusedIterator for ErasedBundleMutRefsIter<'_, D> where
+    D: ErasedArchetypeIterator + FusedIterator + ?Sized
 {
 }
 

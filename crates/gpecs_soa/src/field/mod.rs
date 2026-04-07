@@ -4,8 +4,8 @@ pub use self::{
     buffer_offsets::{BufferOffset, BufferOffsets, RawBufferOffsets},
     copied_descriptors::{CopiedFieldDescriptors, IntoCopiedFieldDescriptors},
     descriptors::{
-        FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput,
-        FieldDescriptorsOwned,
+        FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsIter,
+        FieldDescriptorsOutput, FieldDescriptorsOwned,
     },
 };
 

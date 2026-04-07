@@ -1,10 +1,11 @@
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ptr::slice::CoreSliceItemPtrs,
+    CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    ptr::slice::CoreSliceItemPtrs,
 };
 use itertools::zip_eq;
 
 use crate::{
-    archetype::erased::ErasedArchetype,
+    archetype::erased::{ErasedArchetype, ErasedArchetypeView},
     bundle::erased::{
         ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
         ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
@@ -20,11 +21,218 @@ use crate::{
     },
 };
 
+unsafe impl<Meta> RawSoaContext<ErasedBundle<Meta>> for ErasedArchetypeView<'_, Meta>
+where
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
+{
+    type Ptrs<'a> = ErasedBundlePtrs<Self>;
+
+    #[inline]
+    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
+        ErasedBundlePtrs::dangling(*self)
+    }
+
+    #[inline]
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize {
+        unsafe { ptrs.offset_from(&origin) }
+    }
+
+    type MutPtrs<'a> = ErasedBundleMutPtrs<Self>;
+
+    #[inline]
+    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
+        ErasedBundleMutPtrs::dangling(*self)
+    }
+
+    #[inline]
+    unsafe fn ptrs_add_mut<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+        offset: usize,
+    ) -> Self::MutPtrs<'a> {
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_offset_from_mut(
+        &self,
+        ptrs: Self::MutPtrs<'_>,
+        origin: Self::Ptrs<'_>,
+    ) -> isize {
+        unsafe { ptrs.offset_from(&origin) }
+    }
+
+    #[inline]
+    fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a> {
+        ptrs.cast_const()
+    }
+
+    #[inline]
+    fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a> {
+        ptrs.cast_mut()
+    }
+
+    #[inline]
+    unsafe fn ptrs_swap(&self, mut a: Self::MutPtrs<'_>, mut b: Self::MutPtrs<'_>) {
+        unsafe { a.swap(&mut b) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_forward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        len: usize,
+    ) {
+        unsafe { dst.copy_from_forward(&src, len) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_backward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        len: usize,
+    ) {
+        unsafe { dst.copy_from_backward(&src, len) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_nonoverlapping(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        len: usize,
+    ) {
+        unsafe { dst.copy_from_nonoverlapping(&src, len) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
+        for (component_info, to_drop) in zip_eq(self, ptrs) {
+            let Some(erased_drop) = component_info.erased_drop() else {
+                continue;
+            };
+            unsafe { erased_drop.drop_in_place(to_drop) }
+        }
+    }
+
+    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<Self>;
+
+    #[inline]
+    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+        from: Self::NonNullPtrs<'long>,
+    ) -> Self::NonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
+        unsafe { ErasedBundleNonNullPtrs::new_unchecked(ptrs) }
+    }
+
+    #[inline]
+    fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
+        ptrs.into()
+    }
+
+    type SlicePtrs<'a> = ErasedBundleSlicePtrs<Self>;
+
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        ptrs: Self::Ptrs<'a>,
+        len: usize,
+    ) -> Self::SlicePtrs<'a> {
+        unsafe { ErasedBundleSlicePtrs::from_ptrs(ptrs, len) }
+    }
+
+    #[inline]
+    fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a> {
+        slices.into_ptrs()
+    }
+
+    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<Self>;
+
+    #[inline]
+    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceMutPtrs<'a> {
+        unsafe { ErasedBundleMutSlicePtrs::from_ptrs(ptrs, len) }
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+        slices.into_ptrs()
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
+        slices.cast_const()
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
+        slices.cast_mut()
+    }
+
+    #[inline]
+    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
+        for (component_info, to_drop) in zip_eq(self, slices) {
+            let Some(erased_drop) = component_info.erased_drop() else {
+                continue;
+            };
+            unsafe { erased_drop.drop_in_place_slice(to_drop) }
+        }
+    }
+}
+
 unsafe impl<Meta> RawSoaContext<ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
-    type Ptrs<'a> = ErasedBundlePtrs<'a, Meta>;
+    type Ptrs<'a> = ErasedBundlePtrs<&'a Self>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -46,7 +254,7 @@ where
         unsafe { ptrs.offset_from(&origin) }
     }
 
-    type MutPtrs<'a> = ErasedBundleMutPtrs<'a, Meta>;
+    type MutPtrs<'a> = ErasedBundleMutPtrs<&'a Self>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -131,7 +339,7 @@ where
         }
     }
 
-    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<'a, Meta>;
+    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<&'a Self>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -150,7 +358,7 @@ where
         ptrs.into()
     }
 
-    type SlicePtrs<'a> = ErasedBundleSlicePtrs<'a, Meta>;
+    type SlicePtrs<'a> = ErasedBundleSlicePtrs<&'a Self>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -178,7 +386,7 @@ where
         slices.into_ptrs()
     }
 
-    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<'a, Meta>;
+    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<&'a Self>;
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
@@ -303,6 +511,9 @@ where
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
         let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
         let inner = unsafe { context.ptrs_from_buffer(buffer, capacity) };
+
+        let (_, buffer, capacity, offset) = inner.into_parts();
+        let inner = unsafe { ErasedSoaPtrs::new_unchecked(self, buffer, capacity, offset) };
         unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
@@ -310,6 +521,9 @@ where
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
         let inner = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
+
+        let (_, buffer, capacity, offset) = inner.into_parts();
+        let inner = unsafe { ErasedSoaMutPtrs::new_unchecked(self, buffer, capacity, offset) };
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
@@ -318,7 +532,7 @@ unsafe impl<'data, Meta> SoaContext<'data, ErasedBundle<Meta>> for ErasedArchety
 where
     Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
-    type Refs<'a> = ErasedBundleRefs<'data, 'a, Meta>;
+    type Refs<'a> = ErasedBundleRefs<'data, &'a Self>;
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -335,7 +549,7 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedBundleMutRefs<'data, 'a, Meta>;
+    type RefsMut<'a> = ErasedBundleMutRefs<'data, &'a Self>;
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -357,7 +571,7 @@ where
         refs.into()
     }
 
-    type Slices<'a> = ErasedBundleSlices<'data, 'a, Meta>;
+    type Slices<'a> = ErasedBundleSlices<'data, &'a Self>;
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -379,7 +593,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedBundleMutSlices<'data, 'a, Meta>;
+    type SlicesMut<'a> = ErasedBundleMutSlices<'data, &'a Self>;
 
     #[inline]
     fn upcast_mut_slices<'short, 'long: 'short>(

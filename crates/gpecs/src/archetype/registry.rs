@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -23,7 +22,7 @@ use petgraph::{
 use crate::{
     archetype::{
         erased::{
-            ErasedArchetype,
+            ErasedArchetype, ErasedArchetypeView,
             error::{
                 ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
                 MissingComponentError,
@@ -41,8 +40,8 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, NewBundle,
         erased::{
-            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
-            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair,
+            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBorrowedViewBundle, ErasedBundle,
+            ErasedBundleKind, ErasedBundleMutRefs, ErasedBundleRefs, RemovePair,
         },
     },
     component::{
@@ -129,40 +128,24 @@ impl<Meta> ArchetypeKey<Meta> {
     }
 
     #[inline]
-    fn len(&self) -> usize {
+    pub fn as_view(&self) -> ArchetypeKeyView<'_, Meta> {
         let Self { archetype } = self;
-        archetype.len()
-    }
 
-    #[inline]
-    fn contains(&self, component_id: ComponentId) -> bool {
-        let Self { archetype } = self;
-        archetype.contains(component_id)
-    }
-
-    #[inline]
-    fn component_ids(&self) -> impl Iterator<Item = ComponentId> {
-        let Self { archetype } = self;
-        archetype.component_id_ordered_iter().map(From::from)
-    }
-
-    #[inline]
-    fn difference(&self, other: &ArchetypeKey<impl Sized>) -> impl Iterator<Item = ComponentId> {
-        self.component_ids().filter(|&id| !other.contains(id))
+        let archetype = archetype.as_view();
+        ArchetypeKeyView { archetype }
     }
 }
 
 impl<Meta> Debug for ArchetypeKey<Meta> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.component_ids();
-        f.debug_set().entries(entries).finish()
+        self.as_view().fmt(f)
     }
 }
 
 impl<Meta, OtherMeta> PartialEq<ArchetypeKey<OtherMeta>> for ArchetypeKey<Meta> {
     fn eq(&self, other: &ArchetypeKey<OtherMeta>) -> bool {
-        let other = other.component_ids();
-        self.component_ids().eq(other)
+        let other = &other.as_view();
+        self.as_view().eq(other)
     }
 }
 
@@ -170,19 +153,93 @@ impl<Meta> Eq for ArchetypeKey<Meta> {}
 
 impl<Meta, OtherMeta> PartialOrd<ArchetypeKey<OtherMeta>> for ArchetypeKey<Meta> {
     fn partial_cmp(&self, other: &ArchetypeKey<OtherMeta>) -> Option<cmp::Ordering> {
+        let other = &other.as_view();
+        self.as_view().partial_cmp(other)
+    }
+}
+
+impl<Meta> Ord for ArchetypeKey<Meta> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let other = &other.as_view();
+        self.as_view().cmp(other)
+    }
+}
+
+impl<Meta> Hash for ArchetypeKey<Meta> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_view().hash(state);
+    }
+}
+
+struct ArchetypeKeyView<'a, Meta> {
+    archetype: ErasedArchetypeView<'a, Meta>,
+}
+
+impl<Meta> ArchetypeKeyView<'_, Meta> {
+    #[inline]
+    fn len(self) -> usize {
+        let Self { archetype } = self;
+        archetype.len()
+    }
+
+    #[inline]
+    fn contains(self, component_id: ComponentId) -> bool {
+        let Self { archetype } = self;
+        archetype.contains(component_id)
+    }
+
+    #[inline]
+    fn component_ids(self) -> impl Iterator<Item = ComponentId> {
+        let Self { archetype } = self;
+        archetype.into_component_id_ordered_iter().map(From::from)
+    }
+
+    #[inline]
+    fn difference(self, other: ArchetypeKeyView<impl Sized>) -> impl Iterator<Item = ComponentId> {
+        self.component_ids().filter(move |&id| !other.contains(id))
+    }
+}
+
+impl<Meta> Debug for ArchetypeKeyView<'_, Meta> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries = self.component_ids();
+        f.debug_set().entries(entries).finish()
+    }
+}
+
+impl<Meta> Clone for ArchetypeKeyView<'_, Meta> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<Meta> Copy for ArchetypeKeyView<'_, Meta> {}
+
+impl<Meta, OtherMeta> PartialEq<ArchetypeKeyView<'_, OtherMeta>> for ArchetypeKeyView<'_, Meta> {
+    fn eq(&self, other: &ArchetypeKeyView<'_, OtherMeta>) -> bool {
+        let other = other.component_ids();
+        self.component_ids().eq(other)
+    }
+}
+
+impl<Meta> Eq for ArchetypeKeyView<'_, Meta> {}
+
+impl<Meta, OtherMeta> PartialOrd<ArchetypeKeyView<'_, OtherMeta>> for ArchetypeKeyView<'_, Meta> {
+    fn partial_cmp(&self, other: &ArchetypeKeyView<'_, OtherMeta>) -> Option<cmp::Ordering> {
         let other = other.component_ids();
         self.component_ids().partial_cmp(other)
     }
 }
 
-impl<Meta> Ord for ArchetypeKey<Meta> {
+impl<Meta> Ord for ArchetypeKeyView<'_, Meta> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let other = other.component_ids();
         self.component_ids().cmp(other)
     }
 }
 
-impl<Meta> Hash for ArchetypeKey<Meta> {
+impl<Meta> Hash for ArchetypeKeyView<'_, Meta> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.len().hash(state);
         self.component_ids()
@@ -296,6 +353,56 @@ impl<Meta> Equivalent<ArchetypesItem> for ArchetypeKey<Meta> {
     }
 }
 
+impl<Meta> Equivalent<ArchetypesItem> for ArchetypeKeyView<'_, Meta> {
+    #[inline]
+    fn equivalent(&self, item: &ArchetypesItem) -> bool {
+        item.as_key().as_view().eq(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ErasedArchetypeCow<'a, Meta> {
+    Borrowed(ErasedArchetypeView<'a, Meta>),
+    Owned(ErasedArchetype<Meta>),
+}
+
+impl<Meta> ErasedArchetypeCow<'_, Meta> {
+    #[inline]
+    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
+        match *self {
+            Self::Borrowed(archetype) => archetype,
+            Self::Owned(ref archetype) => archetype.as_view(),
+        }
+    }
+}
+
+impl<Meta> ErasedArchetypeCow<'_, Meta>
+where
+    Meta: Clone,
+{
+    #[inline]
+    pub fn into_owned(self) -> ErasedArchetype<Meta> {
+        match self {
+            Self::Borrowed(archetype) => archetype.into(),
+            Self::Owned(archetype) => archetype,
+        }
+    }
+}
+
+impl<'a, Meta> From<ErasedArchetypeView<'a, Meta>> for ErasedArchetypeCow<'a, Meta> {
+    #[inline]
+    fn from(archetype: ErasedArchetypeView<'a, Meta>) -> Self {
+        Self::Borrowed(archetype)
+    }
+}
+
+impl<Meta> From<ErasedArchetype<Meta>> for ErasedArchetypeCow<'_, Meta> {
+    #[inline]
+    fn from(archetype: ErasedArchetype<Meta>) -> Self {
+        Self::Owned(archetype)
+    }
+}
+
 type Archetypes = IndexSet<ArchetypesItem>;
 type Graph = DiGraph<(), ComponentId, u32>;
 
@@ -348,7 +455,7 @@ impl ArchetypeRegistry {
     pub fn register_archetype<'a, M>(
         &mut self,
         components: &ComponentRegistryView<M, impl ?Sized>,
-        archetype: impl Into<Cow<'a, ErasedArchetype<ErasedDropMeta>>>,
+        archetype: impl Into<ErasedArchetypeCow<'a, ErasedDropMeta>>,
     ) -> ArchetypeId
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -362,22 +469,22 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         components: &ComponentRegistryView<M, impl ?Sized>,
-        archetype: Cow<ErasedArchetype<ErasedDropMeta>>,
+        archetype: ErasedArchetypeCow<ErasedDropMeta>,
     ) -> ArchetypeId
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
     {
-        let archetype_ref = archetype.as_ref();
+        let archetype_view = archetype.as_view();
         assert!(
-            !archetype_ref.is_empty(),
+            !archetype_view.is_empty(),
             "archetype should contain at least one component",
         );
 
-        if let Some(archetype_id) = find_archetype(archetypes, archetype_ref) {
+        if let Some(archetype_id) = find_archetype(archetypes, archetype_view) {
             return archetype_id;
         }
 
-        let before: Vec<_> = Self::register_before(archetypes, graph, components, archetype_ref)
+        let before: Vec<_> = Self::register_before(archetypes, graph, components, archetype_view)
             .into_iter()
             .flatten()
             .collect();
@@ -397,7 +504,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         components: &ComponentRegistryView<M, impl ?Sized>,
-        archetype: &ErasedArchetype<impl Sized>,
+        archetype: ErasedArchetypeView<impl Sized>,
     ) -> Option<impl IntoIterator<Item = (ArchetypeId, ComponentId)>>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -406,8 +513,8 @@ impl ArchetypeRegistry {
         #[inline(never)]
         #[track_caller]
         fn difference_fail(
-            key: &ArchetypeKey<impl Sized>,
-            sub_key: &ArchetypeKey<impl Sized>,
+            key: ArchetypeKeyView<impl Sized>,
+            sub_key: ArchetypeKeyView<impl Sized>,
         ) -> ! {
             unreachable!("difference of {key:?} from {sub_key:?} should have exactly one element")
         }
@@ -417,12 +524,12 @@ impl ArchetypeRegistry {
             return None;
         }
 
-        let key = ArchetypeKey::from_ref(archetype);
-        let register_subset = |component_ids| {
+        let key = ArchetypeKeyView { archetype };
+        let register_subset = move |component_ids| {
             let archetype = ErasedArchetype::new(components, component_ids)
                 .expect("components should be unique & registered");
 
-            let sub_key = ArchetypeKey::from_ref(&archetype);
+            let sub_key = ArchetypeKey::from_ref(&archetype).as_view();
             let Some([component_id]) = key.difference(sub_key).collect_array() else {
                 difference_fail(key, sub_key)
             };
@@ -431,7 +538,7 @@ impl ArchetypeRegistry {
             (archetype_id, component_id)
         };
         archetype
-            .component_ids()
+            .into_component_ids()
             .combinations(len - 1)
             .map(register_subset)
             .into()
@@ -495,7 +602,7 @@ impl ArchetypeRegistry {
         I: IntoIterator<Item = ComponentId>,
     {
         let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
-        let archetype_id = self.archetype_id(&archetype);
+        let archetype_id = self.archetype_id(archetype.as_view());
         Ok(archetype_id)
     }
 
@@ -509,12 +616,12 @@ impl ArchetypeRegistry {
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::<()>::of::<B, _, T>(components)?;
-        let archetype_id = self.archetype_id(&archetype);
+        let archetype_id = self.archetype_id(archetype.as_view());
         Ok(archetype_id)
     }
 
     #[inline]
-    pub fn archetype_id(&self, archetype: &ErasedArchetype<impl Sized>) -> Option<ArchetypeId> {
+    pub fn archetype_id(&self, archetype: ErasedArchetypeView<impl Sized>) -> Option<ArchetypeId> {
         let Self { archetypes, .. } = self;
         find_archetype(archetypes, archetype)
     }
@@ -596,7 +703,7 @@ impl ArchetypeRegistry {
         I: IntoIterator<Item = ComponentId>,
     {
         let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
-        let archetypes = self.compatible_archetypes(&archetype);
+        let archetypes = self.compatible_archetypes(archetype.as_view());
         Ok(archetypes)
     }
 
@@ -610,14 +717,14 @@ impl ArchetypeRegistry {
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::<()>::of::<B, _, T>(components)?;
-        let archetypes = self.compatible_archetypes(&archetype);
+        let archetypes = self.compatible_archetypes(archetype.as_view());
         Ok(archetypes)
     }
 
     #[inline]
     pub fn compatible_archetypes(
         &self,
-        archetype: &ErasedArchetype<impl Sized>,
+        archetype: ErasedArchetypeView<impl Sized>,
     ) -> CompatibleArchetypes<'_> {
         let Self { archetypes, graph } = self;
         CompatibleArchetypes::new(archetypes, graph, archetype)
@@ -633,7 +740,7 @@ impl ArchetypeRegistry {
         I: IntoIterator<Item = ComponentId>,
     {
         let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
-        let archetypes = self.compatible_archetypes_mut(&archetype);
+        let archetypes = self.compatible_archetypes_mut(archetype.as_view());
         Ok(archetypes)
     }
 
@@ -647,14 +754,14 @@ impl ArchetypeRegistry {
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::<()>::of::<B, _, T>(components)?;
-        let archetypes = self.compatible_archetypes_mut(&archetype);
+        let archetypes = self.compatible_archetypes_mut(archetype.as_view());
         Ok(archetypes)
     }
 
     #[inline]
     pub fn compatible_archetypes_mut(
         &mut self,
-        archetype: &ErasedArchetype<impl Sized>,
+        archetype: ErasedArchetypeView<impl Sized>,
     ) -> CompatibleArchetypesMut<'_> {
         let Self { archetypes, graph } = self;
         CompatibleArchetypesMut::new(archetypes, graph, archetype)
@@ -677,7 +784,10 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedDropMeta>> {
+    pub fn get(
+        &self,
+        entity: Entity,
+    ) -> Option<ErasedBundleRefs<'_, &ErasedArchetype<ErasedDropMeta>>> {
         let location = self.find_location(entity);
         let Ok(bundle) = self
             .get_at(entity, location)
@@ -690,7 +800,10 @@ impl ArchetypeRegistry {
         &self,
         entity: Entity,
         location: EntityLocation,
-    ) -> Result<Option<ErasedBundleRefs<'_, '_, ErasedDropMeta>>, InvalidEntityLocationError> {
+    ) -> Result<
+        Option<ErasedBundleRefs<'_, &ErasedArchetype<ErasedDropMeta>>>,
+        InvalidEntityLocationError,
+    > {
         self.check_location(entity, location)?;
         let EntityLocation::WithComponents(archetype_id) = location else {
             return Ok(None);
@@ -741,7 +854,7 @@ impl ArchetypeRegistry {
     pub fn get_mut(
         &mut self,
         entity: Entity,
-    ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedDropMeta>> {
+    ) -> Option<ErasedBundleMutRefs<'_, &ErasedArchetype<ErasedDropMeta>>> {
         let location = self.find_location(entity);
         let Ok(bundle) = self
             .get_mut_at(entity, location)
@@ -754,8 +867,10 @@ impl ArchetypeRegistry {
         &mut self,
         entity: Entity,
         location: EntityLocation,
-    ) -> Result<Option<ErasedBundleMutRefs<'_, '_, ErasedDropMeta>>, InvalidEntityLocationError>
-    {
+    ) -> Result<
+        Option<ErasedBundleMutRefs<'_, &ErasedArchetype<ErasedDropMeta>>>,
+        InvalidEntityLocationError,
+    > {
         self.check_location(entity, location)?;
         let EntityLocation::WithComponents(archetype_id) = location else {
             return Ok(None);
@@ -934,7 +1049,7 @@ impl ArchetypeRegistry {
             components_view,
             entity,
             location,
-            &components_to_insert,
+            components_to_insert.as_view(),
         );
         let (old_archetype, new_archetype) = match result {
             Ok(archetypes) => archetypes,
@@ -1065,7 +1180,7 @@ impl ArchetypeRegistry {
             components_view,
             entity,
             location,
-            &components_to_insert,
+            components_to_insert.as_view(),
         );
         let (old_archetype, new_archetype) = match result {
             Ok(archetypes) => archetypes,
@@ -1098,8 +1213,8 @@ impl ArchetypeRegistry {
         &'me mut self,
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
-        components_to_remove: &'me ErasedArchetype<ErasedDropMeta>,
-    ) -> Result<Option<ErasedBorrowedBundle<'me, ErasedDropMeta>>, MissingComponentError>
+        components_to_remove: ErasedArchetypeView<'me, ErasedDropMeta>,
+    ) -> Result<Option<ErasedBorrowedViewBundle<'me, ErasedDropMeta>>, MissingComponentError>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
     {
@@ -1115,11 +1230,11 @@ impl ArchetypeRegistry {
         &'me mut self,
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
-        components_to_remove: &'me ErasedArchetype<ErasedDropMeta>,
+        components_to_remove: ErasedArchetypeView<'me, ErasedDropMeta>,
         location: EntityLocation,
     ) -> Result<
         (
-            Option<ErasedBorrowedBundle<'me, ErasedDropMeta>>,
+            Option<ErasedBorrowedViewBundle<'me, ErasedDropMeta>>,
             EntityLocation,
         ),
         RemoveExactAtError,
@@ -1142,7 +1257,7 @@ impl ArchetypeRegistry {
 
         let Some(new_archetype) = new_archetype else {
             let value = Self::remove_from_archetype(archetypes, old_archetype, entity);
-            return Ok((Some(value), EntityLocation::WithoutComponents));
+            return Ok((Some(value.into()), EntityLocation::WithoutComponents));
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
@@ -1198,7 +1313,7 @@ impl ArchetypeRegistry {
             components,
             entity,
             location,
-            &components_to_remove,
+            components_to_remove.as_view(),
         )?;
         let Some((old_archetype, new_archetype)) = remove_archetypes else {
             return Ok((None, EntityLocation::WithoutComponents));
@@ -1231,7 +1346,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
-        components_to_remove: &ErasedArchetype<impl Sized>,
+        components_to_remove: ErasedArchetypeView<impl Sized>,
     ) where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
     {
@@ -1246,7 +1361,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
-        components_to_remove: &ErasedArchetype<impl Sized>,
+        components_to_remove: ErasedArchetypeView<impl Sized>,
         location: EntityLocation,
     ) -> Result<EntityLocation, InvalidEntityLocationError>
     where
@@ -1310,6 +1425,7 @@ impl ArchetypeRegistry {
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_remove = ErasedArchetype::<()>::register::<B, M, T>(components)?;
+        let components_to_remove = components_to_remove.as_view();
 
         let Self { archetypes, graph } = self;
         let components = &components.as_view();
@@ -1319,7 +1435,7 @@ impl ArchetypeRegistry {
             components,
             entity,
             location,
-            &components_to_remove,
+            components_to_remove,
         )?;
         let Some((old_archetype, new_archetype)) = remove_archetypes else {
             return Ok(EntityLocation::WithoutComponents);
@@ -1332,7 +1448,7 @@ impl ArchetypeRegistry {
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
-            .destroy(&components_to_remove)
+            .destroy(components_to_remove)
             .expect("all the bundle components should be present in the old archetype");
         Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
 
@@ -1469,7 +1585,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
         location: EntityLocation,
-        components_to_insert: &ErasedArchetype<ErasedDropMeta>,
+        components_to_insert: ErasedArchetypeView<ErasedDropMeta>,
     ) -> Result<(Option<ArchetypeId>, ArchetypeId), InsertExactAtErrorKind>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -1501,7 +1617,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
         location: EntityLocation,
-        components_to_insert: &ErasedArchetype<ErasedDropMeta>,
+        components_to_insert: ErasedArchetypeView<ErasedDropMeta>,
     ) -> Result<(Option<ArchetypeId>, ArchetypeId), InvalidEntityLocationError>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -1526,7 +1642,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
         location: EntityLocation,
-        components_to_remove: &ErasedArchetype<impl Sized>,
+        components_to_remove: ErasedArchetypeView<impl Sized>,
     ) -> Result<Option<(ArchetypeId, Option<ArchetypeId>)>, RemoveExactAtError>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -1558,7 +1674,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistryView<M, impl ?Sized>,
         entity: Entity,
         location: EntityLocation,
-        components_to_remove: &ErasedArchetype<impl Sized>,
+        components_to_remove: ErasedArchetypeView<impl Sized>,
     ) -> Result<Option<(ArchetypeId, Option<ArchetypeId>)>, InvalidEntityLocationError>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -1584,7 +1700,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         components: &ComponentRegistryView<M, impl ?Sized>,
         start: Option<ArchetypeId>,
-        with_components: &ErasedArchetype<ErasedDropMeta>,
+        with_components: ErasedArchetypeView<ErasedDropMeta>,
     ) -> ArchetypeId
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
@@ -1592,8 +1708,7 @@ impl ArchetypeRegistry {
         let Some(start) = start else {
             return Self::register(archetypes, graph, components, with_components.into());
         };
-        if with_components.len() == 1
-            && let Some(component_id) = with_components.component_ids().next()
+        if let Some([component_id]) = with_components.component_ids().collect_array()
             && let Some(archetype_id) =
                 Self::find_archetype_without_component(graph, start, component_id)
         {
@@ -1623,13 +1738,12 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         components: &ComponentRegistryView<M, impl ?Sized>,
         start: ArchetypeId,
-        without_components: &ErasedArchetype<impl Sized>,
+        without_components: ErasedArchetypeView<impl Sized>,
     ) -> Option<ArchetypeId>
     where
         M: AsRef<FieldDescriptor> + WithErasedDrop,
     {
-        if without_components.len() == 1
-            && let Some(component_id) = without_components.component_ids().next()
+        if let Some([component_id]) = without_components.component_ids().collect_array()
             && let Some(archetype_id) =
                 Self::find_archetype_with_component(graph, start, component_id)
         {
@@ -2247,7 +2361,7 @@ impl<'a> CompatibleArchetypes<'a> {
     fn new(
         archetypes: &'a Archetypes,
         graph: &'a Graph,
-        archetype: &ErasedArchetype<impl Sized>,
+        archetype: ErasedArchetypeView<impl Sized>,
     ) -> Self {
         let archetypes_after = find_archetype(archetypes, archetype)
             .and_then(|start| ArchetypesAfter::new(archetypes, graph, start, false));
@@ -2289,7 +2403,7 @@ impl<'a> CompatibleArchetypesMut<'a> {
     fn new(
         archetypes: &'a mut Archetypes,
         graph: &'a Graph,
-        archetype: &ErasedArchetype<impl Sized>,
+        archetype: ErasedArchetypeView<impl Sized>,
     ) -> Self {
         let archetypes_after = find_archetype(archetypes, archetype)
             .and_then(|start| ArchetypesAfterMut::new(archetypes, graph, start, false));
@@ -2344,7 +2458,7 @@ where
     ) -> Result<Self, ArchetypeError> {
         let archetype = ErasedArchetype::<()>::of::<B, M, T>(&components)?;
         let me = Self {
-            archetypes: CompatibleArchetypes::new(archetypes, graph, &archetype),
+            archetypes: CompatibleArchetypes::new(archetypes, graph, archetype.as_view()),
             components,
             phantom: PhantomData,
         };
@@ -2573,7 +2687,7 @@ where
     ) -> Result<Self, ArchetypeError> {
         let archetype = ErasedArchetype::<()>::of::<B, M, T>(&components)?;
         let me = Self {
-            archetypes: CompatibleArchetypesMut::new(archetypes, graph, &archetype),
+            archetypes: CompatibleArchetypesMut::new(archetypes, graph, archetype.as_view()),
             components,
             phantom: PhantomData,
         };
@@ -2774,10 +2888,10 @@ fn archetype_id_trusted(id: u32) -> ArchetypeId {
 #[inline]
 fn find_archetype(
     archetypes: &Archetypes,
-    archetype: &ErasedArchetype<impl Sized>,
+    archetype: ErasedArchetypeView<impl Sized>,
 ) -> Option<ArchetypeId> {
-    let key = ArchetypeKey::from_ref(archetype);
-    let index = archetypes.get_index_of(key)?;
+    let key = ArchetypeKeyView { archetype };
+    let index = archetypes.get_index_of(&key)?;
     Some(archetype_id_from_usize(index))
 }
 

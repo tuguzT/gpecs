@@ -3,7 +3,6 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
 };
-use core_alloc::borrow::Cow;
 
 use gpecs_component::{
     erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
@@ -481,37 +480,6 @@ where
     }
 }
 
-impl<Meta> From<ErasedArchetypeView<'_, Meta>> for Cow<'_, ErasedArchetype<Meta>>
-where
-    Meta: Clone,
-{
-    #[inline]
-    fn from(archetype: ErasedArchetypeView<'_, Meta>) -> Self {
-        let archetype = ErasedArchetype::from(archetype);
-        Self::Owned(archetype)
-    }
-}
-
-impl<'a, Meta> From<&'a ErasedArchetype<Meta>> for Cow<'a, ErasedArchetype<Meta>>
-where
-    Meta: Clone,
-{
-    #[inline]
-    fn from(archetype: &'a ErasedArchetype<Meta>) -> Self {
-        Self::Borrowed(archetype)
-    }
-}
-
-impl<Meta> From<ErasedArchetype<Meta>> for Cow<'_, ErasedArchetype<Meta>>
-where
-    Meta: Clone,
-{
-    #[inline]
-    fn from(archetype: ErasedArchetype<Meta>) -> Self {
-        Self::Owned(archetype)
-    }
-}
-
 impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
     type Item = ComponentInfo<&'a Meta>;
     type IntoIter = Iter<'a, Meta>;
@@ -539,11 +507,11 @@ impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = &'a Self;
+    type Output = ErasedArchetypeView<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        self
+        self.as_view()
     }
 }
 

@@ -359,6 +359,12 @@ where
     }
 
     #[inline]
+    pub fn slice_len(&self) -> usize {
+        let Self { len, .. } = *self;
+        len
+    }
+
+    #[inline]
     pub fn descriptors(&self) -> &D {
         let Self { ptrs, .. } = self;
         ptrs.descriptors()

@@ -8,8 +8,11 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter};
 
 use crate::{
-    archetype::erased::{ErasedArchetype, Iter, error::IncompatibleArchetypeError},
-    bundle::{Bundle, BundleNonNullPtrs, erased::ErasedBundleMutPtrs},
+    archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
+    bundle::{
+        Bundle, BundleNonNullPtrs,
+        erased::{ErasedArchetypeKind, ErasedBundleMutPtrs},
+    },
     component::{
         erased::ErasedComponentNonNullPtr,
         registry::{
@@ -18,21 +21,27 @@ use crate::{
         },
     },
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        field::{
+            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsOutput,
+            FieldDescriptorsOwned,
+        },
         traits::RawSoaContext,
     },
 };
 
-type Inner<'a, Meta> = ErasedSoaNonNullPtrs<&'a ErasedArchetype<Meta>, NonNull<MaybeUninit<u8>>>;
+type Inner<D> = ErasedSoaNonNullPtrs<D, NonNull<MaybeUninit<u8>>>;
 
 #[derive(Debug)]
-pub struct ErasedBundleNonNullPtrs<'a, Meta> {
-    inner: Inner<'a, Meta>,
+pub struct ErasedBundleNonNullPtrs<D>
+where
+    D: ?Sized,
+{
+    inner: Inner<D>,
 }
 
-impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta> {
+impl<D> ErasedBundleNonNullPtrs<D> {
     #[inline]
-    pub fn new(ptrs: ErasedBundleMutPtrs<'a, Meta>) -> Option<Self> {
+    pub fn new(ptrs: ErasedBundleMutPtrs<D>) -> Option<Self> {
         let ptrs = ptrs.into_inner();
         let inner = Inner::new(ptrs)?;
 
@@ -41,43 +50,19 @@ impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta> {
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<'a, Meta>) -> Self {
+    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D>) -> Self {
         let ptrs = ptrs.into_inner();
         let inner = unsafe { Inner::new_unchecked(ptrs) };
         unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
-    pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<D>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> NonNull<[MaybeUninit<u8>]> {
-        let Self { inner } = self;
-        inner.as_buffer()
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        let Self { inner } = self;
-        inner.capacity()
-    }
-
-    #[inline]
-    pub fn offset(&self) -> usize {
-        let Self { inner } = self;
-        inner.offset()
-    }
-
-    #[inline]
-    pub fn archetype(&self) -> &'a ErasedArchetype<Meta> {
-        let Self { inner } = self;
-        inner.descriptors()
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> Inner<'a, Meta> {
+    pub fn into_inner(self) -> Inner<D> {
         let Self { inner } = self;
         inner
     }
@@ -92,177 +77,20 @@ impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta> {
     }
 }
 
-impl<Meta> ErasedBundleNonNullPtrs<'_, Meta>
+impl<D> ErasedBundleNonNullPtrs<D>
 where
-    Meta: AsRef<FieldDescriptor>,
+    D: ?Sized,
 {
     #[inline]
-    pub fn downcast<B, T>(
-        self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<BundleNonNullPtrs<B>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let ptrs = ErasedBundleMutPtrs::from(self).downcast::<B, T>(components)?;
-        let ptrs = unsafe { B::CONTEXT.ptrs_to_nonnull(ptrs) };
-        Ok(ptrs)
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from(&self, origin: &Self) -> isize {
+    pub unsafe fn as_inner(&self) -> &Inner<D> {
         let Self { inner } = self;
-
-        let origin = &origin.into_inner();
-        unsafe { inner.offset_from(origin) }
+        inner
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleNonNullPtrsIter<'_, Meta> {
+    pub unsafe fn as_mut_inner(&mut self) -> &mut Inner<D> {
         let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullPtr> {
-        let index = self.archetype().get_index_of(component_id)?;
-        self.iter().nth(index)
-    }
-}
-
-impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta>
-where
-    Meta: AsRef<FieldDescriptor> + 'static,
-{
-    #[inline]
-    pub fn dangling(archetype: &'a ErasedArchetype<Meta>) -> Self {
-        let inner = Inner::dangling(archetype)
-            .expect("alignment of bytes should be sufficient for any component");
-        unsafe { Self::from_inner(inner) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn swap(&mut self, with: &mut Self) {
-        let Self { inner } = self;
-
-        let with = &mut with.into_inner();
-        unsafe { inner.swap(with) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn copy_from_forward(&mut self, src: &Self, count: usize) {
-        let Self { inner } = self;
-
-        let src = &src.into_inner();
-        unsafe { inner.copy_from_forward(src, count) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn copy_from_backward(&mut self, src: &Self, count: usize) {
-        let Self { inner } = self;
-
-        let src = &src.into_inner();
-        unsafe { inner.copy_from_backward(src, count) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn copy_from_nonoverlapping(&mut self, src: &Self, count: usize) {
-        let Self { inner } = self;
-
-        let src = &src.into_inner();
-        unsafe { inner.copy_from_nonoverlapping(src, count) }
-    }
-}
-
-impl<Meta> Clone for ErasedBundleNonNullPtrs<'_, Meta> {
-    #[inline]
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<Meta> Copy for ErasedBundleNonNullPtrs<'_, Meta> {}
-
-impl<'a, Meta> IntoIterator for &'a ErasedBundleNonNullPtrs<'_, Meta>
-where
-    Meta: AsRef<FieldDescriptor>,
-{
-    type Item = ErasedComponentNonNullPtr;
-    type IntoIter = ErasedBundleNonNullPtrsIter<'a, Meta>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<'a, Meta> IntoIterator for ErasedBundleNonNullPtrs<'a, Meta>
-where
-    Meta: AsRef<FieldDescriptor>,
-{
-    type Item = ErasedComponentNonNullPtr;
-    type IntoIter = ErasedBundleNonNullPtrsIter<'a, Meta>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let Self { inner } = self;
-
-        let inner = inner.into_iter();
-        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
-    }
-}
-
-impl<'a, Meta> From<ErasedBundleNonNullPtrs<'a, Meta>> for ErasedBundleMutPtrs<'a, Meta> {
-    #[inline]
-    fn from(ptrs: ErasedBundleNonNullPtrs<'a, Meta>) -> Self {
-        let inner = ptrs.into_inner();
-        let inner = inner.into();
-        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
-    }
-}
-
-impl<'a, Meta> FieldDescriptors<'a> for ErasedBundleNonNullPtrs<'_, Meta>
-where
-    Meta: AsRef<FieldDescriptor> + 'a,
-{
-    type Output = &'a ErasedArchetype<Meta>;
-
-    #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
-        self.archetype()
-    }
-}
-
-impl<Meta> CovariantFieldDescriptors for ErasedBundleNonNullPtrs<'_, Meta>
-where
-    Meta: AsRef<FieldDescriptor> + 'static,
-{
-    #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        from
-    }
-}
-
-type InnerIter<'a, Meta> = ErasedSoaNonNullPtrsIter<Iter<'a, Meta>, NonNull<MaybeUninit<u8>>>;
-
-pub struct ErasedBundleNonNullPtrsIter<'a, Meta> {
-    inner: InnerIter<'a, Meta>,
-}
-
-impl<'a, Meta> ErasedBundleNonNullPtrsIter<'a, Meta> {
-    #[inline]
-    pub(super) unsafe fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
-        Self { inner }
+        inner
     }
 
     #[inline]
@@ -284,15 +112,253 @@ impl<'a, Meta> ErasedBundleNonNullPtrsIter<'a, Meta> {
     }
 
     #[inline]
-    pub fn descriptors(&self) -> Iter<'a, Meta> {
-        let Self { inner, .. } = self;
-        inner.descriptors().clone()
+    pub fn descriptors(&self) -> &D {
+        let Self { inner } = self;
+        inner.descriptors()
     }
 }
 
-impl<Meta> Debug for ErasedBundleNonNullPtrsIter<'_, Meta>
+impl<D> ErasedBundleNonNullPtrs<D>
 where
-    Meta: AsRef<FieldDescriptor>,
+    D: ErasedArchetypeKind,
+{
+    #[inline]
+    pub fn dangling(archetype: D) -> Self {
+        let inner = Inner::dangling(archetype)
+            .expect("alignment of bytes should be sufficient for any component");
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn downcast<B, T>(
+        self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundleNonNullPtrs<B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let ptrs = ErasedBundleMutPtrs::from(self).downcast::<B, T>(components)?;
+        let ptrs = unsafe { B::CONTEXT.ptrs_to_nonnull(ptrs) };
+        Ok(ptrs)
+    }
+}
+
+impl<D> ErasedBundleNonNullPtrs<D>
+where
+    D: ErasedArchetypeKind + ?Sized,
+{
+    #[inline]
+    pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
+        self.field_descriptors()
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from<N>(&self, origin: &ErasedBundleNonNullPtrs<N>) -> isize
+    where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let origin = unsafe { origin.as_inner() };
+        unsafe { inner.offset_from(origin) }
+    }
+
+    #[inline]
+    pub fn iter(&self) -> ErasedBundleNonNullPtrsIter<Iter<'_, D::Meta>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullPtr> {
+        let index = self.archetype().get_index_of(component_id)?;
+        self.iter().nth(index)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn swap<N>(&mut self, with: &mut ErasedBundleNonNullPtrs<N>)
+    where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let with = unsafe { with.as_mut_inner() };
+        unsafe { inner.swap(with) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn copy_from_forward<N>(&mut self, src: &ErasedBundleNonNullPtrs<N>, count: usize)
+    where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let src = unsafe { src.as_inner() };
+        unsafe { inner.copy_from_forward(src, count) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn copy_from_backward<N>(&mut self, src: &ErasedBundleNonNullPtrs<N>, count: usize)
+    where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let src = unsafe { src.as_inner() };
+        unsafe { inner.copy_from_backward(src, count) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn copy_from_nonoverlapping<N>(
+        &mut self,
+        src: &ErasedBundleNonNullPtrs<N>,
+        count: usize,
+    ) where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let src = unsafe { src.as_inner() };
+        unsafe { inner.copy_from_nonoverlapping(src, count) }
+    }
+}
+
+impl<D> Clone for ErasedBundleNonNullPtrs<D>
+where
+    D: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { inner } = self;
+
+        let inner = inner.clone();
+        unsafe { Self::from_inner(inner) }
+    }
+}
+
+impl<D> Copy for ErasedBundleNonNullPtrs<D> where D: Copy {}
+
+impl<'a, D> IntoIterator for &'a ErasedBundleNonNullPtrs<D>
+where
+    D: ErasedArchetypeKind + ?Sized,
+{
+    type Item = ErasedComponentNonNullPtr;
+    type IntoIter = ErasedBundleNonNullPtrsIter<Iter<'a, D::Meta>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<D> IntoIterator for ErasedBundleNonNullPtrs<D>
+where
+    D: IntoIterator<Item: AsRef<FieldDescriptor>, IntoIter: FieldDescriptorsOwned>,
+    for<'a> FieldDescriptorsItem<'a, D::IntoIter>: Into<ComponentId>,
+{
+    type Item = ErasedComponentNonNullPtr;
+    type IntoIter = ErasedBundleNonNullPtrsIter<D::IntoIter>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { inner } = self;
+
+        let inner = inner.into_iter();
+        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
+    }
+}
+
+impl<D> From<ErasedBundleNonNullPtrs<D>> for ErasedBundleMutPtrs<D> {
+    #[inline]
+    fn from(ptrs: ErasedBundleNonNullPtrs<D>) -> Self {
+        let inner = ptrs.into_inner();
+        let inner = inner.into();
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
+    }
+}
+
+impl<'a, D> FieldDescriptors<'a> for ErasedBundleNonNullPtrs<D>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = D::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        let Self { inner } = self;
+        inner.field_descriptors()
+    }
+}
+
+impl<D> CovariantFieldDescriptors for ErasedBundleNonNullPtrs<D>
+where
+    D: CovariantFieldDescriptors + ?Sized,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
+        D::upcast_field_descriptors(from)
+    }
+}
+
+type InnerIter<D> = ErasedSoaNonNullPtrsIter<D, NonNull<MaybeUninit<u8>>>;
+
+pub struct ErasedBundleNonNullPtrsIter<D>
+where
+    D: ?Sized,
+{
+    inner: InnerIter<D>,
+}
+
+impl<D> ErasedBundleNonNullPtrsIter<D> {
+    #[inline]
+    pub(super) unsafe fn from_inner(inner: InnerIter<D>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<D> ErasedBundleNonNullPtrsIter<D>
+where
+    D: ?Sized,
+{
+    #[inline]
+    pub fn as_buffer(&self) -> NonNull<[MaybeUninit<u8>]> {
+        let Self { inner } = self;
+        inner.as_buffer()
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { inner } = self;
+        inner.capacity()
+    }
+
+    #[inline]
+    pub fn offset(&self) -> usize {
+        let Self { inner } = self;
+        inner.offset()
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { inner, .. } = self;
+        inner.descriptors()
+    }
+}
+
+impl<D> Debug for ErasedBundleNonNullPtrsIter<D>
+where
+    D: Clone + Iterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned,
+    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -301,7 +367,10 @@ where
     }
 }
 
-impl<Meta> Clone for ErasedBundleNonNullPtrsIter<'_, Meta> {
+impl<D> Clone for ErasedBundleNonNullPtrsIter<D>
+where
+    D: Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
         let Self { inner } = self;
@@ -311,9 +380,10 @@ impl<Meta> Clone for ErasedBundleNonNullPtrsIter<'_, Meta> {
     }
 }
 
-impl<Meta> Iterator for ErasedBundleNonNullPtrsIter<'_, Meta>
+impl<D> Iterator for ErasedBundleNonNullPtrsIter<D>
 where
-    Meta: AsRef<FieldDescriptor>,
+    D: Iterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
+    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
 {
     type Item = ErasedComponentNonNullPtr;
 
@@ -321,7 +391,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
 
-        let component_id = inner.descriptors().clone().next()?.into();
+        let component_id = inner.field_descriptors().into_iter().next()?.into();
         let fields = inner.next()?;
         let item = unsafe { ErasedComponentNonNullPtr::from_parts(component_id, fields) };
         Some(item)
@@ -334,9 +404,10 @@ where
     }
 }
 
-impl<Meta> ExactSizeIterator for ErasedBundleNonNullPtrsIter<'_, Meta>
+impl<D> ExactSizeIterator for ErasedBundleNonNullPtrsIter<D>
 where
-    Meta: AsRef<FieldDescriptor>,
+    D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
+    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -345,29 +416,34 @@ where
     }
 }
 
-impl<Meta> FusedIterator for ErasedBundleNonNullPtrsIter<'_, Meta> where Meta: AsRef<FieldDescriptor>
-{}
-
-impl<'a, Meta> FieldDescriptors<'a> for ErasedBundleNonNullPtrsIter<'_, Meta>
+impl<D> FusedIterator for ErasedBundleNonNullPtrsIter<D>
 where
-    Meta: AsRef<FieldDescriptor> + 'a,
+    D: FusedIterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned + ?Sized,
+    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
 {
-    type Output = Iter<'a, Meta>;
+}
+
+impl<'a, D> FieldDescriptors<'a> for ErasedBundleNonNullPtrsIter<D>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = D::Output;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        self.descriptors()
+        let Self { inner } = self;
+        inner.field_descriptors()
     }
 }
 
-impl<Meta> CovariantFieldDescriptors for ErasedBundleNonNullPtrsIter<'_, Meta>
+impl<D> CovariantFieldDescriptors for ErasedBundleNonNullPtrsIter<D>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    D: CovariantFieldDescriptors + ?Sized,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
         from: FieldDescriptorsOutput<'long, Self>,
     ) -> FieldDescriptorsOutput<'short, Self> {
-        from
+        D::upcast_field_descriptors(from)
     }
 }

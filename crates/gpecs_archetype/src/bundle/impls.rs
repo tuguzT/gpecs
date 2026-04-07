@@ -63,7 +63,7 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or_else(NotRegisteredError::of::<T>)?;
 
-        let ptr = ptr.downcast::<T, _>(&components.as_view())?.cast();
+        let ptr = ptr.downcast::<T, U>(components)?.cast();
         Ok(ptr)
     }
 
@@ -85,7 +85,7 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or_else(NotRegisteredError::of::<T>)?;
 
-        let ptr = ptr.downcast::<T, _>(&components.as_view())?.cast();
+        let ptr = ptr.downcast::<T, U>(components)?.cast();
         Ok(ptr)
     }
 
@@ -108,7 +108,7 @@ where
             .find(|component| component.component_id() == component_id)
             .ok_or_else(NotRegisteredError::of::<T>)?;
 
-        let component = component.downcast::<T, _>(&components.as_view())?;
+        let component = component.downcast::<T, U>(components)?;
         Ok(component.into())
     }
 }
@@ -172,7 +172,7 @@ macro_rules! bundle_tuple_impl {
                 for ptr in iter {
                     $(
                         if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
-                            ptrs.$indices = Some(ptr.downcast(&components.as_view())?);
+                            ptrs.$indices = Some(ptr.downcast(components)?);
                             continue;
                         }
                     )*
@@ -199,7 +199,7 @@ macro_rules! bundle_tuple_impl {
                 for ptr in iter {
                     $(
                         if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
-                            ptrs.$indices = Some(ptr.downcast(&components.as_view())?);
+                            ptrs.$indices = Some(ptr.downcast(components)?);
                             continue;
                         }
                     )*
@@ -227,7 +227,7 @@ macro_rules! bundle_tuple_impl {
                 for field in iter {
                     $(
                         if fields.$indices.is_none() && field.component_id() == component_ids[$indices] {
-                            fields.$indices = Some(field.downcast(&components.as_view())?);
+                            fields.$indices = Some(field.downcast(components)?);
                             continue;
                         }
                     )*

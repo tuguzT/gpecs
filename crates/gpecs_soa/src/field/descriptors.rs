@@ -73,6 +73,10 @@ pub type FieldDescriptorsOutput<'a, T, U = T> = <T as FieldDescriptors<'a, U>>::
 pub type FieldDescriptorsIter<'a, T, U = T> =
     <FieldDescriptorsOutput<'a, T, U> as IntoIterator>::IntoIter;
 
+/// Alias for an iterator item of the [field descriptors](FieldDescriptors::Output) of some type `T`.
+pub type FieldDescriptorsItem<'a, T, U = T> =
+    <FieldDescriptorsOutput<'a, T, U> as IntoIterator>::Item;
+
 /// Used to retrieve a non-owning collection of field descriptors.
 pub trait FieldDescriptors<'a, T = Self>
 where

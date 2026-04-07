@@ -1,4 +1,5 @@
 pub use self::{
+    archetype::ErasedArchetypeKind,
     mut_ptrs::{ErasedBundleMutPtrs, ErasedBundleMutPtrsIter},
     mut_refs::{ErasedBundleMutRefs, ErasedBundleMutRefsIter},
     mut_slice_ptrs::{ErasedBundleMutSlicePtrs, ErasedBundleMutSlicePtrsIter},
@@ -9,14 +10,16 @@ pub use self::{
     slice_ptrs::{ErasedBundleSlicePtrs, ErasedBundleSlicePtrsIter},
     slices::{ErasedBundleSlices, ErasedBundleSlicesIter},
     value::{
-        ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBorrowedBundleIntoIter, ErasedBundle,
-        ErasedBundleIntoIter, ErasedBundleIntoIterKind, ErasedBundleKind, FromErasedComponent,
-        RemovePair, ShuffledBundle,
+        ErasedBorrowedBundle, ErasedBorrowedBundleIntoIter, ErasedBorrowedViewBundle,
+        ErasedBorrowedViewBundleIntoIter, ErasedBundle, ErasedBundleIntoIter,
+        ErasedBundleIntoIterKind, ErasedBundleKind, FromErasedComponent, RemovePair,
+        ShuffledBundle,
     },
 };
 
 pub mod error;
 
+mod archetype;
 mod mut_ptrs;
 mod mut_refs;
 mod mut_slice_ptrs;

@@ -1,4 +1,8 @@
-use std::{iter::FusedIterator, mem::MaybeUninit};
+use std::{
+    fmt::{self, Debug},
+    iter::FusedIterator,
+    mem::MaybeUninit,
+};
 
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaMutSlices, ErasedSoaMutSlicesIter};
 
@@ -20,8 +24,8 @@ use crate::{
     },
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsOutput,
-            FieldDescriptorsOwned,
+            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsIter,
+            FieldDescriptorsOutput, FieldDescriptorsOwned,
         },
         traits::SoaContext,
     },
@@ -302,29 +306,47 @@ where
     }
 }
 
-// TODO: fix incorrect impl (should preserve buffer offsets state)
-// impl<D> Debug for ErasedBundleMutSlicesIter<'_, D>
-// where
-//     D: Clone + Iterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned,
-//     for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
-// {
-//     #[inline]
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         let Self { inner } = self;
+impl<'a, D> ErasedBundleMutSlicesIter<'_, D>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
+    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+{
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleMutSlicesIter<'a, FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
 
-//         let inner = {
-//             let descriptors = inner.descriptors().clone();
-//             let buffer = inner.as_buffer();
-//             let capacity = inner.capacity();
-//             let offset = inner.offset();
-//             let len = inner.slice_len();
-//             unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
-//         };
+        let inner = inner.iter();
+        unsafe { ErasedBundleMutSlicesIter::from_inner(inner) }
+    }
+}
 
-//         let entries = unsafe { ErasedBundleSlicesIter::from_inner(inner.into_iter()) };
-//         f.debug_set().entries(entries).finish()
-//     }
-// }
+impl<'a, D> IntoIterator for &'a ErasedBundleMutSlicesIter<'_, D>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
+    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+{
+    type Item = ErasedComponentMutSlice<'a>;
+    type IntoIter = ErasedBundleMutSlicesIter<'a, FieldDescriptorsIter<'a, D>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<D> Debug for ErasedBundleMutSlicesIter<'_, D>
+where
+    D: FieldDescriptorsOwned + ?Sized,
+    for<'a> FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
+    for<'a, 'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_set().entries(self).finish()
+    }
+}
 
 impl<'a, D> Iterator for ErasedBundleMutSlicesIter<'a, D>
 where

@@ -29,8 +29,8 @@ use crate::{
     },
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsOutput,
-            FieldDescriptorsOwned,
+            FieldDescriptor, FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsIter,
+            FieldDescriptorsOutput, FieldDescriptorsOwned,
         },
         traits::RawSoaContext,
     },
@@ -358,15 +358,45 @@ where
     }
 }
 
+impl<'a, D> ErasedBundleMutSlicePtrsIter<D>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
+    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+{
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleMutSlicePtrsIter<FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleMutSlicePtrsIter::from_inner(inner) }
+    }
+}
+
+impl<'a, D> IntoIterator for &'a ErasedBundleMutSlicePtrsIter<D>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
+    for<'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
+{
+    type Item = ErasedComponentMutSlicePtr;
+    type IntoIter = ErasedBundleMutSlicePtrsIter<FieldDescriptorsIter<'a, D>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<D> Debug for ErasedBundleMutSlicePtrsIter<D>
 where
-    D: Clone + Iterator<Item: AsRef<FieldDescriptor>> + FieldDescriptorsOwned,
-    for<'a> FieldDescriptorsItem<'a, D>: Into<ComponentId>,
+    D: FieldDescriptorsOwned + ?Sized,
+    for<'a> FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
+    for<'a, 'b> FieldDescriptorsItem<'b, FieldDescriptorsIter<'a, D>>: Into<ComponentId>,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone();
-        f.debug_set().entries(entries).finish()
+        f.debug_set().entries(self).finish()
     }
 }
 

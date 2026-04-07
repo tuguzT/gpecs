@@ -402,8 +402,7 @@ where
     pub unsafe fn write<T, E>(&'a mut self, value: ErasedSoa<T, E, P::Ptrs>)
     where
         T: AlignedStorage<Item = U>,
-        E: FieldDescriptorsOwned,
-        for<'b, 'c> FieldDescriptorsOutput<'b, E>: FieldDescriptors<'c>,
+        E: FieldDescriptorsOwned<Output: FieldDescriptorsOwned>,
     {
         let src = value.as_ptrs();
         unsafe { self.copy_from_nonoverlapping(&src, 1) };

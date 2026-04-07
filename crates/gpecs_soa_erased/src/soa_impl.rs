@@ -16,8 +16,7 @@ use crate::{
 
 unsafe impl<T, D, P> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone> + ?Sized,
     P: SliceItemPtrs,
 {
     type Ptrs<'a> = ErasedSoaPtrs<FieldDescriptorsOutput<'a, D>, P::Const>;
@@ -227,8 +226,7 @@ where
 
 unsafe impl<T, D, P> RawSoa for ErasedSoa<T, D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone> + ?Sized,
     P: SliceItemPtrs,
 {
     type Context = ErasedSoaContext<D, P>;
@@ -240,8 +238,7 @@ unsafe impl<'a, T, D, P>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
-    D: CovariantFieldDescriptors,
-    for<'b, 'c> FieldDescriptorsOutput<'b, D>: FieldDescriptors<'c> + Clone,
+    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
@@ -258,10 +255,8 @@ unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorage,
-    D: CovariantFieldDescriptors,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    N: FieldDescriptorsOwned,
-    for<'a, 'b> FieldDescriptorsOutput<'a, N>: FieldDescriptors<'b>,
+    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
+    N: FieldDescriptorsOwned<Output: FieldDescriptorsOwned>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
@@ -298,8 +293,7 @@ where
 
 unsafe impl<T, D, P> AllocSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
     P: SliceItemPtrs,
 {
     #[inline]
@@ -315,8 +309,7 @@ where
 
 unsafe impl<'data, T, D, P> SoaContext<'data, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone> + ?Sized,
     P: SliceItemPtrs<Item: 'data>,
 {
     type Refs<'a> = ErasedSoaRefs<'data, FieldDescriptorsOutput<'a, D>, P::Const>;

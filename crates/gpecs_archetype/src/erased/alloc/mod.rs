@@ -1,6 +1,6 @@
 pub use self::{
     archetype::{ErasedArchetype, FromComponentInfo},
-    into_iter::ErasedArchetypeIntoIter,
+    into_iter::IntoIter,
     view_ext::ErasedArchetypeViewExt,
 };
 

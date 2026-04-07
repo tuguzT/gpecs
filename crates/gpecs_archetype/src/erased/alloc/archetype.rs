@@ -24,8 +24,8 @@ use gpecs_sparse::{
 use crate::{
     bundle::{Bundle, NewBundle},
     erased::{
-        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeView,
-        ErasedArchetypeViewExt, Iter,
+        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeView, ErasedArchetypeViewExt,
+        IntoIter, Iter,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, IncompatibleArchetypeExactError,
@@ -492,14 +492,14 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
 
 impl<Meta> IntoIterator for ErasedArchetype<Meta> {
     type Item = ComponentInfo<Meta>;
-    type IntoIter = ErasedArchetypeIntoIter<Meta>;
+    type IntoIter = IntoIter<Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { components } = self;
 
         let inner = components.into_iter();
-        ErasedArchetypeIntoIter::from_inner(inner)
+        IntoIter::from_inner(inner)
     }
 }
 

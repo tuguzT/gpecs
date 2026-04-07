@@ -17,11 +17,11 @@ use crate::erased::Iter;
 
 type Inner<Meta> = SparseIntoIter<u32, Identity<Meta>, Identity<Meta>>;
 
-pub struct ErasedArchetypeIntoIter<Meta> {
+pub struct IntoIter<Meta> {
     inner: Inner<Meta>,
 }
 
-impl<Meta> ErasedArchetypeIntoIter<Meta> {
+impl<Meta> IntoIter<Meta> {
     #[inline]
     pub(super) fn from_inner(inner: Inner<Meta>) -> Self {
         Self { inner }
@@ -37,7 +37,7 @@ impl<Meta> ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> Debug for ErasedArchetypeIntoIter<Meta>
+impl<Meta> Debug for IntoIter<Meta>
 where
     Meta: Debug,
 {
@@ -46,7 +46,7 @@ where
     }
 }
 
-impl<Meta> Clone for ErasedArchetypeIntoIter<Meta>
+impl<Meta> Clone for IntoIter<Meta>
 where
     Meta: Clone,
 {
@@ -57,7 +57,7 @@ where
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a ErasedArchetypeIntoIter<Meta> {
+impl<'a, Meta> IntoIterator for &'a IntoIter<Meta> {
     type Item = ComponentInfo<&'a Meta>;
     type IntoIter = Iter<'a, Meta>;
 
@@ -67,7 +67,7 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
+impl<Meta> Iterator for IntoIter<Meta> {
     type Item = ComponentInfo<Meta>;
 
     #[inline]
@@ -116,7 +116,7 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
+impl<Meta> DoubleEndedIterator for IntoIter<Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
@@ -130,7 +130,7 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> ExactSizeIterator for ErasedArchetypeIntoIter<Meta> {
+impl<Meta> ExactSizeIterator for IntoIter<Meta> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -138,9 +138,9 @@ impl<Meta> ExactSizeIterator for ErasedArchetypeIntoIter<Meta> {
     }
 }
 
-impl<Meta> FusedIterator for ErasedArchetypeIntoIter<Meta> {}
+impl<Meta> FusedIterator for IntoIter<Meta> {}
 
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeIntoIter<Meta>
+impl<'a, Meta> FieldDescriptors<'a> for IntoIter<Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'a,
 {

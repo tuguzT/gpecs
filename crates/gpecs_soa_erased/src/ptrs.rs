@@ -477,7 +477,7 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub(super) fn entries(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self {
             ref inner,
             buffer,
@@ -492,14 +492,27 @@ where
     }
 }
 
+impl<'a, D, P> IntoIterator for &'a ErasedSoaPtrsIter<D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: ConstSliceItemPtr,
+{
+    type Item = ErasedPtr<P>;
+    type IntoIter = ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<D, P> Debug for ErasedSoaPtrsIter<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: ConstSliceItemPtr + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.entries();
-        f.debug_list().entries(entries).finish()
+        f.debug_list().entries(self).finish()
     }
 }
 

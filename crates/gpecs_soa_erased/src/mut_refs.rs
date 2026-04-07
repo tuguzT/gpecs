@@ -328,11 +328,25 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub(super) fn entries(&'a self) -> ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
         let Self { ptrs, .. } = self;
 
-        let ptrs = ptrs.entries();
+        let ptrs = ptrs.iter();
         unsafe { ErasedSoaMutRefsIter::from_ptrs(ptrs) }
+    }
+}
+
+impl<'a, D, P> IntoIterator for &'a ErasedSoaMutRefsIter<'_, D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: MutSliceItemPtr,
+{
+    type Item = ErasedMutRef<'a, P>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -342,8 +356,7 @@ where
     P: MutSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.entries();
-        f.debug_list().entries(entries).finish()
+        f.debug_list().entries(self).finish()
     }
 }
 

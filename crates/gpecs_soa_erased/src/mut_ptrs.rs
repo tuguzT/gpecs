@@ -626,7 +626,7 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub(super) fn entries(&'a self) -> ErasedSoaMutPtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaMutPtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self {
             ref inner,
             buffer,
@@ -641,14 +641,27 @@ where
     }
 }
 
+impl<'a, D, P> IntoIterator for &'a ErasedSoaMutPtrsIter<D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: MutSliceItemPtr,
+{
+    type Item = ErasedMutPtr<P>;
+    type IntoIter = ErasedSoaMutPtrsIter<FieldDescriptorsIter<'a, D>, P>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<D, P> Debug for ErasedSoaMutPtrsIter<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: MutSliceItemPtr + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.entries();
-        f.debug_list().entries(entries).finish()
+        f.debug_list().entries(self).finish()
     }
 }
 

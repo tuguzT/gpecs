@@ -534,7 +534,7 @@ where
     T: AlignedStorage<Item: Debug>,
     D: FieldDescriptorsOwned + ?Sized,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
-    for<'a, 'b> FieldDescriptorsIter<'a, D>: FieldDescriptors<'b>,
+    for<'a> FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = &self.into_iter();

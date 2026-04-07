@@ -319,11 +319,25 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub(super) fn entries(&'a self) -> ErasedSoaSlicesIter<'a, FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaSlicesIter<'a, FieldDescriptorsIter<'a, D>, P> {
         let Self { ptrs, .. } = self;
 
-        let ptrs = ptrs.entries();
+        let ptrs = ptrs.iter();
         unsafe { ErasedSoaSlicesIter::from_ptrs(ptrs) }
+    }
+}
+
+impl<'a, D, P> IntoIterator for &'a ErasedSoaSlicesIter<'_, D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: ConstSliceItemPtr,
+{
+    type Item = ErasedSlice<'a, P>;
+    type IntoIter = ErasedSoaSlicesIter<'a, FieldDescriptorsIter<'a, D>, P>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -333,8 +347,7 @@ where
     P: ConstSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.entries();
-        f.debug_list().entries(entries).finish()
+        f.debug_list().entries(self).finish()
     }
 }
 

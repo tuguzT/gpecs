@@ -535,7 +535,7 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub(super) fn entries(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self {
             ref inner,
             buffer,
@@ -550,14 +550,27 @@ where
     }
 }
 
+impl<'a, D, P> IntoIterator for &'a ErasedSoaNonNullPtrsIter<D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr,
+{
+    type Item = ErasedNonNullPtr<P>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<D, P> Debug for ErasedSoaNonNullPtrsIter<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: NonNullSliceItemPtr + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.entries();
-        f.debug_list().entries(entries).finish()
+        f.debug_list().entries(self).finish()
     }
 }
 

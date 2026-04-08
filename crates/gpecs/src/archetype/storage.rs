@@ -121,8 +121,10 @@ impl FromErasedComponent for ErasedDropMeta {
     }
 }
 
+type Value = ErasedBundle<ErasedDropMeta>;
+
 pub struct ArchetypeStorage {
-    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<ErasedDropMeta>>,
+    sparse_set: EpochSparseSet<NoEpochEntity, Value>,
 }
 
 impl ArchetypeStorage {
@@ -489,7 +491,7 @@ impl ArchetypeStorage {
 
         sparse_set.swap_remove_into(entity.into(), |archetype, ptrs| {
             let Some(ptrs) = ptrs else { return false };
-            unsafe { archetype.ptrs_drop_in_place(ptrs) };
+            unsafe { RawSoaContext::<Value>::ptrs_drop_in_place(archetype, ptrs) };
             true
         })
     }

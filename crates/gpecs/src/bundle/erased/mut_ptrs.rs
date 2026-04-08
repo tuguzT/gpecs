@@ -285,7 +285,7 @@ where
     #[inline]
     pub unsafe fn write<T>(&mut self, value: ErasedBundleKind<T>)
     where
-        T: ErasedArchetypeKind<Meta = D::Meta>,
+        T: ErasedArchetypeKind<Meta: WithErasedDrop>,
     {
         let Self { inner } = self;
 

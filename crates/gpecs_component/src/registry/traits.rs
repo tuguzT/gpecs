@@ -1,9 +1,37 @@
 use core::{
     alloc::Layout,
     any::{self, TypeId},
+    borrow::Borrow,
 };
 
-use crate::{Component, registry::ComponentId};
+use crate::{
+    Component,
+    registry::{ComponentId, ComponentInfo},
+};
+
+pub trait WithComponentId {
+    fn component_id(&self) -> ComponentId;
+}
+
+impl<T> WithComponentId for T
+where
+    T: Borrow<ComponentId> + ?Sized,
+{
+    #[inline]
+    fn component_id(&self) -> ComponentId {
+        *self.borrow()
+    }
+}
+
+impl<Meta> WithComponentId for ComponentInfo<Meta>
+where
+    Meta: ?Sized,
+{
+    #[inline]
+    fn component_id(&self) -> ComponentId {
+        ComponentInfo::component_id(self)
+    }
+}
 
 pub unsafe trait FromComponentType: Sized {
     fn from_component<T: Component>() -> Self;

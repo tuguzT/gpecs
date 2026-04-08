@@ -1,6 +1,6 @@
 use crate::{
     archetype::erased::{ErasedArchetype, ErasedArchetypeView, IntoIter, Iter},
-    component::registry::ComponentId,
+    component::registry::traits::WithComponentId,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         identity::Identity,
@@ -43,7 +43,7 @@ where
 
 pub unsafe trait ErasedArchetypeIterator:
     Iterator<Item: AsRef<FieldDescriptor>>
-    + for<'a> FieldDescriptors<'a, Output: IntoIterator<Item: Into<ComponentId>>>
+    + for<'a> FieldDescriptors<'a, Output: IntoIterator<Item: WithComponentId>>
 {
 }
 

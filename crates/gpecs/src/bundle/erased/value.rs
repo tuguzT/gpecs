@@ -35,7 +35,9 @@ use crate::{
         erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
         registry::{
             ComponentId, ComponentRegistry, ComponentRegistryView,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+            traits::{
+                ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, WithComponentId,
+            },
         },
     },
     soa::{
@@ -821,7 +823,8 @@ where
 
         let component = inner.field_descriptors().into_iter().next()?;
         let erased_drop = component.erased_drop();
-        let id = component.into();
+        let id = component.component_id();
+        drop(component);
 
         let item = match inner.next()? {
             Ok(field) => {

@@ -25,7 +25,7 @@ use crate::{
         },
         registry::{
             ComponentId, ComponentRegistryView,
-            traits::{ComponentIdFrom, FromComponentType},
+            traits::{ComponentIdFrom, FromComponentType, WithComponentId},
         },
     },
     soa::{
@@ -416,7 +416,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
 
-        let component_id = inner.field_descriptors().into_iter().next()?.into();
+        let component_id = inner.field_descriptors().into_iter().next()?.component_id();
         let fields = inner.next()?;
         let item = unsafe { ErasedComponentMutSlicePtr::from_parts(component_id, fields) };
         Some(item)

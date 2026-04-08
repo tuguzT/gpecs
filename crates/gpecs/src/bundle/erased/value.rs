@@ -22,12 +22,13 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, NewBundle,
         erased::{
-            ErasedArchetypeKind, ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter,
-            ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleRefsIter, IntoErasedArchetypeIterator,
+            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
+            ErasedBundleRefs, ErasedBundleRefsIter,
             error::{
                 DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
                 RemoveErrorKind, ReplaceError, ShuffleError,
             },
+            traits::{ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
     },
     component::{

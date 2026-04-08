@@ -40,8 +40,8 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, NewBundle,
         erased::{
-            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBorrowedViewBundle, ErasedBundle,
-            ErasedBundleKind, ErasedBundleMutRefs, ErasedBundleRefs, RemovePair,
+            ErasedBorrowedBundle, ErasedBorrowedViewBundle, ErasedBundle, ErasedBundleKind,
+            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair, traits::ErasedArchetypeKind,
         },
     },
     component::{

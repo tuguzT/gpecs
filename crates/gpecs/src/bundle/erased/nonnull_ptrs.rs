@@ -12,8 +12,8 @@ use crate::{
     bundle::{
         Bundle, BundleNonNullPtrs,
         erased::{
-            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleMutPtrs,
-            IntoErasedArchetypeIterator,
+            ErasedBundleMutPtrs,
+            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
     },
     component::{

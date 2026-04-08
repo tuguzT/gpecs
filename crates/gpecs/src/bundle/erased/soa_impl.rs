@@ -7,10 +7,10 @@ use itertools::zip_eq;
 use crate::{
     archetype::erased::{ErasedArchetype, ErasedArchetypeView},
     bundle::erased::{
-        ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
-        ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
+        ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ErasedBundleMutPtrs,
+        ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
         ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
-        ErasedBundleSlices,
+        ErasedBundleSlices, traits::ErasedArchetypeKind,
     },
     component::erased::WithErasedDrop,
     soa::{

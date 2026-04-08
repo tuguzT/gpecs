@@ -17,9 +17,9 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut, NewBundle,
         erased::{
-            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
-            ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
-            FromErasedComponent, ShuffledBundle,
+            ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ErasedBundleMutRefs,
+            ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices, FromErasedComponent,
+            ShuffledBundle, traits::ErasedArchetypeKind,
         },
     },
     component::{

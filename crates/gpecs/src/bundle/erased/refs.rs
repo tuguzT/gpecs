@@ -7,7 +7,7 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaRefs, ErasedSoaRefsIter};
 
 use crate::{
-    archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleRefs,
         erased::{
@@ -73,7 +73,7 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> *const [MaybeUninit<u8>] {
+    pub fn as_buffer(&self) -> &[MaybeUninit<u8>] {
         let Self { inner } = self;
         inner.as_buffer()
     }
@@ -94,6 +94,19 @@ where
     pub fn descriptors(&self) -> &D {
         let Self { inner } = self;
         inner.descriptors()
+    }
+}
+
+impl<'a, D> ErasedBundleRefs<'_, D>
+where
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleRefsIter::from_inner(inner) }
     }
 }
 
@@ -126,14 +139,6 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleRefsIter<'_, Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundleRefsIter::from_inner(inner) }
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentRef<'_>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
@@ -157,10 +162,10 @@ impl<D> Copy for ErasedBundleRefs<'_, D> where D: Copy {}
 
 impl<'a, D> IntoIterator for &'a ErasedBundleRefs<'_, D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentRef<'a>;
-    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

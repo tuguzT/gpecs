@@ -7,7 +7,7 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaSlices, ErasedSoaSlicesIter};
 
 use crate::{
-    archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleSlices,
         erased::{
@@ -108,6 +108,19 @@ where
     }
 }
 
+impl<'a, D> ErasedBundleSlices<'_, D>
+where
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleSlicesIter<'a, FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleSlicesIter::from_inner(inner) }
+    }
+}
+
 impl<'a, D> ErasedBundleSlices<'a, D>
 where
     D: ErasedArchetypeKind,
@@ -137,14 +150,6 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleSlicesIter<'_, Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundleSlicesIter::from_inner(inner) }
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlice<'_>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
@@ -168,10 +173,10 @@ impl<D> Copy for ErasedBundleSlices<'_, D> where D: Copy {}
 
 impl<'a, D> IntoIterator for &'a ErasedBundleSlices<'_, D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentSlice<'a>;
-    type IntoIter = ErasedBundleSlicesIter<'a, Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleSlicesIter<'a, FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

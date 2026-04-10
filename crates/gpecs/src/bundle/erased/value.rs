@@ -50,6 +50,8 @@ pub type ErasedBundle<Meta> = ErasedBundleKind<ErasedArchetype<Meta>>;
 pub type ErasedBorrowedBundle<'a, Meta> = ErasedBundleKind<&'a ErasedArchetype<Meta>>;
 pub type ErasedBorrowedViewBundle<'a, Meta> = ErasedBundleKind<ErasedArchetypeView<'a, Meta>>;
 
+// TODO: create another type with the same API which does not require `WithErasedDrop` bound,
+//       then use that type inside of this one
 pub struct ErasedBundleKind<T>
 where
     T: ErasedArchetypeKind<Meta: WithErasedDrop> + ?Sized,

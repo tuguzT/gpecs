@@ -8,7 +8,7 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter};
 
 use crate::{
-    archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleNonNullPtrs,
         erased::{
@@ -122,7 +122,7 @@ where
 
 impl<D> ErasedBundleNonNullPtrs<D>
 where
-    D: ErasedArchetypeKind,
+    D: FieldDescriptorsOwned,
 {
     #[inline]
     pub fn dangling(archetype: D) -> Self {
@@ -130,7 +130,94 @@ where
             .expect("alignment of bytes should be sufficient for any component");
         unsafe { Self::from_inner(inner) }
     }
+}
 
+impl<'a, D> ErasedBundleNonNullPtrs<D>
+where
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from<'n, N>(&'a self, origin: &'n ErasedBundleNonNullPtrs<N>) -> isize
+    where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let origin = unsafe { origin.as_inner() };
+        unsafe { inner.offset_from(origin) }
+    }
+
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleNonNullPtrsIter<FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn swap<'n, N>(&'a mut self, with: &'n mut ErasedBundleNonNullPtrs<N>)
+    where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let with = unsafe { with.as_mut_inner() };
+        unsafe { inner.swap(with) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn copy_from_forward<'n, N>(
+        &'a mut self,
+        src: &'n ErasedBundleNonNullPtrs<N>,
+        count: usize,
+    ) where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let src = unsafe { src.as_inner() };
+        unsafe { inner.copy_from_forward(src, count) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn copy_from_backward<'n, N>(
+        &'a mut self,
+        src: &'n ErasedBundleNonNullPtrs<N>,
+        count: usize,
+    ) where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let src = unsafe { src.as_inner() };
+        unsafe { inner.copy_from_backward(src, count) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn copy_from_nonoverlapping<'n, N>(
+        &'a mut self,
+        src: &'n ErasedBundleNonNullPtrs<N>,
+        count: usize,
+    ) where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let src = unsafe { src.as_inner() };
+        unsafe { inner.copy_from_nonoverlapping(src, count) }
+    }
+}
+
+impl<D> ErasedBundleNonNullPtrs<D>
+where
+    D: ErasedArchetypeKind,
+{
     #[inline]
     pub fn downcast<B, T>(
         self,
@@ -156,80 +243,9 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from<N>(&self, origin: &ErasedBundleNonNullPtrs<N>) -> isize
-    where
-        N: ErasedArchetypeKind + ?Sized,
-    {
-        let Self { inner } = self;
-
-        let origin = unsafe { origin.as_inner() };
-        unsafe { inner.offset_from(origin) }
-    }
-
-    #[inline]
-    pub fn iter(&self) -> ErasedBundleNonNullPtrsIter<Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullPtr> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn swap<N>(&mut self, with: &mut ErasedBundleNonNullPtrs<N>)
-    where
-        N: ErasedArchetypeKind + ?Sized,
-    {
-        let Self { inner } = self;
-
-        let with = unsafe { with.as_mut_inner() };
-        unsafe { inner.swap(with) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn copy_from_forward<N>(&mut self, src: &ErasedBundleNonNullPtrs<N>, count: usize)
-    where
-        N: ErasedArchetypeKind + ?Sized,
-    {
-        let Self { inner } = self;
-
-        let src = unsafe { src.as_inner() };
-        unsafe { inner.copy_from_forward(src, count) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn copy_from_backward<N>(&mut self, src: &ErasedBundleNonNullPtrs<N>, count: usize)
-    where
-        N: ErasedArchetypeKind + ?Sized,
-    {
-        let Self { inner } = self;
-
-        let src = unsafe { src.as_inner() };
-        unsafe { inner.copy_from_backward(src, count) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn copy_from_nonoverlapping<N>(
-        &mut self,
-        src: &ErasedBundleNonNullPtrs<N>,
-        count: usize,
-    ) where
-        N: ErasedArchetypeKind + ?Sized,
-    {
-        let Self { inner } = self;
-
-        let src = unsafe { src.as_inner() };
-        unsafe { inner.copy_from_nonoverlapping(src, count) }
     }
 }
 
@@ -250,10 +266,10 @@ impl<D> Copy for ErasedBundleNonNullPtrs<D> where D: Copy {}
 
 impl<'a, D> IntoIterator for &'a ErasedBundleNonNullPtrs<D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentNonNullPtr;
-    type IntoIter = ErasedBundleNonNullPtrsIter<Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleNonNullPtrsIter<FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

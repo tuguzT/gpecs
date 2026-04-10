@@ -11,7 +11,7 @@ use gpecs_soa_erased::{
 
 use crate::{
     archetype::erased::{
-        ErasedArchetypeView, ErasedArchetypeViewExt, Iter, error::IncompatibleArchetypeError,
+        ErasedArchetypeView, ErasedArchetypeViewExt, error::IncompatibleArchetypeError,
     },
     bundle::{
         Bundle, BundlePtrs,
@@ -114,7 +114,7 @@ where
 
 impl<D> ErasedBundlePtrs<D>
 where
-    D: ErasedArchetypeKind,
+    D: FieldDescriptorsOwned,
 {
     #[inline]
     pub fn dangling(archetype: D) -> Self {
@@ -122,7 +122,37 @@ where
             .expect("alignment of bytes should be sufficient for any component");
         unsafe { Self::from_inner(inner) }
     }
+}
 
+impl<'a, D> ErasedBundlePtrs<D>
+where
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from<'n, N>(&'a self, origin: &'n ErasedBundlePtrs<N>) -> isize
+    where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let origin = unsafe { origin.as_inner() };
+        unsafe { inner.offset_from(origin) }
+    }
+
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundlePtrsIter<FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundlePtrsIter::from_inner(inner) }
+    }
+}
+
+impl<D> ErasedBundlePtrs<D>
+where
+    D: ErasedArchetypeKind,
+{
     #[inline]
     pub fn downcast<B, T>(
         self,
@@ -148,26 +178,6 @@ where
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
         self.field_descriptors()
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from<N>(&self, origin: &ErasedBundlePtrs<N>) -> isize
-    where
-        N: ErasedArchetypeKind + ?Sized,
-    {
-        let Self { inner } = self;
-
-        let origin = unsafe { origin.as_inner() };
-        unsafe { inner.offset_from(origin) }
-    }
-
-    #[inline]
-    pub fn iter(&self) -> ErasedBundlePtrsIter<Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundlePtrsIter::from_inner(inner) }
     }
 
     #[inline]
@@ -210,10 +220,10 @@ impl<D> Copy for ErasedBundlePtrs<D> where D: Copy {}
 
 impl<'a, D> IntoIterator for &'a ErasedBundlePtrs<D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentPtr;
-    type IntoIter = ErasedBundlePtrsIter<Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundlePtrsIter<FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

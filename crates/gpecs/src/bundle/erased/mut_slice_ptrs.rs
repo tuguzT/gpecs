@@ -9,7 +9,7 @@ use gpecs_soa_erased::{
 };
 
 use crate::{
-    archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleSliceMutPtrs,
         erased::{
@@ -138,6 +138,54 @@ where
     }
 }
 
+impl<'a, D> ErasedBundleMutSlicePtrs<D>
+where
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleSlicePtrsIter<FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleSlicePtrsIter::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn iter_mut(&'a mut self) -> ErasedBundleMutSlicePtrsIter<FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter_mut();
+        unsafe { ErasedBundleMutSlicePtrsIter::from_inner(inner) }
+    }
+}
+
+impl<D> ErasedBundleMutSlicePtrs<D>
+where
+    D: FieldDescriptorsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    pub unsafe fn drop_in_place(
+        &mut self,
+        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
+    ) -> Result<(), NotRegisteredError> {
+        self.iter()
+            .map(ErasedComponentSlicePtr::component_id)
+            .try_for_each(|id| {
+                components
+                    .get_component_info(id)
+                    .map(drop)
+                    .ok_or_else(NotRegisteredError::new)
+            })?;
+
+        self.iter_mut().for_each(|slice| {
+            if let Err(error) = unsafe { slice.drop_in_place(components) } {
+                unreachable!("{error}, but it was checked earlier to be registered")
+            }
+        });
+        Ok(())
+    }
+}
+
 impl<D> ErasedBundleMutSlicePtrs<D>
 where
     D: ErasedArchetypeKind,
@@ -168,22 +216,6 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleSlicePtrsIter<Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundleSlicePtrsIter::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> ErasedBundleMutSlicePtrsIter<Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter_mut();
-        unsafe { ErasedBundleMutSlicePtrsIter::from_inner(inner) }
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlicePtr> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
@@ -193,28 +225,6 @@ where
     pub fn get_mut(&mut self, component_id: ComponentId) -> Option<ErasedComponentMutSlicePtr> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter_mut().nth(index)
-    }
-
-    #[inline]
-    pub unsafe fn drop_in_place(
-        &mut self,
-        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
-    ) -> Result<(), NotRegisteredError> {
-        self.iter()
-            .map(ErasedComponentSlicePtr::component_id)
-            .try_for_each(|id| {
-                components
-                    .get_component_info(id)
-                    .map(drop)
-                    .ok_or_else(NotRegisteredError::new)
-            })?;
-
-        self.iter_mut().for_each(|slice| {
-            if let Err(error) = unsafe { slice.drop_in_place(components) } {
-                unreachable!("{error}, but it was checked earlier to be registered")
-            }
-        });
-        Ok(())
     }
 }
 
@@ -235,10 +245,10 @@ impl<D> Copy for ErasedBundleMutSlicePtrs<D> where D: Copy {}
 
 impl<'a, D> IntoIterator for &'a ErasedBundleMutSlicePtrs<D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentSlicePtr;
-    type IntoIter = ErasedBundleSlicePtrsIter<Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleSlicePtrsIter<FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -248,10 +258,10 @@ where
 
 impl<'a, D> IntoIterator for &'a mut ErasedBundleMutSlicePtrs<D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentMutSlicePtr;
-    type IntoIter = ErasedBundleMutSlicePtrsIter<Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleMutSlicePtrsIter<FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -7,7 +7,7 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaMutRefs, ErasedSoaMutRefsIter};
 
 use crate::{
-    archetype::erased::{ErasedArchetypeView, Iter, error::IncompatibleArchetypeError},
+    archetype::erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleRefsMut,
         erased::{
@@ -103,6 +103,27 @@ where
     }
 }
 
+impl<'a, D> ErasedBundleMutRefs<'_, D>
+where
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+{
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        unsafe { ErasedBundleRefsIter::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn iter_mut(&'a mut self) -> ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>> {
+        let Self { inner } = self;
+
+        let inner = inner.iter_mut();
+        unsafe { ErasedBundleMutRefsIter::from_inner(inner) }
+    }
+}
+
 impl<'a, D> ErasedBundleMutRefs<'a, D>
 where
     D: ErasedArchetypeKind,
@@ -132,22 +153,6 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleRefsIter<'_, Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        unsafe { ErasedBundleRefsIter::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> ErasedBundleMutRefsIter<'_, Iter<'_, D::Meta>> {
-        let Self { inner } = self;
-
-        let inner = inner.iter_mut();
-        unsafe { ErasedBundleMutRefsIter::from_inner(inner) }
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentRef<'_>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
@@ -162,10 +167,10 @@ where
 
 impl<'a, D> IntoIterator for &'a ErasedBundleMutRefs<'_, D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentRef<'a>;
-    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -175,10 +180,10 @@ where
 
 impl<'a, D> IntoIterator for &'a mut ErasedBundleMutRefs<'_, D>
 where
-    D: ErasedArchetypeKind + ?Sized,
+    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
 {
     type Item = ErasedComponentMutRef<'a>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, D::Meta>>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

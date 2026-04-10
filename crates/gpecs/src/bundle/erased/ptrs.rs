@@ -112,18 +112,6 @@ where
     }
 }
 
-impl<D> ErasedBundlePtrs<D>
-where
-    D: FieldDescriptorsOwned,
-{
-    #[inline]
-    pub fn dangling(archetype: D) -> Self {
-        let inner = Inner::dangling(archetype)
-            .expect("alignment of bytes should be sufficient for any component");
-        unsafe { Self::from_inner(inner) }
-    }
-}
-
 impl<'a, D> ErasedBundlePtrs<D>
 where
     D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,

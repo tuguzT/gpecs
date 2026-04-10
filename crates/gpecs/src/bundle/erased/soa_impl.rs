@@ -34,7 +34,9 @@ where
 
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
-        ErasedBundlePtrs::dangling(*self)
+        let inner = ErasedSoaPtrs::dangling(*self)
+            .expect("archetype components should have sufficient alignment");
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -56,7 +58,9 @@ where
 
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
-        ErasedBundleMutPtrs::dangling(*self)
+        let inner = ErasedSoaMutPtrs::dangling(*self)
+            .expect("archetype components should have sufficient alignment");
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -424,7 +428,9 @@ where
 
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
-        ErasedBundlePtrs::dangling(self)
+        let inner = ErasedSoaPtrs::dangling(self)
+            .expect("archetype components should have sufficient alignment");
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -446,7 +452,9 @@ where
 
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
-        ErasedBundleMutPtrs::dangling(self)
+        let inner = ErasedSoaMutPtrs::dangling(self)
+            .expect("archetype components should have sufficient alignment");
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 
     #[inline]

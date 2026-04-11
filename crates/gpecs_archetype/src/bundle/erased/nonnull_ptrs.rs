@@ -1,38 +1,28 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
     ptr::NonNull,
 };
 
+use gpecs_component::{
+    erased::ErasedComponentNonNullPtr,
+    registry::{ComponentId, traits::WithComponentId},
+};
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
+    soa::field::{
+        FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
+    },
 };
 
 use crate::{
-    archetype::erased::ErasedArchetypeView,
-    bundle::{
-        Bundle, BundleNonNullPtrs,
-        erased::{
-            ErasedBundleMutPtrs,
-            error::DowncastError,
-            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
-        },
+    bundle::erased::{
+        ErasedBundleMutPtrs,
+        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
     },
-    component::{
-        erased::ErasedComponentNonNullPtr,
-        registry::{
-            ComponentId, ComponentRegistryView,
-            traits::{ComponentIdFrom, FromComponentType, WithComponentId},
-        },
-    },
-    soa::{
-        field::{
-            FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
-        },
-        traits::RawSoaContext,
-    },
+    erased::ErasedArchetypeView,
 };
 
 pub struct ErasedBundleNonNullPtrs<D, P = NonNull<MaybeUninit<u8>>>
@@ -206,30 +196,6 @@ where
 
         let src = unsafe { src.as_inner() };
         unsafe { inner.copy_from_nonoverlapping(src, count) }
-    }
-}
-
-impl<D, P> ErasedBundleNonNullPtrs<D, P>
-where
-    D: ErasedArchetypeKind,
-    P: NonNullSliceItemPtr,
-{
-    #[inline]
-    pub fn downcast<B, T>(
-        self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<BundleNonNullPtrs<B>, DowncastError<Self>>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let into_self = |ptrs| unsafe { Self::new_unchecked(ptrs) };
-        let ptrs = ErasedBundleMutPtrs::from(self)
-            .downcast::<B, T>(components)
-            .map_err(|error| error.map_value(into_self))?;
-
-        let ptrs = unsafe { B::CONTEXT.ptrs_to_nonnull(ptrs) };
-        Ok(ptrs)
     }
 }
 

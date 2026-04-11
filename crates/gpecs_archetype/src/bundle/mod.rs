@@ -3,5 +3,7 @@ pub use self::traits::{
     BundleSliceMutPtrs, BundleSlicePtrs, BundleSlices, BundleSlicesMut,
 };
 
+pub mod erased;
+
 mod impls;
 mod traits;

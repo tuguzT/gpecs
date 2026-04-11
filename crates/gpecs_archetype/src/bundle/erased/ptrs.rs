@@ -1,82 +1,88 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
 };
 
-use gpecs_component::erased::ErasedComponentRef;
+use gpecs_component::{
+    erased::ErasedComponentPtr,
+    registry::{ComponentId, traits::WithComponentId},
+};
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoaRefs, ErasedSoaRefsIter, ptr::slice::ConstSliceItemPtr,
+    CovariantFieldDescriptors, ErasedSoaPtrs, ErasedSoaPtrsIter,
+    ptr::slice::{CastMut, ConstSliceItemPtr},
+    soa::field::{
+        FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
+    },
 };
 
 use crate::{
-    archetype::erased::ErasedArchetypeView,
-    bundle::{
-        Bundle, BundleRefs,
-        erased::{
-            ErasedBundlePtrs,
-            error::DowncastError,
-            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
-        },
+    bundle::erased::{
+        ErasedBundleMutPtrs, ErasedBundleRefs,
+        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
     },
-    component::registry::{
-        ComponentId, ComponentRegistryView,
-        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
-    },
-    soa::{
-        field::{
-            FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
-        },
-        traits::SoaContext,
-    },
+    erased::ErasedArchetypeView,
 };
 
-pub struct ErasedBundleRefs<'a, D, P = *const MaybeUninit<u8>>
+pub struct ErasedBundlePtrs<D, P = *const MaybeUninit<u8>>
 where
     D: ?Sized,
     P: ConstSliceItemPtr,
 {
-    inner: ErasedSoaRefs<'a, D, P>,
+    inner: ErasedSoaPtrs<D, P>,
 }
 
-impl<'a, D, P> ErasedBundleRefs<'a, D, P>
+impl<D, P> ErasedBundlePtrs<D, P>
 where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn from_inner(inner: ErasedSoaRefs<'a, D, P>) -> Self {
+    pub unsafe fn from_inner(inner: ErasedSoaPtrs<D, P>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedBundlePtrs<D, P>) -> Self {
-        let inner = ptrs.into_inner();
-        let inner = unsafe { inner.deref() };
-        unsafe { Self::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> ErasedSoaRefs<'a, D, P> {
+    pub fn into_inner(self) -> ErasedSoaPtrs<D, P> {
         let Self { inner } = self;
         inner
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, P> {
+    pub fn cast_mut(self) -> ErasedBundleMutPtrs<D, CastMut<P>> {
         let Self { inner } = self;
 
-        let inner = inner.into_ptrs();
-        unsafe { ErasedBundlePtrs::from_inner(inner) }
+        let inner = inner.cast_mut();
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedBundleRefs<'a, D, P> {
+        unsafe { ErasedBundleRefs::from_ptrs(self) }
+    }
+
+    #[inline]
+    #[must_use]
+    pub unsafe fn add(self, count: usize) -> Self {
+        let Self { inner } = self;
+
+        let inner = unsafe { inner.add(count) };
+        unsafe { Self::from_inner(inner) }
     }
 }
 
-impl<D, P> ErasedBundleRefs<'_, D, P>
+impl<D, P> ErasedBundlePtrs<D, P>
 where
     D: ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn as_buffer(&self) -> &[P::Item] {
+    pub unsafe fn as_inner(&self) -> &ErasedSoaPtrs<D, P> {
+        let Self { inner } = self;
+        inner
+    }
+
+    #[inline]
+    pub fn as_buffer(&self) -> *const [P::Item] {
         let Self { inner } = self;
         inner.as_buffer()
     }
@@ -100,46 +106,33 @@ where
     }
 }
 
-impl<'a, D, P> ErasedBundleRefs<'_, D, P>
+impl<'a, D, P> ErasedBundlePtrs<D, P>
 where
     D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
+    #[track_caller]
+    pub unsafe fn offset_from<'n, N>(&'a self, origin: &'n ErasedBundlePtrs<N, P>) -> isize
+    where
+        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+    {
+        let Self { inner } = self;
+
+        let origin = unsafe { origin.as_inner() };
+        unsafe { inner.offset_from(origin) }
+    }
+
+    #[inline]
+    pub fn iter(&'a self) -> ErasedBundlePtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self { inner } = self;
 
         let inner = inner.iter();
-        unsafe { ErasedBundleRefsIter::from_inner(inner) }
+        unsafe { ErasedBundlePtrsIter::from_inner(inner) }
     }
 }
 
-impl<'a, D, P> ErasedBundleRefs<'a, D, P>
-where
-    D: ErasedArchetypeKind,
-    P: ConstSliceItemPtr,
-{
-    #[inline]
-    pub fn downcast<B, T>(
-        self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<BundleRefs<'a, B>, DowncastError<Self>>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
-        let ptrs = self
-            .into_ptrs()
-            .downcast::<B, T>(components)
-            .map_err(|error| error.map_value(into_self))?;
-
-        let refs = unsafe { B::CONTEXT.ptrs_to_refs(ptrs) };
-        Ok(refs)
-    }
-}
-
-impl<D, P> ErasedBundleRefs<'_, D, P>
+impl<D, P> ErasedBundlePtrs<D, P>
 where
     D: ErasedArchetypeKind + ?Sized,
     P: ConstSliceItemPtr,
@@ -150,26 +143,26 @@ where
     }
 
     #[inline]
-    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentRef<'_, P>> {
+    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentPtr<P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
     }
 }
 
-impl<D, P> Debug for ErasedBundleRefs<'_, D, P>
+impl<D, P> Debug for ErasedBundlePtrs<D, P>
 where
     D: Debug + ?Sized,
     P: ConstSliceItemPtr,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
-        f.debug_struct("ErasedBundleRefs")
+        f.debug_struct("ErasedBundlePtrs")
             .field("inner", &inner)
             .finish()
     }
 }
 
-impl<D, P> Clone for ErasedBundleRefs<'_, D, P>
+impl<D, P> Clone for ErasedBundlePtrs<D, P>
 where
     D: Clone,
     P: ConstSliceItemPtr,
@@ -183,20 +176,20 @@ where
     }
 }
 
-impl<D, P> Copy for ErasedBundleRefs<'_, D, P>
+impl<D, P> Copy for ErasedBundlePtrs<D, P>
 where
     D: Copy,
     P: ConstSliceItemPtr,
 {
 }
 
-impl<'a, D, P> IntoIterator for &'a ErasedBundleRefs<'_, D, P>
+impl<'a, D, P> IntoIterator for &'a ErasedBundlePtrs<D, P>
 where
     D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
 {
-    type Item = ErasedComponentRef<'a, P>;
-    type IntoIter = ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>, P>;
+    type Item = ErasedComponentPtr<P>;
+    type IntoIter = ErasedBundlePtrsIter<FieldDescriptorsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -204,24 +197,24 @@ where
     }
 }
 
-impl<'a, D, P> IntoIterator for ErasedBundleRefs<'a, D, P>
+impl<D, P> IntoIterator for ErasedBundlePtrs<D, P>
 where
     D: IntoErasedArchetypeIterator,
     P: ConstSliceItemPtr,
 {
-    type Item = ErasedComponentRef<'a, P>;
-    type IntoIter = ErasedBundleRefsIter<'a, D::IntoIter, P>;
+    type Item = ErasedComponentPtr<P>;
+    type IntoIter = ErasedBundlePtrsIter<D::IntoIter, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        unsafe { ErasedBundleRefsIter::from_inner(inner) }
+        unsafe { ErasedBundlePtrsIter::from_inner(inner) }
     }
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedBundleRefs<'_, D, P>
+impl<'a, D, P> FieldDescriptors<'a> for ErasedBundlePtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: ConstSliceItemPtr,
@@ -235,7 +228,7 @@ where
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedBundleRefs<'_, D, P>
+impl<D, P> CovariantFieldDescriptors for ErasedBundlePtrs<D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     P: ConstSliceItemPtr,
@@ -248,31 +241,31 @@ where
     }
 }
 
-pub struct ErasedBundleRefsIter<'a, D, P = *const MaybeUninit<u8>>
+pub struct ErasedBundlePtrsIter<D, P>
 where
     D: ?Sized,
     P: ConstSliceItemPtr,
 {
-    inner: ErasedSoaRefsIter<'a, D, P>,
+    inner: ErasedSoaPtrsIter<D, P>,
 }
 
-impl<'a, D, P> ErasedBundleRefsIter<'a, D, P>
+impl<D, P> ErasedBundlePtrsIter<D, P>
 where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn from_inner(inner: ErasedSoaRefsIter<'a, D, P>) -> Self {
+    pub(super) unsafe fn from_inner(inner: ErasedSoaPtrsIter<D, P>) -> Self {
         Self { inner }
     }
 }
 
-impl<D, P> ErasedBundleRefsIter<'_, D, P>
+impl<D, P> ErasedBundlePtrsIter<D, P>
 where
     D: ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn as_buffer(&self) -> &[P::Item] {
+    pub fn as_buffer(&self) -> *const [P::Item] {
         let Self { inner } = self;
         inner.as_buffer()
     }
@@ -296,27 +289,27 @@ where
     }
 }
 
-impl<'a, D, P> ErasedBundleRefsIter<'_, D, P>
+impl<'a, D, P> ErasedBundlePtrsIter<D, P>
 where
     D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedBundlePtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self { inner } = self;
 
         let inner = inner.iter();
-        unsafe { ErasedBundleRefsIter::from_inner(inner) }
+        unsafe { ErasedBundlePtrsIter::from_inner(inner) }
     }
 }
 
-impl<'a, D, P> IntoIterator for &'a ErasedBundleRefsIter<'_, D, P>
+impl<'a, D, P> IntoIterator for &'a ErasedBundlePtrsIter<D, P>
 where
     D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
 {
-    type Item = ErasedComponentRef<'a, P>;
-    type IntoIter = ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>, P>;
+    type Item = ErasedComponentPtr<P>;
+    type IntoIter = ErasedBundlePtrsIter<FieldDescriptorsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -324,10 +317,10 @@ where
     }
 }
 
-impl<D, P> Debug for ErasedBundleRefsIter<'_, D, P>
+impl<D, P> Debug for ErasedBundlePtrsIter<D, P>
 where
     D: FieldDescriptorsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr<Item: Debug>,
+    P: ConstSliceItemPtr + Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -335,7 +328,7 @@ where
     }
 }
 
-impl<D, P> Clone for ErasedBundleRefsIter<'_, D, P>
+impl<D, P> Clone for ErasedBundlePtrsIter<D, P>
 where
     D: Clone,
     P: ConstSliceItemPtr,
@@ -349,12 +342,12 @@ where
     }
 }
 
-impl<'a, D, P> Iterator for ErasedBundleRefsIter<'a, D, P>
+impl<D, P> Iterator for ErasedBundlePtrsIter<D, P>
 where
     D: ErasedArchetypeIterator + ?Sized,
     P: ConstSliceItemPtr,
 {
-    type Item = ErasedComponentRef<'a, P>;
+    type Item = ErasedComponentPtr<P>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -362,7 +355,7 @@ where
 
         let component_id = inner.field_descriptors().into_iter().next()?.component_id();
         let fields = inner.next()?;
-        let item = unsafe { ErasedComponentRef::from_parts(component_id, fields) };
+        let item = unsafe { ErasedComponentPtr::from_parts(component_id, fields) };
         Some(item)
     }
 
@@ -373,7 +366,7 @@ where
     }
 }
 
-impl<D, P> ExactSizeIterator for ErasedBundleRefsIter<'_, D, P>
+impl<D, P> ExactSizeIterator for ErasedBundlePtrsIter<D, P>
 where
     D: ErasedArchetypeIterator + ExactSizeIterator + ?Sized,
     P: ConstSliceItemPtr,
@@ -385,14 +378,14 @@ where
     }
 }
 
-impl<D, P> FusedIterator for ErasedBundleRefsIter<'_, D, P>
+impl<D, P> FusedIterator for ErasedBundlePtrsIter<D, P>
 where
     D: ErasedArchetypeIterator + FusedIterator + ?Sized,
     P: ConstSliceItemPtr,
 {
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedBundleRefsIter<'_, D, P>
+impl<'a, D, P> FieldDescriptors<'a> for ErasedBundlePtrsIter<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: ConstSliceItemPtr,
@@ -401,12 +394,11 @@ where
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        let Self { inner } = self;
-        inner.field_descriptors()
+        self.descriptors().field_descriptors()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedBundleRefsIter<'_, D, P>
+impl<D, P> CovariantFieldDescriptors for ErasedBundlePtrsIter<D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     P: ConstSliceItemPtr,

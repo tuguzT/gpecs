@@ -1,11 +1,10 @@
-use crate::{
-    archetype::erased::{ErasedArchetype, ErasedArchetypeView, IntoIter, Iter},
-    component::registry::traits::WithComponentId,
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors},
-        identity::Identity,
-    },
+use gpecs_component::registry::traits::WithComponentId;
+use gpecs_soa_erased::soa::{
+    field::{FieldDescriptor, FieldDescriptors},
+    identity::Identity,
 };
+
+use crate::erased::{ErasedArchetypeView, Iter};
 
 pub trait ErasedArchetypeKind:
     for<'a> FieldDescriptors<'a, Output = ErasedArchetypeView<'a, Self::Meta>>
@@ -27,13 +26,6 @@ where
     type Meta = T::Meta;
 }
 
-impl<Meta> ErasedArchetypeKind for ErasedArchetype<Meta>
-where
-    Meta: AsRef<FieldDescriptor> + 'static,
-{
-    type Meta = Meta;
-}
-
 impl<Meta> ErasedArchetypeKind for ErasedArchetypeView<'_, Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
@@ -48,11 +40,6 @@ pub unsafe trait ErasedArchetypeIterator:
 }
 
 unsafe impl<Meta> ErasedArchetypeIterator for Iter<'_, Meta> where
-    Meta: AsRef<FieldDescriptor> + 'static
-{
-}
-
-unsafe impl<Meta> ErasedArchetypeIterator for IntoIter<Meta> where
     Meta: AsRef<FieldDescriptor> + 'static
 {
 }

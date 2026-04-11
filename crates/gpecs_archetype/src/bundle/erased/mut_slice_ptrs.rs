@@ -1,41 +1,31 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
 };
 
+use gpecs_component::{
+    erased::{
+        ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, WithErasedDrop,
+        error::NotRegisteredError,
+    },
+    registry::{ComponentId, ComponentRegistryView, traits::WithComponentId},
+};
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
+    soa::field::{
+        FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
+    },
 };
 
 use crate::{
-    archetype::erased::ErasedArchetypeView,
-    bundle::{
-        Bundle, BundleSliceMutPtrs,
-        erased::{
-            ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundleSlicePtrs,
-            ErasedBundleSlicePtrsIter, ErasedBundleSlices,
-            error::DowncastError,
-            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
-        },
+    bundle::erased::{
+        ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundleSlicePtrs,
+        ErasedBundleSlicePtrsIter, ErasedBundleSlices,
+        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
     },
-    component::{
-        erased::{
-            ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, WithErasedDrop,
-            error::NotRegisteredError,
-        },
-        registry::{
-            ComponentId, ComponentRegistryView,
-            traits::{ComponentIdFrom, FromComponentType, WithComponentId},
-        },
-    },
-    soa::{
-        field::{
-            FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
-        },
-        traits::RawSoaContext,
-    },
+    erased::ErasedArchetypeView,
 };
 
 pub struct ErasedBundleMutSlicePtrs<D, P = *mut MaybeUninit<u8>>
@@ -83,16 +73,14 @@ where
         let inner = inner.cast_const();
         unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
     }
-}
 
-impl<D> ErasedBundleMutSlicePtrs<D> {
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedBundleSlices<'a, D> {
+    pub unsafe fn deref<'a>(self) -> ErasedBundleSlices<'a, D, CastConst<P>> {
         unsafe { self.cast_const().deref() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedBundleMutSlices<'a, D> {
+    pub unsafe fn deref_mut<'a>(self) -> ErasedBundleMutSlices<'a, D, P> {
         unsafe { ErasedBundleMutSlices::from_ptrs(self) }
     }
 }
@@ -191,32 +179,6 @@ where
             }
         });
         Ok(())
-    }
-}
-
-impl<D, P> ErasedBundleMutSlicePtrs<D, P>
-where
-    D: ErasedArchetypeKind,
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    pub fn downcast<B, T>(
-        self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<BundleSliceMutPtrs<B>, DowncastError<Self>>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let len = self.len();
-        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
-        let ptrs = self
-            .into_ptrs()
-            .downcast::<B, T>(components)
-            .map_err(|error| error.map_value(into_self))?;
-
-        let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
-        Ok(slices)
     }
 }
 

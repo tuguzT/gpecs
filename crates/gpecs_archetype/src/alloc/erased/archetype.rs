@@ -24,8 +24,7 @@ use gpecs_sparse::{
 use crate::{
     bundle::Bundle,
     erased::{
-        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeView, ErasedArchetypeViewExt,
-        IntoIter, Iter,
+        ComponentIdOrderedIter, ComponentIds, ErasedArchetypeView, IntoIter, Iter,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, IncompatibleArchetypeExactError,

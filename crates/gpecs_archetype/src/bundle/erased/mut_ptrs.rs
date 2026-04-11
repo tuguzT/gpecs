@@ -1,37 +1,29 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
 };
 
+use gpecs_component::{
+    erased::{
+        ErasedComponentMutPtr, ErasedComponentPtr, WithErasedDrop, error::NotRegisteredError,
+    },
+    registry::{ComponentId, ComponentRegistryView, traits::WithComponentId},
+};
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
-};
-
-use crate::{
-    archetype::erased::{ErasedArchetypeView, ErasedArchetypeViewExt},
-    bundle::{
-        Bundle, BundleMutPtrs,
-        erased::{
-            ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundlePtrsIter,
-            ErasedBundleRefs,
-            error::DowncastError,
-            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
-        },
-    },
-    component::{
-        erased::{
-            ErasedComponentMutPtr, ErasedComponentPtr, WithErasedDrop, error::NotRegisteredError,
-        },
-        registry::{
-            ComponentId, ComponentRegistryView,
-            traits::{ComponentIdFrom, FromComponentType, WithComponentId},
-        },
-    },
     soa::field::{
         FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
     },
+};
+
+use crate::{
+    bundle::erased::{
+        ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundlePtrsIter, ErasedBundleRefs,
+        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+    },
+    erased::ErasedArchetypeView,
 };
 
 pub struct ErasedBundleMutPtrs<D, P = *mut MaybeUninit<u8>>
@@ -257,30 +249,6 @@ where
 
 impl<D, P> ErasedBundleMutPtrs<D, P>
 where
-    D: ErasedArchetypeKind,
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    pub fn downcast<B, T>(
-        mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<BundleMutPtrs<B>, DowncastError<Self>>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        if let Err(error) = self.archetype().check_compatibility_of::<B, T>(components) {
-            return Err(DowncastError::new(self, error.into()));
-        }
-
-        let ptrs = B::mut_ptrs_from_erased(components, self.iter_mut())
-            .map_err(|error| DowncastError::new(self, error.into()))?;
-        Ok(ptrs)
-    }
-}
-
-impl<D, P> ErasedBundleMutPtrs<D, P>
-where
     D: ErasedArchetypeKind + ?Sized,
     P: MutSliceItemPtr,
 {
@@ -299,22 +267,6 @@ where
     pub fn get_mut(&mut self, component_id: ComponentId) -> Option<ErasedComponentMutPtr<P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter_mut().nth(index)
-    }
-}
-
-impl<D> ErasedBundleMutPtrs<D>
-where
-    D: ErasedArchetypeKind<Meta: WithErasedDrop> + ?Sized,
-{
-    #[inline]
-    pub unsafe fn write<T>(&mut self, value: ErasedBundleKind<T>)
-    where
-        T: ErasedArchetypeKind<Meta: WithErasedDrop>,
-    {
-        let Self { inner } = self;
-
-        let value = value.into_inner();
-        unsafe { inner.write(value) }
     }
 }
 

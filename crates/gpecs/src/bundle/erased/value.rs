@@ -169,10 +169,7 @@ where
     {
         let src = match self.as_ptrs().downcast::<B, U>(registry) {
             Ok(src) => src,
-            Err(error) => {
-                let source = error.source;
-                return Err(DowncastError::new(self, source));
-            }
+            Err(error) => return Err(error.map_value(drop).map_value(|()| self)),
         };
 
         let bundle = unsafe { B::CONTEXT.read(src) };
@@ -210,10 +207,7 @@ where
     {
         match unsafe { self.as_mut_ptrs().deref_mut() }.downcast::<B, U>(registry) {
             Ok(refs) => Ok(refs),
-            Err(error) => {
-                let source = error.into();
-                Err(DowncastError::new(self, source))
-            }
+            Err(error) => Err(error.map_value(drop).map_value(|()| self)),
         }
     }
 

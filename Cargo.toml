@@ -57,12 +57,12 @@ gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 # standalone benchmarks
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
-cargo-gpu-install = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "7f1995823a82ee6e6b7a63b57313c4a829856e3d" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "30896871ba00e668029ccb724f1438202b284708" }
-indexmap = { version = "2.13", default-features = false }
+cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a874c1b5cb1d79897bbedc37399098b743055dfb" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a874c1b5cb1d79897bbedc37399098b743055dfb" }
+indexmap = { version = "2.14", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
-hashbrown = { version = "0.16", default-features = false }
+hashbrown = { version = "0.17", default-features = false }
 arrayvec = { version = "0.7", default-features = false }
 itertools = { version = "0.14", default-features = false }
 num-traits = { version = "0.2", default-features = false }

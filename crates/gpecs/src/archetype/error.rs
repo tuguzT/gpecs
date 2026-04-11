@@ -6,13 +6,12 @@ use std::{
 use crate::{
     archetype::{
         erased::error::{
-            AlreadyHasComponentError, DuplicateComponentError, IncompatibleArchetypeError,
-            IncompatibleArchetypeExactError, MissingComponentError,
+            AlreadyHasComponentError, DuplicateComponentError, IncompatibleArchetypeExactError,
+            MissingComponentError,
         },
         registry::ArchetypeId,
     },
-    bundle::Bundle,
-    component::erased::error::NotRegisteredError,
+    bundle::{Bundle, erased::error::DowncastErrorKind},
     entity::Entity,
 };
 
@@ -97,20 +96,16 @@ pub enum InvalidEntityLocationErrorKind {
 #[derive(Debug, Clone)]
 pub enum GetAtError {
     InvalidEntityLocation(InvalidEntityLocationError),
-    DuplicateComponent(DuplicateComponentError),
-    MissingComponent(MissingComponentError),
-    ComponentNotRegistered(NotRegisteredError),
+    Downcast(DowncastErrorKind),
 }
 
 impl GetAtError {
     #[inline]
     #[track_caller]
-    pub(crate) fn with_valid_location(self) -> IncompatibleArchetypeError {
+    pub(crate) fn with_valid_location(self) -> DowncastErrorKind {
         match self {
             Self::InvalidEntityLocation(error) => error.with_valid_location(),
-            Self::DuplicateComponent(error) => error.into(),
-            Self::MissingComponent(error) => error.into(),
-            Self::ComponentNotRegistered(error) => error.into(),
+            Self::Downcast(error) => error,
         }
     }
 }
@@ -122,39 +117,10 @@ impl From<InvalidEntityLocationError> for GetAtError {
     }
 }
 
-impl From<DuplicateComponentError> for GetAtError {
+impl From<DowncastErrorKind> for GetAtError {
     #[inline]
-    fn from(error: DuplicateComponentError) -> Self {
-        Self::DuplicateComponent(error)
-    }
-}
-
-impl From<MissingComponentError> for GetAtError {
-    #[inline]
-    fn from(error: MissingComponentError) -> Self {
-        Self::MissingComponent(error)
-    }
-}
-
-impl From<NotRegisteredError> for GetAtError {
-    #[inline]
-    fn from(error: NotRegisteredError) -> Self {
-        Self::ComponentNotRegistered(error)
-    }
-}
-
-impl From<IncompatibleArchetypeError> for GetAtError {
-    #[inline]
-    fn from(error: IncompatibleArchetypeError) -> Self {
-        use IncompatibleArchetypeError::{
-            ComponentNotRegistered, DuplicateComponent, MissingComponent,
-        };
-
-        match error {
-            DuplicateComponent(error) => Self::DuplicateComponent(error),
-            MissingComponent(error) => Self::MissingComponent(error),
-            ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
-        }
+    fn from(error: DowncastErrorKind) -> Self {
+        Self::Downcast(error)
     }
 }
 
@@ -162,9 +128,7 @@ impl Display for GetAtError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidEntityLocation(error) => Display::fmt(error, f),
-            Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::MissingComponent(error) => Display::fmt(error, f),
-            Self::ComponentNotRegistered(error) => Display::fmt(error, f),
+            Self::Downcast(error) => Display::fmt(error, f),
         }
     }
 }
@@ -173,9 +137,7 @@ impl Error for GetAtError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::InvalidEntityLocation(error) => Some(error),
-            Self::DuplicateComponent(error) => Some(error),
-            Self::MissingComponent(error) => Some(error),
-            Self::ComponentNotRegistered(error) => Some(error),
+            Self::Downcast(error) => Some(error),
         }
     }
 }
@@ -184,7 +146,7 @@ impl Error for GetAtError {
 #[non_exhaustive]
 pub struct InsertExactError<T> {
     pub value: T,
-    pub reason: AlreadyHasComponentError,
+    pub source: AlreadyHasComponentError,
 }
 
 impl<T> Display for InsertExactError<T>
@@ -192,8 +154,8 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "exact bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -202,8 +164,8 @@ where
     T: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -260,17 +222,17 @@ impl Error for InsertExactAtErrorKind {
 #[non_exhaustive]
 pub struct InsertExactAtError<T> {
     pub value: T,
-    pub reason: InsertExactAtErrorKind,
+    pub source: InsertExactAtErrorKind,
 }
 
 impl<T> InsertExactAtError<T> {
     #[inline]
     #[track_caller]
     pub(crate) fn with_valid_location(self) -> InsertExactError<T> {
-        let Self { value, reason } = self;
+        let Self { value, source } = self;
 
-        let reason = reason.with_valid_location();
-        InsertExactError { value, reason }
+        let source = source.with_valid_location();
+        InsertExactError { value, source }
     }
 }
 
@@ -279,8 +241,8 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "exact bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -289,8 +251,8 @@ where
     T: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        reason.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 
@@ -298,15 +260,15 @@ where
 #[non_exhaustive]
 pub struct InsertAtError<T> {
     pub value: T,
-    pub reason: InvalidEntityLocationError,
+    pub source: InvalidEntityLocationError,
 }
 
 impl<T> InsertAtError<T> {
     #[inline]
     #[track_caller]
     pub(crate) fn with_valid_location(self) -> ! {
-        let Self { reason, .. } = self;
-        reason.with_valid_location()
+        let Self { source, .. } = self;
+        source.with_valid_location()
     }
 }
 
@@ -315,8 +277,8 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -325,8 +287,8 @@ where
     T: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -375,7 +337,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub reason: InsertBundleExactErrorKind,
+    pub source: InsertBundleExactErrorKind,
 }
 
 impl<B> Display for InsertBundleExactError<B>
@@ -383,8 +345,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "exact bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -393,8 +355,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        reason.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 
@@ -477,7 +439,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub reason: InsertBundleExactAtErrorKind,
+    pub source: InsertBundleExactAtErrorKind,
 }
 
 impl<B> InsertBundleExactAtError<B>
@@ -487,10 +449,10 @@ where
     #[inline]
     #[track_caller]
     pub(crate) fn with_valid_location(self) -> InsertBundleExactError<B> {
-        let Self { value, reason } = self;
+        let Self { value, source } = self;
 
-        let reason = reason.with_valid_location();
-        InsertBundleExactError { value, reason }
+        let source = source.with_valid_location();
+        InsertBundleExactError { value, source }
     }
 }
 
@@ -499,8 +461,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "exact bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -509,8 +471,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        reason.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 
@@ -521,7 +483,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub reason: DuplicateComponentError,
+    pub source: DuplicateComponentError,
 }
 
 impl<B> Display for InsertBundleError<B>
@@ -529,8 +491,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -539,8 +501,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        reason.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 
@@ -551,7 +513,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub reason: InsertBundleAtErrorKind,
+    pub source: InsertBundleAtErrorKind,
 }
 
 impl<B> InsertBundleAtError<B>
@@ -561,10 +523,10 @@ where
     #[inline]
     #[track_caller]
     pub(crate) fn into_insert_bundle_error(self) -> InsertBundleError<B> {
-        let Self { value, reason } = self;
+        let Self { value, source } = self;
 
-        let reason = reason.with_valid_location();
-        InsertBundleError { value, reason }
+        let source = source.with_valid_location();
+        InsertBundleError { value, source }
     }
 }
 
@@ -573,8 +535,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
-        write!(f, "bundle {value} cannot be inserted: {reason}")
+        let Self { value, source } = self;
+        write!(f, "bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -583,8 +545,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        reason.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 
@@ -854,7 +816,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub reason: IncompatibleArchetypeExactError,
+    pub source: IncompatibleArchetypeExactError,
 }
 
 impl<B> Display for IncompatibleBundleValueError<B>
@@ -862,12 +824,12 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, reason } = self;
+        let Self { value, source } = self;
 
-        let Some(reason) = reason.source() else {
+        let Some(source) = source.source() else {
             unreachable!("incompatible bundle exact error should have a source")
         };
-        write!(f, "incompatible bundle {value}: {reason}")
+        write!(f, "incompatible bundle {value}: {source}")
     }
 }
 
@@ -876,7 +838,7 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        reason.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }

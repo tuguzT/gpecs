@@ -54,7 +54,7 @@ pub fn check_len(len: usize, expected: usize) -> Result<(), LenMismatchError> {
     LenMismatchError::new(expected, len).map_or(Ok(()), Err)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayoutMismatchError {
     expected: Layout,
     actual: Layout,

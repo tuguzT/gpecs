@@ -368,8 +368,8 @@ impl Context {
         } = self;
 
         let Some(location) = entities.get_mut(entity) else {
-            let kind = EntityNotFoundError::new(entity).into();
-            return Err(InsertBundleExactError { value, kind });
+            let source = EntityNotFoundError::new(entity).into();
+            return Err(InsertBundleExactError { value, source });
         };
 
         let archetype_id = archetypes
@@ -393,8 +393,8 @@ impl Context {
         } = self;
 
         let Some(location) = entities.get_mut(entity) else {
-            let kind = EntityNotFoundError::new(entity).into();
-            return Err(InsertBundleError { value, kind });
+            let source = EntityNotFoundError::new(entity).into();
+            return Err(InsertBundleError { value, source });
         };
 
         let archetype_id = archetypes

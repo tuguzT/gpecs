@@ -27,7 +27,7 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite<Self> + Sized {
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
         let context = Self::Context::default();
         let value = BoxedErasedSoa::try_from::<Self, _>(&context, black_box(value))
-            .map_err(|error| error.reason)
+            .map_err(|error| error.source)
             .expect("failed to convert value into erased SoA");
         vec.push(value);
     }

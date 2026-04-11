@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -85,7 +85,7 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedPtr<CastConstPtr<T>> {
+    pub fn cast_const(self) -> ErasedPtr<CastConst<T>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.cast_const();
@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedRef<'a, CastConstPtr<T>> {
+    pub unsafe fn deref<'a>(self) -> ErasedRef<'a, CastConst<T>> {
         unsafe { self.cast_const().deref() }
     }
 
@@ -114,7 +114,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from(self, origin: ErasedPtr<CastConstPtr<T>>) -> isize {
+    pub unsafe fn offset_from(self, origin: ErasedPtr<CastConst<T>>) -> isize {
         let Self { layout, ptr } = self;
 
         let offset = unsafe { ptr.offset_from(origin.cast_mut().ptr()) };
@@ -136,7 +136,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from(self, src: ErasedPtr<CastConstPtr<T>>, count: usize) {
+    pub unsafe fn copy_from(self, src: ErasedPtr<CastConst<T>>, count: usize) {
         let Self { layout, ptr } = self;
 
         let src = src.ptr();
@@ -145,7 +145,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from_nonoverlapping(self, src: ErasedPtr<CastConstPtr<T>>, count: usize) {
+    pub unsafe fn copy_from_nonoverlapping(self, src: ErasedPtr<CastConst<T>>, count: usize) {
         let Self { layout, ptr } = self;
 
         let src = src.ptr();

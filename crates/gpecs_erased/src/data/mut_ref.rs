@@ -10,7 +10,7 @@ use crate::{
         ErasedMutPtr, ErasedPtr, ErasedRef,
         error::{DataError, DowncastError, TryFromPtrError},
     },
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
 };
 
 pub struct ErasedMutRef<'a, T>
@@ -88,7 +88,7 @@ where
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedPtr<CastConstPtr<T>> {
+    pub fn as_field_ptr(&self) -> ErasedPtr<CastConst<T>> {
         let Self { ptr, .. } = *self;
         ptr.cast_const()
     }
@@ -167,7 +167,7 @@ where
     }
 }
 
-impl<'a, T> From<ErasedMutRef<'a, T>> for ErasedRef<'a, CastConstPtr<T>>
+impl<'a, T> From<ErasedMutRef<'a, T>> for ErasedRef<'a, CastConst<T>>
 where
     T: MutSliceItemPtr,
 {

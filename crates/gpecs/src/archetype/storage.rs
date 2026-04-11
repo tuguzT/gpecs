@@ -7,10 +7,7 @@ use crate::{
     archetype::{
         erased::{
             ErasedArchetype, FromComponentInfo,
-            error::{
-                ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-                IncompatibleArchetypeExactError,
-            },
+            error::{ArchetypeError, DuplicateComponentError, IncompatibleArchetypeExactError},
         },
         error::IncompatibleBundleValueError,
     },
@@ -19,7 +16,7 @@ use crate::{
         erased::{
             ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ErasedBundleMutRefs,
             ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices, FromErasedComponent,
-            ShuffledBundle, traits::ErasedArchetypeKind,
+            ShuffledBundle, error::DowncastErrorKind, traits::ErasedArchetypeKind,
         },
     },
     component::{
@@ -310,7 +307,7 @@ impl ArchetypeStorage {
     pub fn bundles<B, T>(
         &self,
         components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<(&[Entity], BundleSlices<'_, B>), IncompatibleArchetypeError>
+    ) -> Result<(&[Entity], BundleSlices<'_, B>), DowncastErrorKind>
     where
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -324,7 +321,7 @@ impl ArchetypeStorage {
     pub fn bundles_mut<B, T>(
         &mut self,
         components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<(&[Entity], BundleSlicesMut<'_, B>), IncompatibleArchetypeError>
+    ) -> Result<(&[Entity], BundleSlicesMut<'_, B>), DowncastErrorKind>
     where
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -339,7 +336,7 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
-    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefs<'_, B>>, DowncastErrorKind>
     where
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -357,7 +354,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
-    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefsMut<'_, B>>, DowncastErrorKind>
     where
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -381,11 +378,11 @@ impl ArchetypeStorage {
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        if let Err(reason) = self
+        if let Err(source) = self
             .archetype()
             .check_exact_compatibility_of::<B, T>(components)
         {
-            let error = IncompatibleBundleValueError { value, reason };
+            let error = IncompatibleBundleValueError { value, source };
             return Err(error);
         }
 

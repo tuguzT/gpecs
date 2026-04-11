@@ -10,7 +10,7 @@ use crate::{
     ErasedSoaRefsIter,
     data::{ErasedMutRef, ErasedRef},
     error::{DowncastError, PtrsError},
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput,
@@ -150,7 +150,7 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConstPtr<P>> {
+    pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConst<P>> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -184,8 +184,8 @@ where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedRef<'a, CastConstPtr<P>>;
-    type IntoIter = ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConstPtr<P>>;
+    type Item = ErasedRef<'a, CastConst<P>>;
+    type IntoIter = ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConst<P>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -224,7 +224,7 @@ where
     }
 }
 
-impl<'a, D, P> From<ErasedSoaMutRefs<'a, D, P>> for ErasedSoaRefs<'a, D, CastConstPtr<P>>
+impl<'a, D, P> From<ErasedSoaMutRefs<'a, D, P>> for ErasedSoaRefs<'a, D, CastConst<P>>
 where
     P: MutSliceItemPtr,
 {

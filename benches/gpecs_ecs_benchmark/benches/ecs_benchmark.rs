@@ -10,7 +10,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gpecs::{context::error::IncompatibleBundleError, prelude::*};
+use gpecs::{
+    bundle::erased::error::DowncastErrorKind, context::error::IncompatibleBundleError, prelude::*,
+};
 use gpecs_ecs_benchmark_types::{
     components::{
         DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, PlayerType, Position,
@@ -379,7 +381,7 @@ fn add_components(context: &mut Context, entity: Entity) {
         .expect("entity should be present & should not have these components");
 
     match context.get_bundle::<(Position,)>(entity) {
-        Err(IncompatibleBundleError::MissingComponent(_)) => context
+        Err(IncompatibleBundleError::Downcast(DowncastErrorKind::MissingComponent(_))) => context
             .insert_bundle_exact(entity, (Position::default(),))
             .expect("entity should be present & should not have `Position` component"),
         Err(error) => unreachable!("unexpected error occurred: {error}"),

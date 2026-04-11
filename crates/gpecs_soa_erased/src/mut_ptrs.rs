@@ -17,7 +17,7 @@ use crate::{
         check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
@@ -71,7 +71,7 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedSoaPtrs<D, CastConstPtr<P>> {
+    pub fn cast_const(self) -> ErasedSoaPtrs<D, CastConst<P>> {
         let Self {
             descriptors,
             buffer,
@@ -84,7 +84,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaRefs<'a, D, CastConstPtr<P>> {
+    pub unsafe fn deref<'a>(self) -> ErasedSoaRefs<'a, D, CastConst<P>> {
         unsafe { self.cast_const().deref() }
     }
 
@@ -221,10 +221,7 @@ where
 {
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from<'e, E>(
-        &'a self,
-        origin: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
-    ) -> isize
+    pub unsafe fn offset_from<'e, E>(&'a self, origin: &'e ErasedSoaPtrs<E, CastConst<P>>) -> isize
     where
         E: FieldDescriptors<'e> + ?Sized,
     {
@@ -245,7 +242,7 @@ where
     }
 
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, CastConstPtr<P>> {
+    pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, CastConst<P>> {
         let Self {
             ref descriptors,
             buffer,
@@ -313,7 +310,7 @@ where
     #[track_caller]
     pub unsafe fn copy_from_forward<'e, E>(
         &'a mut self,
-        src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
+        src: &'e ErasedSoaPtrs<E, CastConst<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
@@ -333,7 +330,7 @@ where
     #[track_caller]
     pub unsafe fn copy_from_backward<'e, E>(
         &'a mut self,
-        src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
+        src: &'e ErasedSoaPtrs<E, CastConst<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
@@ -342,7 +339,7 @@ where
         fn rec<'dst, 'src, D, E, P>(
             dst_ptrs: &'dst ErasedSoaMutPtrs<D, P>,
             dst_state: &mut RawBufferOffsets,
-            src_ptrs: &'src ErasedSoaPtrs<E, CastConstPtr<P>>,
+            src_ptrs: &'src ErasedSoaPtrs<E, CastConst<P>>,
             src_state: &mut RawBufferOffsets,
             i: usize,
             n: usize,
@@ -375,7 +372,7 @@ where
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping<'e, E>(
         &'a mut self,
-        src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
+        src: &'e ErasedSoaPtrs<E, CastConst<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
@@ -465,8 +462,8 @@ where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedPtr<CastConstPtr<P>>;
-    type IntoIter = ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, CastConstPtr<P>>;
+    type Item = ErasedPtr<CastConst<P>>;
+    type IntoIter = ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, CastConst<P>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{CastMutPtr, ConstSliceItemPtr},
+    ptr::slice::{CastMut, ConstSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -85,7 +85,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedMutPtr<CastMutPtr<T>> {
+    pub fn cast_mut(self) -> ErasedMutPtr<CastMut<T>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.cast_mut();

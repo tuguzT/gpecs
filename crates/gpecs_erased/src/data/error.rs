@@ -72,14 +72,14 @@ pub struct DowncastError<T>
 where
     T: ?Sized,
 {
-    pub reason: LayoutMismatchError,
+    pub source: LayoutMismatchError,
     pub value: T,
 }
 
 impl<T> DowncastError<T> {
     #[inline]
-    fn new(value: T, reason: LayoutMismatchError) -> Self {
-        Self { reason, value }
+    fn new(value: T, source: LayoutMismatchError) -> Self {
+        Self { source, value }
     }
 
     #[inline]
@@ -87,8 +87,8 @@ impl<T> DowncastError<T> {
     where
         F: FnOnce(T) -> U,
     {
-        let Self { reason, value } = self;
-        DowncastError::new(f(value), reason)
+        let Self { source, value } = self;
+        DowncastError::new(f(value), source)
     }
 }
 
@@ -97,8 +97,8 @@ where
     T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, value } = self;
-        write!(f, "failed to downcast {value}: {reason}")
+        let Self { source, value } = self;
+        write!(f, "failed to downcast {value}: {source}")
     }
 }
 
@@ -107,8 +107,8 @@ where
     T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -117,7 +117,7 @@ pub(super) fn check_downcast<T, U>(layout: Layout, value: U) -> Result<U, Downca
     let expected = Layout::new::<T>();
     match check_layout(layout, expected) {
         Ok(()) => Ok(value),
-        Err(reason) => Err(DowncastError::new(value, reason)),
+        Err(source) => Err(DowncastError::new(value, source)),
     }
 }
 
@@ -268,14 +268,14 @@ pub struct FromValueError<T, V>
 where
     V: ?Sized,
 {
-    pub reason: FromValueErrorKind<T>,
+    pub source: FromValueErrorKind<T>,
     pub value: V,
 }
 
 impl<T, V> FromValueError<T, V> {
     #[inline]
-    pub(crate) fn new(reason: FromValueErrorKind<T>, value: V) -> Self {
-        Self { reason, value }
+    pub(crate) fn new(source: FromValueErrorKind<T>, value: V) -> Self {
+        Self { source, value }
     }
 }
 
@@ -285,8 +285,8 @@ where
     V: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, value } = self;
-        write!(f, "failed to convert {value}: {reason}")
+        let Self { source, value } = self;
+        write!(f, "failed to convert {value}: {source}")
     }
 }
 
@@ -296,8 +296,8 @@ where
     V: Debug + Display + ?Sized,
 {
     fn cause(&self) -> Option<&dyn Error> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -351,13 +351,13 @@ pub struct FromStorageError<T>
 where
     T: ?Sized,
 {
-    pub reason: FromStorageErrorKind,
+    pub source: FromStorageErrorKind,
     pub storage: T,
 }
 
 impl<T> FromStorageError<T> {
-    pub(crate) fn new(reason: FromStorageErrorKind, storage: T) -> Self {
-        Self { reason, storage }
+    pub(crate) fn new(source: FromStorageErrorKind, storage: T) -> Self {
+        Self { source, storage }
     }
 }
 
@@ -366,8 +366,8 @@ where
     T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, storage } = self;
-        write!(f, "failed to create erased field with {storage}: {reason}")
+        let Self { source, storage } = self;
+        write!(f, "failed to create erased field with {storage}: {source}")
     }
 }
 
@@ -376,8 +376,8 @@ where
     T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 

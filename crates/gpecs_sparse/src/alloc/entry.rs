@@ -198,7 +198,7 @@ where
         V: SoaReadOwned<W> + SoaWrite<W>,
     {
         self.try_replace_key(key)
-            .unwrap_or_else(|error| try_replace_key_failed(error.kind))
+            .unwrap_or_else(|error| try_replace_key_failed(error.source))
     }
 }
 
@@ -646,7 +646,7 @@ macro_rules! generate_entry_types {
             {
                 match self {
                     Self::Occupied(mut entry) => {
-                        entry.try_replace_key(key).map_err(|error| error.kind)?;
+                        entry.try_replace_key(key).map_err(|error| error.source)?;
                         Ok(Self::Occupied(entry))
                     }
                     Self::Vacant(entry) => {

@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentMismatchError {
     expected: ComponentId,
     actual: ComponentId,
@@ -327,14 +327,14 @@ pub struct DowncastError<T>
 where
     T: ?Sized,
 {
-    pub reason: DowncastErrorKind,
+    pub source: DowncastErrorKind,
     pub value: T,
 }
 
 impl<T> DowncastError<T> {
     #[inline]
-    pub(super) fn new(value: T, reason: DowncastErrorKind) -> Self {
-        Self { reason, value }
+    pub(super) fn new(value: T, source: DowncastErrorKind) -> Self {
+        Self { source, value }
     }
 
     #[inline]
@@ -342,25 +342,25 @@ impl<T> DowncastError<T> {
     where
         F: FnOnce(T) -> U,
     {
-        let Self { reason, value } = self;
-        DowncastError::new(f(value), reason)
+        let Self { source, value } = self;
+        DowncastError::new(f(value), source)
     }
 }
 
 impl<T> From<DataDowncastError<T>> for DowncastError<T> {
     #[inline]
     fn from(error: DataDowncastError<T>) -> Self {
-        let DataDowncastError { reason, value, .. } = error;
-        let reason = reason.into();
-        Self::new(value, reason)
+        let DataDowncastError { source, value, .. } = error;
+        let source = source.into();
+        Self::new(value, source)
     }
 }
 
 impl<T> From<DowncastError<T>> for DowncastErrorKind {
     #[inline]
     fn from(error: DowncastError<T>) -> Self {
-        let DowncastError { reason, .. } = error;
-        reason
+        let DowncastError { source, .. } = error;
+        source
     }
 }
 
@@ -369,8 +369,8 @@ where
     T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, value } = self;
-        write!(f, "failed to downcast {value} into component: {reason}")
+        let Self { source, value } = self;
+        write!(f, "failed to downcast {value} into component: {source}")
     }
 }
 
@@ -379,8 +379,8 @@ where
     T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -396,7 +396,7 @@ where
 {
     match check_downcast_inner::<C, T>(components, component_id) {
         Ok(()) => Ok(value),
-        Err(reason) => Err(DowncastError::new(value, reason)),
+        Err(source) => Err(DowncastError::new(value, source)),
     }
 }
 
@@ -485,22 +485,22 @@ where
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct FromComponentError<T, C> {
-    pub reason: FromComponentErrorKind<T>,
+    pub source: FromComponentErrorKind<T>,
     pub component: C,
 }
 
 impl<T, C> FromComponentError<T, C> {
     #[inline]
-    pub(super) fn new(component: C, reason: FromComponentErrorKind<T>) -> Self {
-        Self { reason, component }
+    pub(super) fn new(component: C, source: FromComponentErrorKind<T>) -> Self {
+        Self { source, component }
     }
 }
 
 impl<T, C> From<FromValueError<T, C>> for FromComponentError<T, C> {
     #[inline]
     fn from(error: FromValueError<T, C>) -> Self {
-        let FromValueError { value, reason, .. } = error;
-        Self::new(value, reason.into())
+        let FromValueError { value, source, .. } = error;
+        Self::new(value, source.into())
     }
 }
 
@@ -510,8 +510,8 @@ where
     C: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, component } = self;
-        write!(f, "failed to convert component {component}: {reason}")
+        let Self { source, component } = self;
+        write!(f, "failed to convert component {component}: {source}")
     }
 }
 
@@ -528,13 +528,13 @@ pub struct FromStorageError<T>
 where
     T: ?Sized,
 {
-    pub reason: FromStorageErrorKind,
+    pub source: FromStorageErrorKind,
     pub storage: T,
 }
 
 impl<T> FromStorageError<T> {
-    pub(crate) fn new(reason: FromStorageErrorKind, storage: T) -> Self {
-        Self { reason, storage }
+    pub(crate) fn new(source: FromStorageErrorKind, storage: T) -> Self {
+        Self { source, storage }
     }
 }
 
@@ -542,10 +542,10 @@ impl<T> From<DataFromStorageError<T>> for FromStorageError<T> {
     #[inline]
     fn from(error: DataFromStorageError<T>) -> Self {
         let DataFromStorageError {
-            reason, storage, ..
+            source, storage, ..
         } = error;
-        let reason = reason.into();
-        Self::new(reason, storage)
+        let source = source.into();
+        Self::new(source, storage)
     }
 }
 
@@ -554,10 +554,10 @@ where
     T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, storage } = self;
+        let Self { source, storage } = self;
         write!(
             f,
-            "failed to create erased component with {storage}: {reason}"
+            "failed to create erased component with {storage}: {source}"
         )
     }
 }
@@ -567,8 +567,8 @@ where
     T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 

@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedMutRef,
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
 };
 use polonius_the_crab::{polonius, polonius_return};
 
@@ -113,13 +113,13 @@ where
         let Self { component_id, .. } = *self;
         let mut this = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let reason = polonius!(|this| -> Result<&'polonius mut C, _> {
+        let source = polonius!(|this| -> Result<&'polonius mut C, _> {
             match unsafe { this.field.downcast_mut() } {
                 Ok(component) => polonius_return!(Ok(component)),
-                Err(error) => error.reason.into(),
+                Err(error) => error.source.into(),
             }
         });
-        Err(DowncastError::new(this, reason))
+        Err(DowncastError::new(this, source))
     }
 
     #[inline]
@@ -135,7 +135,7 @@ where
     }
 
     #[inline]
-    pub fn as_component_ptr(&self) -> ErasedComponentPtr<CastConstPtr<T>> {
+    pub fn as_component_ptr(&self) -> ErasedComponentPtr<CastConst<T>> {
         let Self {
             ref field,
             component_id,
@@ -276,7 +276,7 @@ where
     }
 }
 
-impl<'a, T> From<ErasedComponentMutRef<'a, T>> for ErasedComponentRef<'a, CastConstPtr<T>>
+impl<'a, T> From<ErasedComponentMutRef<'a, T>> for ErasedComponentRef<'a, CastConst<T>>
 where
     T: MutSliceItemPtr,
 {

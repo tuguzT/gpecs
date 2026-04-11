@@ -4,24 +4,29 @@ use std::{
     fmt::{self, Debug, Display},
 };
 
-use gpecs_soa_erased::storage::AllocError;
+use gpecs_soa_erased::{error::LayoutMismatchError, storage::AllocError};
 
-use crate::archetype::erased::error::{
-    AlreadyHasComponentError, ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-    IncompatibleArchetypeViewExactError, MissingComponentError,
+use crate::{
+    archetype::erased::error::{
+        AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
+        IncompatibleArchetypeError, IncompatibleArchetypeViewExactError, MissingComponentError,
+    },
+    component::erased::error::{
+        ComponentMismatchError, DowncastErrorKind as ComponentDowncastErrorKind, NotRegisteredError,
+    },
 };
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct FromBundleError<B> {
-    pub reason: FromBundleErrorKind,
+    pub source: FromBundleErrorKind,
     pub bundle: B,
 }
 
 impl<B> FromBundleError<B> {
     #[inline]
-    pub(super) fn new(bundle: B, reason: FromBundleErrorKind) -> Self {
-        Self { reason, bundle }
+    pub(super) fn new(bundle: B, source: FromBundleErrorKind) -> Self {
+        Self { source, bundle }
     }
 }
 
@@ -30,8 +35,8 @@ where
     B: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, bundle } = self;
-        write!(f, "failed to create erased bundle from {bundle}: {reason}")
+        let Self { source, bundle } = self;
+        write!(f, "failed to create erased bundle from {bundle}: {source}")
     }
 }
 
@@ -40,8 +45,8 @@ where
     B: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -134,7 +139,7 @@ impl Error for FromComponentsError {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ShuffleError<T, A> {
-    pub reason: ShuffleErrorKind,
+    pub source: ShuffleErrorKind,
     pub bundle: T,
     pub archetype: A,
 }
@@ -142,8 +147,8 @@ pub struct ShuffleError<T, A> {
 impl<T, A> From<ShuffleError<T, A>> for ShuffleErrorKind {
     #[inline]
     fn from(error: ShuffleError<T, A>) -> Self {
-        let ShuffleError { reason, .. } = error;
-        reason
+        let ShuffleError { source, .. } = error;
+        source
     }
 }
 
@@ -154,12 +159,12 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            reason,
+            source,
             bundle,
             archetype,
         } = self;
 
-        write!(f, "failed to shuffle {bundle} by {archetype}: {reason}")
+        write!(f, "failed to shuffle {bundle} by {archetype}: {source}")
     }
 }
 
@@ -169,8 +174,8 @@ where
     A: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -224,7 +229,7 @@ impl Error for ShuffleErrorKind {
 
 #[derive(Debug, Clone)]
 pub struct InsertError<T, I> {
-    pub reason: InsertErrorKind,
+    pub source: InsertErrorKind,
     pub bundle: T,
     pub to_insert: I,
 }
@@ -232,8 +237,8 @@ pub struct InsertError<T, I> {
 impl<T, I> From<InsertError<T, I>> for InsertErrorKind {
     #[inline]
     fn from(error: InsertError<T, I>) -> Self {
-        let InsertError { reason, .. } = error;
-        reason
+        let InsertError { source, .. } = error;
+        source
     }
 }
 
@@ -244,12 +249,12 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            reason,
+            source,
             bundle,
             to_insert,
         } = self;
 
-        write!(f, "failed to insert {to_insert} into {bundle}: {reason}")
+        write!(f, "failed to insert {to_insert} into {bundle}: {source}")
     }
 }
 
@@ -259,8 +264,8 @@ where
     I: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -314,7 +319,7 @@ impl Error for InsertErrorKind {
 
 #[derive(Debug, Clone)]
 pub struct ReplaceError<T, R> {
-    pub reason: ReplaceErrorKind,
+    pub source: ReplaceErrorKind,
     pub bundle: T,
     pub to_replace: R,
 }
@@ -322,8 +327,8 @@ pub struct ReplaceError<T, R> {
 impl<T, R> From<ReplaceError<T, R>> for ReplaceErrorKind {
     #[inline]
     fn from(error: ReplaceError<T, R>) -> Self {
-        let ReplaceError { reason, .. } = error;
-        reason
+        let ReplaceError { source, .. } = error;
+        source
     }
 }
 
@@ -334,12 +339,12 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            reason,
+            source,
             bundle,
             to_replace,
         } = self;
 
-        write!(f, "failed to replace {to_replace} in {bundle}: {reason}")
+        write!(f, "failed to replace {to_replace} in {bundle}: {source}")
     }
 }
 
@@ -349,8 +354,8 @@ where
     R: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -395,15 +400,15 @@ impl Error for ReplaceErrorKind {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct RemoveError<T> {
-    pub reason: RemoveErrorKind,
+    pub source: RemoveErrorKind,
     pub bundle: T,
 }
 
 impl<T> From<RemoveError<T>> for RemoveErrorKind {
     #[inline]
     fn from(error: RemoveError<T>) -> Self {
-        let RemoveError { reason, .. } = error;
-        reason
+        let RemoveError { source, .. } = error;
+        source
     }
 }
 
@@ -412,8 +417,8 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, bundle } = self;
-        write!(f, "failed to remove components from {bundle}: {reason}")
+        let Self { source, bundle } = self;
+        write!(f, "failed to remove components from {bundle}: {source}")
     }
 }
 
@@ -422,8 +427,8 @@ where
     T: Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
     }
 }
 
@@ -471,14 +476,14 @@ pub struct DowncastError<T>
 where
     T: ?Sized,
 {
-    pub reason: IncompatibleArchetypeError,
+    pub source: DowncastErrorKind,
     pub value: T,
 }
 
 impl<T> DowncastError<T> {
     #[inline]
-    pub(super) fn new(value: T, reason: IncompatibleArchetypeError) -> Self {
-        Self { reason, value }
+    pub(super) fn new(value: T, source: DowncastErrorKind) -> Self {
+        Self { source, value }
     }
 
     #[inline]
@@ -486,16 +491,16 @@ impl<T> DowncastError<T> {
     where
         F: FnOnce(T) -> U,
     {
-        let Self { reason, value } = self;
-        DowncastError::new(f(value), reason)
+        let Self { source, value } = self;
+        DowncastError::new(f(value), source)
     }
 }
 
-impl<T> From<DowncastError<T>> for IncompatibleArchetypeError {
+impl<T> From<DowncastError<T>> for DowncastErrorKind {
     #[inline]
     fn from(error: DowncastError<T>) -> Self {
-        let DowncastError { reason, .. } = error;
-        reason
+        let DowncastError { source, .. } = error;
+        source
     }
 }
 
@@ -504,8 +509,8 @@ where
     T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, value } = self;
-        write!(f, "failed to downcast {value} into component: {reason}")
+        let Self { source, value } = self;
+        write!(f, "failed to downcast {value} into bundle: {source}")
     }
 }
 
@@ -514,7 +519,105 @@ where
     T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { reason, .. } = self;
-        Some(reason)
+        let Self { source, .. } = self;
+        Some(source)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DowncastErrorKind {
+    DuplicateComponent(DuplicateComponentError),
+    MissingComponent(MissingComponentError),
+    ComponentNotRegistered(NotRegisteredError),
+    ComponentMismatch(ComponentMismatchError),
+    LayoutMismatch(LayoutMismatchError),
+}
+
+impl From<DuplicateComponentError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<MissingComponentError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
+    }
+}
+
+impl From<NotRegisteredError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: NotRegisteredError) -> Self {
+        Self::ComponentNotRegistered(error)
+    }
+}
+
+impl From<ComponentMismatchError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: ComponentMismatchError) -> Self {
+        Self::ComponentMismatch(error)
+    }
+}
+
+impl From<LayoutMismatchError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
+impl From<IncompatibleArchetypeError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: IncompatibleArchetypeError) -> Self {
+        use IncompatibleArchetypeError::{
+            ComponentNotRegistered, DuplicateComponent, MissingComponent,
+        };
+
+        match error {
+            DuplicateComponent(error) => Self::DuplicateComponent(error),
+            MissingComponent(error) => Self::MissingComponent(error),
+            ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
+        }
+    }
+}
+
+impl From<ComponentDowncastErrorKind> for DowncastErrorKind {
+    #[inline]
+    fn from(error: ComponentDowncastErrorKind) -> Self {
+        use ComponentDowncastErrorKind::{
+            ComponentMismatch, ComponentNotRegistered, LayoutMismatch,
+        };
+
+        match error {
+            ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
+            ComponentMismatch(error) => Self::ComponentMismatch(error),
+            LayoutMismatch(error) => Self::LayoutMismatch(error),
+        }
+    }
+}
+
+impl Display for DowncastErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
+            Self::ComponentNotRegistered(error) => Display::fmt(error, f),
+            Self::ComponentMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for DowncastErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
+            Self::ComponentNotRegistered(error) => Some(error),
+            Self::ComponentMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+        }
     }
 }

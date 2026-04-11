@@ -10,7 +10,7 @@ use crate::{
     data::{ErasedMutSlicePtr, ErasedSlicePtr},
     error::{DowncastError, SlicePtrsError, check_offset, check_offset_len},
     error::{check_ptr_align, check_sufficient_align, check_sufficient_len},
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput,
@@ -65,14 +65,14 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, CastConstPtr<P>> {
+    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.cast_const();
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D, CastConstPtr<P>> {
+    pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D, CastConst<P>> {
         unsafe { self.cast_const().deref() }
     }
 
@@ -187,7 +187,7 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, CastConstPtr<P>> {
+    pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, CastConst<P>> {
         let Self { ref ptrs, len } = *self;
 
         let ptrs = ptrs.iter();
@@ -243,8 +243,8 @@ where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedSlicePtr<CastConstPtr<P>>;
-    type IntoIter = ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, CastConstPtr<P>>;
+    type Item = ErasedSlicePtr<CastConst<P>>;
+    type IntoIter = ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, CastConst<P>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

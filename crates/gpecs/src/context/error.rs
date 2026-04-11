@@ -5,10 +5,7 @@ use std::{
 
 use crate::{
     archetype::{
-        erased::error::{
-            AlreadyHasComponentError, DuplicateComponentError,
-            IncompatibleArchetypeError as ArchetypeIncompatibleBundleError, MissingComponentError,
-        },
+        erased::error::{AlreadyHasComponentError, DuplicateComponentError, MissingComponentError},
         error::{
             InsertBundleError as ArchetypeInsertBundleError,
             InsertBundleExactError as ArchetypeInsertBundleExactError,
@@ -16,8 +13,7 @@ use crate::{
             RemoveBundleExactError as ArchetypeRemoveBundleExactError,
         },
     },
-    bundle::Bundle,
-    component::erased::error::NotRegisteredError,
+    bundle::{Bundle, erased::error::DowncastErrorKind},
     entity::Entity,
 };
 
@@ -80,9 +76,7 @@ impl Error for EntityHasNoDataError {}
 pub enum IncompatibleBundleError {
     EntityNotFound(EntityNotFoundError),
     EntityHasNoData(EntityHasNoDataError),
-    DuplicateComponent(DuplicateComponentError),
-    MissingComponent(MissingComponentError),
-    ComponentNotRegistered(NotRegisteredError),
+    Downcast(DowncastErrorKind),
 }
 
 impl From<EntityNotFoundError> for IncompatibleBundleError {
@@ -99,41 +93,10 @@ impl From<EntityHasNoDataError> for IncompatibleBundleError {
     }
 }
 
-impl From<DuplicateComponentError> for IncompatibleBundleError {
+impl From<DowncastErrorKind> for IncompatibleBundleError {
     #[inline]
-    fn from(error: DuplicateComponentError) -> Self {
-        Self::DuplicateComponent(error)
-    }
-}
-
-impl From<MissingComponentError> for IncompatibleBundleError {
-    #[inline]
-    fn from(error: MissingComponentError) -> Self {
-        Self::MissingComponent(error)
-    }
-}
-
-impl From<NotRegisteredError> for IncompatibleBundleError {
-    #[inline]
-    fn from(error: NotRegisteredError) -> Self {
-        Self::ComponentNotRegistered(error)
-    }
-}
-
-impl From<ArchetypeIncompatibleBundleError> for IncompatibleBundleError {
-    #[inline]
-    fn from(error: ArchetypeIncompatibleBundleError) -> Self {
-        match error {
-            ArchetypeIncompatibleBundleError::DuplicateComponent(error) => {
-                Self::DuplicateComponent(error)
-            }
-            ArchetypeIncompatibleBundleError::MissingComponent(error) => {
-                Self::MissingComponent(error)
-            }
-            ArchetypeIncompatibleBundleError::ComponentNotRegistered(error) => {
-                Self::ComponentNotRegistered(error)
-            }
-        }
+    fn from(error: DowncastErrorKind) -> Self {
+        Self::Downcast(error)
     }
 }
 
@@ -143,9 +106,7 @@ impl Display for IncompatibleBundleError {
         match self {
             Self::EntityNotFound(error) => Display::fmt(error, f),
             Self::EntityHasNoData(error) => Display::fmt(error, f),
-            Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::MissingComponent(error) => Display::fmt(error, f),
-            Self::ComponentNotRegistered(error) => Display::fmt(error, f),
+            Self::Downcast(error) => Display::fmt(error, f),
         }
     }
 }
@@ -155,9 +116,7 @@ impl Error for IncompatibleBundleError {
         match self {
             Self::EntityNotFound(error) => Some(error),
             Self::EntityHasNoData(error) => Some(error),
-            Self::DuplicateComponent(error) => Some(error),
-            Self::MissingComponent(error) => Some(error),
-            Self::ComponentNotRegistered(error) => Some(error),
+            Self::Downcast(error) => Some(error),
         }
     }
 }
@@ -231,7 +190,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub kind: InsertBundleExactErrorKind,
+    pub source: InsertBundleExactErrorKind,
 }
 
 impl<B> From<ArchetypeInsertBundleExactError<B>> for InsertBundleExactError<B>
@@ -240,9 +199,9 @@ where
 {
     #[inline]
     fn from(error: ArchetypeInsertBundleExactError<B>) -> Self {
-        let ArchetypeInsertBundleExactError { value, reason } = error;
-        let kind = reason.into();
-        Self { value, kind }
+        let ArchetypeInsertBundleExactError { value, source } = error;
+        let source = source.into();
+        Self { value, source }
     }
 }
 
@@ -251,8 +210,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, kind } = self;
-        write!(f, "exact bundle {value} cannot be inserted: {kind}")
+        let Self { value, source } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -261,8 +220,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { kind, .. } = self;
-        kind.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 
@@ -311,7 +270,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub kind: InsertBundleErrorKind,
+    pub source: InsertBundleErrorKind,
 }
 
 impl<B> From<ArchetypeInsertBundleError<B>> for InsertBundleError<B>
@@ -320,9 +279,9 @@ where
 {
     #[inline]
     fn from(error: ArchetypeInsertBundleError<B>) -> Self {
-        let ArchetypeInsertBundleError { value, reason } = error;
-        let kind = reason.into();
-        Self { value, kind }
+        let ArchetypeInsertBundleError { value, source } = error;
+        let source = source.into();
+        Self { value, source }
     }
 }
 
@@ -331,8 +290,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, kind } = self;
-        write!(f, "bundle {value} cannot be inserted: {kind}")
+        let Self { value, source } = self;
+        write!(f, "bundle {value} cannot be inserted: {source}")
     }
 }
 
@@ -341,8 +300,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { kind, .. } = self;
-        kind.source()
+        let Self { source, .. } = self;
+        source.source()
     }
 }
 

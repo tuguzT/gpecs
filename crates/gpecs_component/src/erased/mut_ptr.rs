@@ -7,7 +7,7 @@ use core::{
 use gpecs_erased::{
     data::ErasedMutPtr,
     layout::WithLayout,
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
 };
 
 use crate::{
@@ -133,7 +133,7 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedComponentPtr<CastConstPtr<T>> {
+    pub fn cast_const(self) -> ErasedComponentPtr<CastConst<T>> {
         let Self {
             component_id,
             field,
@@ -144,7 +144,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedComponentRef<'a, CastConstPtr<T>> {
+    pub unsafe fn deref<'a>(self) -> ErasedComponentRef<'a, CastConst<T>> {
         unsafe { self.cast_const().deref() }
     }
 
@@ -167,7 +167,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from(self, origin: ErasedComponentPtr<CastConstPtr<T>>) -> isize {
+    pub unsafe fn offset_from(self, origin: ErasedComponentPtr<CastConst<T>>) -> isize {
         let Self { field, .. } = self;
 
         let origin = origin.field();
@@ -183,7 +183,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from(self, src: ErasedComponentPtr<CastConstPtr<T>>, count: usize) {
+    pub unsafe fn copy_from(self, src: ErasedComponentPtr<CastConst<T>>, count: usize) {
         let Self { field, .. } = self;
 
         let src = src.field();
@@ -193,7 +193,7 @@ where
     #[inline]
     pub unsafe fn copy_from_nonoverlapping(
         self,
-        src: ErasedComponentPtr<CastConstPtr<T>>,
+        src: ErasedComponentPtr<CastConst<T>>,
         count: usize,
     ) {
         let Self { field, .. } = self;

@@ -10,7 +10,7 @@ use crate::{
     data::ErasedSlicePtr,
     error::{DowncastError, SlicePtrsError, check_offset, check_offset_len},
     error::{check_ptr_align, check_sufficient_align, check_sufficient_len},
-    ptr::slice::{CastMutPtr, ConstSliceItemPtr},
+    ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput,
@@ -64,7 +64,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedSoaMutSlicePtrs<D, CastMutPtr<P>> {
+    pub fn cast_mut(self) -> ErasedSoaMutSlicePtrs<D, CastMut<P>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.cast_mut();
         unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }

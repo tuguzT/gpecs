@@ -1,7 +1,7 @@
 use core::ptr::NonNull;
 
-pub type CastConstPtr<T> = <<T as MutSliceItemPtr>::Ptrs as SliceItemPtrs>::Const;
-pub type CastMutPtr<T> = <<T as ConstSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
+pub type CastConst<T> = <<T as MutSliceItemPtr>::Ptrs as SliceItemPtrs>::Const;
+pub type CastMut<T> = <<T as ConstSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
 pub type NonNullAsPtr<T> = <<T as NonNullSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
 
 pub unsafe trait SliceItemPtrs {
@@ -41,7 +41,7 @@ pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
         unsafe { &*self.as_item_ptr() }
     }
 
-    fn cast_mut(self) -> CastMutPtr<Self> {
+    fn cast_mut(self) -> CastMut<Self> {
         let slice = self.slice().cast_mut();
         let index = self.index();
         unsafe { MutSliceItemPtr::from_slice(slice, index) }
@@ -64,7 +64,7 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
         unsafe { &mut *self.as_mut_item_ptr() }
     }
 
-    fn cast_const(self) -> CastConstPtr<Self> {
+    fn cast_const(self) -> CastConst<Self> {
         let slice = self.slice().cast_const();
         let index = self.index();
         unsafe { ConstSliceItemPtr::from_slice(slice, index) }
@@ -74,9 +74,9 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
 
     unsafe fn swap(self, with: Self);
 
-    unsafe fn copy_from(self, src: CastConstPtr<Self>, count: usize);
+    unsafe fn copy_from(self, src: CastConst<Self>, count: usize);
 
-    unsafe fn copy_from_nonoverlapping(self, src: CastConstPtr<Self>, count: usize);
+    unsafe fn copy_from_nonoverlapping(self, src: CastConst<Self>, count: usize);
 }
 
 pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {

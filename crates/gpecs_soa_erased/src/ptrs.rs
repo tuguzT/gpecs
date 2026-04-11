@@ -16,7 +16,7 @@ use crate::{
         check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
-    ptr::slice::{CastMutPtr, ConstSliceItemPtr},
+    ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
@@ -70,7 +70,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedSoaMutPtrs<D, CastMutPtr<P>> {
+    pub fn cast_mut(self) -> ErasedSoaMutPtrs<D, CastMut<P>> {
         let Self {
             descriptors,
             buffer,

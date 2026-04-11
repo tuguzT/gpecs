@@ -23,10 +23,7 @@ use crate::{
     archetype::{
         erased::{
             ErasedArchetype, ErasedArchetypeView,
-            error::{
-                ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-                MissingComponentError,
-            },
+            error::{ArchetypeError, DuplicateComponentError, MissingComponentError},
         },
         error::{
             GetAtError, InsertAtError, InsertBundleAtError, InsertBundleError,
@@ -41,7 +38,8 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, NewBundle,
         erased::{
             ErasedBorrowedBundle, ErasedBorrowedViewBundle, ErasedBundle, ErasedBundleKind,
-            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair, traits::ErasedArchetypeKind,
+            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair, error::DowncastErrorKind,
+            traits::ErasedArchetypeKind,
         },
     },
     component::{
@@ -821,7 +819,7 @@ impl ArchetypeRegistry {
         &self,
         components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
-    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefs<'_, B>>, DowncastErrorKind>
     where
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -846,7 +844,9 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let bundle = bundle.downcast::<B, T>(components)?;
+        let bundle = bundle
+            .downcast::<B, T>(components)
+            .map_err(|error| error.source)?;
         Ok(Some(bundle))
     }
 
@@ -888,7 +888,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistryView<impl Sized, T>,
         entity: Entity,
-    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefsMut<'_, B>>, DowncastErrorKind>
     where
         B: Bundle,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -913,7 +913,9 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let bundle = bundle.downcast::<B, T>(components)?;
+        let bundle = bundle
+            .downcast::<B, T>(components)
+            .map_err(|error| error.source)?;
         Ok(Some(bundle))
     }
 
@@ -985,7 +987,7 @@ impl ArchetypeRegistry {
         );
         let (old_archetype, new_archetype) = match result {
             Ok(archetypes) => archetypes,
-            Err(reason) => return Err(InsertExactAtError { value, reason }),
+            Err(source) => return Err(InsertExactAtError { value, source }),
         };
 
         let Some(old_archetype) = old_archetype else {
@@ -1036,8 +1038,8 @@ impl ArchetypeRegistry {
         let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
-                let reason = error.into();
-                return Err(InsertBundleExactAtError { value, reason });
+                let source = error.into();
+                return Err(InsertBundleExactAtError { value, source });
             }
         };
 
@@ -1054,8 +1056,8 @@ impl ArchetypeRegistry {
         let (old_archetype, new_archetype) = match result {
             Ok(archetypes) => archetypes,
             Err(error) => {
-                let reason = error.into();
-                return Err(InsertBundleExactAtError { value, reason });
+                let source = error.into();
+                return Err(InsertBundleExactAtError { value, source });
             }
         };
 
@@ -1067,7 +1069,7 @@ impl ArchetypeRegistry {
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
         let to_insert = ErasedBundle::try_from(components, value)
-            .map_err(|error| error.reason)
+            .map_err(|error| error.source)
             .expect("bundle compatibility should have been already checked");
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
             .insert(to_insert)
@@ -1116,7 +1118,7 @@ impl ArchetypeRegistry {
         );
         let (old_archetype, new_archetype) = match result {
             Ok(archetypes) => archetypes,
-            Err(reason) => return Err(InsertAtError { value, reason }),
+            Err(source) => return Err(InsertAtError { value, source }),
         };
 
         let Some(old_archetype) = old_archetype else {
@@ -1167,8 +1169,8 @@ impl ArchetypeRegistry {
         let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
-                let reason = error.into();
-                return Err(InsertBundleAtError { value, reason });
+                let source = error.into();
+                return Err(InsertBundleAtError { value, source });
             }
         };
 
@@ -1185,8 +1187,8 @@ impl ArchetypeRegistry {
         let (old_archetype, new_archetype) = match result {
             Ok(archetypes) => archetypes,
             Err(error) => {
-                let reason = error.into();
-                return Err(InsertBundleAtError { value, reason });
+                let source = error.into();
+                return Err(InsertBundleAtError { value, source });
             }
         };
 
@@ -1198,7 +1200,7 @@ impl ArchetypeRegistry {
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
         let to_replace = ErasedBundle::try_from(components, value)
-            .map_err(|error| error.reason)
+            .map_err(|error| error.source)
             .expect("bundle compatibility should have been already checked");
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
             .replace(to_replace)
@@ -1525,7 +1527,7 @@ impl ArchetypeRegistry {
     {
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if let Err(error) = info.storage.insert_bundle(components, entity, value) {
-            let error = error.reason;
+            let error = error.source;
             unreachable!("failed to insert {entity} into {archetype_id}: {error}")
         }
     }

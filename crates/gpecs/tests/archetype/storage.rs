@@ -1,10 +1,10 @@
 use gpecs::{
     archetype::{
-        erased::error::{IncompatibleArchetypeError, MissingComponentError, TooFewComponentsError},
+        erased::error::{MissingComponentError, TooFewComponentsError},
         error::IncompatibleBundleValueError,
         storage::ArchetypeStorage,
     },
-    bundle::NewBundle,
+    bundle::{NewBundle, erased::error::DowncastErrorKind},
     context::Components,
     entity::registry::EntityRegistry,
     world::registry::WorldRegistry,
@@ -95,7 +95,7 @@ fn storage_tuple() {
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert!(matches!(
         error,
-        IncompatibleArchetypeError::ComponentNotRegistered(_),
+        DowncastErrorKind::ComponentNotRegistered(_),
     ));
 
     components.register_component::<Tag>();
@@ -139,17 +139,17 @@ fn storage_tuple() {
         z: 3.0,
         padding: Default::default(),
     };
-    let IncompatibleBundleValueError { value, reason, .. } = storage
+    let IncompatibleBundleValueError { value, source, .. } = storage
         .insert_bundle::<(Position,), _>(&components.as_view(), entity, (position,))
         .expect_err("insertion of just `Position` should fail");
     assert_eq!(value, (position,));
-    assert_eq!(reason, TooFewComponentsError::new().into());
+    assert_eq!(source, TooFewComponentsError::new().into());
 
     let mut name = Name {
         value: "Hello, World!".to_owned(),
     };
     let tag = Tag;
-    let IncompatibleBundleValueError { value, reason, .. } = storage
+    let IncompatibleBundleValueError { value, source, .. } = storage
         .insert_bundle::<(Position, Name, Tag), _>(
             &components.as_view(),
             entity,
@@ -158,7 +158,7 @@ fn storage_tuple() {
         .expect_err("insertion of `Position`, `Name` and `Tag` should fail");
     assert_eq!(value, (position, name.clone(), tag));
     assert_eq!(
-        reason,
+        source,
         MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 

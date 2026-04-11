@@ -95,8 +95,8 @@ where
                 Ok(me)
             }
             Err(err) => {
-                let FromStorageError { reason, storage } = err;
-                let err = FromStorageError::new(reason, (storage, value));
+                let FromStorageError { source, storage } = err;
+                let err = FromStorageError::new(source, (storage, value));
                 Err(err)
             }
         }
@@ -178,8 +178,8 @@ where
                 Err(error)
             }
             Err(FromLayoutDataError::FromLayout(error)) => {
-                let reason = FromValueErrorKind::FromLayout(error);
-                let error = FromValueError::new(reason, value);
+                let source = FromValueErrorKind::FromLayout(error);
+                let error = FromValueError::new(source, value);
                 Err(error)
             }
         }

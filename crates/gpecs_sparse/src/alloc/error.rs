@@ -131,7 +131,7 @@ where
     K: Key,
     V: ?Sized,
 {
-    pub kind: TryModifyErrorKind<K>,
+    pub source: TryModifyErrorKind<K>,
     pub value: V,
 }
 
@@ -140,8 +140,8 @@ where
     K: Key,
 {
     #[inline]
-    pub(super) fn new(kind: TryModifyErrorKind<K>, value: V) -> Self {
-        Self { kind, value }
+    pub(super) fn new(source: TryModifyErrorKind<K>, value: V) -> Self {
+        Self { source, value }
     }
 
     #[inline]
@@ -149,9 +149,9 @@ where
     where
         F: FnOnce(V) -> U,
     {
-        let Self { kind, value } = self;
+        let Self { source, value } = self;
         let value = f(value);
-        TryModifyError { kind, value }
+        TryModifyError { source, value }
     }
 }
 
@@ -162,9 +162,9 @@ where
     TryModifyErrorKind<K>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, value } = self;
+        let Self { source, value } = self;
         f.debug_struct("TryModifyError")
-            .field("kind", kind)
+            .field("source", source)
             .field("value", &value)
             .finish()
     }
@@ -177,8 +177,8 @@ where
     TryModifyErrorKind<K>: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, value } = self;
-        write!(f, "invalid key for value {value} ({kind})")
+        let Self { source, value } = self;
+        write!(f, "invalid key for value {value}: {source}")
     }
 }
 

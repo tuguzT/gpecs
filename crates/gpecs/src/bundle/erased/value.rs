@@ -78,7 +78,7 @@ where
     {
         let archetype = match ErasedArchetype::register::<B, M, T>(components) {
             Ok(archetype) => archetype,
-            Err(reason) => return Err(FromBundleError::new(bundle, reason.into())),
+            Err(source) => return Err(FromBundleError::new(bundle, source.into())),
         };
         let inner = Inner::try_from_descriptors_value::<B, _>(archetype, B::CONTEXT, bundle)
             .map_err(|error| {
@@ -86,10 +86,10 @@ where
                     FromDescriptorsValueError, FromDescriptorsValueErrorKind::FromLayout,
                 };
 
-                let FromDescriptorsValueError { value, reason, .. } = error;
-                match reason {
-                    FromLayout(reason) => FromBundleError::new(value, reason.into()),
-                    _ => unreachable!("{reason}"),
+                let FromDescriptorsValueError { value, source, .. } = error;
+                match source {
+                    FromLayout(source) => FromBundleError::new(value, source.into()),
+                    _ => unreachable!("{source}"),
                 }
             })?;
 
@@ -168,7 +168,10 @@ where
     {
         let src = match self.as_ptrs().downcast::<B, U>(registry) {
             Ok(src) => src,
-            Err(reason) => return Err(DowncastError::new(self, reason)),
+            Err(error) => {
+                let source = error.source;
+                return Err(DowncastError::new(self, source));
+            }
         };
 
         let bundle = unsafe { B::CONTEXT.read(src) };
@@ -192,7 +195,7 @@ where
     {
         self.as_refs()
             .downcast::<B, U>(registry)
-            .map_err(|reason| DowncastError::new(self, reason))
+            .map_err(|error| error.map_value(|_| self))
     }
 
     #[inline]
@@ -204,9 +207,13 @@ where
         B: Bundle,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        unsafe { self.as_mut_ptrs().deref_mut() }
-            .downcast::<B, U>(registry)
-            .map_err(|reason| DowncastError::new(self, reason))
+        match unsafe { self.as_mut_ptrs().deref_mut() }.downcast::<B, U>(registry) {
+            Ok(refs) => Ok(refs),
+            Err(error) => {
+                let source = error.into();
+                Err(DowncastError::new(self, source))
+            }
+        }
     }
 
     #[inline]
@@ -360,7 +367,7 @@ where
             let error = ShuffleError {
                 bundle: self,
                 archetype,
-                reason: error.into(),
+                source: error.into(),
             };
             return Err(error);
         }
@@ -387,11 +394,11 @@ where
         });
         let inner = match result {
             Ok(inner) => inner,
-            Err(reason) => {
+            Err(source) => {
                 let error = ShuffleError {
                     bundle: self,
                     archetype,
-                    reason,
+                    source,
                 };
                 return Err(error);
             }
@@ -426,7 +433,7 @@ where
             .find(|&id| self.archetype().contains(id))
         {
             let error = InsertError {
-                reason: AlreadyHasComponentError::new(has_component_id).into(),
+                source: AlreadyHasComponentError::new(has_component_id).into(),
                 bundle: self,
                 to_insert,
             };
@@ -446,9 +453,9 @@ where
         });
         let inner = match result {
             Ok(inner) => inner,
-            Err(reason) => {
+            Err(source) => {
                 let error = InsertError {
-                    reason,
+                    source,
                     bundle: self,
                     to_insert,
                 };
@@ -507,9 +514,9 @@ where
         });
         let inner = match result {
             Ok(inner) => inner,
-            Err(reason) => {
+            Err(source) => {
                 let error = ReplaceError {
-                    reason,
+                    source,
                     bundle: self,
                     to_replace,
                 };
@@ -560,8 +567,8 @@ where
         let result = Inner::try_from_fields_descriptors(retained_refs, retained_archetype);
         let retained_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
-            Err(reason) => {
-                let error = RemoveError { reason, bundle };
+            Err(source) => {
+                let error = RemoveError { source, bundle };
                 return Err(error);
             }
         };
@@ -573,8 +580,8 @@ where
         let result = Inner::try_from_fields_descriptors(removed_refs, archetype_to_remove);
         let removed_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
-            Err(reason) => {
-                let error = RemoveError { reason, bundle };
+            Err(source) => {
+                let error = RemoveError { source, bundle };
                 return Err(error);
             }
         };
@@ -619,8 +626,8 @@ where
         let result = Inner::try_from_fields_descriptors(fields, archetype);
         let inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
-            Err(reason) => {
-                let error = RemoveError { reason, bundle };
+            Err(source) => {
+                let error = RemoveError { source, bundle };
                 return Err(error);
             }
         };
@@ -634,7 +641,7 @@ where
     fn check_remove(self, mut to_remove: ComponentIds<'_>) -> Result<Self, RemoveError<Self>> {
         if let Some(missing_component_id) = to_remove.find(|&id| !self.archetype().contains(id)) {
             let error = RemoveError {
-                reason: MissingComponentError::new(missing_component_id).into(),
+                source: MissingComponentError::new(missing_component_id).into(),
                 bundle: self,
             };
             return Err(error);
@@ -730,7 +737,7 @@ impl<'a, T> IntoIterator for &'a ErasedBundleKind<T>
 where
     T: ErasedArchetypeKind<Meta: WithErasedDrop> + ?Sized,
 {
-    type Item = ErasedComponentRef<'a>;
+    type Item = ErasedComponentRef<'a, *const MaybeUninit<u8>>;
     type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>>;
 
     #[inline]
@@ -743,7 +750,7 @@ impl<'a, T> IntoIterator for &'a mut ErasedBundleKind<T>
 where
     T: ErasedArchetypeKind<Meta: WithErasedDrop> + ?Sized,
 {
-    type Item = ErasedComponentMutRef<'a>;
+    type Item = ErasedComponentMutRef<'a, *mut MaybeUninit<u8>>;
     type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>>;
 
     #[inline]

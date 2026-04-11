@@ -7,7 +7,7 @@ use crate::{
     },
     error::{check_len, check_ptr_align, check_sufficient_align},
     layout::{self, bytes_to_items},
-    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConst, MutSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -87,14 +87,14 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedSlicePtr<CastConstPtr<T>> {
+    pub fn cast_const(self) -> ErasedSlicePtr<CastConst<T>> {
         let Self { ptr, len } = self;
         let ptr = ptr.cast_const();
         unsafe { ErasedSlicePtr::from_parts(ptr, len) }
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSlice<'a, CastConstPtr<T>> {
+    pub unsafe fn deref<'a>(self) -> ErasedSlice<'a, CastConst<T>> {
         unsafe { self.cast_const().deref() }
     }
 

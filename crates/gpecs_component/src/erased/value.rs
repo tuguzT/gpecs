@@ -56,8 +56,8 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(component_info) = components.get_component_info_of::<C>() else {
-            let reason = NotRegisteredError::of::<C>().into();
-            return Err(FromStorageError::new(reason, (storage, component)));
+            let source = NotRegisteredError::of::<C>().into();
+            return Err(FromStorageError::new(source, (storage, component)));
         };
 
         let field = Erased::try_from_storage_value(storage, component)?;
@@ -85,8 +85,8 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(component_info) = components.get_component_info_of::<C>() else {
-            let reason = NotRegisteredError::of::<C>().into();
-            return Err(FromComponentError::new(component, reason));
+            let source = NotRegisteredError::of::<C>().into();
+            return Err(FromComponentError::new(component, source));
         };
 
         let field = Erased::try_from(component)?;
@@ -162,13 +162,13 @@ where
         let Self { component_id, .. } = *self;
         let mut this = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let reason = polonius!(|this| -> Result<&'polonius mut C, _> {
+        let source = polonius!(|this| -> Result<&'polonius mut C, _> {
             match unsafe { this.field.downcast_mut() } {
                 Ok(component) => polonius_return!(Ok(component)),
-                Err(error) => error.reason.into(),
+                Err(error) => error.source.into(),
             }
         });
-        Err(DowncastError::new(this, reason))
+        Err(DowncastError::new(this, source))
     }
 
     #[inline]

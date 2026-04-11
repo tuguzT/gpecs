@@ -165,8 +165,8 @@ impl<Meta> EntityRegistry<Meta> {
         #[inline(never)]
         #[track_caller]
         fn spawn_failed<Meta>(error: TrySpawnError<Meta>) -> ! {
-            let kind = error.kind;
-            panic!("failed to spawn entity: {kind}")
+            let source = error.source;
+            panic!("failed to spawn entity: {source}")
         }
 
         self.try_spawn(world, meta)

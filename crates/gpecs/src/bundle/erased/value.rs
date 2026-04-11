@@ -36,7 +36,8 @@ use crate::{
         registry::{
             ComponentId, ComponentRegistry, ComponentRegistryView,
             traits::{
-                ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, WithComponentId,
+                ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray,
+                WithComponentId,
             },
         },
     },
@@ -72,8 +73,8 @@ where
     ) -> Result<Self, FromBundleError<B>>
     where
         B: NewBundle,
-        Meta: FromComponentInfo<'a, M>,
-        M: FromComponentType,
+        Meta: FromComponentInfo<'a, M::Item>,
+        M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let archetype = match ErasedArchetype::register::<B, M, T>(components) {

@@ -1,4 +1,4 @@
-pub use self::{map::ComponentIdMap, registry::ComponentRegistry};
+pub use self::map::ComponentIdMap;
 
 mod map;
-mod registry;
+mod vec;

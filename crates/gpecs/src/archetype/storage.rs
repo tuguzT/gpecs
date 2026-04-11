@@ -23,7 +23,9 @@ use crate::{
         erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
         registry::{
             ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+            traits::{
+                ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray,
+            },
         },
     },
     entity::Entity,
@@ -157,7 +159,7 @@ impl ArchetypeStorage {
     ) -> Result<Self, DuplicateComponentError>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::register::<B, M, T>(components)?;

@@ -119,7 +119,10 @@ pub unsafe trait Bundle:
 }
 
 #[cfg(feature = "alloc")]
-use gpecs_component::registry::{ComponentRegistry, traits::ComponentIdFromOrInsertWith};
+use gpecs_component::registry::{
+    ComponentRegistry,
+    traits::{ComponentIdFromOrInsertWith, PushBackArray},
+};
 
 /// An extension of [bundle](Bundle) which allows
 /// to register its [components](gpecs_component::Component).
@@ -138,10 +141,10 @@ pub unsafe trait NewBundle: Bundle {
 
     /// Registers all components of this bundle inside of provided registry
     /// and returns their identifiers.
-    fn register_components<M, T>(
-        components: &mut ComponentRegistry<M, T>,
+    fn register_components<T, M>(
+        components: &mut ComponentRegistry<T, M>,
     ) -> Self::RegisterComponents
     where
-        M: FromComponentType,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized;
+        T: PushBackArray<Item: FromComponentType>,
+        M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized;
 }

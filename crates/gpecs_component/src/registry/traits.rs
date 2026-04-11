@@ -106,3 +106,21 @@ where
         (**self).component_id_from_or_insert_with(key, f)
     }
 }
+
+pub unsafe trait PushBackArray: AsRef<[Self::Item]> {
+    type Item;
+
+    fn push(&mut self, value: Self::Item);
+}
+
+unsafe impl<T> PushBackArray for &mut T
+where
+    T: PushBackArray + ?Sized,
+{
+    type Item = T::Item;
+
+    #[inline]
+    fn push(&mut self, value: Self::Item) {
+        (**self).push(value);
+    }
+}

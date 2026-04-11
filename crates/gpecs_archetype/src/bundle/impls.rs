@@ -21,7 +21,10 @@ use gpecs_soa_erased::{
 };
 
 #[cfg(feature = "alloc")]
-use gpecs_component::registry::{ComponentRegistry, traits::ComponentIdFromOrInsertWith};
+use gpecs_component::registry::{
+    ComponentRegistry,
+    traits::{ComponentIdFromOrInsertWith, PushBackArray},
+};
 
 use crate::bundle::{Bundle, BundleMutPtrs, BundlePtrs};
 
@@ -121,12 +124,12 @@ where
     type RegisterComponents = [ComponentId; 1];
 
     #[inline]
-    fn register_components<M, U>(
-        components: &mut ComponentRegistry<M, U>,
+    fn register_components<U, M>(
+        components: &mut ComponentRegistry<U, M>,
     ) -> Self::RegisterComponents
     where
-        M: FromComponentType,
-        U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        U: PushBackArray<Item: FromComponentType>,
+        M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.register_component::<T>();
         [component_id]
@@ -246,12 +249,12 @@ macro_rules! bundle_tuple_impl {
             type RegisterComponents = [ComponentId; count_idents!($($types,)*)];
 
             #[inline]
-            fn register_components<M, U>(
-                components: &mut ComponentRegistry<M, U>,
+            fn register_components<U, M>(
+                components: &mut ComponentRegistry<U, M>,
             ) -> Self::RegisterComponents
             where
-                U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
-                M: FromComponentType,
+                U: PushBackArray<Item: FromComponentType>,
+                M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
             {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 

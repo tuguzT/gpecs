@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub type ComponentTypeIdMap = ComponentIdMap<TypeId, BuildHasher>;
-pub type Components = ComponentRegistry<ComponentDescriptor, ComponentTypeIdMap>;
+pub type Components = ComponentRegistry<Vec<ComponentDescriptor>, ComponentTypeIdMap>;
 pub type ComponentInfo<'a> = registry::ComponentInfo<&'a ComponentDescriptor>;
 
 #[derive(Debug, Clone)]

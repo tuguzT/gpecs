@@ -46,7 +46,9 @@ use crate::{
         erased::WithErasedDrop,
         registry::{
             ComponentId, ComponentRegistry, ComponentRegistryView,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+            traits::{
+                ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray,
+            },
         },
     },
     entity::Entity,
@@ -426,7 +428,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::register::<B, _, _>(components)?;
@@ -1013,7 +1015,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), InsertBundleExactError<B>>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -1032,7 +1034,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, InsertBundleExactAtError<B>>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
@@ -1144,7 +1146,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), InsertBundleError<B>>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -1163,7 +1165,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, InsertBundleAtError<B>>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
@@ -1283,7 +1285,7 @@ impl ArchetypeRegistry {
     ) -> Result<Option<B>, RemoveBundleExactError>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -1302,7 +1304,7 @@ impl ArchetypeRegistry {
     ) -> Result<(Option<B>, EntityLocation), RemoveBundleExactAtError>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_remove = ErasedArchetype::register::<B, M, T>(components)?;
@@ -1405,7 +1407,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), DuplicateComponentError>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -1423,7 +1425,7 @@ impl ArchetypeRegistry {
     ) -> Result<EntityLocation, RemoveBundleAtError>
     where
         B: NewBundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_remove = ErasedArchetype::<()>::register::<B, M, T>(components)?;

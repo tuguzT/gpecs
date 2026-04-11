@@ -8,7 +8,7 @@ use gpecs_component::{
     erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
     registry::{
         ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
-        traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+        traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
     },
 };
 use gpecs_soa_erased::CovariantFieldDescriptors;
@@ -185,8 +185,8 @@ impl<Meta> ErasedArchetype<Meta> {
     ) -> Result<Self, DuplicateComponentError>
     where
         B: NewBundle,
-        Meta: FromComponentInfo<'a, M>,
-        M: FromComponentType,
+        Meta: FromComponentInfo<'a, M::Item>,
+        M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components = try_collect_components(

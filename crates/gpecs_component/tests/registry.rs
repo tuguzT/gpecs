@@ -43,7 +43,7 @@ unsafe impl FromComponentType for ComponentDescriptor {
     }
 }
 
-type Components = ComponentRegistry<ComponentDescriptor, ComponentIdMap<TypeId>>;
+type Components = ComponentRegistry<Vec<ComponentDescriptor>, ComponentIdMap<TypeId>>;
 
 #[test]
 fn new() {

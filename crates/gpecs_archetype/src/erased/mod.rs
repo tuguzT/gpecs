@@ -4,7 +4,9 @@ pub use self::{
 };
 
 #[cfg(feature = "alloc")]
-pub use self::alloc::{ErasedArchetype, ErasedArchetypeViewExt, FromComponentInfo, IntoIter};
+pub use crate::alloc::erased::{
+    ErasedArchetype, ErasedArchetypeViewExt, FromComponentInfo, IntoIter,
+};
 
 pub mod error;
 
@@ -12,6 +14,3 @@ mod component_ids;
 mod iter;
 mod ordered_iter;
 mod view;
-
-#[cfg(feature = "alloc")]
-mod alloc;

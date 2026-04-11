@@ -25,7 +25,7 @@ where
 
 impl<'a, Meta> Iter<'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub(crate) fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
 }

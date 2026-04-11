@@ -80,12 +80,12 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub(crate) fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(super) fn into_inner(self) -> Inner<'a, Meta> {
+    pub(crate) fn into_inner(self) -> Inner<'a, Meta> {
         let Self { inner } = self;
         inner
     }

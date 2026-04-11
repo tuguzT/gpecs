@@ -6,7 +6,7 @@ use core::{
 use gpecs_component::registry::ComponentId;
 
 #[cfg(feature = "alloc")]
-pub use crate::erased::alloc::error::{
+pub use crate::alloc::erased::error::{
     ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
     IncompatibleArchetypeExactError,
 };

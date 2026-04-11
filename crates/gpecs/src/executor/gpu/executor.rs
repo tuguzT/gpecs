@@ -18,7 +18,7 @@ use super::{
         registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
         storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
     },
-    bundle::{GpuBundle, NewGpuBundle},
+    bundle::GpuBundle,
     component::{
         GpuComponent,
         registry::{GpuComponentId, GpuComponentRegistry},
@@ -161,7 +161,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     #[inline]
     pub fn register_archetype_of<B>(&mut self) -> Result<GpuArchetypeId, DuplicateComponentError>
     where
-        B: NewGpuBundle,
+        B: GpuBundle,
     {
         let Self {
             ref mut context,

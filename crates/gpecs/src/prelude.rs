@@ -1,6 +1,6 @@
 pub use crate::{
     archetype::registry::ArchetypeId,
-    bundle::{Bundle, NewBundle},
+    bundle::Bundle,
     component::{Component, registry::ComponentId},
     context::{Bundles, BundlesMut, Context},
     entity::Entity,
@@ -12,7 +12,7 @@ pub use crate::{
         gpu::{
             GpuExecutor,
             archetype::registry::GpuArchetypeId,
-            bundle::{GpuBundle, NewGpuBundle},
+            bundle::GpuBundle,
             component::{GpuComponent, registry::GpuComponentId},
             system::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
         },

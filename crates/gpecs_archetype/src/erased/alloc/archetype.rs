@@ -22,7 +22,7 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    bundle::{Bundle, NewBundle},
+    bundle::Bundle,
     erased::{
         ComponentIdOrderedIter, ComponentIds, ErasedArchetypeView, ErasedArchetypeViewExt,
         IntoIter, Iter,
@@ -184,7 +184,7 @@ impl<Meta> ErasedArchetype<Meta> {
         components: &'a mut ComponentRegistry<M, T>,
     ) -> Result<Self, DuplicateComponentError>
     where
-        B: NewBundle,
+        B: Bundle,
         Meta: FromComponentInfo<'a, M::Item>,
         M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,

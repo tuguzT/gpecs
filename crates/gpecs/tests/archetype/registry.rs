@@ -4,7 +4,7 @@ use gpecs::{
         error::InsertBundleExactError,
         registry::ArchetypeRegistry,
     },
-    bundle::{NewBundle, erased::error::DowncastErrorKind},
+    bundle::{Bundle, erased::error::DowncastErrorKind},
     context::Components,
     entity::registry::EntityRegistry,
 };

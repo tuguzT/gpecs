@@ -13,7 +13,7 @@ use crate::{
             self as archetypes, ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityLocation,
         },
     },
-    bundle::{Bundle, BundleRefs, BundleRefsMut, NewBundle},
+    bundle::{Bundle, BundleRefs, BundleRefsMut},
     component::{Component, registry::ComponentId},
     entity::{
         Entity,
@@ -228,7 +228,7 @@ impl Context {
     #[inline]
     pub fn register_archetype_of<B>(&mut self) -> Result<ArchetypeId, DuplicateComponentError>
     where
-        B: NewBundle,
+        B: Bundle,
     {
         let Self {
             components,
@@ -358,7 +358,7 @@ impl Context {
         value: B,
     ) -> Result<(), InsertBundleExactError<B>>
     where
-        B: NewBundle,
+        B: Bundle,
     {
         let Self {
             entities,
@@ -383,7 +383,7 @@ impl Context {
     #[inline]
     pub fn insert_bundle<B>(&mut self, entity: Entity, value: B) -> Result<(), InsertBundleError<B>>
     where
-        B: NewBundle,
+        B: Bundle,
     {
         let Self {
             entities,
@@ -408,7 +408,7 @@ impl Context {
     #[inline]
     pub fn remove_bundle<B>(&mut self, entity: Entity) -> Result<(), RemoveBundleError>
     where
-        B: NewBundle,
+        B: Bundle,
     {
         let Self {
             entities,
@@ -432,7 +432,7 @@ impl Context {
     #[inline]
     pub fn remove_bundle_exact<B>(&mut self, entity: Entity) -> Result<B, RemoveBundleExactError>
     where
-        B: NewBundle,
+        B: Bundle,
     {
         let Self {
             entities,

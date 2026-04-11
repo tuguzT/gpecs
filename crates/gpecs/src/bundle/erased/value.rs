@@ -20,7 +20,7 @@ use crate::{
         error::{AlreadyHasComponentError, MissingComponentError},
     },
     bundle::{
-        Bundle, BundleRefs, BundleRefsMut, NewBundle,
+        Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
             ErasedBundleRefs, ErasedBundleRefsIter,
@@ -72,7 +72,7 @@ where
         bundle: B,
     ) -> Result<Self, FromBundleError<B>>
     where
-        B: NewBundle,
+        B: Bundle,
         Meta: FromComponentInfo<'a, M::Item>,
         M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,

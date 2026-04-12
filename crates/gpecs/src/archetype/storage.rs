@@ -1,6 +1,10 @@
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    mem::MaybeUninit,
+};
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
+use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::EpochSparseSet};
 
 use crate::{
@@ -110,9 +114,13 @@ where
     }
 }
 
-impl FromErasedComponent for ErasedDropMeta {
+impl<S, P> FromErasedComponent<S, P> for ErasedDropMeta
+where
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
     #[inline]
-    fn from_erased_component(component: &ErasedComponent) -> Self {
+    fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {
         Self {
             desc: FieldDescriptor::new(component.as_field().layout()),
             erased_drop: component.erased_drop(),

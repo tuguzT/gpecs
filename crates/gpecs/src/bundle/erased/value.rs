@@ -7,11 +7,14 @@ use std::{
     ptr,
 };
 
+use gpecs_archetype::bundle::erased::{
+    ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundleRefs,
+};
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaIntoFields,
-    error::FromFieldsDescriptorsError,
-    ptr::slice::CoreSliceItemPtrs,
-    storage::{AllocError, BoxedAlignedUninitStorage},
+    error::{FromDescriptorsValueError, FromDescriptorsValueErrorKind, FromFieldsDescriptorsError},
+    ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs},
+    storage::{AlignedStorage, AlignedStorageFromLayout, BoxedAlignedUninitStorage},
 };
 use itertools::{equal, zip_eq};
 
@@ -23,11 +26,11 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
-            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
-            ErasedBundleRefs, ErasedBundleRefsIter,
+            ErasedBundleMutRefsIter, ErasedBundleRefsIter,
             error::{
-                DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
-                RemoveErrorKind, ReplaceError, ShuffleError,
+                DowncastError, FromBundleError, FromBundleErrorKind, FromComponentsError,
+                InsertError, InsertErrorKind, RemoveError, RemoveErrorKind, ReplaceError,
+                ReplaceErrorKind, ShuffleError, ShuffleErrorKind,
             },
             traits::{
                 ErasedArchetypeKind, ErasedBundleDrop, IntoErasedArchetypeIterator, MustDrop,
@@ -50,32 +53,39 @@ use crate::{
     },
 };
 
-pub type ErasedBundle<Meta, D = MustDrop> = ErasedBundleKind<ErasedArchetype<Meta>, D>;
-pub type ErasedBorrowedBundle<'a, Meta, D = MustDrop> =
-    ErasedBundleKind<&'a ErasedArchetype<Meta>, D>;
-pub type ErasedBorrowedViewBundle<'a, Meta, D = MustDrop> =
-    ErasedBundleKind<ErasedArchetypeView<'a, Meta>, D>;
+pub type ErasedBundle<Meta, D = MustDrop, S = St, P = SlicePtrs> =
+    ErasedBundleKind<ErasedArchetype<Meta>, D, S, P>;
+pub type ErasedBorrowedBundle<'a, Meta, D = MustDrop, S = St, P = SlicePtrs> =
+    ErasedBundleKind<&'a ErasedArchetype<Meta>, D, S, P>;
+pub type ErasedBorrowedViewBundle<'a, Meta, D = MustDrop, S = St, P = SlicePtrs> =
+    ErasedBundleKind<ErasedArchetypeView<'a, Meta>, D, S, P>;
 
-pub struct ErasedBundleKind<T, D = MustDrop>
+pub struct ErasedBundleKind<T, D = MustDrop, S = St, P = SlicePtrs>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     phantom: PhantomData<D>,
-    inner: Inner<T>,
+    inner: ErasedSoa<S, T, P>,
 }
 
-type Inner<T> = ErasedSoa<BoxedAlignedUninitStorage, T, CoreSliceItemPtrs<MaybeUninit<u8>>>;
+type St = BoxedAlignedUninitStorage;
+type SlicePtrs = CoreSliceItemPtrs<MaybeUninit<u8>>;
 
-impl<Meta> ErasedBundle<Meta>
+impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
+    Meta: AsRef<FieldDescriptor> + 'static,
+    D: ErasedBundleDrop<Meta>,
+    S: AlignedStorageFromLayout,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     pub fn try_from<'a, B, M, T>(
         components: &'a mut ComponentRegistry<M, T>,
         bundle: B,
-    ) -> Result<Self, FromBundleError<B>>
+    ) -> Result<Self, FromBundleError<B, S::Error>>
     where
         B: Bundle,
         Meta: FromComponentInfo<'a, M::Item>,
@@ -86,39 +96,53 @@ where
             Ok(archetype) => archetype,
             Err(source) => return Err(FromBundleError::new(bundle, source.into())),
         };
-        let inner = Inner::try_from_descriptors_value::<B, _>(archetype, B::CONTEXT, bundle)
-            .map_err(|error| {
-                use gpecs_soa_erased::error::{
-                    FromDescriptorsValueError, FromDescriptorsValueErrorKind::FromLayout,
-                };
-
-                let FromDescriptorsValueError { value, source, .. } = error;
-                match source {
-                    FromLayout(source) => FromBundleError::new(value, source.into()),
-                    _ => unreachable!("{source}"),
-                }
-            })?;
+        let inner = ErasedSoa::try_from_descriptors_value::<B, B>(archetype, B::CONTEXT, bundle)
+            .map_err(into_from_bundle_error)?;
 
         let me = unsafe { Self::from_inner(inner) };
         Ok(me)
     }
 }
 
-pub trait FromErasedComponent: Sized {
-    fn from_erased_component(component: &ErasedComponent) -> Self;
+#[inline]
+fn into_from_bundle_error<B, T>(error: FromDescriptorsValueError<B, T>) -> FromBundleError<B, T> {
+    let FromDescriptorsValueError { value, source, .. } = error;
+    let source = match source {
+        FromDescriptorsValueErrorKind::FromLayout(error) => FromBundleErrorKind::FromLayout(error),
+        FromDescriptorsValueErrorKind::InsufficientAlign(error) => error.into(),
+        FromDescriptorsValueErrorKind::InvalidLayout(error) => error.into(),
+        FromDescriptorsValueErrorKind::LenMismatch(error) => {
+            unreachable!("failed to erase some bundle: {error}")
+        }
+        FromDescriptorsValueErrorKind::LayoutMismatch(error) => {
+            unreachable!("failed to erase some bundle: {error}")
+        }
+    };
+    FromBundleError::new(value, source)
 }
 
-impl<Meta> ErasedBundle<Meta>
+pub trait FromErasedComponent<S, P>: Sized
 where
-    Meta: AsRef<FieldDescriptor> + WithErasedDrop + FromErasedComponent + 'static,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
+    fn from_erased_component(component: &ErasedComponent<S, P>) -> Self;
+}
+
+impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
+where
+    Meta: AsRef<FieldDescriptor> + FromErasedComponent<S, P> + 'static,
+    D: ErasedBundleDrop<Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     pub fn from_components<I>(
         components: &ComponentRegistryView<impl Sized, impl ?Sized>,
         iter: I,
-    ) -> Result<Self, FromComponentsError>
+    ) -> Result<Self, FromComponentsError<S::Error>>
     where
-        I: IntoIterator<Item = ErasedComponent>,
+        I: IntoIterator<Item = ErasedComponent<S, P>>,
     {
         let iter = iter
             .into_iter()
@@ -136,31 +160,43 @@ where
             .into_iter()
             .map(|component_info| component_info.into_meta().into_field());
 
-        let inner = Inner::try_from_fields_descriptors(fields, archetype)
-            .map_err::<FromComponentsError, _>(|error| match error {
-                FromFieldsDescriptorsError::FromLayout(error) => error.into(),
-                FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-                _ => unreachable!("failed to create erased bundle from components: {error}"),
-            })?;
+        let inner = ErasedSoa::try_from_fields_descriptors(fields, archetype)
+            .map_err(into_from_components_error)?;
 
         let me = unsafe { Self::from_inner(inner) };
         Ok(me)
     }
 }
 
-impl<T, D> ErasedBundleKind<T, D>
+#[inline]
+fn into_from_components_error<T>(error: FromFieldsDescriptorsError<T>) -> FromComponentsError<T> {
+    match error {
+        FromFieldsDescriptorsError::FromLayout(error) => FromComponentsError::FromLayout(error),
+        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+        FromFieldsDescriptorsError::LenMismatch(error) => {
+            unreachable!("failed to create erased bundle from components: {error}")
+        }
+        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+            unreachable!("failed to create erased bundle from components: {error}")
+        }
+    }
+}
+
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    pub unsafe fn from_inner(inner: Inner<T>) -> Self {
+    pub unsafe fn from_inner(inner: ErasedSoa<S, T, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, inner }
     }
 
     #[inline]
-    pub fn into_inner(self) -> Inner<T> {
+    pub fn into_inner(self) -> ErasedSoa<S, T, P> {
         let me = ManuallyDrop::new(self);
         unsafe { ptr::read(&raw const me.inner) }
     }
@@ -185,10 +221,12 @@ where
     }
 }
 
-impl<T, D> ErasedBundleKind<T, D>
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     pub fn downcast_ref<B, U>(
@@ -232,40 +270,41 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
+    pub fn as_ptr(&self) -> *const P::Item {
         let Self { inner, .. } = self;
         inner.as_ptr()
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&mut self) -> *mut MaybeUninit<u8> {
+    pub unsafe fn as_mut_ptr(&mut self) -> *mut P::Item {
         let Self { inner, .. } = self;
         inner.as_mut_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[MaybeUninit<u8>] {
+    pub fn as_buffer(&self) -> &[P::Item] {
         let Self { inner, .. } = self;
         inner.as_buffer()
     }
 
     #[inline]
-    pub unsafe fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<u8>] {
+    pub unsafe fn as_mut_buffer(&mut self) -> &mut [P::Item] {
         let Self { inner, .. } = self;
         inner.as_mut_buffer()
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> ErasedBundlePtrs<ErasedArchetypeView<'_, T::Meta>> {
+    pub fn as_ptrs(&self) -> ErasedBundlePtrs<ErasedArchetypeView<'_, T::Meta>, P::Const> {
         let (ptrs, _) = self.as_ptrs_with_archetype();
         ptrs
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_ptrs_with_archetype(
         &self,
     ) -> (
-        ErasedBundlePtrs<ErasedArchetypeView<'_, T::Meta>>,
+        ErasedBundlePtrs<ErasedArchetypeView<'_, T::Meta>, P::Const>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
         let Self { inner, .. } = self;
@@ -276,16 +315,17 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> ErasedBundleMutPtrs<ErasedArchetypeView<'_, T::Meta>> {
+    pub fn as_mut_ptrs(&mut self) -> ErasedBundleMutPtrs<ErasedArchetypeView<'_, T::Meta>, P::Mut> {
         let (ptrs, _) = self.as_mut_ptrs_with_archetype();
         ptrs
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_mut_ptrs_with_archetype(
         &mut self,
     ) -> (
-        ErasedBundleMutPtrs<ErasedArchetypeView<'_, T::Meta>>,
+        ErasedBundleMutPtrs<ErasedArchetypeView<'_, T::Meta>, P::Mut>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
         let Self { inner, .. } = self;
@@ -296,16 +336,17 @@ where
     }
 
     #[inline]
-    pub fn as_refs(&self) -> ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>> {
+    pub fn as_refs(&self) -> ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Const> {
         let (refs, _) = self.as_refs_with_archetype();
         refs
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_refs_with_archetype(
         &self,
     ) -> (
-        ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>>,
+        ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Const>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
         let (ptrs, descriptors) = self.as_ptrs_with_archetype();
@@ -314,16 +355,19 @@ where
     }
 
     #[inline]
-    pub fn as_mut_refs(&mut self) -> ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>> {
+    pub fn as_mut_refs(
+        &mut self,
+    ) -> ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Mut> {
         let (refs, _) = self.as_mut_refs_with_archetype();
         refs
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_mut_refs_with_archetype(
         &mut self,
     ) -> (
-        ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>>,
+        ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Mut>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
         let (ptrs, descriptors) = self.as_mut_ptrs_with_archetype();
@@ -332,35 +376,57 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleRefsIter<'_, Iter<'_, T::Meta>> {
+    pub fn iter(&self) -> ErasedBundleRefsIter<'_, Iter<'_, T::Meta>, P::Const> {
         self.as_refs().into_iter()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> ErasedBundleMutRefsIter<'_, Iter<'_, T::Meta>> {
+    pub fn iter_mut(&mut self) -> ErasedBundleMutRefsIter<'_, Iter<'_, T::Meta>, P::Mut> {
         self.as_mut_refs().into_iter()
     }
 }
 
-#[derive(Debug)]
-pub enum ShuffledBundle<Original, Other>
+pub enum ShuffledBundle<Original, Other, D, S, P>
 where
-    Original: ErasedArchetypeKind<Meta: WithErasedDrop>,
+    Original: ErasedArchetypeKind,
     Other: ErasedArchetypeKind<Meta = Original::Meta>,
+    D: ErasedBundleDrop<Original::Meta>,
+    S: AlignedStorageFromLayout,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    Original(ErasedBundleKind<Original>),
-    Other(ErasedBundleKind<Other>),
+    Original(ErasedBundleKind<Original, D, S, P>),
+    Other(ErasedBundleKind<Other, D, S, P>),
 }
 
-impl<Original> ErasedBundleKind<Original>
+impl<Original, Other, D, S, P> Debug for ShuffledBundle<Original, Other, D, S, P>
 where
-    Original: ErasedArchetypeKind<Meta: WithErasedDrop>,
+    Original: ErasedArchetypeKind,
+    Other: ErasedArchetypeKind<Meta = Original::Meta>,
+    D: ErasedBundleDrop<Original::Meta>,
+    S: AlignedStorageFromLayout,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Original(bundle) => f.debug_tuple("Original").field(bundle).finish(),
+            Self::Other(bundle) => f.debug_tuple("Other").field(bundle).finish(),
+        }
+    }
+}
+
+impl<Original, D, S, P> ErasedBundleKind<Original, D, S, P>
+where
+    Original: ErasedArchetypeKind,
+    D: ErasedBundleDrop<Original::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn shuffle<Other>(
         self,
         archetype: Other,
-    ) -> Result<ShuffledBundle<Original, Other>, ShuffleError<Self, Other>>
+    ) -> Result<ShuffledBundle<Original, Other, D, S, P>, ShuffleError<Self, Other, S::Error>>
     where
         Other: ErasedArchetypeKind<Meta = Original::Meta>,
     {
@@ -388,14 +454,9 @@ where
             let component_id = component.into();
             refs.get(component_id).expect("component should be present")
         });
-        let result = Inner::try_from_fields_descriptors(fields, other);
 
-        let result = result.map_err(|error| match error {
-            FromFieldsDescriptorsError::FromLayout(error) => error.into(),
-            FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-            _ => unreachable!("failed to shuffle bundle: {error}"),
-        });
-        let inner = match result {
+        let result = ErasedSoa::<_, _, P>::try_from_fields_descriptors(fields, other);
+        let inner = match result.map_err(into_shuffle_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
                 let error = ShuffleError {
@@ -417,16 +478,37 @@ where
     }
 }
 
-impl<T> ErasedBundleKind<T>
+#[inline]
+fn into_shuffle_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> ShuffleErrorKind<E> {
+    match error {
+        FromFieldsDescriptorsError::FromLayout(error) => ShuffleErrorKind::FromLayout(error),
+        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+        FromFieldsDescriptorsError::LenMismatch(error) => {
+            unreachable!("failed to shuffle bundle: {error}")
+        }
+        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+            unreachable!("failed to shuffle bundle: {error}")
+        }
+    }
+}
+
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
-    T: ErasedArchetypeKind<Meta: WithErasedDrop + Clone>,
+    T: ErasedArchetypeKind<Meta: Clone>,
+    D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
+    #[expect(clippy::type_complexity)]
     // FIXME: can we optimize this?
     pub fn insert<ToInsert>(
         self,
-        to_insert: ErasedBundleKind<ToInsert>,
-    ) -> Result<ErasedBundle<T::Meta>, InsertError<Self, ErasedBundleKind<ToInsert>>>
+        to_insert: ErasedBundleKind<ToInsert, D, S, P>,
+    ) -> Result<
+        ErasedBundle<T::Meta, D, S, P>,
+        InsertError<Self, ErasedBundleKind<ToInsert, D, S, P>, S::Error>,
+    >
     where
         ToInsert: ErasedArchetypeKind<Meta = T::Meta>,
     {
@@ -447,14 +529,9 @@ where
         let iter = chain(self.archetype(), to_insert.archetype())
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
-        let result = Inner::try_from_fields_descriptors(refs, archetype);
 
-        let result = result.map_err(|error| match error {
-            FromFieldsDescriptorsError::FromLayout(error) => error.into(),
-            FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-            _ => unreachable!("failed to insert some components into bundle: {error}"),
-        });
-        let inner = match result {
+        let result = ErasedSoa::try_from_fields_descriptors(refs, archetype);
+        let inner = match result.map_err(into_insert_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
                 let error = InsertError {
@@ -470,13 +547,39 @@ where
         let bundle = unsafe { ErasedBundle::from_inner(inner) };
         Ok(bundle)
     }
+}
 
+#[inline]
+fn into_insert_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> InsertErrorKind<E> {
+    match error {
+        FromFieldsDescriptorsError::FromLayout(error) => InsertErrorKind::FromLayout(error),
+        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+        FromFieldsDescriptorsError::LenMismatch(error) => {
+            unreachable!("failed to insert some components into bundle: {error}")
+        }
+        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+            unreachable!("failed to insert some components into bundle: {error}")
+        }
+    }
+}
+
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
+where
+    T: ErasedArchetypeKind<Meta: Clone + WithErasedDrop>,
+    D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
     #[inline]
+    #[expect(clippy::type_complexity)]
     // FIXME: can we optimize this?
     pub fn replace<ToReplace>(
         mut self,
-        to_replace: ErasedBundleKind<ToReplace>,
-    ) -> Result<ErasedBundle<T::Meta>, ReplaceError<Self, ErasedBundleKind<ToReplace>>>
+        to_replace: ErasedBundleKind<ToReplace, D, S, P>,
+    ) -> Result<
+        ErasedBundle<T::Meta, D, S, P>,
+        ReplaceError<Self, ErasedBundleKind<ToReplace, D, S, P>, S::Error>,
+    >
     where
         ToReplace: ErasedArchetypeKind<Meta = T::Meta>,
     {
@@ -509,13 +612,8 @@ where
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
-        let result = Inner::try_from_fields_descriptors(refs, archetype);
-        let result = result.map_err(|error| match error {
-            FromFieldsDescriptorsError::FromLayout(error) => error.into(),
-            FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-            _ => unreachable!("failed to replace some components in bundle: {error}"),
-        });
-        let inner = match result {
+        let result = ErasedSoa::try_from_fields_descriptors(refs, archetype);
+        let inner = match result.map_err(into_replace_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
                 let error = ReplaceError {
@@ -533,24 +631,61 @@ where
     }
 }
 
-pub struct RemovePair<ToRemove>
-where
-    ToRemove: ErasedArchetypeKind<Meta: WithErasedDrop>,
-{
-    pub retained: ErasedBundle<ToRemove::Meta>,
-    pub removed: ErasedBundleKind<ToRemove>,
+#[inline]
+fn into_replace_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> ReplaceErrorKind<E> {
+    match error {
+        FromFieldsDescriptorsError::FromLayout(error) => ReplaceErrorKind::FromLayout(error),
+        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+        FromFieldsDescriptorsError::LenMismatch(error) => {
+            unreachable!("failed to replace some components in bundle: {error}")
+        }
+        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+            unreachable!("failed to replace some components in bundle: {error}")
+        }
+    }
 }
 
-impl<T> ErasedBundleKind<T>
+pub struct RemovePair<ToRemove, D, S, P>
 where
-    T: ErasedArchetypeKind<Meta: WithErasedDrop + Clone>,
+    ToRemove: ErasedArchetypeKind,
+    D: ErasedBundleDrop<ToRemove::Meta>,
+    S: AlignedStorageFromLayout,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
+    pub retained: ErasedBundle<ToRemove::Meta, D, S, P>,
+    pub removed: ErasedBundleKind<ToRemove, D, S, P>,
+}
+
+impl<ToRemove, D, S, P> Debug for RemovePair<ToRemove, D, S, P>
+where
+    ToRemove: ErasedArchetypeKind,
+    D: ErasedBundleDrop<ToRemove::Meta>,
+    S: AlignedStorageFromLayout,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { retained, removed } = self;
+        f.debug_struct("RemovePair")
+            .field("retained", retained)
+            .field("removed", removed)
+            .finish()
+    }
+}
+
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
+where
+    T: ErasedArchetypeKind<Meta: Clone>,
+    D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
+    #[expect(clippy::type_complexity)]
     // FIXME: can we optimize this?
     pub fn remove<ToRemove>(
         self,
         to_remove: ToRemove,
-    ) -> Result<RemovePair<ToRemove>, RemoveError<Self>>
+    ) -> Result<RemovePair<ToRemove, D, S, P>, RemoveError<Self, S::Error>>
     where
         ToRemove: ErasedArchetypeKind<Meta = T::Meta>,
     {
@@ -567,7 +702,7 @@ where
             .filter(|component_info| !archetype_to_remove.contains(component_info.component_id()))
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let retained_archetype = unsafe { ErasedArchetype::from_iter_unchecked(retained_iter) };
-        let result = Inner::try_from_fields_descriptors(retained_refs, retained_archetype);
+        let result = ErasedSoa::try_from_fields_descriptors(retained_refs, retained_archetype);
         let retained_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -580,7 +715,8 @@ where
             .as_refs()
             .into_iter()
             .filter(|component| archetype_to_remove.contains(component.component_id()));
-        let result = Inner::try_from_fields_descriptors(removed_refs, archetype_to_remove);
+        let result =
+            ErasedSoa::<_, _, P>::try_from_fields_descriptors(removed_refs, archetype_to_remove);
         let removed_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -589,7 +725,7 @@ where
             }
         };
         let (removed_storage, _) = removed_inner.into_parts();
-        let removed_inner = unsafe { Inner::from_parts(removed_storage, to_remove) };
+        let removed_inner = unsafe { ErasedSoa::from_parts(removed_storage, to_remove) };
 
         let _ = bundle.into_inner();
         let pair = RemovePair {
@@ -598,13 +734,22 @@ where
         };
         Ok(pair)
     }
+}
 
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
+where
+    T: ErasedArchetypeKind<Meta: WithErasedDrop + Clone>,
+    D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
     #[inline]
+    #[expect(clippy::type_complexity)]
     // FIXME: can we optimize this?
     pub fn destroy(
         self,
         to_destroy: ErasedArchetypeView<impl Sized>,
-    ) -> Result<ErasedBundle<T::Meta>, RemoveError<Self>> {
+    ) -> Result<ErasedBundle<T::Meta, D, S, P>, RemoveError<Self, S::Error>> {
         let mut bundle = self.check_remove(to_destroy.component_ids())?;
 
         let (refs, archetype) = bundle.as_mut_refs_with_archetype();
@@ -626,7 +771,7 @@ where
             Some(component_info.into_parts())
         });
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
-        let result = Inner::try_from_fields_descriptors(fields, archetype);
+        let result = ErasedSoa::try_from_fields_descriptors(fields, archetype);
         let inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -639,9 +784,20 @@ where
         let bundle = unsafe { ErasedBundle::from_inner(inner) };
         Ok(bundle)
     }
+}
 
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
+where
+    T: ErasedArchetypeKind,
+    D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
     #[inline]
-    fn check_remove(self, mut to_remove: ComponentIds<'_>) -> Result<Self, RemoveError<Self>> {
+    fn check_remove<E>(
+        self,
+        mut to_remove: ComponentIds<'_>,
+    ) -> Result<Self, RemoveError<Self, E>> {
         if let Some(missing_component_id) = to_remove.find(|&id| !self.archetype().contains(id)) {
             let error = RemoveError {
                 source: MissingComponentError::new(missing_component_id).into(),
@@ -654,63 +810,81 @@ where
 }
 
 #[inline]
-#[expect(clippy::needless_pass_by_value)]
-fn into_remove_error_kind(error: FromFieldsDescriptorsError<AllocError>) -> RemoveErrorKind {
+fn into_remove_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> RemoveErrorKind<E> {
     match error {
-        FromFieldsDescriptorsError::FromLayout(error) => error.into(),
-        _ => unreachable!("failed to remove some components of bundle: {error}"),
+        FromFieldsDescriptorsError::FromLayout(error) => RemoveErrorKind::FromLayout(error),
+        FromFieldsDescriptorsError::LenMismatch(error) => {
+            unreachable!("failed to remove some components of bundle: {error}")
+        }
+        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+            unreachable!("failed to remove some components of bundle: {error}")
+        }
+        FromFieldsDescriptorsError::InvalidLayout(error) => {
+            unreachable!("failed to remove some components of bundle: {error}")
+        }
     }
 }
 
-impl<'a, Meta, D> From<ErasedBorrowedBundle<'a, Meta, D>> for ErasedBorrowedViewBundle<'a, Meta, D>
+impl<'a, Meta, D, S, P> From<ErasedBorrowedBundle<'a, Meta, D, S, P>>
+    for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    fn from(bundle: ErasedBorrowedBundle<'a, Meta, D>) -> Self {
+    fn from(bundle: ErasedBorrowedBundle<'a, Meta, D, S, P>) -> Self {
         let (storage, archetype) = bundle.into_inner().into_parts();
         let archetype = archetype.as_view();
 
-        let inner = unsafe { Inner::from_parts(storage, archetype) };
+        let inner = unsafe { ErasedSoa::from_parts(storage, archetype) };
         unsafe { Self::from_inner(inner) }
     }
 }
 
-impl<'a, Meta, D> From<ErasedBorrowedBundle<'a, Meta, D>> for ErasedBundle<Meta, D>
+impl<'a, Meta, D, S, P> From<ErasedBorrowedBundle<'a, Meta, D, S, P>>
+    for ErasedBundle<Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    fn from(bundle: ErasedBorrowedBundle<'a, Meta, D>) -> Self {
+    fn from(bundle: ErasedBorrowedBundle<'a, Meta, D, S, P>) -> Self {
         let (storage, archetype) = bundle.into_inner().into_parts();
         let archetype = archetype.clone();
 
-        let inner = unsafe { Inner::from_parts(storage, archetype) };
+        let inner = unsafe { ErasedSoa::from_parts(storage, archetype) };
         unsafe { Self::from_inner(inner) }
     }
 }
 
-impl<'a, Meta, D> From<ErasedBorrowedViewBundle<'a, Meta, D>> for ErasedBundle<Meta, D>
+impl<'a, Meta, D, S, P> From<ErasedBorrowedViewBundle<'a, Meta, D, S, P>>
+    for ErasedBundle<Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    fn from(bundle: ErasedBorrowedViewBundle<'a, Meta, D>) -> Self {
+    fn from(bundle: ErasedBorrowedViewBundle<'a, Meta, D, S, P>) -> Self {
         let (storage, archetype) = bundle.into_inner().into_parts();
         let archetype = archetype.into();
 
-        let inner = unsafe { Inner::from_parts(storage, archetype) };
+        let inner = unsafe { ErasedSoa::from_parts(storage, archetype) };
         unsafe { Self::from_inner(inner) }
     }
 }
 
-impl<T, D> Debug for ErasedBundleKind<T, D>
+impl<T, D, S, P> Debug for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let components = &self.into_iter();
@@ -720,21 +894,25 @@ where
     }
 }
 
-impl<T, D> AsRef<[MaybeUninit<u8>]> for ErasedBundleKind<T, D>
+impl<T, D, S, P> AsRef<[P::Item]> for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<u8>] {
+    fn as_ref(&self) -> &[P::Item] {
         self.as_buffer()
     }
 }
 
-impl<T, D> Drop for ErasedBundleKind<T, D>
+impl<T, D, S, P> Drop for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     fn drop(&mut self) {
         let (mut ptrs, archetype) = self.as_mut_ptrs_with_archetype();
@@ -742,13 +920,15 @@ where
     }
 }
 
-impl<'a, T, D> IntoIterator for &'a ErasedBundleKind<T, D>
+impl<'a, T, D, S, P> IntoIterator for &'a ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Item = ErasedComponentRef<'a, *const MaybeUninit<u8>>;
-    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>>;
+    type Item = ErasedComponentRef<'a, P::Const>;
+    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>, P::Const>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -756,13 +936,15 @@ where
     }
 }
 
-impl<'a, T, D> IntoIterator for &'a mut ErasedBundleKind<T, D>
+impl<'a, T, D, S, P> IntoIterator for &'a mut ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Item = ErasedComponentMutRef<'a, *mut MaybeUninit<u8>>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>>;
+    type Item = ErasedComponentMutRef<'a, P::Mut>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>, P::Mut>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -770,14 +952,16 @@ where
     }
 }
 
-impl<T, D> IntoIterator for ErasedBundleKind<T, D>
+impl<T, D, S, P> IntoIterator for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
-    type Item = Result<ErasedComponent, AllocError>;
-    type IntoIter = ErasedBundleIntoIterKind<T>;
+    type Item = Result<ErasedComponent<S, P>, S::Error>;
+    type IntoIter = ErasedBundleIntoIterKind<S, T, S, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -788,10 +972,12 @@ where
     }
 }
 
-impl<'a, T, D> FieldDescriptors<'a> for ErasedBundleKind<T, D>
+impl<'a, T, D, S, P> FieldDescriptors<'a> for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
 
@@ -801,10 +987,12 @@ where
     }
 }
 
-impl<T, D> CovariantFieldDescriptors for ErasedBundleKind<T, D>
+impl<T, D, S, P> CovariantFieldDescriptors for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -814,36 +1002,35 @@ where
     }
 }
 
-pub type ErasedBundleIntoIter<Meta> = ErasedBundleIntoIterKind<ErasedArchetype<Meta>>;
-pub type ErasedBorrowedBundleIntoIter<'a, Meta> =
-    ErasedBundleIntoIterKind<&'a ErasedArchetype<Meta>>;
-pub type ErasedBorrowedViewBundleIntoIter<'a, Meta> =
-    ErasedBundleIntoIterKind<ErasedArchetypeView<'a, Meta>>;
+pub type ErasedBundleIntoIter<S, Meta, F, P> =
+    ErasedBundleIntoIterKind<S, ErasedArchetype<Meta>, F, P>;
+pub type ErasedBorrowedBundleIntoIter<'a, S, Meta, F, P> =
+    ErasedBundleIntoIterKind<S, &'a ErasedArchetype<Meta>, F, P>;
+pub type ErasedBorrowedViewBundleIntoIter<'a, S, Meta, F, P> =
+    ErasedBundleIntoIterKind<S, ErasedArchetypeView<'a, Meta>, F, P>;
 
-pub struct ErasedBundleIntoIterKind<T>
+pub struct ErasedBundleIntoIterKind<S, T, F, P>
 where
     T: ErasedArchetypeKind + IntoIterator,
 {
-    inner: InnerIter<T::IntoIter>,
+    inner: ErasedSoaIntoFields<S, T::IntoIter, F, P>,
 }
 
-type InnerIter<T> = ErasedSoaIntoFields<
-    BoxedAlignedUninitStorage,
-    T,
-    BoxedAlignedUninitStorage,
-    CoreSliceItemPtrs<MaybeUninit<u8>>,
->;
-
-impl<T> Iterator for ErasedBundleIntoIterKind<T>
+impl<S, T, F, P> Iterator for ErasedBundleIntoIterKind<S, T, F, P>
 where
+    S: AlignedStorage<Item: Copy>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
+    F: AlignedStorageFromLayout<Item = S::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
-    type Item = Result<ErasedComponent, AllocError>;
+    type Item = Result<ErasedComponent<F, P>, F::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        use gpecs_soa_erased::data::error::FromLayoutDataError::FromLayout;
+        use gpecs_soa_erased::data::error::FromLayoutDataError::{
+            FromLayout, InsufficientAlign, LenMismatch,
+        };
 
         let Self { inner } = self;
 
@@ -859,7 +1046,8 @@ where
             }
             Err(error) => match error {
                 FromLayout(error) => Err(error),
-                _ => unreachable!("failed to create erased data: {error}"),
+                LenMismatch(error) => unreachable!("failed to create erased data: {error}"),
+                InsufficientAlign(error) => unreachable!("failed to create erased data: {error}"),
             },
         };
         Some(item)
@@ -872,9 +1060,12 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for ErasedBundleIntoIterKind<T>
+impl<S, T, F, P> ExactSizeIterator for ErasedBundleIntoIterKind<S, T, F, P>
 where
+    S: AlignedStorage<Item: Copy>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
+    F: AlignedStorageFromLayout<Item = S::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
     T::IntoIter: ExactSizeIterator,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
@@ -885,9 +1076,12 @@ where
     }
 }
 
-impl<T> FusedIterator for ErasedBundleIntoIterKind<T>
+impl<S, T, F, P> FusedIterator for ErasedBundleIntoIterKind<S, T, F, P>
 where
+    S: AlignedStorage<Item: Copy>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
+    F: AlignedStorageFromLayout<Item = S::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
     T::IntoIter: FusedIterator,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {

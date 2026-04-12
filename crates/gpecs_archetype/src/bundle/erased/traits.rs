@@ -59,43 +59,33 @@ impl<T> IntoErasedArchetypeIterator for T where
 }
 
 pub unsafe trait ErasedBundleDrop<Meta> {
+    #[inline]
     unsafe fn ptrs_drop_in_place<T, U, P>(archetype: &T, ptrs: &mut ErasedBundleMutPtrs<U, P>)
     where
         T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
         U: ErasedArchetypeKind + ?Sized,
-        P: MutSliceItemPtr;
+        P: MutSliceItemPtr,
+    {
+        let _ = (archetype, ptrs);
+    }
 
+    #[inline]
     unsafe fn slices_drop_in_place<T, U, P>(
         archetype: &T,
         slices: &mut ErasedBundleMutSlicePtrs<U, P>,
     ) where
         T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
         U: ErasedArchetypeKind + ?Sized,
-        P: MutSliceItemPtr;
+        P: MutSliceItemPtr,
+    {
+        let _ = (archetype, slices);
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MustNotDrop;
 
-unsafe impl<Meta> ErasedBundleDrop<Meta> for MustNotDrop {
-    #[inline]
-    unsafe fn ptrs_drop_in_place<T, U, P>(_: &T, _: &mut ErasedBundleMutPtrs<U, P>)
-    where
-        T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
-        U: ErasedArchetypeKind + ?Sized,
-        P: MutSliceItemPtr,
-    {
-    }
-
-    #[inline]
-    unsafe fn slices_drop_in_place<T, U, P>(_: &T, _: &mut ErasedBundleMutSlicePtrs<U, P>)
-    where
-        T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
-        U: ErasedArchetypeKind + ?Sized,
-        P: MutSliceItemPtr,
-    {
-    }
-}
+unsafe impl<Meta> ErasedBundleDrop<Meta> for MustNotDrop {}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MustDrop;

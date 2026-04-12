@@ -4,7 +4,7 @@ use std::{
     fmt::{self, Debug, Display},
 };
 
-use gpecs_soa_erased::storage::AllocError;
+use gpecs_soa_erased::error::InsufficientAlignError;
 
 use crate::archetype::erased::error::{
     AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
@@ -15,21 +15,22 @@ pub use gpecs_archetype::bundle::erased::error::{DowncastError, DowncastErrorKin
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct FromBundleError<B> {
-    pub source: FromBundleErrorKind,
+pub struct FromBundleError<B, T> {
+    pub source: FromBundleErrorKind<T>,
     pub bundle: B,
 }
 
-impl<B> FromBundleError<B> {
+impl<B, T> FromBundleError<B, T> {
     #[inline]
-    pub(super) fn new(bundle: B, source: FromBundleErrorKind) -> Self {
+    pub(super) fn new(bundle: B, source: FromBundleErrorKind<T>) -> Self {
         Self { source, bundle }
     }
 }
 
-impl<B> Display for FromBundleError<B>
+impl<B, T> Display for FromBundleError<B, T>
 where
     B: Display,
+    T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { source, bundle } = self;
@@ -37,122 +38,159 @@ where
     }
 }
 
-impl<B> Error for FromBundleError<B>
+impl<B, T> Error for FromBundleError<B, T>
 where
     B: Debug + Display,
+    T: Error,
 {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+    fn cause(&self) -> Option<&dyn Error> {
         let Self { source, .. } = self;
         Some(source)
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum FromBundleErrorKind {
+pub enum FromBundleErrorKind<T> {
     DuplicateComponent(DuplicateComponentError),
-    Alloc(AllocError),
-}
-
-impl From<DuplicateComponentError> for FromBundleErrorKind {
-    #[inline]
-    fn from(error: DuplicateComponentError) -> Self {
-        Self::DuplicateComponent(error)
-    }
-}
-
-impl From<AllocError> for FromBundleErrorKind {
-    #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
-    }
-}
-
-impl Display for FromBundleErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
-        }
-    }
-}
-
-impl Error for FromBundleErrorKind {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::DuplicateComponent(error) => Some(error),
-            Self::Alloc(error) => Some(error),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum FromComponentsError {
-    Archetype(ArchetypeError),
+    InsufficientAlign(InsufficientAlignError),
     InvalidLayout(LayoutError),
-    Alloc(AllocError),
+    FromLayout(T),
 }
 
-impl From<ArchetypeError> for FromComponentsError {
+impl<T> From<InsufficientAlignError> for FromBundleErrorKind<T> {
     #[inline]
-    fn from(error: ArchetypeError) -> Self {
-        Self::Archetype(error)
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
     }
 }
 
-impl From<LayoutError> for FromComponentsError {
+impl<T> From<LayoutError> for FromBundleErrorKind<T> {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<AllocError> for FromComponentsError {
+impl<T> From<DuplicateComponentError> for FromBundleErrorKind<T> {
     #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
     }
 }
 
-impl Display for FromComponentsError {
+impl<T> Display for FromBundleErrorKind<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Archetype(error) => Display::fmt(error, f),
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for FromComponentsError {
+impl<T> Error for FromBundleErrorKind<T>
+where
+    T: Error,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromComponentsError<T> {
+    Archetype(ArchetypeError),
+    InvalidLayout(LayoutError),
+    FromLayout(T),
+}
+
+impl<T> From<ArchetypeError> for FromComponentsError<T> {
+    #[inline]
+    fn from(error: ArchetypeError) -> Self {
+        Self::Archetype(error)
+    }
+}
+
+impl<T> From<LayoutError> for FromComponentsError<T> {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl<T> Display for FromComponentsError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Archetype(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<T> Error for FromComponentsError<T>
+where
+    T: Error,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Archetype(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
-            Self::Alloc(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::Archetype(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct ShuffleError<T, A> {
-    pub source: ShuffleErrorKind,
+pub struct ShuffleError<T, A, E> {
+    pub source: ShuffleErrorKind<E>,
     pub bundle: T,
     pub archetype: A,
 }
 
-impl<T, A> From<ShuffleError<T, A>> for ShuffleErrorKind {
+impl<T, A, E> From<ShuffleError<T, A, E>> for ShuffleErrorKind<E> {
     #[inline]
-    fn from(error: ShuffleError<T, A>) -> Self {
+    fn from(error: ShuffleError<T, A, E>) -> Self {
         let ShuffleError { source, .. } = error;
         source
     }
 }
 
-impl<T, A> Display for ShuffleError<T, A>
+impl<T, A, E> Display for ShuffleError<T, A, E>
 where
     T: Display,
     A: Display,
+    E: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -165,84 +203,99 @@ where
     }
 }
 
-impl<T, A> Error for ShuffleError<T, A>
+impl<T, A, E> Error for ShuffleError<T, A, E>
 where
     T: Debug + Display,
     A: Debug + Display,
+    E: Error,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { source, .. } = self;
-        Some(source)
+        source.source()
+    }
+
+    #[expect(deprecated)]
+    fn cause(&self) -> Option<&dyn Error> {
+        let Self { source, .. } = self;
+        source.cause()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ShuffleErrorKind {
+pub enum ShuffleErrorKind<T> {
     IncompatibleArchetype(IncompatibleArchetypeViewExactError),
     InvalidLayout(LayoutError),
-    Alloc(AllocError),
+    FromLayout(T),
 }
 
-impl From<IncompatibleArchetypeViewExactError> for ShuffleErrorKind {
+impl<T> From<IncompatibleArchetypeViewExactError> for ShuffleErrorKind<T> {
     #[inline]
     fn from(error: IncompatibleArchetypeViewExactError) -> Self {
         Self::IncompatibleArchetype(error)
     }
 }
 
-impl From<LayoutError> for ShuffleErrorKind {
+impl<T> From<LayoutError> for ShuffleErrorKind<T> {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<AllocError> for ShuffleErrorKind {
-    #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
-    }
-}
-
-impl Display for ShuffleErrorKind {
+impl<T> Display for ShuffleErrorKind<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IncompatibleArchetype(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for ShuffleErrorKind {
+impl<T> Error for ShuffleErrorKind<T>
+where
+    T: Error,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::IncompatibleArchetype(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
-            Self::Alloc(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::IncompatibleArchetype(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct InsertError<T, I> {
-    pub source: InsertErrorKind,
+pub struct InsertError<T, I, E> {
+    pub source: InsertErrorKind<E>,
     pub bundle: T,
     pub to_insert: I,
 }
 
-impl<T, I> From<InsertError<T, I>> for InsertErrorKind {
+impl<T, I, E> From<InsertError<T, I, E>> for InsertErrorKind<E> {
     #[inline]
-    fn from(error: InsertError<T, I>) -> Self {
+    fn from(error: InsertError<T, I, E>) -> Self {
         let InsertError { source, .. } = error;
         source
     }
 }
 
-impl<T, I> Display for InsertError<T, I>
+impl<T, I, E> Display for InsertError<T, I, E>
 where
     T: Display,
     I: Display,
+    E: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -255,84 +308,99 @@ where
     }
 }
 
-impl<T, I> Error for InsertError<T, I>
+impl<T, I, E> Error for InsertError<T, I, E>
 where
     T: Debug + Display,
     I: Debug + Display,
+    E: Error,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { source, .. } = self;
-        Some(source)
+        source.source()
+    }
+
+    #[expect(deprecated)]
+    fn cause(&self) -> Option<&dyn Error> {
+        let Self { source, .. } = self;
+        source.cause()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum InsertErrorKind {
+pub enum InsertErrorKind<T> {
     AlreadyHasComponent(AlreadyHasComponentError),
     InvalidLayout(LayoutError),
-    Alloc(AllocError),
+    FromLayout(T),
 }
 
-impl From<AlreadyHasComponentError> for InsertErrorKind {
+impl<T> From<AlreadyHasComponentError> for InsertErrorKind<T> {
     #[inline]
     fn from(error: AlreadyHasComponentError) -> Self {
         Self::AlreadyHasComponent(error)
     }
 }
 
-impl From<LayoutError> for InsertErrorKind {
+impl<T> From<LayoutError> for InsertErrorKind<T> {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<AllocError> for InsertErrorKind {
-    #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
-    }
-}
-
-impl Display for InsertErrorKind {
+impl<T> Display for InsertErrorKind<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::AlreadyHasComponent(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for InsertErrorKind {
+impl<T> Error for InsertErrorKind<T>
+where
+    T: Error,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::AlreadyHasComponent(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
-            Self::Alloc(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::AlreadyHasComponent(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ReplaceError<T, R> {
-    pub source: ReplaceErrorKind,
+pub struct ReplaceError<T, R, E> {
+    pub source: ReplaceErrorKind<E>,
     pub bundle: T,
     pub to_replace: R,
 }
 
-impl<T, R> From<ReplaceError<T, R>> for ReplaceErrorKind {
+impl<T, R, E> From<ReplaceError<T, R, E>> for ReplaceErrorKind<E> {
     #[inline]
-    fn from(error: ReplaceError<T, R>) -> Self {
+    fn from(error: ReplaceError<T, R, E>) -> Self {
         let ReplaceError { source, .. } = error;
         source
     }
 }
 
-impl<T, R> Display for ReplaceError<T, R>
+impl<T, R, E> Display for ReplaceError<T, R, E>
 where
     T: Display,
     R: Display,
+    E: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -345,73 +413,87 @@ where
     }
 }
 
-impl<T, R> Error for ReplaceError<T, R>
+impl<T, R, E> Error for ReplaceError<T, R, E>
 where
     T: Debug + Display,
     R: Debug + Display,
+    E: Error,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { source, .. } = self;
-        Some(source)
+        source.source()
+    }
+
+    #[expect(deprecated)]
+    fn cause(&self) -> Option<&dyn Error> {
+        let Self { source, .. } = self;
+        source.cause()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ReplaceErrorKind {
+pub enum ReplaceErrorKind<T> {
     InvalidLayout(LayoutError),
-    Alloc(AllocError),
+    FromLayout(T),
 }
 
-impl From<LayoutError> for ReplaceErrorKind {
+impl<T> From<LayoutError> for ReplaceErrorKind<T> {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<AllocError> for ReplaceErrorKind {
-    #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
-    }
-}
-
-impl Display for ReplaceErrorKind {
+impl<T> Display for ReplaceErrorKind<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidLayout(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for ReplaceErrorKind {
+impl<T> Error for ReplaceErrorKind<T>
+where
+    T: Error,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::InvalidLayout(error) => Some(error),
-            Self::Alloc(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct RemoveError<T> {
-    pub source: RemoveErrorKind,
+pub struct RemoveError<T, E> {
+    pub source: RemoveErrorKind<E>,
     pub bundle: T,
 }
 
-impl<T> From<RemoveError<T>> for RemoveErrorKind {
+impl<T, E> From<RemoveError<T, E>> for RemoveErrorKind<E> {
     #[inline]
-    fn from(error: RemoveError<T>) -> Self {
+    fn from(error: RemoveError<T, E>) -> Self {
         let RemoveError { source, .. } = error;
         source
     }
 }
 
-impl<T> Display for RemoveError<T>
+impl<T, E> Display for RemoveError<T, E>
 where
     T: Display,
+    E: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { source, bundle } = self;
@@ -419,50 +501,57 @@ where
     }
 }
 
-impl<T> Error for RemoveError<T>
+impl<T, E> Error for RemoveError<T, E>
 where
     T: Debug + Display,
+    E: Error,
 {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+    fn cause(&self) -> Option<&dyn Error> {
         let Self { source, .. } = self;
         Some(source)
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum RemoveErrorKind {
+pub enum RemoveErrorKind<T> {
     MissingComponent(MissingComponentError),
-    Alloc(AllocError),
+    FromLayout(T),
 }
 
-impl From<MissingComponentError> for RemoveErrorKind {
+impl<T> From<MissingComponentError> for RemoveErrorKind<T> {
     #[inline]
     fn from(error: MissingComponentError) -> Self {
         Self::MissingComponent(error)
     }
 }
 
-impl From<AllocError> for RemoveErrorKind {
-    #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
-    }
-}
-
-impl Display for RemoveErrorKind {
+impl<T> Display for RemoveErrorKind<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingComponent(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for RemoveErrorKind {
+impl<T> Error for RemoveErrorKind<T>
+where
+    T: Error,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::MissingComponent(error) => Some(error),
-            Self::Alloc(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::MissingComponent(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }

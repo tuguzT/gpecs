@@ -14,11 +14,6 @@ pub type ErasedBundleRefs<'a, D> =
 pub type ErasedBundleMutRefs<'a, D> =
     gpecs_archetype::bundle::erased::ErasedBundleMutRefs<'a, D, *mut MaybeUninit<u8>>;
 
-pub type ErasedBundleRefsIter<'a, D> =
-    gpecs_archetype::bundle::erased::ErasedBundleRefsIter<'a, D, *const MaybeUninit<u8>>;
-pub type ErasedBundleMutRefsIter<'a, D> =
-    gpecs_archetype::bundle::erased::ErasedBundleMutRefsIter<'a, D, *mut MaybeUninit<u8>>;
-
 pub type ErasedBundleSlicePtrs<D> =
     gpecs_archetype::bundle::erased::ErasedBundleSlicePtrs<D, *const MaybeUninit<u8>>;
 pub type ErasedBundleMutSlicePtrs<D> =

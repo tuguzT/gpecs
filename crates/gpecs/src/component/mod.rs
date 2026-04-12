@@ -1,3 +1,1 @@
-pub use gpecs_component::{Component, registry};
-
-pub mod erased;
+pub use gpecs_component::{Component, erased, registry};

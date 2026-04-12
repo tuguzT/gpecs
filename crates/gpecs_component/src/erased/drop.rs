@@ -1,4 +1,4 @@
-use core::{mem, ptr};
+use core::{convert::Infallible, mem, ptr};
 
 use gpecs_erased::ptr::slice::MutSliceItemPtr;
 
@@ -7,7 +7,7 @@ use crate::{
     erased::{ErasedComponentMutPtr, ErasedComponentMutSlicePtr},
 };
 
-type Inner = unsafe fn(*mut ());
+type Inner = unsafe fn(*mut Infallible);
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
@@ -64,7 +64,7 @@ impl ErasedDrop {
     }
 }
 
-unsafe fn erased_drop<C>(to_drop: *mut ())
+unsafe fn erased_drop<C>(to_drop: *mut Infallible)
 where
     C: Component,
 {

@@ -1,7 +1,6 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
     ptr::NonNull,
 };
 
@@ -25,7 +24,7 @@ use crate::{
     erased::ErasedArchetypeView,
 };
 
-pub struct ErasedBundleNonNullPtrs<D, P = NonNull<MaybeUninit<u8>>>
+pub struct ErasedBundleNonNullPtrs<D, P>
 where
     D: ?Sized,
     P: NonNullSliceItemPtr,

@@ -1,5 +1,3 @@
-// TODO: move `gpecs` erased bundle pointers & refs here, values after
-
 pub use self::{
     mut_ptrs::{ErasedBundleMutPtrs, ErasedBundleMutPtrsIter},
     mut_refs::{ErasedBundleMutRefs, ErasedBundleMutRefsIter},

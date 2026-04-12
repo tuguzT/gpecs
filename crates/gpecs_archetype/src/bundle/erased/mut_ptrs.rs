@@ -1,7 +1,6 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
 };
 
 use gpecs_component::{
@@ -26,7 +25,7 @@ use crate::{
     erased::ErasedArchetypeView,
 };
 
-pub struct ErasedBundleMutPtrs<D, P = *mut MaybeUninit<u8>>
+pub struct ErasedBundleMutPtrs<D, P>
 where
     D: ?Sized,
     P: MutSliceItemPtr,

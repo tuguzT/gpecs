@@ -682,6 +682,7 @@ dependencies = [
  "gpecs_component",
  "gpecs_soa_erased",
  "gpecs_sparse",
+ "itertools 0.14.0",
 ]
 
 [[package]]

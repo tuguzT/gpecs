@@ -11,6 +11,7 @@ rust-version.workspace = true
 gpecs_component = { workspace = true }
 gpecs_soa_erased = { workspace = true }
 gpecs_sparse = { workspace = true }
+itertools = { workspace = true }
 
 [features]
 default = ["alloc"]

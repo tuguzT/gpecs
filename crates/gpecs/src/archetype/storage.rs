@@ -4,7 +4,8 @@ use std::{
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
+use gpecs_archetype::bundle::erased::traits::{ErasedBundleDrop, MustDrop};
+use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::EpochSparseSet};
 
 use crate::{
@@ -36,7 +37,7 @@ use crate::{
     soa::{
         self,
         field::FieldDescriptor,
-        traits::{RawSoaContext, ReadSoaContext, WriteSoaContext},
+        traits::{ReadSoaContext, WriteSoaContext},
     },
 };
 
@@ -177,14 +178,16 @@ impl ArchetypeStorage {
 
     #[inline]
     pub fn from_archetype(archetype: ErasedArchetype<ErasedDropMeta>) -> Self {
-        let sparse_set = EpochSparseSet::with_context(archetype);
+        let context = ErasedSoaContext::new(archetype)
+            .expect("alignment of byte should be suffisient for any type");
+        let sparse_set = EpochSparseSet::with_context(context);
         Self { sparse_set }
     }
 
     #[inline]
     pub fn archetype(&self) -> &ErasedArchetype<ErasedDropMeta> {
         let Self { sparse_set } = self;
-        sparse_set.context()
+        sparse_set.context().as_inner()
     }
 
     #[inline]
@@ -192,7 +195,7 @@ impl ArchetypeStorage {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.into_parts();
-        dense.into_context().into_inner()
+        dense.into_context().into_inner().into_inner()
     }
 
     #[inline]
@@ -496,9 +499,11 @@ impl ArchetypeStorage {
     pub fn destroy(&mut self, entity: Entity) -> bool {
         let Self { sparse_set } = self;
 
-        sparse_set.swap_remove_into(entity.into(), |archetype, ptrs| {
-            let Some(ptrs) = ptrs else { return false };
-            unsafe { RawSoaContext::<Value>::ptrs_drop_in_place(archetype, ptrs) };
+        sparse_set.swap_remove_into(entity.into(), |context, ptrs| {
+            let Some(mut ptrs) = ptrs else { return false };
+
+            let archetype = context.as_inner();
+            unsafe { MustDrop::ptrs_drop_in_place(archetype, &mut ptrs) };
             true
         })
     }

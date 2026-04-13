@@ -1,15 +1,20 @@
+use std::{fmt::Debug, mem::MaybeUninit};
+
+use gpecs_archetype::bundle::erased::{
+    ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
+    ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
+    ErasedBundleSlices,
+};
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
-    ptr::slice::CoreSliceItemPtrs,
+    ptr::slice::SliceItemPtrs,
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 use crate::{
     archetype::erased::{ErasedArchetype, ErasedArchetypeView},
     bundle::erased::{
         ErasedBorrowedBundle, ErasedBorrowedViewBundle, ErasedBundle, ErasedBundleKind,
-        ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
-        ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
-        ErasedBundleSlices,
         traits::{ErasedArchetypeKind, ErasedBundleDrop},
     },
     soa::{
@@ -20,12 +25,15 @@ use crate::{
     },
 };
 
-unsafe impl<T, D> RawSoaContext<ErasedBundleKind<T, D>> for ErasedArchetypeView<'_, T::Meta>
+unsafe impl<'view, T, D, S, P> RawSoaContext<ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetypeView<'view, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Ptrs<'a> = ErasedBundlePtrs<Self>;
+    type Ptrs<'a> = ErasedBundlePtrs<ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -34,7 +42,8 @@ where
 
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
-        let inner = ErasedSoaPtrs::dangling(*self)
+        let archetype = *self.as_inner();
+        let inner = ErasedSoaPtrs::dangling(archetype)
             .expect("archetype components should have sufficient alignment");
         unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
@@ -49,7 +58,7 @@ where
         unsafe { ptrs.offset_from(&origin) }
     }
 
-    type MutPtrs<'a> = ErasedBundleMutPtrs<Self>;
+    type MutPtrs<'a> = ErasedBundleMutPtrs<ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -58,7 +67,8 @@ where
 
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
-        let inner = ErasedSoaMutPtrs::dangling(*self)
+        let archetype = *self.as_inner();
+        let inner = ErasedSoaMutPtrs::dangling(archetype)
             .expect("archetype components should have sufficient alignment");
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
@@ -128,10 +138,11 @@ where
 
     #[inline]
     unsafe fn ptrs_drop_in_place(&self, mut ptrs: Self::MutPtrs<'_>) {
-        unsafe { D::ptrs_drop_in_place(self, &mut ptrs) }
+        let archetype = self.as_inner();
+        unsafe { D::ptrs_drop_in_place(archetype, &mut ptrs) }
     }
 
-    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<Self>;
+    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<ErasedArchetypeView<'view, T::Meta>, P::NonNull>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -150,7 +161,7 @@ where
         ptrs.into()
     }
 
-    type SlicePtrs<'a> = ErasedBundleSlicePtrs<Self>;
+    type SlicePtrs<'a> = ErasedBundleSlicePtrs<ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -178,7 +189,7 @@ where
         slices.into_ptrs()
     }
 
-    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<Self>;
+    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
@@ -218,109 +229,135 @@ where
 
     #[inline]
     unsafe fn slices_drop_in_place(&self, mut slices: Self::SliceMutPtrs<'_>) {
-        unsafe { D::slices_drop_in_place(self, &mut slices) }
+        let archetype = self.as_inner();
+        unsafe { D::slices_drop_in_place(archetype, &mut slices) }
     }
 }
 
-unsafe impl<'a, Meta, D> RawSoa for ErasedBorrowedViewBundle<'a, Meta, D>
+unsafe impl<'a, Meta, D, S, P> RawSoa for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Context = ErasedArchetypeView<'a, Meta>;
+    type Context = ErasedSoaContext<ErasedArchetypeView<'a, Meta>, P>;
     type Fields = ErasedSoaFields<u8>;
 }
 
-unsafe impl<'me, 'a, T, D>
-    ReadSoaContext<'me, ErasedBorrowedViewBundle<'a, T::Meta, D>, ErasedBundleKind<T, D>>
-    for ErasedArchetypeView<'a, T::Meta>
+unsafe impl<'me, 'a, T, D, S, P>
+    ReadSoaContext<
+        'me,
+        ErasedBorrowedViewBundle<'a, T::Meta, D, S, P>,
+        ErasedBundleKind<T, D, S, P>,
+    > for ErasedSoaContext<ErasedArchetypeView<'a, T::Meta>, P>
 where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    unsafe fn read(&'me self, src: Self::Ptrs<'me>) -> ErasedBorrowedViewBundle<'a, T::Meta, D> {
+    unsafe fn read(
+        &'me self,
+        src: Self::Ptrs<'me>,
+    ) -> ErasedBorrowedViewBundle<'a, T::Meta, D, S, P> {
         let inner = unsafe { src.as_inner() };
         let inner = unsafe { inner.read() }.expect("erased bundle should be created successfully");
         unsafe { ErasedBundleKind::from_inner(inner) }
     }
 }
 
-unsafe impl<T, W, D, N> WriteSoaContext<ErasedBundleKind<W, N>, ErasedBundleKind<T, D>>
-    for ErasedArchetypeView<'_, T::Meta>
+unsafe impl<T, W, D, N, S, U, P>
+    WriteSoaContext<ErasedBundleKind<W, N, U, P>, ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     W: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
     N: ErasedBundleDrop<W::Meta>,
+    S: AlignedStorage,
+    U: AlignedStorage<Item = S::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N>) {
+    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
         let inner = unsafe { dst.as_mut_inner() };
         let value = bundle.into_inner();
         unsafe { inner.write(value) }
     }
 }
 
-impl<'a, T, D> FieldDescriptors<'a, ErasedBundleKind<T, D>> for ErasedArchetypeView<'_, T::Meta>
+impl<'a, T, D, S, P> FieldDescriptors<'a, ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        *self
+        *self.as_inner()
     }
 }
 
-impl<T, D> CovariantFieldDescriptors<ErasedBundleKind<T, D>> for ErasedArchetypeView<'_, T::Meta>
+impl<T, D, S, P> CovariantFieldDescriptors<ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self, ErasedBundleKind<T, D>>,
-    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundleKind<T, D>> {
+        from: FieldDescriptorsOutput<'long, Self, ErasedBundleKind<T, D, S, P>>,
+    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundleKind<T, D, S, P>> {
         from
     }
 }
 
-unsafe impl<T, D> AllocSoaContext<ErasedBundleKind<T, D>> for ErasedArchetypeView<'_, T::Meta>
+unsafe impl<T, D, S, P> AllocSoaContext<ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-        let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
-        let inner = unsafe { context.ptrs_from_buffer(buffer, capacity) };
+        let inner = unsafe { self.ptrs_from_buffer(buffer, capacity) };
 
+        let archetype = *self.as_inner();
         let (_, buffer, capacity, offset) = inner.into_parts();
-        let inner = unsafe { ErasedSoaPtrs::new_unchecked(*self, buffer, capacity, offset) };
+        let inner = unsafe { ErasedSoaPtrs::new_unchecked(archetype, buffer, capacity, offset) };
         unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-        let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
-        let inner = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
+        let inner = unsafe { self.ptrs_from_buffer_mut(buffer, capacity) };
 
+        let archetype = *self.as_inner();
         let (_, buffer, capacity, offset) = inner.into_parts();
-        let inner = unsafe { ErasedSoaMutPtrs::new_unchecked(*self, buffer, capacity, offset) };
+        let inner = unsafe { ErasedSoaMutPtrs::new_unchecked(archetype, buffer, capacity, offset) };
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
 
-unsafe impl<'data, T, D> SoaContext<'data, ErasedBundleKind<T, D>>
-    for ErasedArchetypeView<'_, T::Meta>
+unsafe impl<'data, 'view, T, D, S, P> SoaContext<'data, ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetypeView<'view, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage<Item: 'data>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Refs<'a> = ErasedBundleRefs<'data, Self>;
+    type Refs<'a> = ErasedBundleRefs<'data, ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -337,7 +374,7 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedBundleMutRefs<'data, Self>;
+    type RefsMut<'a> = ErasedBundleMutRefs<'data, ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -359,7 +396,7 @@ where
         refs.into()
     }
 
-    type Slices<'a> = ErasedBundleSlices<'data, Self>;
+    type Slices<'a> = ErasedBundleSlices<'data, ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -381,7 +418,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedBundleMutSlices<'data, Self>;
+    type SlicesMut<'a> = ErasedBundleMutSlices<'data, ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_slices<'short, 'long: 'short>(
@@ -417,12 +454,15 @@ where
     }
 }
 
-unsafe impl<T, D> RawSoaContext<ErasedBundleKind<T, D>> for ErasedArchetype<T::Meta>
+unsafe impl<T, D, S, P> RawSoaContext<ErasedBundleKind<T, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Ptrs<'a> = ErasedBundlePtrs<&'a Self>;
+    type Ptrs<'a> = ErasedBundlePtrs<&'a ErasedArchetype<T::Meta>, P::Const>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -431,7 +471,8 @@ where
 
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
-        let inner = ErasedSoaPtrs::dangling(self)
+        let archetype = self.as_inner();
+        let inner = ErasedSoaPtrs::dangling(archetype)
             .expect("archetype components should have sufficient alignment");
         unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
@@ -446,7 +487,7 @@ where
         unsafe { ptrs.offset_from(&origin) }
     }
 
-    type MutPtrs<'a> = ErasedBundleMutPtrs<&'a Self>;
+    type MutPtrs<'a> = ErasedBundleMutPtrs<&'a ErasedArchetype<T::Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -455,7 +496,8 @@ where
 
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
-        let inner = ErasedSoaMutPtrs::dangling(self)
+        let archetype = self.as_inner();
+        let inner = ErasedSoaMutPtrs::dangling(archetype)
             .expect("archetype components should have sufficient alignment");
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
@@ -525,10 +567,11 @@ where
 
     #[inline]
     unsafe fn ptrs_drop_in_place(&self, mut ptrs: Self::MutPtrs<'_>) {
-        unsafe { D::ptrs_drop_in_place(self, &mut ptrs) }
+        let archetype = self.as_inner();
+        unsafe { D::ptrs_drop_in_place(archetype, &mut ptrs) }
     }
 
-    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<&'a Self>;
+    type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<&'a ErasedArchetype<T::Meta>, P::NonNull>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -547,7 +590,7 @@ where
         ptrs.into()
     }
 
-    type SlicePtrs<'a> = ErasedBundleSlicePtrs<&'a Self>;
+    type SlicePtrs<'a> = ErasedBundleSlicePtrs<&'a ErasedArchetype<T::Meta>, P::Const>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -575,7 +618,7 @@ where
         slices.into_ptrs()
     }
 
-    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<&'a Self>;
+    type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<&'a ErasedArchetype<T::Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
@@ -615,121 +658,145 @@ where
 
     #[inline]
     unsafe fn slices_drop_in_place(&self, mut slices: Self::SliceMutPtrs<'_>) {
-        unsafe { D::slices_drop_in_place(self, &mut slices) }
+        let archetype = self.as_inner();
+        unsafe { D::slices_drop_in_place(archetype, &mut slices) }
     }
 }
 
-unsafe impl<Meta, D> RawSoa for ErasedBundle<Meta, D>
+unsafe impl<Meta, D, S, P> RawSoa for ErasedBundle<Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Context = ErasedArchetype<Meta>;
+    type Context = ErasedSoaContext<ErasedArchetype<Meta>, P>;
     type Fields = ErasedSoaFields<u8>;
 }
 
-unsafe impl<'a, Meta, D>
-    ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta, D>, ErasedBundle<Meta, D>>
-    for ErasedArchetype<Meta>
+unsafe impl<'a, Meta, D, S, P>
+    ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta, D> {
+    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta, D, S, P> {
         let inner = unsafe { src.as_inner() };
         let inner = unsafe { inner.read() }.expect("erased bundle should be created successfully");
         unsafe { ErasedBundleKind::from_inner(inner) }
     }
 }
 
-unsafe impl<'a, Meta, D> ReadSoaContext<'a, ErasedBundle<Meta, D>, ErasedBundle<Meta, D>>
-    for ErasedArchetype<Meta>
+unsafe impl<'a, Meta, D, S, P>
+    ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta, D> {
-        let bundle: ErasedBorrowedBundle<_, _> = unsafe { self.read(src) };
+    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta, D, S, P> {
+        let bundle: ErasedBorrowedBundle<Meta, D, S, P> = unsafe { self.read(src) };
         bundle.into()
     }
 }
 
-unsafe impl<Meta, W, D, N> WriteSoaContext<ErasedBundleKind<W, N>, ErasedBundle<Meta, D>>
-    for ErasedArchetype<Meta>
+unsafe impl<Meta, W, D, N, S, U, P>
+    WriteSoaContext<ErasedBundleKind<W, N, U, P>, ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     W: ErasedArchetypeKind,
     D: ErasedBundleDrop<Meta>,
     N: ErasedBundleDrop<W::Meta>,
+    S: AlignedStorage,
+    U: AlignedStorage<Item = S::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N>) {
+    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
         let inner = unsafe { dst.as_mut_inner() };
         let value = bundle.into_inner();
         unsafe { inner.write(value) }
     }
 }
 
-impl<'a, Meta, D> FieldDescriptors<'a, ErasedBundle<Meta, D>> for ErasedArchetype<Meta>
+impl<'a, Meta, D, S, P> FieldDescriptors<'a, ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Output = &'a Self;
+    type Output = &'a ErasedArchetype<Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        self
+        self.as_inner()
     }
 }
 
-impl<Meta, D> CovariantFieldDescriptors<ErasedBundle<Meta, D>> for ErasedArchetype<Meta>
+impl<Meta, D, S, P> CovariantFieldDescriptors<ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self, ErasedBundle<Meta, D>>,
-    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundle<Meta, D>> {
+        from: FieldDescriptorsOutput<'long, Self, ErasedBundle<Meta, D, S, P>>,
+    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundle<Meta, D, S, P>> {
         from
     }
 }
 
-unsafe impl<Meta, D> AllocSoaContext<ErasedBundle<Meta, D>> for ErasedArchetype<Meta>
+unsafe impl<Meta, D, S, P> AllocSoaContext<ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-        let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
-        let inner = unsafe { context.ptrs_from_buffer(buffer, capacity) };
+        let inner = unsafe { self.ptrs_from_buffer(buffer, capacity) };
 
+        let archetype = self.as_inner();
         let (_, buffer, capacity, offset) = inner.into_parts();
-        let inner = unsafe { ErasedSoaPtrs::new_unchecked(self, buffer, capacity, offset) };
+        let inner = unsafe { ErasedSoaPtrs::new_unchecked(archetype, buffer, capacity, offset) };
         unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-        let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
-        let inner = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
+        let inner = unsafe { self.ptrs_from_buffer_mut(buffer, capacity) };
 
+        let archetype = self.as_inner();
         let (_, buffer, capacity, offset) = inner.into_parts();
-        let inner = unsafe { ErasedSoaMutPtrs::new_unchecked(self, buffer, capacity, offset) };
+        let inner = unsafe { ErasedSoaMutPtrs::new_unchecked(archetype, buffer, capacity, offset) };
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
 
-unsafe impl<'data, Meta, D> SoaContext<'data, ErasedBundle<Meta, D>> for ErasedArchetype<Meta>
+unsafe impl<'data, Meta, D, S, P> SoaContext<'data, ErasedBundle<Meta, D, S, P>>
+    for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage<Item: 'data>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
 {
-    type Refs<'a> = ErasedBundleRefs<'data, &'a Self>;
+    type Refs<'a> = ErasedBundleRefs<'data, &'a ErasedArchetype<Meta>, P::Const>;
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -746,7 +813,7 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedBundleMutRefs<'data, &'a Self>;
+    type RefsMut<'a> = ErasedBundleMutRefs<'data, &'a ErasedArchetype<Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -768,7 +835,7 @@ where
         refs.into()
     }
 
-    type Slices<'a> = ErasedBundleSlices<'data, &'a Self>;
+    type Slices<'a> = ErasedBundleSlices<'data, &'a ErasedArchetype<Meta>, P::Const>;
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -790,7 +857,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedBundleMutSlices<'data, &'a Self>;
+    type SlicesMut<'a> = ErasedBundleMutSlices<'data, &'a ErasedArchetype<Meta>, P::Mut>;
 
     #[inline]
     fn upcast_mut_slices<'short, 'long: 'short>(

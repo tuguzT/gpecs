@@ -1070,7 +1070,7 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
-        let to_insert = ErasedBundle::try_from(components, value)
+        let to_insert = ErasedBundle::from_bundle(components, value)
             .map_err(|error| error.source)
             .expect("bundle compatibility should have been already checked");
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
@@ -1201,7 +1201,7 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
-        let to_replace = ErasedBundle::try_from(components, value)
+        let to_replace = ErasedBundle::from_bundle(components, value)
             .map_err(|error| error.source)
             .expect("bundle compatibility should have been already checked");
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)

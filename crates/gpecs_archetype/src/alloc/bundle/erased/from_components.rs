@@ -1,0 +1,136 @@
+use core::{
+    alloc::LayoutError,
+    error::Error,
+    fmt::{self, Debug, Display},
+    mem::MaybeUninit,
+};
+
+use gpecs_component::{erased::ErasedComponent, registry::ComponentRegistryView};
+use gpecs_soa_erased::{
+    ErasedSoa,
+    error::FromFieldsDescriptorsError,
+    ptr::slice::SliceItemPtrs,
+    soa::field::FieldDescriptor,
+    storage::{AlignedStorage, AlignedStorageFromLayout},
+};
+
+use crate::{
+    bundle::erased::{ErasedBundle, traits::ErasedBundleDrop},
+    erased::{ErasedArchetype, error::ArchetypeError},
+};
+
+pub trait FromErasedComponent<S, P>: Sized
+where
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
+    fn from_erased_component(component: &ErasedComponent<S, P>) -> Self;
+}
+
+impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
+where
+    Meta: AsRef<FieldDescriptor> + FromErasedComponent<S, P> + 'static,
+    D: ErasedBundleDrop<Meta>,
+    S: AlignedStorageFromLayout<Item: Copy>,
+    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+{
+    #[inline]
+    pub fn from_components<I>(
+        components: &ComponentRegistryView<impl Sized, impl ?Sized>,
+        iter: I,
+    ) -> Result<Self, FromComponentsError<S::Error>>
+    where
+        I: IntoIterator<Item = ErasedComponent<S, P>>,
+    {
+        let iter = iter
+            .into_iter()
+            .map(|component| (component.component_id(), component));
+        let components = ErasedArchetype::from_iter(components, iter)?;
+
+        let iter = components.iter().map(|component_info| {
+            let component_id = component_info.component_id();
+            let meta = Meta::from_erased_component(component_info.as_meta());
+            (component_id, meta)
+        });
+        let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
+
+        let fields = components
+            .into_iter()
+            .map(|component_info| component_info.into_meta().into_field());
+
+        let inner = ErasedSoa::try_from_fields_descriptors(fields, archetype)
+            .map_err(into_from_components_error)?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Ok(me)
+    }
+}
+
+#[inline]
+fn into_from_components_error<T>(error: FromFieldsDescriptorsError<T>) -> FromComponentsError<T> {
+    match error {
+        FromFieldsDescriptorsError::FromLayout(error) => FromComponentsError::FromLayout(error),
+        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+        FromFieldsDescriptorsError::LenMismatch(error) => {
+            unreachable!("failed to create erased bundle from components: {error}")
+        }
+        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+            unreachable!("failed to create erased bundle from components: {error}")
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromComponentsError<T> {
+    Archetype(ArchetypeError),
+    InvalidLayout(LayoutError),
+    FromLayout(T),
+}
+
+impl<T> From<ArchetypeError> for FromComponentsError<T> {
+    #[inline]
+    fn from(error: ArchetypeError) -> Self {
+        Self::Archetype(error)
+    }
+}
+
+impl<T> From<LayoutError> for FromComponentsError<T> {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl<T> Display for FromComponentsError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Archetype(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<T> Error for FromComponentsError<T>
+where
+    T: Error,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Archetype(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::Archetype(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
+}

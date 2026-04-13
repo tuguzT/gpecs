@@ -8,6 +8,19 @@ pub use self::{
     refs::{ErasedBundleRefs, ErasedBundleRefsIter},
     slice_ptrs::{ErasedBundleSlicePtrs, ErasedBundleSlicePtrsIter},
     slices::{ErasedBundleSlices, ErasedBundleSlicesIter},
+    value::{
+        ErasedBorrowedViewBundle, ErasedBorrowedViewBundleIntoIter, ErasedBundleIntoIterKind,
+        ErasedBundleKind, ShuffledBundle,
+    },
+};
+
+#[cfg(feature = "alloc")]
+pub use crate::alloc::bundle::erased::{
+    from_components::FromErasedComponent,
+    remove::RemovePair,
+    value::{
+        ErasedBorrowedBundle, ErasedBorrowedBundleIntoIter, ErasedBundle, ErasedBundleIntoIter,
+    },
 };
 
 pub mod error;
@@ -22,3 +35,5 @@ mod ptrs;
 mod refs;
 mod slice_ptrs;
 mod slices;
+mod soa_impl;
+mod value;

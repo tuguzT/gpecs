@@ -129,10 +129,8 @@ where
     }
 }
 
-type Value = ErasedBundle<ErasedDropMeta>;
-
 pub struct ArchetypeStorage {
-    sparse_set: EpochSparseSet<NoEpochEntity, Value>,
+    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<ErasedDropMeta>>,
 }
 
 impl ArchetypeStorage {

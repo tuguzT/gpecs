@@ -4,7 +4,6 @@ use std::{
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_archetype::bundle::erased::traits::{ErasedBundleDrop, MustDrop};
 use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::EpochSparseSet};
 
@@ -21,7 +20,9 @@ use crate::{
         erased::{
             ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ErasedBundleMutRefs,
             ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices, FromErasedComponent,
-            ShuffledBundle, error::DowncastErrorKind, traits::ErasedArchetypeKind,
+            ShuffledBundle,
+            error::DowncastErrorKind,
+            traits::{ErasedArchetypeKind, ErasedBundleDrop, MustDrop},
         },
     },
     component::{

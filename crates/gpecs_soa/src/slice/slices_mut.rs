@@ -316,13 +316,13 @@ where
             slice_index_usize_fail(len, b);
         }
 
-        // call `get_unchecked_mut` directly on slice pointers to avoid creating multiple mutable references
-        let (context, slices) = ptrs.as_mut_slice_ptrs_with_context();
-        unsafe {
-            let a = SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone());
-            let b = SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices);
-            context.ptrs_swap(a, b);
-        }
+        unsafe { ptrs.swap_unchecked(a, b) }
+    }
+
+    #[inline]
+    pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
+        let Self { ptrs, .. } = self;
+        unsafe { ptrs.swap_unchecked(a, b) }
     }
 
     pub(crate) fn sort_impl<P, F>(&mut self, mut permutation: P, f: F)

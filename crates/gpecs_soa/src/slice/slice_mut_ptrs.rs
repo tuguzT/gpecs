@@ -299,6 +299,17 @@ where
     }
 
     #[inline]
+    pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
+        // call `get_unchecked_mut` directly on slice pointers to avoid creating multiple mutable references
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
+        unsafe {
+            let a = SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone());
+            let b = SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices);
+            context.ptrs_swap(a, b);
+        }
+    }
+
+    #[inline]
     pub fn iter(&self) -> RawIter<'_, T> {
         let (_, iter) = self.iter_with_context();
         iter

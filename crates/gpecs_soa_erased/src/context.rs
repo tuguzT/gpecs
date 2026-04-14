@@ -4,6 +4,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
+    ops::{Deref, DerefMut},
     ptr,
 };
 
@@ -75,25 +76,25 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
-    pub unsafe fn from_inner_ref(descriptors: &D) -> &Self {
+    pub const unsafe fn from_inner_ref(descriptors: &D) -> &Self {
         // SAFETY: Self is `#[repr(transparent)]` over `D`.
         unsafe { &*(ptr::from_ref(descriptors) as *const _) }
     }
 
     #[inline]
-    pub unsafe fn from_inner_mut(descriptors: &mut D) -> &mut Self {
+    pub const unsafe fn from_inner_mut(descriptors: &mut D) -> &mut Self {
         // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
         unsafe { &mut *(ptr::from_mut(descriptors) as *mut _) }
     }
 
     #[inline]
-    pub fn as_inner(&self) -> &D {
+    pub const fn as_inner(&self) -> &D {
         let Self { descriptors, .. } = self;
         descriptors
     }
 
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut D {
+    pub const fn as_inner_mut(&mut self) -> &mut D {
         let Self { descriptors, .. } = self;
         descriptors
     }
@@ -269,6 +270,30 @@ where
 
         phantom.hash(state);
         descriptors.hash(state);
+    }
+}
+
+impl<D, P> Deref for ErasedSoaContext<D, P>
+where
+    D: ?Sized,
+    P: SliceItemPtrs,
+{
+    type Target = D;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_inner()
+    }
+}
+
+impl<D, P> DerefMut for ErasedSoaContext<D, P>
+where
+    D: ?Sized,
+    P: SliceItemPtrs,
+{
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_inner_mut()
     }
 }
 

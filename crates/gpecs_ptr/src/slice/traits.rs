@@ -1,5 +1,9 @@
 use core::ptr::NonNull;
 
+pub type ConstPtr<T> = <T as SliceItemPtrs>::Const;
+pub type MutPtr<T> = <T as SliceItemPtrs>::Mut;
+pub type NonNullPtr<T> = <T as SliceItemPtrs>::NonNull;
+
 pub type CastConst<T> = <<T as MutSliceItemPtr>::Ptrs as SliceItemPtrs>::Const;
 pub type CastMut<T> = <<T as ConstSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
 pub type NonNullAsPtr<T> = <<T as NonNullSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;

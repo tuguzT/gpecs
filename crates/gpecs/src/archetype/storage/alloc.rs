@@ -11,7 +11,7 @@ use crate::{
             error::{ArchetypeError, DuplicateComponentError, IncompatibleArchetypeExactError},
         },
         error::IncompatibleBundleValueError,
-        storage::{ErasedDropMeta, NoEpochEntity},
+        storage::{ArchetypeStorageView, ErasedDropMeta, NoEpochEntity},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
@@ -90,6 +90,14 @@ impl ArchetypeStorage {
             .expect("alignment of byte should be suffisient for any type");
         let sparse_set = EpochSparseSet::with_context(context);
         Self { sparse_set }
+    }
+
+    #[inline]
+    pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, ErasedBundle<ErasedDropMeta>> {
+        let Self { sparse_set } = self;
+
+        let inner = sparse_set.as_view_ptr();
+        unsafe { ArchetypeStorageView::from_inner(inner) }
     }
 
     #[inline]
@@ -211,17 +219,14 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn entities(&self) -> &[Entity] {
-        let Self { sparse_set } = self;
-
-        let entities = sparse_set.as_key_slice();
-        must_cast_slice(entities)
+    pub fn contains(&self, entity: Entity) -> bool {
+        self.as_view().contains(entity)
     }
 
     #[inline]
-    pub fn contains(&self, entity: Entity) -> bool {
-        let Self { sparse_set } = self;
-        sparse_set.contains_key(entity.into())
+    pub fn entities(&self) -> &[Entity] {
+        let (entities, _) = self.as_slices();
+        entities
     }
 
     #[inline]
@@ -359,8 +364,7 @@ impl ArchetypeStorage {
         &self,
         entity: Entity,
     ) -> Option<ErasedBundleRefs<'_, &ErasedArchetype<ErasedDropMeta>>> {
-        let Self { sparse_set } = self;
-        sparse_set.get(entity.into())
+        self.as_view().into_get(entity)
     }
 
     #[inline]
@@ -429,13 +433,8 @@ impl ArchetypeStorage {
         &[Entity],
         ErasedBundleSlices<'_, &ErasedArchetype<ErasedDropMeta>>,
     ) {
-        let Self { sparse_set } = self;
-
-        let (dense, _) = sparse_set.as_view().into_parts();
-        let (entities, slices) = dense.into_slices().into_parts();
-
-        let entities = must_cast_slice(entities);
-        (entities, slices)
+        let (entities, bundles, _, _) = self.as_view().into_parts();
+        (entities, bundles)
     }
 
     #[inline]

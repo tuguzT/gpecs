@@ -1,34 +1,31 @@
-use std::{
-    fmt::{self, Debug},
-    mem::MaybeUninit,
-};
+use std::fmt::{self, Debug};
 
-use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::SliceItemPtrs, storage::AlignedStorage};
-use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::EpochSparseSet};
+use bytemuck::must_cast_slice;
+use gpecs_soa_erased::ErasedSoaContext;
+use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet};
 
 use crate::{
     archetype::{
         erased::{
-            ErasedArchetype, FromComponentInfo,
+            ErasedArchetype,
             error::{ArchetypeError, DuplicateComponentError, IncompatibleArchetypeExactError},
         },
         error::IncompatibleBundleValueError,
+        storage::{ErasedDropMeta, NoEpochEntity},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ErasedBundleMutRefs,
-            ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices, FromErasedComponent,
-            ShuffledBundle,
+            ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices, ShuffledBundle,
             error::DowncastErrorKind,
             traits::{ErasedArchetypeKind, ErasedBundleDrop, MustDrop},
         },
     },
     component::{
-        erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
+        erased::WithErasedDrop,
         registry::{
-            ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
+            ComponentId, ComponentRegistry, ComponentRegistryView,
             traits::{
                 ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray,
             },
@@ -41,94 +38,6 @@ use crate::{
         traits::{ReadSoaContext, WriteSoaContext},
     },
 };
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct NoEpochEntity(pub Entity);
-
-impl Key for NoEpochEntity {
-    type SparseIndex = <Entity as Key>::SparseIndex;
-    type Epoch = ();
-
-    #[inline]
-    fn new(sparse_index: Self::SparseIndex, (): Self::Epoch) -> Self {
-        let epoch = <Entity as Key>::Epoch::default();
-        let entity = <Entity as Key>::new(sparse_index, epoch);
-        Self(entity)
-    }
-
-    #[inline]
-    fn sparse_index(self) -> Self::SparseIndex {
-        let Self(entity) = self;
-        entity.sparse_index()
-    }
-
-    #[inline]
-    fn epoch(self) -> Self::Epoch {}
-}
-
-impl From<Entity> for NoEpochEntity {
-    #[inline]
-    fn from(entity: Entity) -> Self {
-        Self(entity)
-    }
-}
-
-impl From<NoEpochEntity> for Entity {
-    #[inline]
-    fn from(entity: NoEpochEntity) -> Self {
-        let NoEpochEntity(entity) = entity;
-        entity
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ErasedDropMeta {
-    desc: FieldDescriptor,
-    erased_drop: Option<ErasedDrop>,
-}
-
-impl AsRef<FieldDescriptor> for ErasedDropMeta {
-    #[inline]
-    fn as_ref(&self) -> &FieldDescriptor {
-        let Self { desc, .. } = self;
-        desc
-    }
-}
-
-impl WithErasedDrop for ErasedDropMeta {
-    #[inline]
-    fn erased_drop(&self) -> Option<ErasedDrop> {
-        let Self { erased_drop, .. } = *self;
-        erased_drop
-    }
-}
-
-impl<Meta> FromComponentInfo<'_, Meta> for ErasedDropMeta
-where
-    Meta: AsRef<FieldDescriptor> + WithErasedDrop,
-{
-    #[inline]
-    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
-        let desc = FromComponentInfo::from_component_info(info);
-        let erased_drop = FromComponentInfo::from_component_info(info);
-        Self { desc, erased_drop }
-    }
-}
-
-impl<S, P> FromErasedComponent<S, P> for ErasedDropMeta
-where
-    S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
-{
-    #[inline]
-    fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {
-        Self {
-            desc: FieldDescriptor::new(component.as_field().layout()),
-            erased_drop: component.erased_drop(),
-        }
-    }
-}
 
 pub struct ArchetypeStorage {
     sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<ErasedDropMeta>>,

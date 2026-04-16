@@ -450,7 +450,7 @@ impl ArchetypeStorage {
         &[Entity],
         ErasedBundleMutSlices<'_, &ErasedArchetype<ErasedDropMeta>>,
     ) {
-        let (entities, bundles, _, _) = self.as_mut_view().into_parts();
+        let (entities, bundles, _, _) = unsafe { self.as_mut_view().into_parts() };
         (entities, bundles)
     }
 }

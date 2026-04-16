@@ -14,7 +14,7 @@ use crate::{
     entity::Entity,
     soa::{
         field::FieldDescriptors,
-        traits::{Refs, Slices as Bundles},
+        traits::{Refs as ErasedBundleRefs, Slices as ErasedBundles},
     },
 };
 
@@ -109,7 +109,7 @@ where
     }
 
     #[inline]
-    pub fn as_bundles(&self) -> Bundles<'_, '_, T> {
+    pub fn as_erased_bundles(&self) -> ErasedBundles<'_, '_, T> {
         let (_, bundles, _) = self.as_slices();
         bundles
     }
@@ -127,12 +127,12 @@ where
     }
 
     #[inline]
-    pub fn get(&self, entity: Entity) -> Option<Refs<'_, '_, T>> {
+    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, T>> {
         self.clone().into_get(entity)
     }
 
     #[inline]
-    pub fn into_get(self, entity: Entity) -> Option<Refs<'ctx, 'a, T>> {
+    pub fn into_get(self, entity: Entity) -> Option<ErasedBundleRefs<'ctx, 'a, T>> {
         let Self { inner, .. } = self;
         unsafe { inner.as_ref_unchecked() }.into_get(entity.into())
     }
@@ -172,12 +172,12 @@ where
 
 type SlicesWithArchetype<'ctx, 'a, T> = (
     &'a [Entity],
-    Bundles<'ctx, 'a, T>,
+    ErasedBundles<'ctx, 'a, T>,
     &'a [SparseItem<NoEpochEntity>],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
 type Slices<'a, T> = (
     &'a [Entity],
-    Bundles<'a, 'a, T>,
+    ErasedBundles<'a, 'a, T>,
     &'a [SparseItem<NoEpochEntity>],
 );

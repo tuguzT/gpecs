@@ -65,6 +65,17 @@ where
         let Self { ptrs, .. } = self;
         ptrs
     }
+
+    #[inline]
+    pub unsafe fn map_descriptors<N, F>(self, f: F) -> ErasedSoaMutRefs<'a, N, P>
+    where
+        F: FnOnce(D) -> N,
+    {
+        let Self { ptrs, .. } = self;
+
+        let ptrs = unsafe { ptrs.map_descriptors(f) };
+        unsafe { ErasedSoaMutRefs::from_ptrs(ptrs) }
+    }
 }
 
 impl<'a, D, P> ErasedSoaMutRefs<'a, D, P>

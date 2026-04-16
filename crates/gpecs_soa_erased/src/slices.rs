@@ -66,6 +66,17 @@ where
         let Self { ptrs, .. } = self;
         ptrs
     }
+
+    #[inline]
+    pub unsafe fn map_descriptors<N, F>(self, f: F) -> ErasedSoaSlices<'a, N, P>
+    where
+        F: FnOnce(D) -> N,
+    {
+        let Self { ptrs, .. } = self;
+
+        let ptrs = unsafe { ptrs.map_descriptors(f) };
+        unsafe { ErasedSoaSlices::from_ptrs(ptrs) }
+    }
 }
 
 impl<'a, D, P> ErasedSoaSlices<'a, D, P>

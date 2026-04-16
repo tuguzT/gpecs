@@ -70,6 +70,22 @@ where
     }
 
     #[inline]
+    pub unsafe fn map_descriptors<N, F>(self, f: F) -> ErasedSoaPtrs<N, P>
+    where
+        F: FnOnce(D) -> N,
+    {
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            offset,
+        } = self;
+
+        let descriptors = f(descriptors);
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, offset) }
+    }
+
+    #[inline]
     pub fn cast_mut(self) -> ErasedSoaMutPtrs<D, CastMut<P>> {
         let Self {
             descriptors,

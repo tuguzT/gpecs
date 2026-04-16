@@ -65,6 +65,17 @@ where
     }
 
     #[inline]
+    pub unsafe fn map_descriptors<N, F>(self, f: F) -> ErasedSoaMutSlicePtrs<N, P>
+    where
+        F: FnOnce(D) -> N,
+    {
+        let Self { ptrs, len } = self;
+
+        let ptrs = unsafe { ptrs.map_descriptors(f) };
+        unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
+    }
+
+    #[inline]
     pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.cast_const();

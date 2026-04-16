@@ -23,9 +23,7 @@ where
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
-        let (descriptors, ptr, capacity, offset) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -48,9 +46,7 @@ where
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
-        let (descriptors, ptr, capacity, offset) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -133,9 +129,7 @@ where
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short> {
-        let (descriptors, ptr, capacity, offset) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaNonNullPtrs::from_parts(descriptors, ptr, capacity, offset) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -154,9 +148,7 @@ where
     fn upcast_slice_ptrs<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short> {
-        let (descriptors, buffer, capacity, offset, len) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaSlicePtrs::new_unchecked(descriptors, buffer, capacity, offset, len) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -184,9 +176,7 @@ where
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
-        let (descriptors, buffer, capacity, offset, len) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaMutSlicePtrs::new_unchecked(descriptors, buffer, capacity, offset, len) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -316,9 +306,7 @@ where
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
-        let (descriptors, buffer, capacity, offset) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -335,9 +323,7 @@ where
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
-        let (descriptors, buffer, capacity, offset) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaMutRefs::new_unchecked(descriptors, buffer, capacity, offset) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -359,9 +345,7 @@ where
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
-        let (descriptors, buffer, capacity, offset, len) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]
@@ -385,9 +369,7 @@ where
     fn upcast_mut_slices<'short, 'long: 'short>(
         from: Self::SlicesMut<'long>,
     ) -> Self::SlicesMut<'short> {
-        let (descriptors, buffer, capacity, offset, len) = from.into_parts();
-        let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaMutSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
+        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
     }
 
     #[inline]

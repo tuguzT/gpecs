@@ -81,6 +81,22 @@ where
     }
 
     #[inline]
+    pub unsafe fn map_descriptors<N, F>(self, f: F) -> ErasedSoaNonNullPtrs<N, P>
+    where
+        F: FnOnce(D) -> N,
+    {
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            offset,
+        } = self;
+
+        let descriptors = f(descriptors);
+        unsafe { ErasedSoaNonNullPtrs::from_parts(descriptors, buffer, capacity, offset) }
+    }
+
+    #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { offset, .. } = self;

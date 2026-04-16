@@ -55,7 +55,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedBundleRefs<'a, D, P> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleRefs<'a, D, P> {
         unsafe { ErasedBundleRefs::from_ptrs(self) }
     }
 

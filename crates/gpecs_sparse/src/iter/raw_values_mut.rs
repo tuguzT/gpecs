@@ -174,13 +174,13 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Values<'ctx, 'a, K, V> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> Values<'ctx, 'a, K, V> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ValuesMut<'ctx, 'a, K, V> {
-        let inner = unsafe { self.into_inner().deref_mut() };
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ValuesMut<'ctx, 'a, K, V> {
+        let inner = unsafe { self.into_inner().as_mut_unchecked() };
         let inner = IterMut::from_inner(inner);
         unsafe { ValuesMut::from_inner(inner) }
     }

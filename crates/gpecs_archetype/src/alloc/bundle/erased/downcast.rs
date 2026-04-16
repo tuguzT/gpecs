@@ -315,7 +315,7 @@ where
         B: Bundle,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        match unsafe { self.as_mut_ptrs().deref_mut() }.downcast::<B, U>(registry) {
+        match unsafe { self.as_mut_ptrs().as_mut_unchecked() }.downcast::<B, U>(registry) {
             Ok(refs) => Ok(refs),
             Err(error) => Err(error.map_value(drop).map_value(|()| self)),
         }

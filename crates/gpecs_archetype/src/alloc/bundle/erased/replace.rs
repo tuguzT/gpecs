@@ -60,7 +60,7 @@ where
             .as_ptrs()
             .into_iter()
             .filter(|ptr| !archetype.contains(ptr.component_id()));
-        let refs = chain(ptrs, ptrs_to_append).map(|ptr| unsafe { ptr.deref() });
+        let refs = chain(ptrs, ptrs_to_append).map(|ptr| unsafe { ptr.as_ref_unchecked() });
 
         let metas_to_append = to_replace
             .archetype()

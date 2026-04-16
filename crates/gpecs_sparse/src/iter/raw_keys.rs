@@ -103,7 +103,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Keys<'ctx, 'a, K, V> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> Keys<'ctx, 'a, K, V> {
         unsafe { Keys::from_inner(self) }
     }
 }

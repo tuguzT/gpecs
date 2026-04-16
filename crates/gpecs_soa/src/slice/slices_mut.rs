@@ -473,7 +473,7 @@ where
     #[inline]
     pub fn into_iter_with_context(self) -> (&'ctx T::Context, IterMut<'ctx, 'a, T>) {
         let (context, iter) = self.into_raw_iter_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
+        let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
 }
@@ -600,7 +600,7 @@ where
     #[inline]
     pub fn iter_with_context(&'a self) -> (&'a T::Context, Iter<'a, 'a, T>) {
         let (context, iter) = self.raw_iter_with_context();
-        let iter = unsafe { iter.deref() };
+        let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 
@@ -613,7 +613,7 @@ where
     #[inline]
     pub fn iter_mut_with_context(&'a mut self) -> (&'a T::Context, IterMut<'a, 'a, T>) {
         let (context, iter) = self.raw_iter_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
+        let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
 

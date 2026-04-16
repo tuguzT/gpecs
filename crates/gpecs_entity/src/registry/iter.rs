@@ -29,7 +29,7 @@ impl<'a, Meta> Iter<'a, Meta> {
     pub fn as_slices(&self) -> (&[Entity], &[Meta]) {
         let Self { inner } = self;
 
-        let inner = unsafe { inner.clone().deref() };
+        let inner = unsafe { inner.clone().as_ref_unchecked() };
         let (entities, metas) = inner.into_slices();
         let metas = metas.as_inner();
         (entities, metas)

@@ -57,15 +57,15 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> EpochSparseView<'ctx, 'a, K, V> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> EpochSparseView<'ctx, 'a, K, V> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> EpochSparseViewMut<'ctx, 'a, K, V> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> EpochSparseViewMut<'ctx, 'a, K, V> {
         let Self { dense, sparse } = self;
 
-        let dense = unsafe { dense.deref_mut() };
+        let dense = unsafe { dense.as_mut_unchecked() };
         let sparse = unsafe { sparse.as_mut_unchecked() };
         unsafe { EpochSparseViewMut::from_parts(dense, sparse) }
     }

@@ -257,7 +257,7 @@ where
     #[inline]
     pub fn as_refs_with_descriptors(&'a self) -> (ErasedSoaRefs<'a, D::Output, P::Const>, &'a D) {
         let (ptrs, descriptors) = self.as_ptrs_with_descriptors();
-        let refs = unsafe { ptrs.deref() };
+        let refs = unsafe { ptrs.as_ref_unchecked() };
         (refs, descriptors)
     }
 
@@ -272,7 +272,7 @@ where
         &'a mut self,
     ) -> (ErasedSoaMutRefs<'a, D::Output, P::Mut>, &'a D) {
         let (ptrs, descriptors) = self.as_mut_ptrs_with_descriptors();
-        let refs = unsafe { ptrs.deref_mut() };
+        let refs = unsafe { ptrs.as_mut_unchecked() };
         (refs, descriptors)
     }
 

@@ -221,12 +221,12 @@ where
 
     #[inline]
     pub fn as_erased_component(&self) -> ErasedComponentRef<'_, P::Const> {
-        unsafe { self.as_erased_component_ptr().deref() }
+        unsafe { self.as_erased_component_ptr().as_ref_unchecked() }
     }
 
     #[inline]
     pub fn as_mut_erased_component(&mut self) -> ErasedComponentMutRef<'_, P::Mut> {
-        unsafe { self.as_mut_erased_component_ptr().deref_mut() }
+        unsafe { self.as_mut_erased_component_ptr().as_mut_unchecked() }
     }
 
     #[inline]

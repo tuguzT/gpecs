@@ -91,7 +91,7 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub unsafe fn deref(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
+    pub unsafe fn as_ref_unchecked(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
         let keys = unsafe { keys.as_ref_unchecked() };

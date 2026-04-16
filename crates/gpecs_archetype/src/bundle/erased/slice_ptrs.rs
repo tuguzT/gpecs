@@ -70,7 +70,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedBundleSlices<'a, D, P> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleSlices<'a, D, P> {
         unsafe { ErasedBundleSlices::from_ptrs(self) }
     }
 }

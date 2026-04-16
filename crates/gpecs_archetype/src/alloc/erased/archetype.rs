@@ -470,7 +470,7 @@ where
 {
     #[inline]
     fn from(archetype: ErasedArchetypeView<'_, Meta>) -> Self {
-        let (dense, _) = unsafe { archetype.into_inner().deref() }.into_parts();
+        let (dense, _) = unsafe { archetype.into_inner().as_ref_unchecked() }.into_parts();
         let dense = dense.to_vec();
         let sparse = archetype.as_sparse().to_vec();
 

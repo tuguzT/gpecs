@@ -47,7 +47,7 @@ where
         let archetype = (**context).field_descriptors();
         let sparse = unsafe { sparse.as_mut_unchecked() };
 
-        let (entities, bundles) = unsafe { dense.deref_mut(context) }.into_parts();
+        let (entities, bundles) = unsafe { dense.as_mut_unchecked(context) }.into_parts();
         let entities = must_cast_slice_mut(entities);
 
         (entities, bundles, sparse, archetype)
@@ -136,7 +136,7 @@ where
         let archetype = (**context).field_descriptors();
         let sparse = unsafe { sparse.as_mut_unchecked() };
 
-        let (entities, bundles) = unsafe { dense.deref_mut(context) }.into_parts();
+        let (entities, bundles) = unsafe { dense.as_mut_unchecked(context) }.into_parts();
         let entities = must_cast_slice_mut(entities);
 
         (entities, bundles, sparse, archetype)
@@ -167,7 +167,7 @@ where
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<Refs<'ctx, 'a, T>> {
         let Self { inner, .. } = self;
-        unsafe { inner.deref() }.into_get(entity.into())
+        unsafe { inner.as_ref_unchecked() }.into_get(entity.into())
     }
 
     #[inline]
@@ -178,7 +178,7 @@ where
     #[inline]
     pub fn into_get_mut(self, entity: Entity) -> Option<RefsMut<'ctx, 'a, T>> {
         let Self { inner, .. } = self;
-        unsafe { inner.deref_mut() }.into_get_mut(entity.into())
+        unsafe { inner.as_mut_unchecked() }.into_get_mut(entity.into())
     }
 }
 

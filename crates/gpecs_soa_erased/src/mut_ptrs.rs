@@ -100,12 +100,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaRefs<'a, D, CastConst<P>> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, CastConst<P>> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
         unsafe { ErasedSoaMutRefs::from_ptrs(self) }
     }
 

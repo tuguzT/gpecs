@@ -232,12 +232,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Iter<'ctx, 'a, T> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> Iter<'ctx, 'a, T> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> IterMut<'ctx, 'a, T> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> IterMut<'ctx, 'a, T> {
         let (context, slices) = self.into_mut_slice_ptrs_with_context();
         unsafe { IterMut::from_parts(context, slices) }
     }

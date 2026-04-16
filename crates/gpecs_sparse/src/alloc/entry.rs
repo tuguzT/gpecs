@@ -404,7 +404,7 @@ where
         let (dense, _) = self.as_view().into_parts();
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSlicePtrs::new(context.as_inner(), values).deref() }
+        unsafe { SoaSlicePtrs::new(context.as_inner(), values).as_ref_unchecked() }
     }
 
     #[inline]
@@ -414,7 +414,7 @@ where
             .into_mut_slice_ptrs()
             .into_mut_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).deref_mut() }
+        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).as_mut_unchecked() }
     }
 
     #[inline]
@@ -461,7 +461,7 @@ where
         let (dense, _) = self.as_view().into_parts();
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSlicePtrs::new(context.as_inner(), values).deref() }
+        unsafe { SoaSlicePtrs::new(context.as_inner(), values).as_ref_unchecked() }
     }
 
     #[inline]
@@ -471,7 +471,7 @@ where
             .into_mut_slice_ptrs()
             .into_mut_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).deref_mut() }
+        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).as_mut_unchecked() }
     }
 
     #[inline]

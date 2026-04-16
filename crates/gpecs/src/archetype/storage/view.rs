@@ -47,7 +47,7 @@ where
         let archetype = (**context).field_descriptors();
         let sparse = unsafe { sparse.as_ref_unchecked() };
 
-        let (entities, bundles) = unsafe { dense.deref(context) }.into_parts();
+        let (entities, bundles) = unsafe { dense.as_ref_unchecked(context) }.into_parts();
         let entities = must_cast_slice(entities);
 
         (entities, bundles, sparse, archetype)
@@ -123,7 +123,7 @@ where
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner, .. } = self;
-        unsafe { inner.clone().deref() }.contains_key(entity.into())
+        unsafe { inner.clone().as_ref_unchecked() }.contains_key(entity.into())
     }
 
     #[inline]
@@ -134,7 +134,7 @@ where
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<Refs<'ctx, 'a, T>> {
         let Self { inner, .. } = self;
-        unsafe { inner.deref() }.into_get(entity.into())
+        unsafe { inner.as_ref_unchecked() }.into_get(entity.into())
     }
 }
 

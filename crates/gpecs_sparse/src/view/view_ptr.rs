@@ -57,10 +57,10 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> EpochSparseView<'ctx, 'a, K, V> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> EpochSparseView<'ctx, 'a, K, V> {
         let Self { dense, sparse } = self;
 
-        let dense = unsafe { dense.deref() };
+        let dense = unsafe { dense.as_ref_unchecked() };
         let sparse = unsafe { sparse.as_ref_unchecked() };
         unsafe { EpochSparseView::from_parts(dense, sparse) }
     }

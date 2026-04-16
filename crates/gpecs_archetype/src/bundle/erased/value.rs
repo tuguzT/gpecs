@@ -164,7 +164,7 @@ where
         ErasedArchetypeView<'_, T::Meta>,
     ) {
         let (ptrs, descriptors) = self.as_ptrs_with_archetype();
-        let refs = unsafe { ptrs.deref() };
+        let refs = unsafe { ptrs.as_ref_unchecked() };
         (refs, descriptors)
     }
 
@@ -185,7 +185,7 @@ where
         ErasedArchetypeView<'_, T::Meta>,
     ) {
         let (ptrs, descriptors) = self.as_mut_ptrs_with_archetype();
-        let refs = unsafe { ptrs.deref_mut() };
+        let refs = unsafe { ptrs.as_mut_unchecked() };
         (refs, descriptors)
     }
 

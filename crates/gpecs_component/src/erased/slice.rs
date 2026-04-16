@@ -61,7 +61,7 @@ where
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedComponentSlicePtr<T>) -> Self {
         let (component_id, fields) = ptr.into_parts();
-        let fields = unsafe { fields.deref() };
+        let fields = unsafe { fields.as_ref_unchecked() };
         unsafe { Self::from_parts(component_id, fields) }
     }
 

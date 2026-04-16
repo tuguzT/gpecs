@@ -43,7 +43,7 @@ where
     #[inline]
     pub unsafe fn from_ptrs(ptrs: ErasedBundleMutPtrs<D, P>) -> Self {
         let inner = ptrs.into_inner();
-        let inner = unsafe { inner.deref_mut() };
+        let inner = unsafe { inner.as_mut_unchecked() };
         unsafe { Self::from_inner(inner) }
     }
 

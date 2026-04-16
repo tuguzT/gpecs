@@ -291,12 +291,12 @@ where
 
     #[inline]
     pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
-        unsafe { self.as_view_ptr().deref() }
+        unsafe { self.as_view_ptr().as_ref_unchecked() }
     }
 
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
-        unsafe { self.as_mut_view_ptr().deref_mut() }
+        unsafe { self.as_mut_view_ptr().as_mut_unchecked() }
     }
 
     #[inline]
@@ -1261,7 +1261,7 @@ where
         &'a [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
-        let dense = unsafe { dense.deref(context) };
+        let dense = unsafe { dense.as_ref_unchecked(context) };
         let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
@@ -1283,7 +1283,7 @@ where
         &'a mut [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_mut_slice_ptrs_with_context();
-        let dense = unsafe { dense.deref_mut(context) };
+        let dense = unsafe { dense.as_mut_unchecked(context) };
         let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, dense, sparse)
     }

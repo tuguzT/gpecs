@@ -137,7 +137,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedComponentSlice<'a, T> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentSlice<'a, T> {
         unsafe { ErasedComponentSlice::from_ptr(self) }
     }
 

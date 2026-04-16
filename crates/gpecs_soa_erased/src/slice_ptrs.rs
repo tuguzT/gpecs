@@ -82,7 +82,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D, P> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, P> {
         unsafe { ErasedSoaSlices::from_ptrs(self) }
     }
 }

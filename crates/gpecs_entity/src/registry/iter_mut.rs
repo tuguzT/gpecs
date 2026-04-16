@@ -53,7 +53,7 @@ impl<'a, Meta> IterMut<'a, Meta> {
     pub fn into_slices(self) -> (&'a [Entity], &'a mut [Meta]) {
         let Self { inner } = self;
 
-        let inner = unsafe { inner.clone().deref_mut() };
+        let inner = unsafe { inner.clone().as_mut_unchecked() };
         let (entities, metas) = inner.into_slices();
         let metas = metas.as_inner_mut();
         (entities, metas)
@@ -63,7 +63,7 @@ impl<'a, Meta> IterMut<'a, Meta> {
     pub fn as_slices(&self) -> (&[Entity], &[Meta]) {
         let Self { inner } = self;
 
-        let inner = unsafe { inner.clone().deref() };
+        let inner = unsafe { inner.clone().as_ref_unchecked() };
         let (entities, metas) = inner.into_slices();
         let metas = metas.as_inner();
         (entities, metas)

@@ -401,7 +401,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ptrs, .. } = self;
 
-        let item = unsafe { ptrs.next()?.deref_mut() };
+        let item = unsafe { ptrs.next()?.as_mut_unchecked() };
         Some(item)
     }
 

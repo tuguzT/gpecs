@@ -94,12 +94,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSlice<'a, CastConst<T>> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, CastConst<T>> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedMutSlice<'a, T> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutSlice<'a, T> {
         unsafe { ErasedMutSlice::from_ptr(self) }
     }
 

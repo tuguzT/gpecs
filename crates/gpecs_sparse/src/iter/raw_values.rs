@@ -118,8 +118,8 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Values<'ctx, 'a, K, V> {
-        let inner = unsafe { self.into_inner().deref() };
+    pub unsafe fn as_ref_unchecked<'a>(self) -> Values<'ctx, 'a, K, V> {
+        let inner = unsafe { self.into_inner().as_ref_unchecked() };
         let inner = Iter::from_inner(inner);
         unsafe { Values::from_inner(inner) }
     }

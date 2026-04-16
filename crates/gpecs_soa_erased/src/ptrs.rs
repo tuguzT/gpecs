@@ -99,7 +99,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaRefs<'a, D, P> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, P> {
         unsafe { ErasedSoaRefs::from_ptrs(self) }
     }
 
@@ -293,7 +293,7 @@ where
     where
         T: AlignedStorageFromLayout<Item = U>,
     {
-        let fields = self.iter().map(|ptr| unsafe { ptr.deref() });
+        let fields = self.iter().map(|ptr| unsafe { ptr.as_ref_unchecked() });
         let descriptors = self.descriptors().clone();
         ErasedSoa::try_from_fields_descriptors(fields, descriptors)
     }

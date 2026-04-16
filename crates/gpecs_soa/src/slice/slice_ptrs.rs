@@ -50,7 +50,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> SoaSlices<'ctx, 'a, T> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> SoaSlices<'ctx, 'a, T> {
         let (context, ptrs, len) = self.into_parts();
         unsafe { SoaSlices::from_parts(context, ptrs, len) }
     }

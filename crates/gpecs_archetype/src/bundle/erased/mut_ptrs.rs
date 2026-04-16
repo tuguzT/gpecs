@@ -57,12 +57,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedBundleRefs<'a, D, CastConst<P>> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleRefs<'a, D, CastConst<P>> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedBundleMutRefs<'a, D, P> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedBundleMutRefs<'a, D, P> {
         unsafe { ErasedBundleMutRefs::from_ptrs(self) }
     }
 

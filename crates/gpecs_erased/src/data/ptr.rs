@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedRef<'a, T> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, T> {
         unsafe { ErasedRef::from_ptr(self) }
     }
 

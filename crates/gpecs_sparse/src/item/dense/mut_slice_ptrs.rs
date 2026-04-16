@@ -111,12 +111,15 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub unsafe fn deref(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
-        unsafe { self.cast_const(context).deref(context) }
+    pub unsafe fn as_ref_unchecked(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
+        unsafe { self.cast_const(context).as_ref_unchecked(context) }
     }
 
     #[inline]
-    pub unsafe fn deref_mut(self, context: &'ctx V::Context) -> DenseSlicesMut<'ctx, 'a, K, V> {
+    pub unsafe fn as_mut_unchecked(
+        self,
+        context: &'ctx V::Context,
+    ) -> DenseSlicesMut<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
         let keys = unsafe { keys.as_mut_unchecked() };

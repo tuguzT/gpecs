@@ -81,7 +81,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
-        let (entities, metas) = unsafe { dense.deref(context).into_parts() };
+        let (entities, metas) = unsafe { dense.as_ref_unchecked(context).into_parts() };
         let metas = metas.as_inner();
 
         (entities, metas, sparse)
@@ -112,7 +112,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
-        let (entities, metas) = unsafe { dense.deref(context).into_parts() };
+        let (entities, metas) = unsafe { dense.as_ref_unchecked(context).into_parts() };
         let metas = metas.as_inner();
 
         (entities, metas, sparse)
@@ -145,7 +145,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
-        unsafe { inner.deref() }.contains_key(entity)
+        unsafe { inner.as_ref_unchecked() }.contains_key(entity)
     }
 
     #[inline]
@@ -158,14 +158,14 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let Self { inner } = self;
 
         let sparse_index = sparse_index.try_into().ok()?;
-        unsafe { inner.deref() }.get_epoch(sparse_index)
+        unsafe { inner.as_ref_unchecked() }.get_epoch(sparse_index)
     }
 
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<&'a Meta> {
         let Self { inner } = self;
 
-        unsafe { inner.deref() }
+        unsafe { inner.as_ref_unchecked() }
             .into_get(entity)
             .map(Identity::as_inner)
     }
@@ -173,7 +173,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     #[inline]
     pub fn into_index(self, entity: Entity) -> &'a Meta {
         let Self { inner } = self;
-        unsafe { inner.deref() }.into_index(entity)
+        unsafe { inner.as_ref_unchecked() }.into_index(entity)
     }
 
     #[inline]

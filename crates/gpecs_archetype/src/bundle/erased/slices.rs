@@ -43,7 +43,7 @@ where
     #[inline]
     pub unsafe fn from_ptrs(ptrs: ErasedBundleSlicePtrs<D, P>) -> Self {
         let inner = ptrs.into_inner();
-        let inner = unsafe { inner.deref() };
+        let inner = unsafe { inner.as_ref_unchecked() };
         unsafe { Self::from_inner(inner) }
     }
 

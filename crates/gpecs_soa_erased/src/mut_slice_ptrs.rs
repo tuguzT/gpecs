@@ -83,12 +83,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D, CastConst<P>> {
-        unsafe { self.cast_const().deref() }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, CastConst<P>> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedSoaMutSlices<'a, D, P> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutSlices<'a, D, P> {
         unsafe { ErasedSoaMutSlices::from_ptrs(self) }
     }
 }

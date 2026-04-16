@@ -98,7 +98,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
-        let (keys, values) = unsafe { dense.deref(context).into_parts() };
+        let (keys, values) = unsafe { dense.as_ref_unchecked(context).into_parts() };
 
         let component_ids = unsafe { u32s_to_component_ids(keys) };
         let metas = values.as_inner();
@@ -130,7 +130,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
-        let (keys, values) = unsafe { dense.deref(context).into_parts() };
+        let (keys, values) = unsafe { dense.as_ref_unchecked(context).into_parts() };
 
         let component_ids = unsafe { u32s_to_component_ids(keys) };
         let metas = values.as_inner();
@@ -166,7 +166,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let key = component_id.into_u32();
-        unsafe { inner.deref() }.contains_key(key)
+        unsafe { inner.as_ref_unchecked() }.contains_key(key)
     }
 
     #[inline]
@@ -203,7 +203,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let key = component_id.into_u32();
-        unsafe { inner.deref() }
+        unsafe { inner.as_ref_unchecked() }
             .into_get(key)
             .map(Identity::as_inner)
     }
@@ -213,7 +213,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let key = component_id.into_u32();
-        unsafe { inner.deref() }.into_index(key)
+        unsafe { inner.as_ref_unchecked() }.into_index(key)
     }
 
     #[inline]
@@ -221,7 +221,9 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let index: usize = component_id.into_u32().try_into().ok()?;
-        let sparse_item = unsafe { inner.deref() }.into_sparse_slice().get(index)?;
+        let sparse_item = unsafe { inner.as_ref_unchecked() }
+            .into_sparse_slice()
+            .get(index)?;
         let index_of = sparse_item.dense_index().copied()?;
         index_of.try_into().ok()
     }
@@ -236,7 +238,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let index = index.try_into().ok()?;
-        let (id, meta) = unsafe { inner.deref() }.into_get_with_key(index)?;
+        let (id, meta) = unsafe { inner.as_ref_unchecked() }.into_get_with_key(index)?;
 
         let id = unsafe { ComponentId::from_u32(id) };
         Some((id, meta))
@@ -282,7 +284,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     pub fn into_component_ids(self) -> ComponentIds<'a> {
         let Self { inner } = self;
 
-        let inner = unsafe { inner.deref() }.into_key_slice().iter();
+        let inner = unsafe { inner.as_ref_unchecked() }.into_key_slice().iter();
         ComponentIds::from_inner(inner)
     }
 

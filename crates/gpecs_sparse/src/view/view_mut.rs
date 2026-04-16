@@ -143,12 +143,12 @@ where
 
     #[inline]
     pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
-        unsafe { self.as_view_ptr().deref() }
+        unsafe { self.as_view_ptr().as_ref_unchecked() }
     }
 
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
-        unsafe { self.as_mut_view_ptr().deref_mut() }
+        unsafe { self.as_mut_view_ptr().as_mut_unchecked() }
     }
 
     #[inline]
@@ -1235,7 +1235,7 @@ where
     #[inline]
     pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
         let (context, iter) = self.raw_keys_with_context();
-        let iter = unsafe { iter.deref() };
+        let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 
@@ -1248,7 +1248,7 @@ where
     #[inline]
     pub fn into_keys_with_context(self) -> (&'ctx V::Context, Keys<'ctx, 'a, K, V>) {
         let (context, iter) = self.into_raw_keys_with_context();
-        let iter = unsafe { iter.deref() };
+        let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 }
@@ -1273,7 +1273,7 @@ where
         &'a [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.into_slice_ptrs_with_context();
-        let dense = unsafe { dense.deref(context) };
+        let dense = unsafe { dense.as_ref_unchecked(context) };
         let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
@@ -1295,7 +1295,7 @@ where
         &'a mut [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.into_mut_slice_ptrs_with_context();
-        let dense = unsafe { dense.deref_mut(context) };
+        let dense = unsafe { dense.as_mut_unchecked(context) };
         let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, dense, sparse)
     }
@@ -1479,7 +1479,7 @@ where
     #[inline]
     pub fn into_values_with_context(self) -> (&'ctx V::Context, Values<'ctx, 'a, K, V>) {
         let (context, iter) = self.into_raw_values_with_context();
-        let iter = unsafe { iter.deref() };
+        let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 
@@ -1492,14 +1492,14 @@ where
     #[inline]
     pub fn into_values_mut_with_context(self) -> (&'ctx V::Context, ValuesMut<'ctx, 'a, K, V>) {
         let (context, iter) = self.into_raw_values_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
+        let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
 
     #[inline]
     pub fn into_iter_with_context(self) -> (&'ctx V::Context, IterMut<'ctx, 'a, K, V>) {
         let (context, iter) = self.into_raw_iter_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
+        let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
 }
@@ -1524,7 +1524,7 @@ where
         &'a [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
-        let dense = unsafe { dense.deref(context) };
+        let dense = unsafe { dense.as_ref_unchecked(context) };
         let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
@@ -1546,7 +1546,7 @@ where
         &'a mut [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_mut_slice_ptrs_with_context();
-        let dense = unsafe { dense.deref_mut(context) };
+        let dense = unsafe { dense.as_mut_unchecked(context) };
         let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, dense, sparse)
     }
@@ -1732,7 +1732,7 @@ where
     #[inline]
     pub fn values_with_context(&'a self) -> (&'a V::Context, Values<'a, 'a, K, V>) {
         let (context, iter) = self.raw_values_with_context();
-        let iter = unsafe { iter.deref() };
+        let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 
@@ -1745,7 +1745,7 @@ where
     #[inline]
     pub fn values_mut_with_context(&'a mut self) -> (&'a V::Context, ValuesMut<'a, 'a, K, V>) {
         let (context, iter) = self.raw_values_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
+        let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
 
@@ -1758,7 +1758,7 @@ where
     #[inline]
     pub fn iter_with_context(&'a self) -> (&'a V::Context, Iter<'a, 'a, K, V>) {
         let (context, iter) = self.raw_iter_with_context();
-        let iter = unsafe { iter.deref() };
+        let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 
@@ -1771,7 +1771,7 @@ where
     #[inline]
     pub fn iter_mut_with_context(&'a mut self) -> (&'a V::Context, IterMut<'a, 'a, K, V>) {
         let (context, iter) = self.raw_iter_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
+        let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
 }
@@ -1907,7 +1907,7 @@ where
     #[inline]
     fn from(context: &'ctx V::Context) -> Self {
         let view_mut_ptr = EpochSparseViewMutPtr::from(context);
-        unsafe { view_mut_ptr.deref_mut() }
+        unsafe { view_mut_ptr.as_mut_unchecked() }
     }
 }
 

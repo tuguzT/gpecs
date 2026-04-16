@@ -249,7 +249,7 @@ where
 {
     #[inline]
     pub fn as_erased(&self) -> ErasedRef<'_, P::Const> {
-        unsafe { self.as_erased_ptr().deref() }
+        unsafe { self.as_erased_ptr().as_ref_unchecked() }
     }
 
     #[inline]
@@ -264,7 +264,7 @@ where
 
     #[inline]
     pub fn as_mut_erased(&mut self) -> ErasedMutRef<'_, P::Mut> {
-        unsafe { self.as_mut_erased_ptr().deref_mut() }
+        unsafe { self.as_mut_erased_ptr().as_mut_unchecked() }
     }
 
     #[inline]

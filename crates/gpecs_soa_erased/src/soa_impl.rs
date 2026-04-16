@@ -311,7 +311,7 @@ where
 
     #[inline]
     unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
-        unsafe { ptrs.deref() }
+        unsafe { ptrs.as_ref_unchecked() }
     }
 
     #[inline]
@@ -328,7 +328,7 @@ where
 
     #[inline]
     unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
-        unsafe { ptrs.deref_mut() }
+        unsafe { ptrs.as_mut_unchecked() }
     }
 
     #[inline]
@@ -350,7 +350,7 @@ where
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
-        unsafe { slices.deref() }
+        unsafe { slices.as_ref_unchecked() }
     }
 
     #[inline]
@@ -377,7 +377,7 @@ where
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a> {
-        unsafe { slices.deref_mut() }
+        unsafe { slices.as_mut_unchecked() }
     }
 
     #[inline]

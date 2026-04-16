@@ -65,7 +65,7 @@ where
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedComponentMutSlicePtr<T>) -> Self {
         let (component_id, fields) = ptr.into_parts();
-        let fields = unsafe { fields.deref_mut() };
+        let fields = unsafe { fields.as_mut_unchecked() };
         unsafe { Self::from_parts(component_id, fields) }
     }
 

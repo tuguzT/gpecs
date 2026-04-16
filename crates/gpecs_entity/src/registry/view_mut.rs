@@ -87,7 +87,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let context = Self::CONTEXT;
-        let (entities, metas) = unsafe { dense.deref_mut(context).into_parts() };
+        let (entities, metas) = unsafe { dense.as_mut_unchecked(context).into_parts() };
         let metas = metas.as_inner_mut();
 
         (entities, metas, sparse)
@@ -126,7 +126,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
-        let (entities, metas) = unsafe { dense.deref(context).into_parts() };
+        let (entities, metas) = unsafe { dense.as_ref_unchecked(context).into_parts() };
         let metas = metas.as_inner();
 
         (entities, metas, sparse)
@@ -160,7 +160,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let context = Self::CONTEXT;
-        let (entities, metas) = unsafe { dense.deref_mut(context).into_parts() };
+        let (entities, metas) = unsafe { dense.as_mut_unchecked(context).into_parts() };
         let metas = metas.as_inner_mut();
 
         (entities, metas, sparse)
@@ -191,14 +191,14 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
-        unsafe { inner.deref() }.contains_key(entity)
+        unsafe { inner.as_ref_unchecked() }.contains_key(entity)
     }
 
     #[inline]
     pub fn get(&self, entity: Entity) -> Option<&Meta> {
         let Self { inner } = self;
 
-        unsafe { inner.deref() }
+        unsafe { inner.as_ref_unchecked() }
             .into_get(entity)
             .map(Identity::as_inner)
     }
@@ -207,7 +207,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut Meta> {
         let Self { inner } = self;
 
-        unsafe { inner.deref_mut() }
+        unsafe { inner.as_mut_unchecked() }
             .into_get_mut(entity)
             .map(Identity::as_inner_mut)
     }
@@ -217,7 +217,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let sparse_index = sparse_index.try_into().ok()?;
-        unsafe { inner.deref() }.get_epoch(sparse_index)
+        unsafe { inner.as_ref_unchecked() }.get_epoch(sparse_index)
     }
 
     #[inline]
@@ -225,7 +225,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let world = entity.world();
-        let mut inner = unsafe { inner.deref_mut() };
+        let mut inner = unsafe { inner.as_mut_unchecked() };
 
         let entity = inner.invalidate_epoch(entity)?;
         let entity = inner
@@ -238,7 +238,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     pub fn into_get(self, entity: Entity) -> Option<&'a Meta> {
         let Self { inner } = self;
 
-        unsafe { inner.deref() }
+        unsafe { inner.as_ref_unchecked() }
             .into_get(entity)
             .map(Identity::as_inner)
     }
@@ -247,7 +247,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     pub fn into_get_mut(self, entity: Entity) -> Option<&'a mut Meta> {
         let Self { inner } = self;
 
-        unsafe { inner.deref_mut() }
+        unsafe { inner.as_mut_unchecked() }
             .into_get_mut(entity)
             .map(Identity::as_inner_mut)
     }
@@ -255,13 +255,13 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     #[inline]
     pub fn into_index(self, entity: Entity) -> &'a Meta {
         let Self { inner } = self;
-        unsafe { inner.deref() }.into_index(entity)
+        unsafe { inner.as_ref_unchecked() }.into_index(entity)
     }
 
     #[inline]
     pub fn into_index_mut(self, entity: Entity) -> &'a mut Meta {
         let Self { inner } = self;
-        unsafe { inner.deref_mut() }.into_index_mut(entity)
+        unsafe { inner.as_mut_unchecked() }.into_index_mut(entity)
     }
 
     #[inline]
@@ -357,7 +357,7 @@ impl<Meta> Index<Entity> for EntityRegistryViewMut<'_, Meta> {
     #[inline]
     fn index(&self, entity: Entity) -> &Self::Output {
         let Self { inner } = self;
-        unsafe { inner.deref() }.into_index(entity)
+        unsafe { inner.as_ref_unchecked() }.into_index(entity)
     }
 }
 
@@ -365,7 +365,7 @@ impl<Meta> IndexMut<Entity> for EntityRegistryViewMut<'_, Meta> {
     #[inline]
     fn index_mut(&mut self, entity: Entity) -> &mut Self::Output {
         let Self { inner } = self;
-        unsafe { inner.deref_mut() }.into_index_mut(entity)
+        unsafe { inner.as_mut_unchecked() }.into_index_mut(entity)
     }
 }
 

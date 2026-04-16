@@ -143,12 +143,12 @@ where
 
     #[inline]
     pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        unsafe { self.slice_ptrs().deref() }
+        unsafe { self.slice_ptrs().as_ref_unchecked() }
     }
 
     #[inline]
     pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        unsafe { self.mut_slice_ptrs().deref_mut() }
+        unsafe { self.mut_slice_ptrs().as_mut_unchecked() }
     }
 
     #[inline]

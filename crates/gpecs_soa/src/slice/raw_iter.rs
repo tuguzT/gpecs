@@ -145,7 +145,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Iter<'ctx, 'a, T> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> Iter<'ctx, 'a, T> {
         let (context, slices) = self.into_slice_ptrs_with_context();
         unsafe { Iter::from_parts(context, slices) }
     }

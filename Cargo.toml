@@ -34,8 +34,8 @@ version = "0.0.0"
 authors = ["tuguzT <timurka.tugushev@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2024"
-# stable counterpart of nightly-2025-11-13, which is required for Rust-GPU project
-rust-version = "1.92.0"
+# stable counterpart of nightly-2026-04-11, which is required for Rust-GPU project
+rust-version = "1.95.0"
 
 [workspace.dependencies]
 # main crates
@@ -57,8 +57,8 @@ gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 # standalone benchmarks
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
-cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a874c1b5cb1d79897bbedc37399098b743055dfb" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a874c1b5cb1d79897bbedc37399098b743055dfb" }
+cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "3f7cb642478f21d82b2f1a849150276790025737" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "3f7cb642478f21d82b2f1a849150276790025737" }
 indexmap = { version = "2.14", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }

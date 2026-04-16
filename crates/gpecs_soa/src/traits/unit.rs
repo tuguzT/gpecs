@@ -1,7 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
     ptr::{self, NonNull},
-    slice,
 };
 
 use crate::{
@@ -265,7 +264,7 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
 
     #[inline]
     unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
-        unsafe { &*ptrs }
+        unsafe { ptrs.as_ref_unchecked() }
     }
 
     #[inline]
@@ -282,7 +281,7 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
 
     #[inline]
     unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
-        unsafe { &mut *ptrs }
+        unsafe { ptrs.as_mut_unchecked() }
     }
 
     #[inline]
@@ -292,7 +291,7 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
 
     #[inline]
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        &*refs
+        refs
     }
 
     type Slices<'a> = &'data [()];
@@ -304,7 +303,7 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
-        unsafe { slice::from_raw_parts(slices.cast(), slices.len()) }
+        unsafe { slices.as_ref_unchecked() }
     }
 
     #[inline]
@@ -331,7 +330,7 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a> {
-        unsafe { slice::from_raw_parts_mut(slices.cast(), slices.len()) }
+        unsafe { slices.as_mut_unchecked() }
     }
 
     #[inline]
@@ -349,6 +348,6 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
 
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
-        &*slices
+        slices
     }
 }

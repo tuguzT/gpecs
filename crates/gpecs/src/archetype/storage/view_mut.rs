@@ -45,7 +45,7 @@ where
 
         let (context, dense, sparse) = inner.into_mut_slice_ptrs_with_context();
         let archetype = (**context).field_descriptors();
-        let sparse = unsafe { &mut *sparse };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let (entities, bundles) = unsafe { dense.deref_mut(context) }.into_parts();
         let entities = must_cast_slice_mut(entities);
@@ -134,7 +134,7 @@ where
 
         let (context, dense, sparse) = inner.as_mut_slice_ptrs_with_context();
         let archetype = (**context).field_descriptors();
-        let sparse = unsafe { &mut *sparse };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let (entities, bundles) = unsafe { dense.deref_mut(context) }.into_parts();
         let entities = must_cast_slice_mut(entities);

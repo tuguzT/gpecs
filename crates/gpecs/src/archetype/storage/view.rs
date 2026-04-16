@@ -45,7 +45,7 @@ where
 
         let (context, dense, sparse) = inner.into_slice_ptrs_with_context();
         let archetype = (**context).field_descriptors();
-        let sparse = unsafe { &*sparse };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let (entities, bundles) = unsafe { dense.deref(context) }.into_parts();
         let entities = must_cast_slice(entities);

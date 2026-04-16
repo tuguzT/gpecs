@@ -2,7 +2,6 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    slice,
 };
 
 use crate::{
@@ -57,7 +56,7 @@ where
         let Self { ptrs, .. } = self;
         let (descriptors, buffer, capacity, offset, len) = ptrs.into_parts();
 
-        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        let buffer = unsafe { buffer.as_ref_unchecked() };
         (descriptors, buffer, capacity, offset, len)
     }
 
@@ -127,7 +126,7 @@ where
         let Self { ptrs, .. } = self;
 
         let buffer = ptrs.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_ref_unchecked() }
     }
 
     #[inline]
@@ -296,7 +295,7 @@ where
         let Self { ptrs, .. } = self;
 
         let buffer = ptrs.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_ref_unchecked() }
     }
 
     #[inline]

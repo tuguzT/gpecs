@@ -226,8 +226,9 @@ where
         let layout = self.layout();
         let Self { storage, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let ptr = storage.as_ptr().cast();
-        Ok(unsafe { &*ptr })
+        let ptr = storage.as_ptr().cast::<V>();
+        let r#ref = unsafe { ptr.as_ref_unchecked() };
+        Ok(r#ref)
     }
 
     #[inline]
@@ -235,8 +236,9 @@ where
         let layout = self.layout();
         let Self { storage, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let ptr = storage.as_mut_ptr().cast();
-        Ok(unsafe { &mut *ptr })
+        let ptr = storage.as_mut_ptr().cast::<V>();
+        let r#ref = unsafe { ptr.as_mut_unchecked() };
+        Ok(r#ref)
     }
 }
 

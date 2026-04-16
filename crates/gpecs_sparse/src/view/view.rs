@@ -5,7 +5,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::Index,
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -396,7 +396,7 @@ where
     #[inline]
     pub fn as_key_slice_with_context(&self) -> (&V::Context, &[K]) {
         let (context, keys) = self.as_key_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 
@@ -409,7 +409,7 @@ where
     #[inline]
     pub fn as_sparse_slice_with_context(&self) -> (&V::Context, &[SparseItem<K>]) {
         let (context, sparse) = self.as_sparse_slice_ptr_with_context();
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, sparse)
     }
 
@@ -422,7 +422,7 @@ where
     #[inline]
     pub fn into_key_slice_with_context(self) -> (&'ctx V::Context, &'a [K]) {
         let (context, keys) = self.into_key_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 
@@ -435,7 +435,7 @@ where
     #[inline]
     pub fn into_sparse_slice_with_context(self) -> (&'ctx V::Context, &'a [SparseItem<K>]) {
         let (context, sparse) = self.into_sparse_slice_ptr_with_context();
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, sparse)
     }
 
@@ -655,7 +655,7 @@ where
     ) {
         let (context, dense, sparse) = self.into_slice_ptrs_with_context();
         let dense = unsafe { dense.deref(context) };
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
 
@@ -782,7 +782,7 @@ where
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
         let dense = unsafe { dense.deref(context) };
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
 

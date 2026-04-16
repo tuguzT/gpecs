@@ -84,7 +84,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_mut_slice_ptrs();
-        let sparse = unsafe { &mut *sparse };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let context = Self::CONTEXT;
         let (entities, metas) = unsafe { dense.deref_mut(context).into_parts() };
@@ -123,7 +123,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
-        let sparse = unsafe { &*sparse };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
         let (entities, metas) = unsafe { dense.deref(context).into_parts() };
@@ -157,7 +157,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_mut_slice_ptrs();
-        let sparse = unsafe { &mut *sparse };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let context = Self::CONTEXT;
         let (entities, metas) = unsafe { dense.deref_mut(context).into_parts() };

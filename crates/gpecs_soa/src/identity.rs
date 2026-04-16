@@ -4,7 +4,6 @@ use core::{
     cmp,
     ops::{Deref, DerefMut},
     ptr::{self, NonNull},
-    slice,
 };
 
 use crate::{
@@ -28,13 +27,13 @@ where
     #[inline]
     pub const fn from_inner_ref(inner: &T) -> &Self {
         // SAFETY: Self is `#[repr(transparent)]` over `T`.
-        unsafe { &*(ptr::from_ref(inner) as *const _) }
+        unsafe { (ptr::from_ref(inner) as *const Self).as_ref_unchecked() }
     }
 
     #[inline]
     pub const fn from_inner_mut(inner: &mut T) -> &mut Self {
         // SAFETY: Self is `#[repr(transparent)]` over `T`.
-        unsafe { &mut *(ptr::from_mut(inner) as *mut _) }
+        unsafe { (ptr::from_mut(inner) as *mut Self).as_mut_unchecked() }
     }
 
     #[inline]
@@ -126,13 +125,13 @@ impl<T> IdentitySlice<T> for [Identity<T>] {
     #[inline]
     fn as_inner(&self) -> &[T] {
         let inner = ptr::from_ref(self).as_inner_ptr();
-        unsafe { &*inner }
+        unsafe { inner.as_ref_unchecked() }
     }
 
     #[inline]
     fn as_inner_mut(&mut self) -> &mut [T] {
         let inner = ptr::from_mut(self).as_inner_mut_ptr();
-        unsafe { &mut *inner }
+        unsafe { inner.as_mut_unchecked() }
     }
 }
 
@@ -144,14 +143,14 @@ pub trait AsIdentitySlice<T>: private::Sealed {
 impl<T> AsIdentitySlice<T> for [T] {
     #[inline]
     fn as_identity_slice(&self) -> &[Identity<T>] {
-        let data = ptr::from_ref(self);
-        unsafe { slice::from_raw_parts(data.cast(), data.len()) }
+        let inner = ptr::from_ref(self) as *const [_];
+        unsafe { inner.as_ref_unchecked() }
     }
 
     #[inline]
     fn as_identity_slice_mut(&mut self) -> &mut [Identity<T>] {
-        let data = ptr::from_mut(self);
-        unsafe { slice::from_raw_parts_mut(data.cast(), data.len()) }
+        let inner = ptr::from_mut(self) as *mut [_];
+        unsafe { inner.as_mut_unchecked() }
     }
 }
 
@@ -524,7 +523,7 @@ where
 {
     #[inline]
     unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
-        let src = unsafe { &*src }.clone();
+        let src = unsafe { src.as_ref_unchecked() }.clone();
         unsafe { ptr::write(dst, src) }
     }
 }
@@ -592,7 +591,7 @@ where
 
     #[inline]
     unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
-        unsafe { &*ptrs }
+        unsafe { ptrs.as_ref_unchecked() }
     }
 
     #[inline]
@@ -609,7 +608,7 @@ where
 
     #[inline]
     unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
-        unsafe { &mut *ptrs }
+        unsafe { ptrs.as_mut_unchecked() }
     }
 
     #[inline]
@@ -619,7 +618,7 @@ where
 
     #[inline]
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        &*refs
+        refs
     }
 
     type Slices<'a> = &'data [Identity<T>];
@@ -631,7 +630,7 @@ where
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
-        unsafe { slice::from_raw_parts(slices.cast(), slices.len()) }
+        unsafe { slices.as_ref_unchecked() }
     }
 
     #[inline]
@@ -658,7 +657,7 @@ where
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a> {
-        unsafe { slice::from_raw_parts_mut(slices.cast(), slices.len()) }
+        unsafe { slices.as_mut_unchecked() }
     }
 
     #[inline]
@@ -676,6 +675,6 @@ where
 
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
-        &*slices
+        slices
     }
 }

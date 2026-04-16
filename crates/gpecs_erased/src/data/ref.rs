@@ -2,7 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -53,7 +53,7 @@ where
             .downcast::<V>()
             .map_err(|err| err.map_value(into_self))?;
 
-        let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
+        let r#ref = unsafe { ptr.as_ref_unchecked() };
         Ok(r#ref)
     }
 
@@ -65,7 +65,7 @@ where
             .downcast::<V>()
             .map_err(|err| err.map_value(into_self))?;
 
-        let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
+        let r#ref = unsafe { ptr.as_ref_unchecked() };
         Ok(r#ref)
     }
 
@@ -85,7 +85,7 @@ where
     pub fn as_buffer(&self) -> &[T::Item] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_ref_unchecked() }
     }
 
     #[inline]
@@ -98,7 +98,7 @@ where
     pub fn into_buffer(self) -> &'a [T::Item] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_ref_unchecked() }
     }
 }
 

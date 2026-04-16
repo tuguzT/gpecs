@@ -2,7 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -52,7 +52,7 @@ where
             .downcast::<V>()
             .map_err(|err| err.map_value(into_self))?;
 
-        let slice = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
+        let slice = unsafe { buffer.as_mut_unchecked() };
         Ok(slice)
     }
 
@@ -64,7 +64,7 @@ where
             .downcast::<V>()
             .map_err(|err| err.map_value(into_self))?;
 
-        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        let slice = unsafe { buffer.as_ref_unchecked() };
         Ok(slice)
     }
 
@@ -76,7 +76,7 @@ where
             .downcast::<V>()
             .map_err(|err| err.map_value(into_self))?;
 
-        let slice = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
+        let slice = unsafe { buffer.as_mut_unchecked() };
         Ok(slice)
     }
 
@@ -124,8 +124,9 @@ where
     #[inline]
     pub fn as_buffer(&self) -> &[T::Item] {
         let Self { ptr, .. } = self;
+
         let buffer = ptr.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_ref_unchecked() }
     }
 
     #[inline]
@@ -137,8 +138,9 @@ where
     #[inline]
     pub fn as_mut_buffer(&mut self) -> &mut [T::Item] {
         let Self { ptr, .. } = self;
+
         let buffer = ptr.as_mut_buffer();
-        unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_mut_unchecked() }
     }
 
     #[inline]
@@ -150,8 +152,9 @@ where
     #[inline]
     pub fn into_buffer(self) -> &'a mut [T::Item] {
         let Self { ptr, .. } = self;
+
         let buffer = ptr.as_mut_buffer();
-        unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
+        unsafe { buffer.as_mut_unchecked() }
     }
 
     #[inline]

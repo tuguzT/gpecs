@@ -2,7 +2,6 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    slice,
 };
 
 use crate::{iter::RawKeys, soa::traits::RawSoa};
@@ -117,7 +116,7 @@ where
     #[inline]
     pub fn as_slice_with_context(&self) -> (&'ctx V::Context, &'a [K]) {
         let (context, keys) = self.as_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 
@@ -130,7 +129,7 @@ where
     #[inline]
     pub fn into_slice_with_context(self) -> (&'ctx V::Context, &'a [K]) {
         let (context, keys) = self.into_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 }
@@ -178,7 +177,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner, .. } = self;
-        inner.next().map(|key| unsafe { &*key })
+        inner.next().map(|key| unsafe { key.as_ref_unchecked() })
     }
 
     #[inline]
@@ -195,7 +194,9 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner, .. } = self;
-        inner.next_back().map(|key| unsafe { &*key })
+        inner
+            .next_back()
+            .map(|key| unsafe { key.as_ref_unchecked() })
     }
 }
 

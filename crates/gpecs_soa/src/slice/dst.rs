@@ -590,7 +590,7 @@ pub unsafe fn from_raw_parts<'slice, T>(
 where
     T: AllocSoaTrusted + ?Sized,
 {
-    unsafe { &*slice_from_raw_parts(data, len, capacity) }
+    unsafe { slice_from_raw_parts(data, len, capacity).as_ref_unchecked() }
 }
 
 #[inline]
@@ -602,5 +602,5 @@ pub unsafe fn from_raw_parts_mut<'slice, T>(
 where
     T: AllocSoaTrusted + ?Sized,
 {
-    unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
+    unsafe { slice_from_raw_parts_mut(data, len, capacity).as_mut_unchecked() }
 }

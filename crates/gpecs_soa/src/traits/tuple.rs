@@ -319,7 +319,7 @@ macro_rules! soa_tuple_impl {
         {
             #[inline]
             unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
-                let src = unsafe { ($(&*src.$indices,)*) };
+                let src = unsafe { ($(src.$indices.as_ref_unchecked(),)*) };
                 unsafe { $(ptr::write(dst.$indices, src.$indices.clone());)* }
             }
         }
@@ -405,7 +405,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
-                let refs = unsafe { ($(&*ptrs.$indices,)*) };
+                let refs = unsafe { ($(ptrs.$indices.as_ref_unchecked(),)*) };
                 refs
             }
 
@@ -424,7 +424,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
-                let refs = unsafe { ($(&mut *ptrs.$indices,)*) };
+                let refs = unsafe { ($(ptrs.$indices.as_mut_unchecked(),)*) };
                 refs
             }
 

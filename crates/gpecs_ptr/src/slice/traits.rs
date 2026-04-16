@@ -42,7 +42,7 @@ pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
     }
 
     unsafe fn as_item<'a>(self) -> &'a Self::Item {
-        unsafe { &*self.as_item_ptr() }
+        unsafe { self.as_item_ptr().as_ref_unchecked() }
     }
 
     fn cast_mut(self) -> CastMut<Self> {
@@ -65,7 +65,7 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
     }
 
     unsafe fn as_mut_item<'a>(self) -> &'a mut Self::Item {
-        unsafe { &mut *self.as_mut_item_ptr() }
+        unsafe { self.as_mut_item_ptr().as_mut_unchecked() }
     }
 
     fn cast_const(self) -> CastConst<Self> {

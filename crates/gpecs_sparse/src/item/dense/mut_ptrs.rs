@@ -207,7 +207,7 @@ where
     pub unsafe fn deref_mut(self, context: &'ctx V::Context) -> DenseRefsMut<'ctx, 'a, K, V> {
         let Self { key, value } = self;
 
-        let key = unsafe { &mut *key };
+        let key = unsafe { key.as_mut_unchecked() };
         let value = unsafe { context.mut_ptrs_to_mut_refs(value.into_inner()) };
         DenseRefsMut::new(key, value)
     }

@@ -150,6 +150,6 @@ fn inner_item_to_item_trusted<'a, Meta>(
     (entity, meta): (*const Entity, *const Identity<Meta>),
 ) -> (Entity, &'a Meta) {
     let entity = unsafe { *entity };
-    let meta = unsafe { &*meta }.as_inner();
+    let meta = unsafe { meta.as_ref_unchecked() }.as_inner();
     (entity, meta)
 }

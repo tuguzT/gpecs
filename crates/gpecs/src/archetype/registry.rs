@@ -124,7 +124,7 @@ impl<Meta> ArchetypeKey<Meta> {
     #[inline]
     fn from_ref(archetype: &ErasedArchetype<Meta>) -> &Self {
         // SAFETY: Self is `#[repr(transparent)]` over `ErasedArchetype<Meta>`.
-        unsafe { &*ptr::from_ref(archetype).cast() }
+        unsafe { ptr::from_ref(archetype).cast::<Self>().as_ref_unchecked() }
     }
 
     #[inline]
@@ -2182,7 +2182,7 @@ impl<'a> Iterator for ArchetypesBeforeMut<'a> {
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
 
         // SAFETY: BFS walker is non-recursive, so it must not yield the same node twice
-        let info = unsafe { &mut *ptr::from_mut(info) };
+        let info = unsafe { ptr::from_mut(info).as_mut_unchecked() };
         Some(info)
     }
 
@@ -2341,7 +2341,7 @@ impl<'a> Iterator for ArchetypesAfterMut<'a> {
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
 
         // SAFETY: BFS walker is non-recursive, so it must not yield the same node twice
-        let info = unsafe { &mut *ptr::from_mut(info) };
+        let info = unsafe { ptr::from_mut(info).as_mut_unchecked() };
         Some(info)
     }
 

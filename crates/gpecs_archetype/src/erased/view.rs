@@ -3,7 +3,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::Index,
-    ptr, slice,
+    ptr,
 };
 
 use gpecs_component::registry::{ComponentId, ComponentInfo};
@@ -95,7 +95,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_slice_ptrs();
-        let sparse = unsafe { &*sparse };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
         let (keys, values) = unsafe { dense.deref(context).into_parts() };
@@ -127,7 +127,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
-        let sparse = unsafe { &*sparse };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
         let (keys, values) = unsafe { dense.deref(context).into_parts() };
@@ -429,12 +429,12 @@ where
 
 #[inline]
 fn component_ids_to_u32s(component_ids: &[ComponentId]) -> &[u32] {
-    let data = ptr::from_ref(component_ids);
-    unsafe { slice::from_raw_parts(data.cast(), data.len()) }
+    let u32s = ptr::from_ref(component_ids) as *const [_];
+    unsafe { u32s.as_ref_unchecked() }
 }
 
 #[inline]
 unsafe fn u32s_to_component_ids(keys: &[u32]) -> &[ComponentId] {
-    let data = ptr::from_ref(keys);
-    unsafe { slice::from_raw_parts(data.cast(), data.len()) }
+    let component_ids = ptr::from_ref(keys) as *const [_];
+    unsafe { component_ids.as_ref_unchecked() }
 }

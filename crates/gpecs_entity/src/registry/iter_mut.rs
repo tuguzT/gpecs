@@ -162,6 +162,6 @@ fn inner_item_to_item_trusted<'a, Meta>(
     (entity, meta): (*mut Entity, *mut Identity<Meta>),
 ) -> (Entity, &'a mut Meta) {
     let entity = unsafe { *entity };
-    let meta = unsafe { &mut *meta }.as_inner_mut();
+    let meta = unsafe { meta.as_mut_unchecked() }.as_inner_mut();
     (entity, meta)
 }

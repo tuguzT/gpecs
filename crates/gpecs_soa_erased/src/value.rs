@@ -318,7 +318,7 @@ where
         V: AllocSoa + Soa<'a> + ?Sized,
     {
         let ptr = ptr::from_mut(self);
-        let into_self = |_| unsafe { &mut *ptr };
+        let into_self = |_| unsafe { ptr.as_mut_unchecked() };
 
         let result = unsafe { self.as_mut_refs().downcast::<V>(context) };
         let refs = result.map_err(|err| err.map_value(into_self))?;

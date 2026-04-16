@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
     mem::swap,
     ops::{Index, IndexMut},
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -730,7 +730,7 @@ where
     #[inline]
     pub fn as_key_slice_with_context(&self) -> (&V::Context, &[K]) {
         let (context, keys) = self.as_key_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 
@@ -743,7 +743,7 @@ where
     #[inline]
     pub unsafe fn as_mut_key_slice_with_context(&mut self) -> (&V::Context, &mut [K]) {
         let (context, keys) = self.as_mut_key_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_mut_unchecked() };
         (context, keys)
     }
 
@@ -756,7 +756,7 @@ where
     #[inline]
     pub fn as_sparse_slice_with_context(&self) -> (&V::Context, &[SparseItem<K>]) {
         let (context, sparse) = self.as_sparse_slice_ptr_with_context();
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, sparse)
     }
 
@@ -771,7 +771,7 @@ where
         &mut self,
     ) -> (&V::Context, &mut [SparseItem<K>]) {
         let (context, sparse) = self.as_mut_sparse_slice_ptr_with_context();
-        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, sparse)
     }
 
@@ -784,7 +784,7 @@ where
     #[inline]
     pub fn into_key_slice_with_context(self) -> (&'ctx V::Context, &'a [K]) {
         let (context, keys) = self.into_key_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 
@@ -797,7 +797,7 @@ where
     #[inline]
     pub unsafe fn into_mut_key_slice_with_context(self) -> (&'ctx V::Context, &'a mut [K]) {
         let (context, keys) = self.into_mut_key_slice_ptr_with_context();
-        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_mut_unchecked() };
         (context, keys)
     }
 
@@ -810,7 +810,7 @@ where
     #[inline]
     pub fn into_sparse_slice_with_context(self) -> (&'ctx V::Context, &'a [SparseItem<K>]) {
         let (context, sparse) = self.into_sparse_slice_ptr_with_context();
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, sparse)
     }
 
@@ -825,7 +825,7 @@ where
         self,
     ) -> (&'ctx V::Context, &'a mut [SparseItem<K>]) {
         let (context, sparse) = self.into_mut_sparse_slice_ptr_with_context();
-        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, sparse)
     }
 
@@ -984,7 +984,7 @@ where
         let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
 
         let (keys, _) = dense.as_mut_slice_ptrs().into_parts();
-        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_mut_unchecked() };
 
         let dense_key = unwrap_dense(keys, dense_index);
         assert_equal_key(key, *dense_key);
@@ -1005,7 +1005,7 @@ where
         let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
 
         let (keys, _) = dense.as_mut_slice_ptrs().into_parts();
-        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_mut_unchecked() };
 
         let dense_key = unwrap_dense(keys, dense_index);
         assert_compatible_key(key, *dense_key);
@@ -1049,7 +1049,7 @@ where
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let Self { dense, sparse } = self;
         let (keys, _) = dense.as_mut_slice_ptrs().into_parts();
-        let keys = unsafe { slice::from_raw_parts_mut::<K>(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_mut_unchecked() };
 
         let first_index = unwrap_into_usize(first_key.sparse_index());
         let second_index = unwrap_into_usize(second_key.sparse_index());
@@ -1274,7 +1274,7 @@ where
     ) {
         let (context, dense, sparse) = self.into_slice_ptrs_with_context();
         let dense = unsafe { dense.deref(context) };
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
 
@@ -1296,7 +1296,7 @@ where
     ) {
         let (context, dense, sparse) = self.into_mut_slice_ptrs_with_context();
         let dense = unsafe { dense.deref_mut(context) };
-        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, dense, sparse)
     }
 
@@ -1525,7 +1525,7 @@ where
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
         let dense = unsafe { dense.deref(context) };
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, dense, sparse)
     }
 
@@ -1547,7 +1547,7 @@ where
     ) {
         let (context, dense, sparse) = self.as_mut_slice_ptrs_with_context();
         let dense = unsafe { dense.deref_mut(context) };
-        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, dense, sparse)
     }
 

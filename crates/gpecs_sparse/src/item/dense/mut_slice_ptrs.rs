@@ -119,7 +119,7 @@ where
     pub unsafe fn deref_mut(self, context: &'ctx V::Context) -> DenseSlicesMut<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
-        let keys = unsafe { &mut *keys };
+        let keys = unsafe { keys.as_mut_unchecked() };
         let values = unsafe { context.mut_slice_ptrs_to_mut_slices(values.into_inner()) };
         unsafe { DenseSlicesMut::new_unchecked(keys, values) }
     }

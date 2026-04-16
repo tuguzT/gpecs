@@ -114,7 +114,7 @@ where
         let dst_value = dst_value.into_inner();
 
         unsafe {
-            dst_key.write((&*key).clone());
+            dst_key.write(key.as_ref_unchecked().clone());
             context.clone_to_uninit(value, dst_value);
         }
     }
@@ -128,7 +128,7 @@ where
     pub unsafe fn deref(self, context: &'ctx V::Context) -> DenseRefs<'ctx, 'a, K, V> {
         let Self { key, value } = self;
 
-        let key = unsafe { &*key };
+        let key = unsafe { key.as_ref_unchecked() };
         let value = unsafe { context.ptrs_to_refs(value.into_inner()) };
         DenseRefs::new(key, value)
     }

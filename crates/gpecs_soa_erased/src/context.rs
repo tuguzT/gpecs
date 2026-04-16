@@ -78,13 +78,13 @@ where
     #[inline]
     pub const unsafe fn from_inner_ref(descriptors: &D) -> &Self {
         // SAFETY: Self is `#[repr(transparent)]` over `D`.
-        unsafe { &*(ptr::from_ref(descriptors) as *const _) }
+        unsafe { (ptr::from_ref(descriptors) as *const Self).as_ref_unchecked() }
     }
 
     #[inline]
     pub const unsafe fn from_inner_mut(descriptors: &mut D) -> &mut Self {
         // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
-        unsafe { &mut *(ptr::from_mut(descriptors) as *mut _) }
+        unsafe { (ptr::from_mut(descriptors) as *mut Self).as_mut_unchecked() }
     }
 
     #[inline]

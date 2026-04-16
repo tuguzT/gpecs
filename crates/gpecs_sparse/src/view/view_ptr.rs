@@ -2,7 +2,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -61,7 +61,7 @@ where
         let Self { dense, sparse } = self;
 
         let dense = unsafe { dense.deref() };
-        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
         unsafe { EpochSparseView::from_parts(dense, sparse) }
     }
 

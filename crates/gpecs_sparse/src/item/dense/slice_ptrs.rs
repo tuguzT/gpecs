@@ -94,7 +94,7 @@ where
     pub unsafe fn deref(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
-        let keys = unsafe { &*keys };
+        let keys = unsafe { keys.as_ref_unchecked() };
         let values = unsafe { context.slice_ptrs_to_slices(values.into_inner()) };
         unsafe { DenseSlices::new_unchecked(keys, values) }
     }

@@ -151,6 +151,6 @@ fn inner_item_to_info_trusted<'a, Meta>(
     (component_id, meta): (*const u32, *const Identity<Meta>),
 ) -> ComponentInfo<&'a Meta> {
     let component_id = unsafe { ComponentId::from_u32(*component_id) };
-    let meta = unsafe { &*meta }.as_inner();
+    let meta = unsafe { meta.as_ref_unchecked() }.as_inner();
     ComponentInfo::new(component_id, meta)
 }

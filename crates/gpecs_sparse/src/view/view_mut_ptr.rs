@@ -2,7 +2,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -66,7 +66,7 @@ where
         let Self { dense, sparse } = self;
 
         let dense = unsafe { dense.deref_mut() };
-        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        let sparse = unsafe { sparse.as_mut_unchecked() };
         unsafe { EpochSparseViewMut::from_parts(dense, sparse) }
     }
 

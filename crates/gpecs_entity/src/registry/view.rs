@@ -78,7 +78,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_slice_ptrs();
-        let sparse = unsafe { &*sparse };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
         let (entities, metas) = unsafe { dense.deref(context).into_parts() };
@@ -109,7 +109,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
-        let sparse = unsafe { &*sparse };
+        let sparse = unsafe { sparse.as_ref_unchecked() };
 
         let context = Self::CONTEXT;
         let (entities, metas) = unsafe { dense.deref(context).into_parts() };

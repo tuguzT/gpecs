@@ -1,4 +1,4 @@
-use core::{borrow::Borrow, fmt::Debug, ops, slice};
+use core::{borrow::Borrow, fmt::Debug, ops};
 
 use crate::{
     assert::{
@@ -229,7 +229,7 @@ where
     let (context, slices) = dense.into_slice_ptrs_with_context();
 
     let (keys, _) = slices.into_parts();
-    let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+    let keys = unsafe { keys.as_ref_unchecked() };
 
     (context, keys)
 }

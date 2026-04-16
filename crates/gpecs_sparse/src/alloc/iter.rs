@@ -1,7 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
@@ -32,7 +32,7 @@ where
     #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
     pub(super) fn new(vec: vec::SoaVec<DenseItem<K, V>>) -> Self {
         let (keys, _) = vec.as_slice_ptrs().into_parts();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
 
         let inner = keys.to_vec().into_iter();
         let context = vec.into_context().into_inner();
@@ -627,7 +627,7 @@ where
     #[inline]
     pub fn as_key_slice_with_context(&self) -> (&V::Context, &[K]) {
         let (context, keys, _) = self.as_slice_ptrs_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 
@@ -640,7 +640,7 @@ where
     #[inline]
     pub fn as_mut_key_slice_with_context(&mut self) -> (&V::Context, &mut [K]) {
         let (context, keys, _) = self.as_mut_slice_ptrs_with_context();
-        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_mut_unchecked() };
         (context, keys)
     }
 }
@@ -904,7 +904,7 @@ where
     #[inline]
     pub fn as_key_slice_with_context(&self) -> (&V::Context, &[K]) {
         let (context, keys, _) = self.as_slice_ptrs_with_context();
-        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        let keys = unsafe { keys.as_ref_unchecked() };
         (context, keys)
     }
 }

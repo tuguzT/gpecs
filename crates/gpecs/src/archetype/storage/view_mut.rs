@@ -4,7 +4,11 @@ use std::{
 };
 
 use bytemuck::must_cast_slice_mut;
-use gpecs_sparse::{item::SparseItem, view::EpochSparseViewMutPtr};
+use gpecs_sparse::{
+    error::FromPartsError,
+    item::{DenseSlicesMut, SparseItem},
+    view::{EpochSparseViewMut, EpochSparseViewMutPtr},
+};
 
 use crate::{
     archetype::{
@@ -14,6 +18,8 @@ use crate::{
     entity::Entity,
     soa::{
         field::FieldDescriptors,
+        identity::Identity,
+        slice::SoaSlicesMut,
         traits::{
             Refs as ErasedBundleRefs, RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles,
             SlicesMut as ErasedBundlesMut,
@@ -36,6 +42,41 @@ impl<'ctx, 'a, T> ArchetypeStorageViewMut<'ctx, 'a, T>
 where
     T: ErasedArchetypeSoa + ?Sized,
 {
+    #[inline]
+    pub fn new(
+        context: &'ctx T::Context,
+        entities: &'a mut [Entity],
+        bundles: ErasedBundlesMut<'ctx, 'a, T>,
+        sparse: &'a mut [SparseItem<NoEpochEntity>],
+    ) -> Result<Self, FromPartsError<NoEpochEntity>> {
+        let entities = must_cast_slice_mut(entities);
+        let dense = SoaSlicesMut::new(
+            Identity::from_inner_ref(context),
+            DenseSlicesMut::new(context, entities, bundles),
+        );
+
+        let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptr();
+        let me = unsafe { Self::from_inner(inner) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(
+        context: &'ctx T::Context,
+        entities: &'a mut [Entity],
+        bundles: ErasedBundlesMut<'ctx, 'a, T>,
+        sparse: &'a mut [SparseItem<NoEpochEntity>],
+    ) -> Self {
+        let entities = must_cast_slice_mut(entities);
+        let dense = SoaSlicesMut::new(
+            Identity::from_inner_ref(context),
+            DenseSlicesMut::new(context, entities, bundles),
+        );
+
+        let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) }.into_mut_view_ptr();
+        unsafe { Self::from_inner(inner) }
+    }
+
     #[inline]
     pub(super) unsafe fn from_inner(inner: Inner<'ctx, T>) -> Self {
         let phantom = PhantomData;

@@ -4,7 +4,11 @@ use std::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_sparse::{item::SparseItem, view::EpochSparseViewPtr};
+use gpecs_sparse::{
+    error::FromPartsError,
+    item::{DenseSlices, SparseItem},
+    view::{EpochSparseView, EpochSparseViewPtr},
+};
 
 use crate::{
     archetype::{
@@ -14,6 +18,8 @@ use crate::{
     entity::Entity,
     soa::{
         field::FieldDescriptors,
+        identity::Identity,
+        slice::SoaSlices,
         traits::{Refs as ErasedBundleRefs, Slices as ErasedBundles},
     },
 };
@@ -33,6 +39,41 @@ impl<'ctx, 'a, T> ArchetypeStorageView<'ctx, 'a, T>
 where
     T: ErasedArchetypeSoa + ?Sized,
 {
+    #[inline]
+    pub fn new(
+        context: &'ctx T::Context,
+        entities: &'a [Entity],
+        bundles: ErasedBundles<'ctx, 'a, T>,
+        sparse: &'a [SparseItem<NoEpochEntity>],
+    ) -> Result<Self, FromPartsError<NoEpochEntity>> {
+        let entities = must_cast_slice(entities);
+        let dense = SoaSlices::new(
+            Identity::from_inner_ref(context),
+            DenseSlices::new(context, entities, bundles),
+        );
+
+        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
+        let me = unsafe { Self::from_inner(inner) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(
+        context: &'ctx T::Context,
+        entities: &'a [Entity],
+        bundles: ErasedBundles<'ctx, 'a, T>,
+        sparse: &'a [SparseItem<NoEpochEntity>],
+    ) -> Self {
+        let entities = must_cast_slice(entities);
+        let dense = SoaSlices::new(
+            Identity::from_inner_ref(context),
+            DenseSlices::new(context, entities, bundles),
+        );
+
+        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();
+        unsafe { Self::from_inner(inner) }
+    }
+
     #[inline]
     pub(super) unsafe fn from_inner(inner: Inner<'ctx, T>) -> Self {
         let phantom = PhantomData;

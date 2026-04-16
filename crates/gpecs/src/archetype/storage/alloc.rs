@@ -230,12 +230,14 @@ impl ArchetypeStorage {
         self.as_view().contains(entity)
     }
 
+    // TODO: rework slice public API
     #[inline]
     pub fn entities(&self) -> &[Entity] {
         let (entities, _) = self.as_slices();
         entities
     }
 
+    // TODO: rework slice public API
     #[inline]
     pub fn bundles<B, T>(
         &self,
@@ -250,6 +252,7 @@ impl ArchetypeStorage {
         Ok((entities, bundles))
     }
 
+    // TODO: rework slice public API
     #[inline]
     pub fn bundles_mut<B, T>(
         &mut self,
@@ -432,6 +435,7 @@ impl ArchetypeStorage {
         sparse_set.clear_sparse();
     }
 
+    // TODO: rework slice public API
     #[inline]
     pub fn as_slices(
         &self,
@@ -443,6 +447,7 @@ impl ArchetypeStorage {
         (entities, bundles)
     }
 
+    // TODO: rework slice public API
     #[inline]
     pub fn as_mut_slices(
         &mut self,

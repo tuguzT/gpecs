@@ -1,6 +1,5 @@
 use std::fmt::{self, Debug};
 
-use bytemuck::must_cast_slice;
 use gpecs_soa_erased::ErasedSoaContext;
 use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet};
 
@@ -11,7 +10,7 @@ use crate::{
             error::{ArchetypeError, DuplicateComponentError, IncompatibleArchetypeExactError},
         },
         error::IncompatibleBundleValueError,
-        storage::{ArchetypeStorageView, ErasedDropMeta, NoEpochEntity},
+        storage::{ArchetypeStorageView, ArchetypeStorageViewMut, ErasedDropMeta, NoEpochEntity},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
@@ -98,6 +97,14 @@ impl ArchetypeStorage {
 
         let inner = sparse_set.as_view_ptr();
         unsafe { ArchetypeStorageView::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn as_mut_view(&mut self) -> ArchetypeStorageViewMut<'_, '_, ErasedBundle<ErasedDropMeta>> {
+        let Self { sparse_set } = self;
+
+        let inner = sparse_set.as_mut_view_ptr();
+        unsafe { ArchetypeStorageViewMut::from_inner(inner) }
     }
 
     #[inline]
@@ -372,8 +379,7 @@ impl ArchetypeStorage {
         &mut self,
         entity: Entity,
     ) -> Option<ErasedBundleMutRefs<'_, &ErasedArchetype<ErasedDropMeta>>> {
-        let Self { sparse_set } = self;
-        sparse_set.get_mut(entity.into())
+        self.as_mut_view().into_get_mut(entity)
     }
 
     #[inline]
@@ -444,13 +450,8 @@ impl ArchetypeStorage {
         &[Entity],
         ErasedBundleMutSlices<'_, &ErasedArchetype<ErasedDropMeta>>,
     ) {
-        let Self { sparse_set } = self;
-
-        let (dense, _) = sparse_set.as_mut_view().into_parts();
-        let (entities, slices) = dense.into_slices().into_parts();
-
-        let entities = must_cast_slice(entities);
-        (entities, slices)
+        let (entities, bundles, _, _) = self.as_mut_view().into_parts();
+        (entities, bundles)
     }
 }
 

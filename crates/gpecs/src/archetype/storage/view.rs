@@ -4,14 +4,7 @@ use std::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_sparse::{
-    item::SparseItem,
-    soa::{
-        field::FieldDescriptors,
-        traits::{Refs, Slices as Bundles},
-    },
-    view::EpochSparseViewPtr,
-};
+use gpecs_sparse::{item::SparseItem, view::EpochSparseViewPtr};
 
 use crate::{
     archetype::{
@@ -19,6 +12,10 @@ use crate::{
         storage::{NoEpochEntity, traits::ErasedArchetypeSoa},
     },
     entity::Entity,
+    soa::{
+        field::FieldDescriptors,
+        traits::{Refs, Slices as Bundles},
+    },
 };
 
 type Inner<'a, T> = EpochSparseViewPtr<'a, NoEpochEntity, T>;
@@ -137,7 +134,7 @@ where
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<Refs<'ctx, 'a, T>> {
         let Self { inner, .. } = self;
-        unsafe { inner.clone().deref() }.into_get(entity.into())
+        unsafe { inner.deref() }.into_get(entity.into())
     }
 }
 

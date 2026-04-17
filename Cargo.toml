@@ -57,8 +57,8 @@ gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 # standalone benchmarks
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
-cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "3f7cb642478f21d82b2f1a849150276790025737" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "3f7cb642478f21d82b2f1a849150276790025737" }
+cargo-gpu-install = { version = "0.10.0-alpha.1", default-features = false }
+spirv-std = { version = "0.10.0-alpha.1", default-features = false }
 indexmap = { version = "2.14", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }

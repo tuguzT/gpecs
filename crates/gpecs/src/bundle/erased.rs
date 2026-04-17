@@ -8,9 +8,6 @@ pub use erased::*;
 pub type ErasedBundleRefs<'a, D> = erased::ErasedBundleRefs<'a, D, *const MaybeUninit<u8>>;
 pub type ErasedBundleMutRefs<'a, D> = erased::ErasedBundleMutRefs<'a, D, *mut MaybeUninit<u8>>;
 
-pub type ErasedBundleSlices<'a, D> = erased::ErasedBundleSlices<'a, D, *const MaybeUninit<u8>>;
-pub type ErasedBundleMutSlices<'a, D> = erased::ErasedBundleMutSlices<'a, D, *mut MaybeUninit<u8>>;
-
 pub type ErasedBundleKind<T> = erased::ErasedBundleKind<T, MustDrop, Storage, SlicePtrs>;
 pub type ErasedBundle<Meta> = erased::ErasedBundle<Meta, MustDrop, Storage, SlicePtrs>;
 pub type ErasedBorrowedBundle<'a, Meta> =

@@ -134,7 +134,7 @@ where
 
     #[inline]
     pub fn as_slices_with_archetype(&self) -> SlicesWithArchetype<'_, '_, T> {
-        self.clone().into_parts()
+        self.as_view().into_parts()
     }
 
     #[inline]
@@ -169,7 +169,7 @@ where
 
     #[inline]
     pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, T>> {
-        self.clone().into_get(entity)
+        self.as_view().into_get(entity)
     }
 
     #[inline]

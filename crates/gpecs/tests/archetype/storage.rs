@@ -1,10 +1,10 @@
 use gpecs::{
     archetype::{
-        erased::error::{MissingComponentError, TooFewComponentsError},
+        erased::error::{IncompatibleArchetypeError, MissingComponentError, TooFewComponentsError},
         error::IncompatibleBundleValueError,
         storage::ArchetypeStorage,
     },
-    bundle::{Bundle, erased::error::DowncastErrorKind},
+    bundle::Bundle,
     context::Components,
     entity::registry::EntityRegistry,
     world::registry::WorldRegistry,
@@ -17,7 +17,7 @@ fn storage_tag() {
     let mut components = Components::new();
     let mut storage = ArchetypeStorage::register::<(Tag,), _, _>(&mut components)
         .expect("creation of storage for tag archetype should succeed");
-    assert_eq!(storage.entities(), []);
+    assert_eq!(storage.as_entities(), []);
 
     let component_ids = <(Tag,)>::register_components(&mut components);
     itertools::assert_equal(storage.archetype().component_ids(), component_ids);
@@ -39,19 +39,19 @@ fn storage_tag() {
         .insert_bundle::<(Tag,), _>(&components.as_view(), entity, (Tag,))
         .expect("archetype storage should store tag");
     assert_eq!(value, None);
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
 
     let refs = storage
         .get_bundle::<(Tag,), _>(&components.as_view(), entity)
         .expect("components by given entity should exist");
     assert_eq!(refs, Some((&Tag,)));
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
 
     let value = storage
         .remove_bundle::<(Tag,), _>(&components.as_view(), entity)
         .expect("components by given entity should exist");
     assert_eq!(value, Some((Tag,)));
-    assert_eq!(storage.entities(), []);
+    assert_eq!(storage.as_entities(), []);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn storage_tuple() {
 
     let mut storage = ArchetypeStorage::register::<(Position, Name), _, _>(&mut components)
         .expect("creation of storage for bundle `(Position, Name)` should succeed");
-    assert_eq!(storage.entities(), []);
+    assert_eq!(storage.as_entities(), []);
 
     let component_ids = <(Position, Name)>::register_components(&mut components);
     itertools::assert_equal(storage.archetype().component_ids(), component_ids);
@@ -85,53 +85,52 @@ fn storage_tuple() {
     let mut entities = EntityRegistry::new();
     let entity = entities.spawn(world, ());
 
-    let slices = storage
-        .bundles::<(Position,), _>(&components.as_view())
+    let (positions,) = storage
+        .as_bundles::<(Position,), _>(&components.as_view())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([].as_slice(), ([].as_slice(),)));
+    assert_eq!(positions, []);
 
     let error = storage
-        .bundles::<(Position, Name, Tag), _>(&components.as_view())
+        .as_bundles::<(Position, Name, Tag), _>(&components.as_view())
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert!(matches!(
         error,
-        DowncastErrorKind::ComponentNotRegistered(_),
+        IncompatibleArchetypeError::ComponentNotRegistered(_),
     ));
 
     components.register_component::<Tag>();
     let error = storage
-        .bundles::<(Position, Name, Tag), _>(&components.as_view())
+        .as_bundles::<(Position, Name, Tag), _>(&components.as_view())
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
         MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
-    let slices = storage
-        .bundles::<(Name, Position), _>(&components.as_view())
+    let (names, positions) = storage
+        .as_bundles::<(Name, Position), _>(&components.as_view())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(slices, ([].as_slice(), ([].as_slice(), [].as_slice())));
+    assert_eq!(names, []);
+    assert_eq!(positions, []);
 
-    let slices = storage
-        .bundles_mut::<(Position,), _>(&components.as_view())
+    let (positions,) = storage
+        .as_mut_bundles::<(Position,), _>(&components.as_view())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([].as_slice(), ([].as_mut_slice(),)));
+    assert_eq!(positions, []);
 
     let error = storage
-        .bundles_mut::<(Position, Name, Tag), _>(&components.as_view())
+        .as_mut_bundles::<(Position, Name, Tag), _>(&components.as_view())
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
         MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
-    let slices = storage
-        .bundles_mut::<(Name, Position), _>(&components.as_view())
+    let (names, positions) = storage
+        .as_mut_bundles::<(Name, Position), _>(&components.as_view())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(
-        slices,
-        ([].as_slice(), ([].as_mut_slice(), [].as_mut_slice())),
-    );
+    assert_eq!(names, []);
+    assert_eq!(positions, []);
 
     let mut position = Position {
         x: 1.0,
@@ -150,11 +149,7 @@ fn storage_tuple() {
     };
     let tag = Tag;
     let IncompatibleBundleValueError { value, source, .. } = storage
-        .insert_bundle::<(Position, Name, Tag), _>(
-            &components.as_view(),
-            entity,
-            (position, name.clone(), tag),
-        )
+        .insert_bundle(&components.as_view(), entity, (position, name.clone(), tag))
         .expect_err("insertion of `Position`, `Name` and `Tag` should fail");
     assert_eq!(value, (position, name.clone(), tag));
     assert_eq!(
@@ -170,14 +165,14 @@ fn storage_tuple() {
         )
         .expect("insertion of `Name` and `Position` should succeed");
     assert_eq!(value, None);
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
     assert!(storage.contains(entity));
 
     let refs = storage
         .get_bundle::<(Position,), _>(&components.as_view(), entity)
         .expect("retrieval of just `Position` should succeed");
     assert_eq!(refs, Some((&position,)));
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
     assert!(storage.contains(entity));
 
     let error = storage
@@ -192,14 +187,14 @@ fn storage_tuple() {
         .get_bundle::<(Name, Position), _>(&components.as_view(), entity)
         .expect("retrieval of `Name` and `Position` should succeed");
     assert_eq!(refs, Some((&name, &position)));
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
     assert!(storage.contains(entity));
 
     let refs_mut = storage
         .get_bundle_mut::<(Position,), _>(&components.as_view(), entity)
         .expect("retrieval of just `Position` should succeed");
     assert_eq!(refs_mut, Some((&mut position,)));
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
     assert!(storage.contains(entity));
 
     let error = storage
@@ -214,56 +209,50 @@ fn storage_tuple() {
         .get_bundle_mut::<(Name, Position), _>(&components.as_view(), entity)
         .expect("retrieval of `Name` and `Position` should succeed");
     assert_eq!(refs_mut, Some((&mut name, &mut position)));
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
     assert!(storage.contains(entity));
 
-    let slices = storage
-        .bundles::<(Position,), _>(&components.as_view())
+    let (entities, (positions,), _) = storage
+        .as_bundles_with_archetype::<(Position,), _>(&components.as_view())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([entity].as_slice(), ([position].as_slice(),)));
+    assert_eq!(entities, [entity]);
+    assert_eq!(positions, [position]);
 
     let error = storage
-        .bundles::<(Position, Name, Tag), _>(&components.as_view())
+        .as_bundles::<(Position, Name, Tag), _>(&components.as_view())
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
         MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
-    let slices = storage
-        .bundles::<(Name, Position), _>(&components.as_view())
+    let (entities, (names, positions), _) = storage
+        .as_bundles_with_archetype::<(Name, Position), _>(&components.as_view())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(
-        slices,
-        (
-            [entity].as_slice(),
-            ([name.clone()].as_slice(), [position].as_slice()),
-        ),
-    );
+    assert_eq!(entities, [entity]);
+    assert_eq!(names, [name.clone()]);
+    assert_eq!(positions, [position]);
 
-    let slices = storage
-        .bundles_mut::<(Position,), _>(&components.as_view())
+    let (entities, (positions,), _) = storage
+        .as_mut_bundles_with_archetype::<(Position,), _>(&components.as_view())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([entity].as_slice(), ([position].as_mut_slice(),)));
+    assert_eq!(entities, [entity]);
+    assert_eq!(positions, [position]);
 
     let error = storage
-        .bundles_mut::<(Position, Name, Tag), _>(&components.as_view())
+        .as_mut_bundles::<(Position, Name, Tag), _>(&components.as_view())
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
         MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
-    let slices = storage
-        .bundles_mut::<(Name, Position), _>(&components.as_view())
+    let (entities, (names, positions), _) = storage
+        .as_mut_bundles_with_archetype::<(Name, Position), _>(&components.as_view())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(
-        slices,
-        (
-            [entity].as_slice(),
-            ([name.clone()].as_mut_slice(), [position].as_mut_slice()),
-        ),
-    );
+    assert_eq!(entities, [entity]);
+    assert_eq!(names, [name.clone()]);
+    assert_eq!(positions, [position]);
 
     let error = storage
         .remove_bundle::<(Position,), _>(&components.as_view(), entity)
@@ -282,17 +271,13 @@ fn storage_tuple() {
         .remove_bundle::<(Name, Position), _>(&components.as_view(), entity)
         .expect("removal of `Name` and `Position` should succeed");
     assert_eq!(value, Some((name.clone(), position)));
-    assert_eq!(storage.entities(), []);
+    assert_eq!(storage.as_entities(), []);
     assert!(!storage.contains(entity));
 
     let value = storage
-        .insert_bundle::<(Name, Position), _>(
-            &components.as_view(),
-            entity,
-            (name.clone(), position),
-        )
+        .insert_bundle(&components.as_view(), entity, (name.clone(), position))
         .expect("insertion of `Name` and `Position` should succeed");
     assert_eq!(value, None);
-    assert_eq!(storage.entities(), [entity]);
+    assert_eq!(storage.as_entities(), [entity]);
     assert!(storage.contains(entity));
 }

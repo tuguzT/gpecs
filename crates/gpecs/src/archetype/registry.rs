@@ -285,11 +285,11 @@ impl ArchetypesItem {
     }
 
     #[inline]
-    fn as_key(&self) -> &ArchetypeKey<ErasedDropMeta> {
+    fn as_key(&self) -> ArchetypeKeyView<'_, ErasedDropMeta> {
         let Self { info } = self;
 
         let archetype = info.storage.archetype();
-        ArchetypeKey::from_ref(archetype)
+        ArchetypeKeyView { archetype }
     }
 }
 
@@ -302,7 +302,7 @@ impl Debug for ArchetypesItem {
 
 impl PartialEq for ArchetypesItem {
     fn eq(&self, other: &Self) -> bool {
-        let other = other.as_key();
+        let other = &other.as_key();
         self.as_key().eq(other)
     }
 }
@@ -317,7 +317,7 @@ impl PartialOrd for ArchetypesItem {
 
 impl Ord for ArchetypesItem {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let other = other.as_key();
+        let other = &other.as_key();
         self.as_key().cmp(other)
     }
 }
@@ -349,14 +349,15 @@ impl DerefMut for ArchetypesItem {
 impl<Meta> Equivalent<ArchetypesItem> for ArchetypeKey<Meta> {
     #[inline]
     fn equivalent(&self, item: &ArchetypesItem) -> bool {
-        item.as_key().eq(self)
+        let other = &item.as_key();
+        self.as_view().eq(other)
     }
 }
 
 impl<Meta> Equivalent<ArchetypesItem> for ArchetypeKeyView<'_, Meta> {
     #[inline]
     fn equivalent(&self, item: &ArchetypesItem) -> bool {
-        item.as_key().as_view().eq(self)
+        item.as_key().eq(self)
     }
 }
 
@@ -1755,7 +1756,7 @@ impl ArchetypeRegistry {
         }
 
         let info = unwrap_archetype_info(archetypes, start);
-        let archetype_component_ids = info.storage().archetype().component_ids();
+        let archetype_component_ids = info.storage().archetype().into_component_ids();
         if archetype_component_ids.len() <= 1 {
             return None;
         }
@@ -1823,7 +1824,7 @@ where
     let node_attrs = |_, (index, &()): (NodeIndex<_>, _)| {
         let archetype_id = archetype_id_from_usize(index.index());
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        let component_ids = info.storage().archetype().component_ids();
+        let component_ids = info.storage().archetype().into_component_ids();
         format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
     };
     let edge_attrs = |_, edge: EdgeReference<'_, _, _>| {
@@ -2564,14 +2565,14 @@ where
         info: &'a ArchetypeInfo,
         components: &ComponentRegistryView<'ctx, M, T>,
     ) -> BundlesIntoIterInner<'a, B> {
-        let archetype_id = info.id();
-        let Ok((entities, components)) = info.storage().bundles::<B, T>(components) else {
-            unreachable!("{archetype_id} should be compatible with requested bundle")
-        };
+        let (entities, bundles, _) = info
+            .storage
+            .as_bundles_with_archetype::<B, T>(components)
+            .expect("archetype should be compatible with requested bundle");
 
         let entities = entities.iter().copied();
-        let components = SoaSlices::new(B::CONTEXT, components);
-        entities.zip(components)
+        let bundles = SoaSlices::new(B::CONTEXT, bundles);
+        entities.zip(bundles)
     }
 }
 
@@ -2779,14 +2780,14 @@ where
         info: &'a mut ArchetypeInfo,
         components: &ComponentRegistryView<'ctx, M, T>,
     ) -> BundlesMutIntoIterInner<'a, B> {
-        let archetype_id = info.id();
-        let Ok((entities, components)) = info.storage.bundles_mut::<B, T>(components) else {
-            unreachable!("{archetype_id} should be compatible with requested bundle")
-        };
+        let (entities, bundles, _) = info
+            .storage
+            .as_mut_bundles_with_archetype::<B, T>(components)
+            .expect("archetype should be compatible with requested bundle");
 
         let entities = entities.iter().copied();
-        let components = SoaSlicesMut::new(B::CONTEXT, components);
-        entities.zip(components)
+        let bundles = SoaSlicesMut::new(B::CONTEXT, bundles);
+        entities.zip(bundles)
     }
 }
 

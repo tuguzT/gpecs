@@ -26,13 +26,14 @@ pub struct GpuErasedSoaDesc {
     pub capacity: usize,
 }
 
+pub type DescUniform = TypedBuffer<GpuErasedSoaDesc>;
 pub type DenseStorage = TypedBuffer<[u32]>;
 pub type DescriptorsStorage = TypedBuffer<[FieldDescriptor]>;
 
 #[spirv(compute(threads(64)))]
 pub fn erased_soa_work(
     #[spirv(global_invocation_id)] id: USizeVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] erased_soa_desc: &GpuErasedSoaDesc,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] erased_soa_desc: &DescUniform,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] dense: &mut DenseStorage,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] descriptors: &DescriptorsStorage,
 ) {
@@ -40,7 +41,7 @@ pub fn erased_soa_work(
     let descriptors = &**descriptors;
 
     let descriptors = GpuFieldDescriptors::from(descriptors);
-    let GpuErasedSoaDesc { len, capacity } = *erased_soa_desc;
+    let GpuErasedSoaDesc { len, capacity } = **erased_soa_desc;
     let invocation_id = id.x;
 
     let context = unsafe { ErasedSoaContext::from_inner(descriptors) };

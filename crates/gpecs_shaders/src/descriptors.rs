@@ -4,6 +4,7 @@ use gpecs_soa_erased::{
     CovariantFieldDescriptors,
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
+use spirv_std::arch::IndexUnchecked;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GpuFieldDescriptors<T>
@@ -73,9 +74,10 @@ where
             *next = descriptors.len();
             return None;
         }
-
         *next = index + 1;
-        Some(descriptors[index])
+
+        let item = *unsafe { descriptors.index_unchecked(index) };
+        Some(item)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

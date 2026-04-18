@@ -1,9 +1,8 @@
 use std::fmt::{self, Debug};
 
-use gpecs_soa_erased::ErasedSoaContext;
-use gpecs_sparse::{
-    TryInsertAccess, error::TryReserveError, set::EpochSparseSet, soa::field::FieldDescriptors,
-};
+use gpecs_archetype::bundle::erased::ErasedBundleKind;
+use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::PtrsItem, storage::AlignedStorage};
+use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet};
 
 use crate::{
     archetype::{
@@ -23,8 +22,8 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
-            ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ShuffledBundle,
-            traits::ErasedArchetypeKind,
+            ErasedBorrowedBundle, ErasedBundle, ShuffledBundle,
+            traits::{ErasedArchetypeKind, ErasedBundleDrop},
         },
     },
     component::{
@@ -39,11 +38,11 @@ use crate::{
     entity::Entity,
     soa::{
         self,
-        field::FieldDescriptor,
+        field::{FieldDescriptor, FieldDescriptors},
         traits::{
             RawSoaContext, ReadSoaContext, Refs as ErasedBundleRefs,
             RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles, SlicesMut as ErasedBundlesMut,
-            WriteSoaContext,
+            SoaRead, WriteSoaContext,
         },
     },
 };
@@ -265,13 +264,9 @@ where
         B: Bundle,
         M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (entities, bundles, archetype) = self.as_slices_with_archetype();
-        archetype.check_compatibility_of::<B, M>(components)?;
-
-        let bundles = bundles
-            .downcast::<B, M>(components)
-            .map_err(|error| error.source)
-            .expect("archetype compatibility should have been already checked");
+        let (entities, bundles, _, archetype) = self
+            .as_view()
+            .into_bundles_with_archetype::<B, M>(components)?;
         Ok((entities, bundles, archetype))
     }
 
@@ -284,7 +279,7 @@ where
         B: Bundle,
         M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (_, bundles, _) = self.as_bundles_with_archetype::<B, M>(components)?;
+        let (_, bundles, _) = self.as_view().into_bundles::<B, M>(components)?;
         Ok(bundles)
     }
 
@@ -297,13 +292,9 @@ where
         B: Bundle,
         M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (entities, bundles, archetype) = self.as_mut_slices_with_archetype();
-        archetype.check_compatibility_of::<B, M>(components)?;
-
-        let bundles = bundles
-            .downcast::<B, M>(components)
-            .map_err(|error| error.source)
-            .expect("archetype compatibility should have been already checked");
+        let (entities, bundles, _, archetype) = self
+            .as_mut_view()
+            .into_mut_bundles_with_archetype::<B, M>(components)?;
         Ok((entities, bundles, archetype))
     }
 
@@ -316,7 +307,7 @@ where
         B: Bundle,
         M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (_, bundles, _) = self.as_mut_bundles_with_archetype::<B, M>(components)?;
+        let (_, bundles, _) = self.as_mut_view().into_mut_bundles::<B, M>(components)?;
         Ok(bundles)
     }
 
@@ -330,17 +321,7 @@ where
         B: Bundle,
         M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.archetype()
-            .check_compatibility_of::<B, M>(components)?;
-
-        let Some(bundle) = self.get(entity) else {
-            return Ok(None);
-        };
-        let bundle = bundle
-            .downcast::<B, M>(components)
-            .map_err(|error| error.source)
-            .expect("archetype compatibility should have been already checked");
-        Ok(Some(bundle))
+        self.as_view().into_get_bundle::<B, M>(components, entity)
     }
 
     #[inline]
@@ -353,17 +334,22 @@ where
         B: Bundle,
         M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.archetype()
-            .check_compatibility_of::<B, M>(components)?;
+        self.as_mut_view()
+            .into_get_bundle_mut::<B, M>(components, entity)
+    }
 
-        let Some(bundle) = self.get_mut(entity) else {
-            return Ok(None);
-        };
-        let bundle = bundle
-            .downcast::<B, M>(components)
-            .map_err(|error| error.source)
-            .expect("archetype compatibility should have been already checked");
-        Ok(Some(bundle))
+    #[inline]
+    pub fn remove<'a, D, S>(
+        &'a mut self,
+        entity: Entity,
+    ) -> Option<ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>
+    where
+        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>,
+        D: ErasedBundleDrop<T::Meta>,
+        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+    {
+        let Self { sparse_set } = self;
+        sparse_set.swap_remove(entity.into())
     }
 
     #[inline]
@@ -372,7 +358,7 @@ where
 
         sparse_set.swap_remove_into(entity.into(), |context, ptrs| {
             let Some(ptrs) = ptrs else { return false };
-            unsafe { T::Context::ptrs_drop_in_place(context, ptrs) };
+            unsafe { context.ptrs_drop_in_place(ptrs) };
             true
         })
     }
@@ -531,7 +517,7 @@ impl ArchetypeStorage {
     pub fn insert<T>(
         &mut self,
         entity: Entity,
-        bundle: ErasedBundleKind<T>,
+        bundle: crate::bundle::erased::ErasedBundleKind<T>,
     ) -> Result<Option<ErasedBorrowedBundle<'_, ErasedDropMeta>>, IncompatibleArchetypeExactError>
     where
         T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
@@ -550,12 +536,6 @@ impl ArchetypeStorage {
             ShuffledBundle::Other(bundle) => sparse_set.insert(entity, bundle),
         };
         Ok(bundle)
-    }
-
-    #[inline]
-    pub fn remove(&mut self, entity: Entity) -> Option<ErasedBorrowedBundle<'_, ErasedDropMeta>> {
-        let Self { sparse_set } = self;
-        sparse_set.swap_remove(entity.into())
     }
 }
 

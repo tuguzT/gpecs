@@ -4,6 +4,7 @@ use std::{
 };
 
 use bytemuck::must_cast_slice_mut;
+use gpecs_soa_erased::ptr::slice::PtrsItem;
 use gpecs_sparse::{
     error::FromPartsError,
     item::{DenseSlicesMut, SparseItem},
@@ -12,8 +13,13 @@ use gpecs_sparse::{
 
 use crate::{
     archetype::{
-        erased::ErasedArchetypeView,
+        erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
         storage::{ArchetypeStorageView, NoEpochEntity, traits::ErasedArchetypeSoa},
+    },
+    bundle::{Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut},
+    component::registry::{
+        ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType},
     },
     entity::Entity,
     soa::{
@@ -35,7 +41,7 @@ where
     T: ErasedArchetypeSoa + ?Sized,
 {
     inner: Inner<'ctx, T>,
-    phantom: PhantomData<fn() -> &'a mut ()>,
+    phantom: PhantomData<&'a mut [PtrsItem<T::Ptrs>]>,
 }
 
 impl<'ctx, 'a, T> ArchetypeStorageViewMut<'ctx, 'a, T>
@@ -98,6 +104,42 @@ where
     }
 
     #[inline]
+    pub fn into_slices(self) -> Slices<'ctx, 'a, T> {
+        let (entities, bundles, sparse, _) = unsafe { self.into_parts() };
+        (entities, bundles.into(), sparse)
+    }
+
+    #[inline]
+    pub unsafe fn into_mut_slices(self) -> MutSlices<'ctx, 'a, T> {
+        let (entities, bundles, sparse, _) = unsafe { self.into_parts() };
+        (entities, bundles, sparse)
+    }
+
+    #[inline]
+    pub fn into_entities(self) -> &'a [Entity] {
+        let (entities, _, _) = self.into_slices();
+        entities
+    }
+
+    #[inline]
+    pub fn into_erased_bundles(self) -> ErasedBundles<'ctx, 'a, T> {
+        let (_, bundles, _) = self.into_slices();
+        bundles
+    }
+
+    #[inline]
+    pub fn into_mut_erased_bundles(self) -> ErasedBundlesMut<'ctx, 'a, T> {
+        let (_, bundles, _) = unsafe { self.into_mut_slices() };
+        bundles
+    }
+
+    #[inline]
+    pub fn into_sparse(self) -> &'a [SparseItem<NoEpochEntity>] {
+        let (_, _, sparse) = self.into_slices();
+        sparse
+    }
+
+    #[inline]
     pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, T> {
         let Self { inner, .. } = self;
 
@@ -111,6 +153,14 @@ where
 
         let inner = inner.clone();
         unsafe { ArchetypeStorageViewMut::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_view(self) -> ArchetypeStorageView<'ctx, 'a, T> {
+        let Self { inner, .. } = self;
+
+        let inner = inner.cast_const();
+        unsafe { ArchetypeStorageView::from_inner(inner) }
     }
 
     #[inline]
@@ -149,53 +199,38 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> Slices<'_, T> {
-        let (entities, bundles, sparse, _) = self.as_slices_with_archetype();
-        (entities, bundles, sparse)
+    pub fn as_slices(&self) -> Slices<'_, '_, T> {
+        self.as_view().into_slices()
     }
 
     #[inline]
     pub fn as_entities(&self) -> &[Entity] {
-        let (entities, _, _) = self.as_slices();
-        entities
+        self.as_view().into_entities()
     }
 
     #[inline]
     pub fn as_erased_bundles(&self) -> ErasedBundles<'_, '_, T> {
-        let (_, bundles, _) = self.as_slices();
-        bundles
+        self.as_view().into_erased_bundles()
     }
 
     #[inline]
     pub fn as_sparse(&self) -> &[SparseItem<NoEpochEntity>] {
-        let (_, _, sparse) = self.as_slices();
-        sparse
+        self.as_view().into_sparse()
     }
 
     #[inline]
     pub unsafe fn as_mut_slices_with_archetype(&mut self) -> MutSlicesWithArchetype<'_, '_, T> {
-        let Self { inner, .. } = self;
-
-        let (context, dense, sparse) = inner.as_mut_slice_ptrs_with_context();
-        let archetype = (**context).field_descriptors();
-        let sparse = unsafe { sparse.as_mut_unchecked() };
-
-        let (entities, bundles) = unsafe { dense.as_mut_unchecked(context) }.into_parts();
-        let entities = must_cast_slice_mut(entities);
-
-        (entities, bundles, sparse, archetype)
+        unsafe { self.as_mut_view().into_parts() }
     }
 
     #[inline]
-    pub unsafe fn as_mut_slices(&mut self) -> MutSlices<'_, T> {
-        let (entities, bundles, sparse, _) = unsafe { self.as_mut_slices_with_archetype() };
-        (entities, bundles, sparse)
+    pub unsafe fn as_mut_slices(&mut self) -> MutSlices<'_, '_, T> {
+        unsafe { self.as_mut_view().into_mut_slices() }
     }
 
     #[inline]
     pub fn as_mut_erased_bundles(&mut self) -> ErasedBundlesMut<'_, '_, T> {
-        let (_, bundles, _) = unsafe { self.as_mut_slices() };
-        bundles
+        self.as_mut_view().into_mut_erased_bundles()
     }
 
     #[inline]
@@ -210,8 +245,7 @@ where
 
     #[inline]
     pub fn into_get(self, entity: Entity) -> Option<ErasedBundleRefs<'ctx, 'a, T>> {
-        let Self { inner, .. } = self;
-        unsafe { inner.as_ref_unchecked() }.into_get(entity.into())
+        self.into_view().into_get(entity)
     }
 
     #[inline]
@@ -223,6 +257,177 @@ where
     pub fn into_get_mut(self, entity: Entity) -> Option<ErasedBundleRefsMut<'ctx, 'a, T>> {
         let Self { inner, .. } = self;
         unsafe { inner.as_mut_unchecked() }.into_get_mut(entity.into())
+    }
+
+    #[inline]
+    pub fn as_bundles_with_archetype<B, M>(
+        &self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<BundlesWithArchetype<'_, '_, B, T>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_view()
+            .into_bundles_with_archetype::<B, M>(components)
+    }
+
+    #[inline]
+    pub fn into_bundles_with_archetype<B, M>(
+        self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<BundlesWithArchetype<'ctx, 'a, B, T>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.into_view()
+            .into_bundles_with_archetype::<B, M>(components)
+    }
+
+    #[inline]
+    pub fn as_bundles<B, M>(
+        &self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<Bundles<'_, '_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_view().into_bundles::<B, M>(components)
+    }
+
+    #[inline]
+    pub fn into_bundles<B, M>(
+        self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<Bundles<'ctx, 'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.into_view().into_bundles::<B, M>(components)
+    }
+
+    #[inline]
+    pub fn as_mut_bundles_with_archetype<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<MutBundlesWithArchetype<'_, '_, B, T>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_mut_view()
+            .into_mut_bundles_with_archetype::<B, M>(components)
+    }
+
+    #[inline]
+    pub fn into_mut_bundles_with_archetype<B, M>(
+        self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<MutBundlesWithArchetype<'ctx, 'a, B, T>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let (entities, bundles, sparse, archetype) = unsafe { self.into_parts() };
+        archetype.check_compatibility_of::<B, M>(components)?;
+
+        let bundles = bundles
+            .downcast::<B, M>(components)
+            .map_err(|error| error.source)
+            .expect("archetype compatibility should have been already checked");
+        Ok((entities, bundles, sparse, archetype))
+    }
+
+    #[inline]
+    pub fn as_mut_bundles<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<MutBundles<'_, '_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_mut_view().into_mut_bundles::<B, M>(components)
+    }
+
+    #[inline]
+    pub fn into_mut_bundles<B, M>(
+        self,
+        components: &ComponentRegistryView<impl Sized, M>,
+    ) -> Result<MutBundles<'ctx, 'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let (entities, bundles, sparse, _) =
+            self.into_mut_bundles_with_archetype::<B, M>(components)?;
+        Ok((entities, bundles, sparse))
+    }
+
+    #[inline]
+    pub fn get_bundle<B, M>(
+        &self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        entity: Entity,
+    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_view().into_get_bundle::<B, M>(components, entity)
+    }
+
+    #[inline]
+    pub fn into_get_bundle<B, M>(
+        self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        entity: Entity,
+    ) -> Result<Option<BundleRefs<'a, B>>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.into_view().into_get_bundle::<B, M>(components, entity)
+    }
+
+    #[inline]
+    pub fn get_bundle_mut<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        entity: Entity,
+    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_mut_view()
+            .into_get_bundle_mut::<B, M>(components, entity)
+    }
+
+    #[inline]
+    pub fn into_get_bundle_mut<B, M>(
+        self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        entity: Entity,
+    ) -> Result<Option<BundleRefsMut<'a, B>>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.archetype()
+            .check_compatibility_of::<B, M>(components)?;
+
+        let Some(bundle) = self.into_get_mut(entity) else {
+            return Ok(None);
+        };
+        let bundle = bundle
+            .downcast::<B, M>(components)
+            .map_err(|error| error.source)
+            .expect("archetype compatibility should have been already checked");
+        Ok(Some(bundle))
     }
 }
 
@@ -238,15 +443,37 @@ where
     }
 }
 
+impl<'ctx, 'a, T> From<ArchetypeStorageViewMut<'ctx, 'a, T>> for ArchetypeStorageView<'ctx, 'a, T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    #[inline]
+    fn from(view: ArchetypeStorageViewMut<'ctx, 'a, T>) -> Self {
+        view.into_view()
+    }
+}
+
 type SlicesWithArchetype<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
     &'a [SparseItem<NoEpochEntity>],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
-type Slices<'a, T> = (
+type Slices<'ctx, 'a, T> = (
     &'a [Entity],
-    ErasedBundles<'a, 'a, T>,
+    ErasedBundles<'ctx, 'a, T>,
+    &'a [SparseItem<NoEpochEntity>],
+);
+
+type BundlesWithArchetype<'ctx, 'a, B, T> = (
+    &'a [Entity],
+    BundleSlices<'a, B>,
+    &'a [SparseItem<NoEpochEntity>],
+    ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
+);
+type Bundles<'ctx, 'a, B> = (
+    &'a [Entity],
+    BundleSlices<'a, B>,
     &'a [SparseItem<NoEpochEntity>],
 );
 
@@ -256,8 +483,20 @@ type MutSlicesWithArchetype<'ctx, 'a, T> = (
     &'a mut [SparseItem<NoEpochEntity>],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
-type MutSlices<'a, T> = (
+type MutSlices<'ctx, 'a, T> = (
     &'a mut [Entity],
-    ErasedBundlesMut<'a, 'a, T>,
+    ErasedBundlesMut<'ctx, 'a, T>,
     &'a mut [SparseItem<NoEpochEntity>],
+);
+
+type MutBundlesWithArchetype<'ctx, 'a, B, T> = (
+    &'a [Entity],
+    BundleSlicesMut<'a, B>,
+    &'a [SparseItem<NoEpochEntity>],
+    ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
+);
+type MutBundles<'ctx, 'a, B> = (
+    &'a [Entity],
+    BundleSlicesMut<'a, B>,
+    &'a [SparseItem<NoEpochEntity>],
 );

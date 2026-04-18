@@ -256,6 +256,37 @@ where
     }
 
     #[inline]
+    pub fn remove<'a, D, S>(
+        &'a mut self,
+        entity: Entity,
+    ) -> Option<ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>
+    where
+        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>,
+        D: ErasedBundleDrop<T::Meta>,
+        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+    {
+        let Self { sparse_set } = self;
+        sparse_set.swap_remove(entity.into())
+    }
+
+    #[inline]
+    pub fn destroy(&mut self, entity: Entity) -> bool {
+        let Self { sparse_set } = self;
+
+        sparse_set.swap_remove_into(entity.into(), |context, ptrs| {
+            let Some(ptrs) = ptrs else { return false };
+            unsafe { context.ptrs_drop_in_place(ptrs) };
+            true
+        })
+    }
+
+    #[inline]
+    pub fn destroy_all(&mut self) {
+        let Self { sparse_set } = self;
+        sparse_set.clear_sparse();
+    }
+
+    #[inline]
     pub fn as_bundles_with_archetype<B, M>(
         &self,
         components: &ComponentRegistryView<impl Sized, M>,
@@ -339,34 +370,66 @@ where
     }
 
     #[inline]
-    pub fn remove<'a, D, S>(
-        &'a mut self,
+    pub fn insert_bundle<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
         entity: Entity,
-    ) -> Option<ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>
+        value: B,
+    ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
     where
-        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>,
-        D: ErasedBundleDrop<T::Meta>,
-        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
+        if let Err(source) = self
+            .archetype()
+            .check_exact_compatibility_of::<B, M>(components)
+        {
+            let error = IncompatibleBundleValueError { value, source };
+            return Err(error);
+        }
+
         let Self { sparse_set } = self;
-        sparse_set.swap_remove(entity.into())
+        let bundle = sparse_set.insert_from(entity.into(), |_, access| match access? {
+            TryInsertAccess::ReadWrite(dst) => {
+                let Ok(dst) = dst.into_ptrs().downcast::<B, M>(components) else {
+                    unreachable!("exact archetype compatibility should be already checked")
+                };
+                let value = unsafe { soa::ptr::replace::<B, _, _>(B::CONTEXT, dst, value) };
+                Some(value)
+            }
+            TryInsertAccess::WriteOnly(dst) => {
+                let Ok(dst) = dst.into_inner().downcast::<B, M>(components) else {
+                    unreachable!("exact archetype compatibility should be already checked")
+                };
+                unsafe { B::CONTEXT.write(dst, value) };
+                None
+            }
+        });
+        Ok(bundle)
     }
 
     #[inline]
-    pub fn destroy(&mut self, entity: Entity) -> bool {
-        let Self { sparse_set } = self;
+    pub fn remove_bundle<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        entity: Entity,
+    ) -> Result<Option<B>, IncompatibleArchetypeExactError>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.archetype()
+            .check_exact_compatibility_of::<B, M>(components)?;
 
-        sparse_set.swap_remove_into(entity.into(), |context, ptrs| {
-            let Some(ptrs) = ptrs else { return false };
-            unsafe { context.ptrs_drop_in_place(ptrs) };
-            true
-        })
-    }
-
-    #[inline]
-    pub fn destroy_all(&mut self) {
         let Self { sparse_set } = self;
-        sparse_set.clear_sparse();
+        let bundle = sparse_set.swap_remove_into(entity.into(), |_, src| {
+            let Ok(src) = src?.cast_const().downcast::<B, M>(components) else {
+                unreachable!("exact archetype compatibility should be already checked")
+            };
+            let bundle = unsafe { B::CONTEXT.read(src) };
+            Some(bundle)
+        });
+        Ok(bundle)
     }
 }
 
@@ -445,72 +508,6 @@ impl ArchetypeStorage {
     #[inline]
     pub fn into_archetype(self) -> ErasedArchetype<ErasedDropMeta> {
         self.into_context().into_inner()
-    }
-
-    #[inline]
-    pub fn insert_bundle<B, T>(
-        &mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
-        entity: Entity,
-        value: B,
-    ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        if let Err(source) = self
-            .archetype()
-            .check_exact_compatibility_of::<B, T>(components)
-        {
-            let error = IncompatibleBundleValueError { value, source };
-            return Err(error);
-        }
-
-        let Self { sparse_set } = self;
-        let bundle = sparse_set.insert_from(entity.into(), |_, access| match access? {
-            TryInsertAccess::ReadWrite(dst) => {
-                let dst = dst
-                    .into_ptrs()
-                    .downcast::<B, T>(components)
-                    .expect("exact archetype compatibility should be already checked");
-                let value = unsafe { soa::ptr::replace::<B, _, _>(B::CONTEXT, dst, value) };
-                Some(value)
-            }
-            TryInsertAccess::WriteOnly(dst) => {
-                let dst = dst
-                    .into_inner()
-                    .downcast::<B, T>(components)
-                    .expect("exact archetype compatibility should be already checked");
-                unsafe { B::CONTEXT.write(dst, value) };
-                None
-            }
-        });
-        Ok(bundle)
-    }
-
-    #[inline]
-    pub fn remove_bundle<B, T>(
-        &mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
-        entity: Entity,
-    ) -> Result<Option<B>, IncompatibleArchetypeExactError>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        self.archetype()
-            .check_exact_compatibility_of::<B, T>(components)?;
-
-        let Self { sparse_set } = self;
-        let bundle = sparse_set.swap_remove_into(entity.into(), |_, src| {
-            let src = src?
-                .cast_const()
-                .downcast::<B, T>(components)
-                .expect("exact archetype compatibility should be already checked");
-            let bundle = unsafe { B::CONTEXT.read(src) };
-            Some(bundle)
-        });
-        Ok(bundle)
     }
 
     #[inline]

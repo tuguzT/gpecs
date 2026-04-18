@@ -58,7 +58,6 @@ where
         let actual = actual?;
         let expected = expected?;
         check_layout(actual.desc.layout(), expected.desc.layout())?;
-        check_layout(actual.layout, expected.layout)?;
     }
     check_layout(actual.into_layout(), expected.into_layout())?;
     Ok(())

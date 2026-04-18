@@ -11,20 +11,14 @@ use crate::field::{CopiedFieldDescriptors, FieldDescriptor};
 pub struct BufferOffset {
     /// Descriptor of the processed field.
     pub desc: FieldDescriptor,
-    /// Layout of fields in the buffer of provided capacity.
-    pub layout: Layout,
     /// Offset from the start of the buffer, in bytes.
     pub offset: usize,
 }
 
 impl BufferOffset {
     #[inline]
-    pub const fn new(desc: FieldDescriptor, layout: Layout, offset: usize) -> Self {
-        Self {
-            desc,
-            layout,
-            offset,
-        }
+    pub const fn new(desc: FieldDescriptor, offset: usize) -> Self {
+        Self { desc, offset }
     }
 }
 
@@ -111,7 +105,8 @@ where
         let Self { inner, state } = self;
 
         let desc = unsafe { inner.next().unwrap_unchecked() };
-        unsafe { state.next_unchecked(desc) }
+        let offset = unsafe { state.next_unchecked(desc) };
+        BufferOffset::new(desc, offset)
     }
 }
 
@@ -127,7 +122,9 @@ where
         let Self { inner, state } = self;
 
         let desc = inner.next()?;
-        let item = state.next(desc);
+        let item = state
+            .next(desc)
+            .map(|offset| BufferOffset::new(desc, offset));
         Some(item)
     }
 
@@ -194,7 +191,7 @@ impl RawBufferOffsets {
     }
 
     #[inline]
-    pub const fn next(&mut self, desc: FieldDescriptor) -> Result<BufferOffset, LayoutError> {
+    pub const fn next(&mut self, desc: FieldDescriptor) -> Result<usize, LayoutError> {
         let Self {
             ref mut layout,
             capacity,
@@ -212,12 +209,11 @@ impl RawBufferOffsets {
             Err(error) => return Err(error),
         };
 
-        let offset = BufferOffset::new(desc, next, offset);
         Ok(offset)
     }
 
     #[inline]
-    pub const unsafe fn next_unchecked(&mut self, desc: FieldDescriptor) -> BufferOffset {
+    pub const unsafe fn next_unchecked(&mut self, desc: FieldDescriptor) -> usize {
         let Self {
             ref mut layout,
             capacity,
@@ -229,7 +225,7 @@ impl RawBufferOffsets {
         let offset;
         (*layout, offset) = unsafe { extend_unchecked(*layout, next) };
 
-        BufferOffset::new(desc, next, offset)
+        offset
     }
 }
 

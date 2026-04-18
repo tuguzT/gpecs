@@ -241,7 +241,10 @@ where
         let mut descriptors = descriptors.field_descriptors().copied_field_descriptors();
         let desc = unsafe { descriptors.nth(i).unwrap_unchecked() };
 
-        let buffer_offset = unsafe { state.next_unchecked(desc) };
+        let buffer_offset = BufferOffset {
+            offset: unsafe { state.next_unchecked(desc) },
+            desc,
+        };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 
@@ -692,7 +695,7 @@ where
     P: NonNullSliceItemPtr,
 {
     let (index, layout) = {
-        let BufferOffset { desc, offset, .. } = buffer_offset;
+        let BufferOffset { desc, offset } = buffer_offset;
         (bytes_to_items::<P::Item>(offset), desc.into())
     };
 

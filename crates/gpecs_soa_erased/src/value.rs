@@ -2,7 +2,7 @@ use core::{
     alloc::{Layout, LayoutError},
     error::Error,
     fmt::{self, Debug, Display},
-    iter::{self, FusedIterator},
+    iter::FusedIterator,
     marker::PhantomData,
     ptr, slice,
 };
@@ -712,7 +712,7 @@ where
             ..
         } = *self;
 
-        let BufferOffset { desc, offset, .. } = unsafe { offsets.next()?.unwrap_unchecked() };
+        let BufferOffset { desc, offset } = unsafe { offsets.next()?.unwrap_unchecked() };
         let layout = desc.layout();
 
         let offset = bytes_to_items::<T::Item>(offset);
@@ -866,7 +866,7 @@ where
             return Err(error);
         };
 
-        let BufferOffset { desc, offset, .. } = offset?;
+        let BufferOffset { desc, offset } = offset?;
         let layout = desc.layout();
         check_sufficient_align(layout, Layout::new::<T>())?;
 
@@ -897,18 +897,14 @@ where
         .into_iter()
         .enumerate()
         .map(|(field_index, (src, desc))| {
-            let state = RawBufferOffsets::from_parts(storage.layout(), 1);
-            let mut buffer_offsets = unsafe { BufferOffsets::from_parts(state, iter::once(desc)) };
-
-            let BufferOffset { desc, offset, .. } = buffer_offsets
-                .next()
-                .expect("should have exactly one item")?;
+            let desc = *desc.as_ref();
             let layout = desc.layout();
             check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-            storage
-                .set_layout(buffer_offsets.into_layout())
-                .map_err(FromLayout)?;
+            let mut state = RawBufferOffsets::from_parts(storage.layout(), 1);
+            let offset = state.next(desc)?;
+
+            storage.set_layout(state.layout()).map_err(FromLayout)?;
 
             let offset = bytes_to_items::<T::Item>(offset);
             let len = bytes_to_items::<T::Item>(layout.size());

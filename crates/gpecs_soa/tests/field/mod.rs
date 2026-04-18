@@ -61,7 +61,6 @@ fn identity() {
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc.layout(), Layout::new::<u128>());
-    assert_eq!(offset.layout, Layout::array::<u128>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::array::<u128>(capacity).unwrap());
 
     let offset = offsets.next();
@@ -101,25 +100,21 @@ fn tuple() {
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc.layout(), Layout::new::<u8>());
-    assert_eq!(offset.layout, Layout::array::<u8>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(5, 1).unwrap());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 5);
     assert_eq!(offset.desc.layout(), Layout::new::<()>());
-    assert_eq!(offset.layout, Layout::array::<()>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(5, 1).unwrap());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 8);
     assert_eq!(offset.desc.layout(), Layout::new::<u32>());
-    assert_eq!(offset.layout, Layout::array::<u32>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(28, 4).unwrap());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 32);
     assert_eq!(offset.desc.layout(), Layout::new::<u128>());
-    assert_eq!(offset.layout, Layout::array::<u128>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(112, 16).unwrap());
 
     let offset = offsets.next();
@@ -158,19 +153,16 @@ fn zst_tuple() {
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc.layout(), Layout::new::<ZST2>());
-    assert_eq!(offset.layout, Layout::array::<ZST2>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(0, 1).unwrap());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc.layout(), Layout::new::<ZST3>());
-    assert_eq!(offset.layout, Layout::array::<ZST3>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(0, 4).unwrap());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc.layout(), Layout::new::<ZST1>());
-    assert_eq!(offset.layout, Layout::array::<ZST1>(capacity).unwrap());
     assert_eq!(offsets.layout(), Layout::from_size_align(0, 16).unwrap());
 
     let offset = offsets.next();

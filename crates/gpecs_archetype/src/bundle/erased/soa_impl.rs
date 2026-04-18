@@ -259,9 +259,7 @@ where
         &'me self,
         src: Self::Ptrs<'me>,
     ) -> ErasedBorrowedViewBundle<'a, T::Meta, D, S, P> {
-        let inner = unsafe { src.as_inner() };
-        let inner = unsafe { inner.read() }.expect("erased bundle should be created successfully");
-        unsafe { ErasedBundleKind::from_inner(inner) }
+        unsafe { src.read() }.expect("erased bundle should be created successfully")
     }
 }
 
@@ -279,9 +277,7 @@ where
 {
     #[inline]
     unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
-        let inner = unsafe { dst.as_mut_inner() };
-        let value = bundle.into_inner();
-        unsafe { inner.write(value) }
+        unsafe { dst.write(bundle) }
     }
 }
 

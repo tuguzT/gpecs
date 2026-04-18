@@ -15,12 +15,17 @@ use gpecs_soa_erased::{
     soa::field::{
         FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
     },
+    storage::AlignedStorage,
 };
 
 use crate::{
     bundle::erased::{
-        ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundlePtrsIter, ErasedBundleRefs,
-        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+        ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundlePtrsIter,
+        ErasedBundleRefs,
+        traits::{
+            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+            IntoErasedArchetypeIterator,
+        },
     },
     erased::ErasedArchetypeView,
 };
@@ -266,6 +271,26 @@ where
     pub fn get_mut(&mut self, component_id: ComponentId) -> Option<ErasedComponentMutPtr<P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter_mut().nth(index)
+    }
+}
+
+impl<D, P> ErasedBundleMutPtrs<D, P>
+where
+    D: ErasedArchetypeKind + ?Sized,
+    P: MutSliceItemPtr,
+{
+    #[inline]
+    // TODO: shuffle components if needed?..
+    pub unsafe fn write<T, K, S>(&mut self, value: ErasedBundleKind<T, K, S, P::Ptrs>)
+    where
+        T: ErasedArchetypeKind,
+        K: ErasedBundleDrop<T::Meta>,
+        S: AlignedStorage<Item = P::Item>,
+    {
+        let Self { inner } = self;
+
+        let value = value.into_inner();
+        unsafe { inner.write(value) }
     }
 }
 

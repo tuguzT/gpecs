@@ -9,16 +9,21 @@ use gpecs_component::{
 };
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoaPtrs, ErasedSoaPtrsIter,
+    error::FromFieldsDescriptorsError,
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::field::{
         FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
     },
+    storage::AlignedStorageFromLayout,
 };
 
 use crate::{
     bundle::erased::{
-        ErasedBundleMutPtrs, ErasedBundleRefs,
-        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+        ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundleRefs,
+        traits::{
+            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+            IntoErasedArchetypeIterator,
+        },
     },
     erased::ErasedArchetypeView,
 };
@@ -145,6 +150,30 @@ where
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentPtr<P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
+    }
+}
+
+type ReadResult<D, K, S, P> = Result<
+    ErasedBundleKind<D, K, S, <P as ConstSliceItemPtr>::Ptrs>,
+    FromFieldsDescriptorsError<<S as AlignedStorageFromLayout>::Error>,
+>;
+
+impl<D, P> ErasedBundlePtrs<D, P>
+where
+    D: ErasedArchetypeKind + Clone,
+    P: ConstSliceItemPtr<Item: Clone>,
+{
+    #[inline]
+    pub unsafe fn read<K, S>(&self) -> ReadResult<D, K, S, P>
+    where
+        K: ErasedBundleDrop<D::Meta>,
+        S: AlignedStorageFromLayout<Item = P::Item>,
+    {
+        let Self { inner } = self;
+
+        let inner = unsafe { inner.read()? };
+        let bundle = unsafe { ErasedBundleKind::from_inner(inner) };
+        Ok(bundle)
     }
 }
 

@@ -1,4 +1,4 @@
-use core::{fmt::Debug, mem::MaybeUninit};
+use core::fmt::Debug;
 
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
@@ -29,7 +29,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Ptrs<'a> = ErasedBundlePtrs<&'a ErasedArchetype<T::Meta>, P::Const>;
 
@@ -237,7 +237,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Context = ErasedSoaContext<ErasedArchetype<Meta>, P>;
     type Fields = ErasedSoaFields<P::Item>;
@@ -249,8 +249,8 @@ unsafe impl<'a, Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
-    S: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta, D, S, P> {
@@ -266,8 +266,8 @@ unsafe impl<'a, Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
-    S: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta, D, S, P> {
@@ -286,7 +286,7 @@ where
     N: ErasedBundleDrop<W::Meta>,
     S: AlignedStorage,
     U: AlignedStorage<Item = S::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
@@ -302,7 +302,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Output = &'a ErasedArchetype<Meta>;
 
@@ -318,7 +318,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -334,7 +334,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
@@ -363,7 +363,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'data>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Refs<'a> = ErasedBundleRefs<'data, &'a ErasedArchetype<Meta>, P::Const>;
 

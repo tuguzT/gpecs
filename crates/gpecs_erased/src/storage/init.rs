@@ -2,7 +2,6 @@ use core::{
     alloc::Layout,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
-    slice,
 };
 
 use crate::storage::{AlignedStorage, AlignedStorageFromLayout};
@@ -46,20 +45,22 @@ where
     }
 }
 
-impl<T> AlignedInitStorage<T>
+impl<T, U> AlignedInitStorage<T>
 where
-    T: AlignedStorage<Item: Default>,
+    T: AlignedStorage<Item = MaybeUninit<U>>,
+    U: Default,
 {
     #[inline]
     pub fn new(mut slice: T) -> Self {
-        slice.as_mut_uninit_slice().fill_with(default_uninit);
+        slice.as_mut_slice().fill_with(default_uninit);
         unsafe { Self::new_unchecked(slice) }
     }
 }
 
-impl<T> AlignedInitStorage<T>
+impl<T, U> AlignedInitStorage<T>
 where
-    T: AlignedStorageFromLayout<Item: Default>,
+    T: AlignedStorageFromLayout<Item = MaybeUninit<U>>,
+    U: Default,
 {
     #[inline]
     pub fn from_layout(layout: Layout) -> Result<Self, T::Error> {
@@ -75,47 +76,39 @@ where
         let old_len = inner.layout().size();
         inner.set_layout(layout)?;
 
-        if let Some(remainder) = inner.as_mut_uninit_slice().get_mut(old_len..) {
+        if let Some(remainder) = inner.as_mut_slice().get_mut(old_len..) {
             remainder.fill_with(default_uninit);
         }
         Ok(())
     }
 }
 
-impl<T> AlignedInitStorage<T>
+impl<T, U> AlignedInitStorage<T>
 where
-    T: AlignedStorage + ?Sized,
+    T: AlignedStorage<Item = MaybeUninit<U>> + ?Sized,
 {
     #[inline]
-    pub fn as_slice(&self) -> &[T::Item] {
+    pub fn as_slice(&self) -> &[U] {
         let Self { inner, .. } = self;
-        let slice = inner.as_uninit_slice();
-
-        let data = slice.as_ptr().cast();
-        let len = slice.len();
-        unsafe { slice::from_raw_parts(data, len) }
+        unsafe { inner.as_slice().assume_init_ref() }
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T::Item] {
+    pub fn as_mut_slice(&mut self) -> &mut [U] {
         let Self { inner, .. } = self;
-        let slice = inner.as_mut_uninit_slice();
-
-        let data = slice.as_mut_ptr().cast();
-        let len = slice.len();
-        unsafe { slice::from_raw_parts_mut(data, len) }
+        unsafe { inner.as_mut_slice().assume_init_mut() }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const T::Item {
+    pub fn as_ptr(&self) -> *const U {
         let Self { inner, .. } = self;
-        inner.as_ptr()
+        inner.as_ptr().cast()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut T::Item {
+    pub fn as_mut_ptr(&mut self) -> *mut U {
         let Self { inner, .. } = self;
-        inner.as_mut_ptr()
+        inner.as_mut_ptr().cast()
     }
 
     #[inline]
@@ -125,11 +118,11 @@ where
     }
 }
 
-impl<T> Deref for AlignedInitStorage<T>
+impl<T, U> Deref for AlignedInitStorage<T>
 where
-    T: AlignedStorage + ?Sized,
+    T: AlignedStorage<Item = MaybeUninit<U>> + ?Sized,
 {
-    type Target = [T::Item];
+    type Target = [U];
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -137,9 +130,9 @@ where
     }
 }
 
-impl<T> DerefMut for AlignedInitStorage<T>
+impl<T, U> DerefMut for AlignedInitStorage<T>
 where
-    T: AlignedStorage + ?Sized,
+    T: AlignedStorage<Item = MaybeUninit<U>> + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -147,42 +140,39 @@ where
     }
 }
 
-impl<T, U> AsRef<U> for AlignedInitStorage<T>
+impl<T, U> AsRef<[U]> for AlignedInitStorage<T>
 where
-    T: AlignedStorage + ?Sized,
-    U: ?Sized,
-    <Self as Deref>::Target: AsRef<U>,
+    T: AlignedStorage<Item = MaybeUninit<U>> + ?Sized,
 {
-    fn as_ref(&self) -> &U {
-        self.deref().as_ref()
+    #[inline]
+    fn as_ref(&self) -> &[U] {
+        self
     }
 }
 
-impl<T, U> AsMut<U> for AlignedInitStorage<T>
+impl<T, U> AsMut<[U]> for AlignedInitStorage<T>
 where
-    T: AlignedStorage + ?Sized,
-    U: ?Sized,
-    <Self as Deref>::Target: AsMut<U>,
+    T: AlignedStorage<Item = MaybeUninit<U>> + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut U {
-        self.deref_mut().as_mut()
+    fn as_mut(&mut self) -> &mut [U] {
+        self
     }
 }
 
-unsafe impl<T> AlignedStorage for AlignedInitStorage<T>
+unsafe impl<T, U> AlignedStorage for AlignedInitStorage<T>
 where
-    T: AlignedStorage + ?Sized,
+    T: AlignedStorage<Item = MaybeUninit<U>> + ?Sized,
 {
-    type Item = T::Item;
+    type Item = U;
 
     #[inline]
-    fn as_ptr(&self) -> *const T::Item {
+    fn as_ptr(&self) -> *const U {
         Self::as_ptr(self)
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T::Item {
+    fn as_mut_ptr(&mut self) -> *mut U {
         Self::as_mut_ptr(self)
     }
 
@@ -192,9 +182,10 @@ where
     }
 }
 
-unsafe impl<T> AlignedStorageFromLayout for AlignedInitStorage<T>
+unsafe impl<T, U> AlignedStorageFromLayout for AlignedInitStorage<T>
 where
-    T: AlignedStorageFromLayout<Item: Default>,
+    T: AlignedStorageFromLayout<Item = MaybeUninit<U>>,
+    U: Default,
 {
     type Error = T::Error;
 

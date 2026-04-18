@@ -191,16 +191,16 @@ impl Drop for BoxedAlignedUninitStorage {
 }
 
 unsafe impl AlignedStorage for BoxedAlignedUninitStorage {
-    type Item = u8;
+    type Item = MaybeUninit<u8>;
 
     #[inline]
-    fn as_ptr(&self) -> *const u8 {
-        Self::as_ptr(self)
+    fn as_ptr(&self) -> *const Self::Item {
+        Self::as_ptr(self).cast()
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut u8 {
-        Self::as_mut_ptr(self)
+    fn as_mut_ptr(&mut self) -> *mut Self::Item {
+        Self::as_mut_ptr(self).cast()
     }
 
     #[inline]

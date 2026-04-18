@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::ManuallyDrop,
     ptr,
 };
 
@@ -32,7 +32,7 @@ use crate::{
 pub struct ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     component_id: ComponentId,
     field: Erased<T, P>,
@@ -41,8 +41,8 @@ where
 
 impl<T, P> ErasedComponent<T, P>
 where
-    T: AlignedStorage<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    T: AlignedStorage<Item: Clone>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub fn try_from_storage_component<C, M, U>(
@@ -71,8 +71,8 @@ where
 
 impl<T, P> ErasedComponent<T, P>
 where
-    T: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    T: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub fn try_from<C, M, U>(
@@ -101,7 +101,7 @@ where
 impl<T, P> ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub unsafe fn from_parts(
@@ -242,13 +242,13 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[MaybeUninit<T::Item>] {
+    pub fn as_slice(&self) -> &[T::Item] {
         let Self { field, .. } = self;
         field.as_slice()
     }
 
     #[inline]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [MaybeUninit<T::Item>] {
+    pub unsafe fn as_mut_slice(&mut self) -> &mut [T::Item] {
         let Self { field, .. } = self;
         field.as_mut_slice()
     }
@@ -275,7 +275,7 @@ where
 impl<T, P> Debug for ErasedComponent<T, P>
 where
     T: AlignedStorage<Item: Debug>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -296,8 +296,8 @@ impl<T, U, P, Z> PartialEq<ErasedComponent<U, Z>> for ErasedComponent<T, P>
 where
     T: AlignedStorage,
     U: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
-    Z: SliceItemPtrs<Item = MaybeUninit<U::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
+    Z: SliceItemPtrs<Item = U::Item>,
 {
     #[inline]
     fn eq(&self, other: &ErasedComponent<U, Z>) -> bool {
@@ -309,7 +309,7 @@ where
 impl<T, P> Eq for ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
 }
 
@@ -317,8 +317,8 @@ impl<T, U, P, Z> PartialOrd<ErasedComponent<U, Z>> for ErasedComponent<T, P>
 where
     T: AlignedStorage,
     U: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
-    Z: SliceItemPtrs<Item = MaybeUninit<U::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
+    Z: SliceItemPtrs<Item = U::Item>,
 {
     #[inline]
     fn partial_cmp(&self, other: &ErasedComponent<U, Z>) -> Option<cmp::Ordering> {
@@ -330,7 +330,7 @@ where
 impl<T, P> Ord for ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -342,7 +342,7 @@ where
 impl<T, P> Hash for ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -354,7 +354,7 @@ where
 impl<T, P> Borrow<ComponentId> for ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     fn borrow(&self) -> &ComponentId {
@@ -363,13 +363,13 @@ where
     }
 }
 
-impl<T, P> AsRef<[MaybeUninit<T::Item>]> for ErasedComponent<T, P>
+impl<T, P> AsRef<[T::Item]> for ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<T::Item>] {
+    fn as_ref(&self) -> &[T::Item] {
         self.as_slice()
     }
 }
@@ -377,7 +377,7 @@ where
 impl<T, P> Drop for ErasedComponent<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     fn drop(&mut self) {

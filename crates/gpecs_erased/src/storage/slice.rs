@@ -4,7 +4,6 @@ use core::{
     fmt::{self, Debug, Display},
     hash::{self, Hash},
     marker::PhantomData,
-    mem::MaybeUninit,
 };
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
     storage::AlignedStorage,
 };
 
-pub struct AlignedUninitStorage<T, U>
+pub struct AlignedStorageSlice<T, U>
 where
     T: ?Sized,
 {
@@ -21,7 +20,7 @@ where
     inner: T,
 }
 
-impl<T, U> AlignedUninitStorage<T, U> {
+impl<T, U> AlignedStorageSlice<T, U> {
     #[inline]
     pub unsafe fn new_unchecked(inner: T, layout: Layout) -> Self {
         Self {
@@ -38,9 +37,9 @@ impl<T, U> AlignedUninitStorage<T, U> {
     }
 }
 
-impl<T, U> AlignedUninitStorage<T, U>
+impl<T, U> AlignedStorageSlice<T, U>
 where
-    T: AsRef<[MaybeUninit<U>]>,
+    T: AsRef<[U]>,
 {
     #[inline]
     pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitStorageError> {
@@ -53,7 +52,7 @@ where
     }
 }
 
-impl<T, U> AlignedUninitStorage<T, U>
+impl<T, U> AlignedStorageSlice<T, U>
 where
     T: ?Sized,
 {
@@ -76,49 +75,49 @@ where
     }
 }
 
-impl<T, U> AlignedUninitStorage<T, U>
+impl<T, U> AlignedStorageSlice<T, U>
 where
-    T: AsRef<[MaybeUninit<U>]> + ?Sized,
+    T: AsRef<[U]> + ?Sized,
 {
     #[inline]
-    pub fn as_slice(&self) -> &[MaybeUninit<U>] {
+    pub fn as_slice(&self) -> &[U] {
         let Self { inner, .. } = self;
         inner.as_ref()
     }
 }
 
-impl<T, U> AlignedUninitStorage<T, U>
+impl<T, U> AlignedStorageSlice<T, U>
 where
-    T: AsMut<[MaybeUninit<U>]> + ?Sized,
+    T: AsMut<[U]> + ?Sized,
 {
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<U>] {
+    pub fn as_mut_slice(&mut self) -> &mut [U] {
         let Self { inner, .. } = self;
         inner.as_mut()
     }
 }
 
-impl<T, U> AsRef<[MaybeUninit<U>]> for AlignedUninitStorage<T, U>
+impl<T, U> AsRef<[U]> for AlignedStorageSlice<T, U>
 where
-    T: AsRef<[MaybeUninit<U>]> + ?Sized,
+    T: AsRef<[U]> + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<U>] {
+    fn as_ref(&self) -> &[U] {
         self.as_slice()
     }
 }
 
-impl<T, U> AsMut<[MaybeUninit<U>]> for AlignedUninitStorage<T, U>
+impl<T, U> AsMut<[U]> for AlignedStorageSlice<T, U>
 where
-    T: AsMut<[MaybeUninit<U>]> + ?Sized,
+    T: AsMut<[U]> + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [MaybeUninit<U>] {
+    fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_slice()
     }
 }
 
-impl<T, U> Debug for AlignedUninitStorage<T, U>
+impl<T, U> Debug for AlignedStorageSlice<T, U>
 where
     T: Debug + ?Sized,
 {
@@ -131,7 +130,7 @@ where
     }
 }
 
-impl<T, U> Clone for AlignedUninitStorage<T, U>
+impl<T, U> Clone for AlignedStorageSlice<T, U>
 where
     T: Clone,
 {
@@ -150,9 +149,9 @@ where
     }
 }
 
-impl<T, U> Copy for AlignedUninitStorage<T, U> where T: Copy {}
+impl<T, U> Copy for AlignedStorageSlice<T, U> where T: Copy {}
 
-impl<T, U> PartialEq for AlignedUninitStorage<T, U>
+impl<T, U> PartialEq for AlignedStorageSlice<T, U>
 where
     T: PartialEq + ?Sized,
 {
@@ -167,9 +166,9 @@ where
     }
 }
 
-impl<T, U> Eq for AlignedUninitStorage<T, U> where T: Eq + ?Sized {}
+impl<T, U> Eq for AlignedStorageSlice<T, U> where T: Eq + ?Sized {}
 
-impl<T, U> Hash for AlignedUninitStorage<T, U>
+impl<T, U> Hash for AlignedStorageSlice<T, U>
 where
     T: Hash + ?Sized,
 {
@@ -186,9 +185,9 @@ where
     }
 }
 
-unsafe impl<T, U> AlignedStorage for AlignedUninitStorage<T, U>
+unsafe impl<T, U> AlignedStorage for AlignedStorageSlice<T, U>
 where
-    T: AsRef<[MaybeUninit<U>]> + AsMut<[MaybeUninit<U>]> + ?Sized,
+    T: AsRef<[U]> + AsMut<[U]> + ?Sized,
 {
     type Item = U;
 

@@ -1,7 +1,6 @@
 use core::{
     error::Error,
     fmt::{self, Debug, Display},
-    mem::MaybeUninit,
 };
 
 use gpecs_component::erased::WithErasedDrop;
@@ -26,7 +25,7 @@ where
     ToRemove: ErasedArchetypeKind,
     D: ErasedBundleDrop<ToRemove::Meta>,
     S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     pub retained: ErasedBundle<ToRemove::Meta, D, S, P>,
     pub removed: ErasedBundleKind<ToRemove, D, S, P>,
@@ -36,8 +35,8 @@ impl<ToRemove, D, S, P> Debug for RemovePair<ToRemove, D, S, P>
 where
     ToRemove: ErasedArchetypeKind,
     D: ErasedBundleDrop<ToRemove::Meta>,
-    S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Debug>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { retained, removed } = self;
@@ -52,8 +51,8 @@ impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
-    S: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]
@@ -116,8 +115,8 @@ impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind<Meta: WithErasedDrop + Clone>,
     D: ErasedBundleDrop<T::Meta>,
-    S: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]
@@ -167,7 +166,7 @@ where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn check_remove<E>(

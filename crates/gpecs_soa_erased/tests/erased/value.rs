@@ -6,7 +6,7 @@ use gpecs_soa_erased::{
     data::ErasedRef,
     ptr::slice::CoreSliceItemPtrs,
     soa::field::{FieldDescriptor, FieldDescriptors},
-    storage::AlignedUninitStorage,
+    storage::AlignedStorageSlice,
 };
 
 #[cfg(feature = "alloc")]
@@ -37,7 +37,7 @@ fn value() {
         bytes
     };
 
-    let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Value>()).unwrap();
+    let bytes = AlignedStorageSlice::new(bytes, Layout::new::<Value>()).unwrap();
     let erased_value =
         ArrayErasedSoa::<_, 5>::try_from_storage_value::<Value, _>(bytes, &context, value).unwrap();
 
@@ -168,7 +168,7 @@ fn value_zst() {
     let value = ();
 
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
-    let bytes = AlignedUninitStorage::new(bytes, Layout::new::<()>()).unwrap();
+    let bytes = AlignedStorageSlice::new(bytes, Layout::new::<()>()).unwrap();
     let erased_value =
         ArrayErasedSoa::<_, 1>::try_from_storage_value::<(), _>(bytes, &context, value).unwrap();
 

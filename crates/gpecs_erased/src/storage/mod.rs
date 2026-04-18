@@ -1,6 +1,6 @@
 pub use self::{
     init::AlignedInitStorage,
-    slice::{AlignedUninitStorage, AlignedUninitStorageError},
+    slice::{AlignedStorageSlice, AlignedUninitStorageError},
     traits::{AlignedStorage, AlignedStorageFromLayout},
 };
 

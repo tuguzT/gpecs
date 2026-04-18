@@ -1,4 +1,4 @@
-use core::{fmt::Debug, mem::MaybeUninit};
+use core::fmt::Debug;
 
 use crate::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
@@ -227,9 +227,9 @@ unsafe impl<'a, T, D, P>
     ReadSoaContext<'a, ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
-    T: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
+    T: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
     D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     unsafe fn read(
@@ -247,7 +247,7 @@ where
     T: AlignedStorage,
     D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
     N: FieldDescriptorsOwned<Output: FieldDescriptorsOwned>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {

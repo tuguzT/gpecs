@@ -3,7 +3,6 @@ use core::{
     error::Error,
     fmt::{self, Debug, Display},
     iter::chain,
-    mem::MaybeUninit,
 };
 
 use gpecs_soa_erased::{
@@ -23,8 +22,8 @@ impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
-    S: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]

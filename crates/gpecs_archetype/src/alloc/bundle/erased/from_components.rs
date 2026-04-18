@@ -2,7 +2,6 @@ use core::{
     alloc::LayoutError,
     error::Error,
     fmt::{self, Debug, Display},
-    mem::MaybeUninit,
 };
 
 use gpecs_component::{erased::ErasedComponent, registry::ComponentRegistryView};
@@ -22,7 +21,7 @@ use crate::{
 pub trait FromErasedComponent<S, P>: Sized
 where
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self;
 }
@@ -31,8 +30,8 @@ impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
 where
     Meta: AsRef<FieldDescriptor> + FromErasedComponent<S, P> + 'static,
     D: ErasedBundleDrop<Meta>,
-    S: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     pub fn from_components<I>(

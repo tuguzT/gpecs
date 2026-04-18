@@ -2,7 +2,6 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
     ptr,
 };
 
@@ -405,16 +404,16 @@ where
     }
 }
 
-impl<'a, D, P, U> ErasedSoaMutPtrs<D, P>
+impl<'a, D, P> ErasedSoaMutPtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr<Item: >,
 {
     #[inline]
     #[track_caller]
     pub unsafe fn write<T, E>(&'a mut self, value: ErasedSoa<T, E, P::Ptrs>)
     where
-        T: AlignedStorage<Item = U>,
+        T: AlignedStorage<Item = P::Item>,
         E: FieldDescriptorsOwned<Output: FieldDescriptorsOwned>,
     {
         let src = value.as_ptrs();

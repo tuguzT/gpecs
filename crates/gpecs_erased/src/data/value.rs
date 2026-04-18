@@ -2,7 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    mem::{MaybeUninit, forget},
+    mem::forget,
     ptr, slice,
 };
 
@@ -36,7 +36,7 @@ where
 
 impl<T, P> Erased<T, P>
 where
-    T: AlignedStorage<Item: Copy>,
+    T: AlignedStorage<Item: Clone>,
     P: SliceItemPtrs,
 {
     #[inline]
@@ -46,7 +46,7 @@ where
         data: V,
     ) -> Result<Self, FromStorageError<T>>
     where
-        V: AsRef<[MaybeUninit<T::Item>]>,
+        V: AsRef<[T::Item]>,
     {
         let expected_layout = layout;
         let layout = storage.layout();
@@ -67,7 +67,7 @@ where
             return Err(FromStorageError::new(err.into(), storage));
         }
 
-        if let Err(err) = try_copy_from_slice(storage.as_mut_uninit_slice(), data) {
+        if let Err(err) = try_clone_from_slice(storage.as_mut_slice(), data) {
             return Err(FromStorageError::new(err.into(), storage));
         }
 
@@ -133,7 +133,7 @@ where
 
 impl<T, P> Erased<T, P>
 where
-    T: AlignedStorageFromLayout<Item: Copy>,
+    T: AlignedStorageFromLayout<Item: Clone>,
     P: SliceItemPtrs,
 {
     #[inline]
@@ -142,7 +142,7 @@ where
         data: V,
     ) -> Result<Self, FromLayoutDataError<T::Error>>
     where
-        V: AsRef<[MaybeUninit<T::Item>]>,
+        V: AsRef<[T::Item]>,
     {
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
@@ -150,7 +150,7 @@ where
         check_len(size_of_val(data), layout.size())?;
 
         let mut storage = T::from_layout(layout).map_err(FromLayoutDataError::FromLayout)?;
-        try_copy_from_slice(storage.as_mut_uninit_slice(), data)?;
+        try_clone_from_slice(storage.as_mut_slice(), data)?;
 
         let me = Self {
             storage,
@@ -198,9 +198,9 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[MaybeUninit<T::Item>] {
+    pub fn as_slice(&self) -> &[T::Item] {
         let Self { storage, .. } = self;
-        storage.as_uninit_slice()
+        storage.as_slice()
     }
 
     #[inline]
@@ -210,9 +210,9 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<T::Item>] {
+    pub fn as_mut_slice(&mut self) -> &mut [T::Item] {
         let Self { storage, .. } = self;
-        storage.as_mut_uninit_slice()
+        storage.as_mut_slice()
     }
 
     #[inline]
@@ -245,7 +245,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub fn as_erased(&self) -> ErasedRef<'_, P::Const> {
@@ -257,7 +257,7 @@ where
         let Self { storage, .. } = self;
 
         let layout = storage.layout();
-        let buffer = storage.as_uninit_slice();
+        let buffer = storage.as_slice();
         let ptr = unsafe { ConstSliceItemPtr::from_slice(buffer, 0) };
         unsafe { ErasedPtr::from_parts(layout, ptr) }
     }
@@ -272,7 +272,7 @@ where
         let Self { storage, .. } = self;
 
         let layout = storage.layout();
-        let buffer = storage.as_mut_uninit_slice();
+        let buffer = storage.as_mut_slice();
         let ptr = unsafe { MutSliceItemPtr::from_slice(buffer, 0) };
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
@@ -293,37 +293,37 @@ where
     }
 }
 
-impl<T, P> AsRef<[MaybeUninit<T::Item>]> for Erased<T, P>
+impl<T, P> AsRef<[T::Item]> for Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
     P: SliceItemPtrs,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<T::Item>] {
+    fn as_ref(&self) -> &[T::Item] {
         self.as_slice()
     }
 }
 
-impl<T, P> AsMut<[MaybeUninit<T::Item>]> for Erased<T, P>
+impl<T, P> AsMut<[T::Item]> for Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
     P: SliceItemPtrs,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [MaybeUninit<T::Item>] {
+    fn as_mut(&mut self) -> &mut [T::Item] {
         self.as_mut_slice()
     }
 }
 
 #[inline]
-pub fn try_copy_from_slice<T>(dst: &mut [T], src: &[T]) -> Result<(), LenMismatchError>
+pub fn try_clone_from_slice<T>(dst: &mut [T], src: &[T]) -> Result<(), LenMismatchError>
 where
-    T: Copy,
+    T: Clone,
 {
     let expected = dst.len();
     let len = src.len();
     check_len(len, expected)?;
 
-    dst.copy_from_slice(src);
+    dst.clone_from_slice(src);
     Ok(())
 }

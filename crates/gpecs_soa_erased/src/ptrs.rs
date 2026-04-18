@@ -2,7 +2,6 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
     ptr,
 };
 
@@ -280,18 +279,17 @@ where
     }
 }
 
-impl<D, P, U> ErasedSoaPtrs<D, P>
+impl<D, P> ErasedSoaPtrs<D, P>
 where
     D: FieldDescriptorsOwned + Clone,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: Copy,
+    P: ConstSliceItemPtr<Item: Clone>,
 {
     #[inline]
     pub unsafe fn read<T>(
         &self,
     ) -> Result<ErasedSoa<T, D, P::Ptrs>, FromFieldsDescriptorsError<T::Error>>
     where
-        T: AlignedStorageFromLayout<Item = U>,
+        T: AlignedStorageFromLayout<Item = P::Item>,
     {
         let fields = self.iter().map(|ptr| unsafe { ptr.as_ref_unchecked() });
         let descriptors = self.descriptors().clone();

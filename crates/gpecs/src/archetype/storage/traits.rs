@@ -1,4 +1,4 @@
-use std::{mem::MaybeUninit, ops::Deref};
+use std::ops::Deref;
 
 use gpecs_archetype::bundle::erased::{
     ErasedBorrowedViewBundle, ErasedBundle, ErasedBundleMutRefs, ErasedBundleMutSlices,
@@ -48,7 +48,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Meta = Meta;
     type Archetype<'a> = ErasedArchetypeView<'view, Meta>;
@@ -60,7 +60,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Meta = Meta;
     type Archetype<'a> = &'a ErasedArchetype<Meta>;

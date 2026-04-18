@@ -1,7 +1,6 @@
 use core::{
     error::Error,
     fmt::{self, Debug, Display},
-    mem::MaybeUninit,
 };
 
 use gpecs_component::{
@@ -263,7 +262,7 @@ where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     pub fn downcast<B, U>(
@@ -290,7 +289,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     pub fn downcast_ref<B, U>(

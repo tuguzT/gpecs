@@ -1,30 +1,28 @@
-use core::{alloc::Layout, mem::MaybeUninit, slice};
+use core::{alloc::Layout, slice};
 
-/// [Slice](prim@slice) of dynamically aligned, potentially uninitialized data.
+/// [Slice](prim@slice) of dynamically aligned data.
 pub unsafe trait AlignedStorage {
     type Item;
 
-    /// Pointer to the start of [slice](AlignedStorage::as_uninit_slice) of self.
+    /// Pointer to the start of [slice](AlignedStorage::as_slice) of self.
     fn as_ptr(&self) -> *const Self::Item;
 
-    /// Mutable pointer to the start of [slice](AlignedStorage::as_mut_uninit_slice) of self.
+    /// Mutable pointer to the start of [slice](AlignedStorage::as_mut_slice) of self.
     fn as_mut_ptr(&mut self) -> *mut Self::Item;
 
-    /// Layout of [slice](AlignedStorage::as_uninit_slice) of self: its length and alignment.
+    /// Layout of [slice](AlignedStorage::as_slice) of self: its length and alignment.
     fn layout(&self) -> Layout;
 
-    /// Retrieve an uninitialized [slice](prim@slice) of self,
-    /// even if such data could be initialized.
-    fn as_uninit_slice(&self) -> &[MaybeUninit<Self::Item>] {
-        let data = self.as_ptr().cast();
+    /// Retrieve an uninitialized [slice](prim@slice) of self.
+    fn as_slice(&self) -> &[Self::Item] {
+        let data = self.as_ptr();
         let len = self.layout().size();
         unsafe { slice::from_raw_parts(data, len) }
     }
 
-    /// Retrieve a mutable uninitialized [slice](prim@slice) of self,
-    /// even if such data could be initialized.
-    fn as_mut_uninit_slice(&mut self) -> &mut [MaybeUninit<Self::Item>] {
-        let data = self.as_mut_ptr().cast();
+    /// Retrieve a mutable uninitialized [slice](prim@slice) of self.
+    fn as_mut_slice(&mut self) -> &mut [Self::Item] {
+        let data = self.as_mut_ptr();
         let len = self.layout().size();
         unsafe { slice::from_raw_parts_mut(data, len) }
     }
@@ -52,13 +50,13 @@ where
     }
 
     #[inline]
-    fn as_uninit_slice(&self) -> &[MaybeUninit<Self::Item>] {
-        (**self).as_uninit_slice()
+    fn as_slice(&self) -> &[Self::Item] {
+        (**self).as_slice()
     }
 
     #[inline]
-    fn as_mut_uninit_slice(&mut self) -> &mut [MaybeUninit<Self::Item>] {
-        (**self).as_mut_uninit_slice()
+    fn as_mut_slice(&mut self) -> &mut [Self::Item] {
+        (**self).as_mut_slice()
     }
 }
 

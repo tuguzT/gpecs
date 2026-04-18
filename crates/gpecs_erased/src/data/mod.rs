@@ -8,7 +8,7 @@ pub use self::{
     r#ref::ErasedRef,
     slice::ErasedSlice,
     slice_ptr::ErasedSlicePtr,
-    value::{Erased, try_copy_from_slice},
+    value::{Erased, try_clone_from_slice},
 };
 
 #[cfg(feature = "alloc")]

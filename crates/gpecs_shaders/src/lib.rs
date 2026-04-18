@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![cfg_attr(not(test), no_std)]
 
-use core::{convert::Infallible, mem::MaybeUninit};
+use core::convert::Infallible;
 use spirv_std::{TypedBuffer, glam::USizeVec3, spirv};
 
 use gpecs_soa_erased::{
@@ -17,7 +17,7 @@ pub use self::{
 mod descriptors;
 mod ptr;
 
-pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSliceItemPtrs<MaybeUninit<u32>>>;
+pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSliceItemPtrs<u32>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
@@ -26,7 +26,7 @@ pub struct GpuErasedSoaDesc {
     pub capacity: usize,
 }
 
-pub type DenseStorage = TypedBuffer<[MaybeUninit<u32>]>;
+pub type DenseStorage = TypedBuffer<[u32]>;
 pub type DescriptorsStorage = TypedBuffer<[FieldDescriptor]>;
 
 #[spirv(compute(threads(64)))]

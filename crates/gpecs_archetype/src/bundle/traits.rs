@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use gpecs_component::{
     erased::{
         ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
@@ -130,5 +128,5 @@ pub unsafe trait Bundle:
         I: IntoIterator<Item = ErasedComponent<S, P>>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
         S: AlignedStorage,
-        P: SliceItemPtrs<Item = MaybeUninit<S::Item>>;
+        P: SliceItemPtrs<Item = S::Item>;
 }

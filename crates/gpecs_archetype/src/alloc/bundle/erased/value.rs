@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use gpecs_soa_erased::{
     ErasedSoa, ptr::slice::SliceItemPtrs, soa::field::FieldDescriptor, storage::AlignedStorage,
 };
@@ -27,7 +25,7 @@ where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedBundle<'a, Meta, D, S, P>) -> Self {
@@ -45,7 +43,7 @@ where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedBundle<'a, Meta, D, S, P>) -> Self {
@@ -63,7 +61,7 @@ where
     Meta: AsRef<FieldDescriptor> + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedViewBundle<'a, Meta, D, S, P>) -> Self {

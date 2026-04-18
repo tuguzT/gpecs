@@ -3,7 +3,7 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::ManuallyDrop,
     ptr,
 };
 
@@ -38,7 +38,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     phantom: PhantomData<D>,
     inner: ErasedSoa<S, T, P>,
@@ -49,7 +49,7 @@ where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     pub unsafe fn from_inner(inner: ErasedSoa<S, T, P>) -> Self {
@@ -69,7 +69,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     pub fn layout(&self) -> Layout {
@@ -206,7 +206,7 @@ where
     Other: ErasedArchetypeKind<Meta = Original::Meta>,
     D: ErasedBundleDrop<Original::Meta>,
     S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     Original(ErasedBundleKind<Original, D, S, P>),
     Other(ErasedBundleKind<Other, D, S, P>),
@@ -217,8 +217,8 @@ where
     Original: ErasedArchetypeKind,
     Other: ErasedArchetypeKind<Meta = Original::Meta>,
     D: ErasedBundleDrop<Original::Meta>,
-    S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Debug>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -232,8 +232,8 @@ impl<Original, D, S, P> ErasedBundleKind<Original, D, S, P>
 where
     Original: ErasedArchetypeKind,
     D: ErasedBundleDrop<Original::Meta>,
-    S: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]
@@ -310,8 +310,8 @@ impl<T, D, S, P> Debug for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
-    S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorage<Item: Debug>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let components = &self.into_iter();
@@ -326,7 +326,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn as_ref(&self) -> &[P::Item] {
@@ -339,7 +339,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     fn drop(&mut self) {
         let (mut ptrs, archetype) = self.as_mut_ptrs_with_archetype();
@@ -352,7 +352,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Item = ErasedComponentRef<'a, P::Const>;
     type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>, P::Const>;
@@ -368,7 +368,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Item = ErasedComponentMutRef<'a, P::Mut>;
     type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>, P::Mut>;
@@ -383,8 +383,8 @@ impl<T, D, S, P> IntoIterator for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     D: ErasedBundleDrop<T::Meta>,
-    S: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    S: AlignedStorageFromLayout<Item: Clone>,
+    P: SliceItemPtrs<Item = S::Item>,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<S, P>, S::Error>;
@@ -404,7 +404,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
 
@@ -419,7 +419,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -441,10 +441,10 @@ where
 
 impl<S, T, F, P> Iterator for ErasedBundleIntoIterKind<S, T, F, P>
 where
-    S: AlignedStorage<Item: Copy>,
+    S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     F: AlignedStorageFromLayout<Item = S::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<F, P>, F::Error>;
@@ -485,10 +485,10 @@ where
 
 impl<S, T, F, P> ExactSizeIterator for ErasedBundleIntoIterKind<S, T, F, P>
 where
-    S: AlignedStorage<Item: Copy>,
+    S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     F: AlignedStorageFromLayout<Item = S::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
     T::IntoIter: ExactSizeIterator,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {
@@ -501,10 +501,10 @@ where
 
 impl<S, T, F, P> FusedIterator for ErasedBundleIntoIterKind<S, T, F, P>
 where
-    S: AlignedStorage<Item: Copy>,
+    S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     F: AlignedStorageFromLayout<Item = S::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
     T::IntoIter: FusedIterator,
     for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
 {

@@ -4,7 +4,6 @@ use core::{
     fmt::{self, Debug, Display},
     iter::{self, FusedIterator},
     marker::PhantomData,
-    mem::MaybeUninit,
     ptr, slice,
 };
 
@@ -14,7 +13,7 @@ use crate::{
     CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutRefs, ErasedSoaMutRefsIter,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsIter,
     assert::check_downcast,
-    data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError, try_copy_from_slice},
+    data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError, try_clone_from_slice},
     error::{
         DowncastError, FromDescriptorsValueError, FromDescriptorsValueErrorKind,
         FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError, FromStorageValueError,
@@ -95,33 +94,33 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const MaybeUninit<T::Item> {
+    pub fn as_ptr(&self) -> *const T::Item {
         let Self { storage, .. } = self;
         storage.as_ptr().cast()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut MaybeUninit<T::Item> {
+    pub fn as_mut_ptr(&mut self) -> *mut T::Item {
         let Self { storage, .. } = self;
         storage.as_mut_ptr().cast()
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[MaybeUninit<T::Item>] {
+    pub fn as_buffer(&self) -> &[T::Item] {
         let Self { storage, .. } = self;
-        storage.as_uninit_slice()
+        storage.as_slice()
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<T::Item>] {
+    pub fn as_mut_buffer(&mut self) -> &mut [T::Item] {
         let Self { storage, .. } = self;
-        storage.as_mut_uninit_slice()
+        storage.as_mut_slice()
     }
 }
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<Item: Copy>,
+    T: AlignedStorage<Item: Clone>,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -132,7 +131,7 @@ where
     ) -> Result<Self, FromStorageFieldsDescriptorsError>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[MaybeUninit<T::Item>]>,
+        F: AsRef<[T::Item]>,
     {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
@@ -144,8 +143,8 @@ where
         let expected_layout = offsets.into_layout();
         check_layout(layout, expected_layout)?;
 
-        write_copy_of_fields(
-            storage.as_mut_uninit_slice(),
+        write_clone_of_fields(
+            storage.as_mut_slice(),
             fields,
             descriptors.field_descriptors(),
         )?;
@@ -200,7 +199,7 @@ impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldDescriptors<'a> + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub fn as_ptrs(&'a self) -> ErasedSoaPtrs<D::Output, P::Const> {
@@ -218,7 +217,7 @@ where
 
         let ptrs = {
             let descriptors = descriptors.field_descriptors();
-            let buffer = storage.as_uninit_slice();
+            let buffer = storage.as_slice();
             unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, 1, 0) }
         };
         (ptrs, descriptors)
@@ -242,7 +241,7 @@ where
 
         let ptrs = {
             let descriptors = descriptors.field_descriptors();
-            let buffer = storage.as_mut_uninit_slice();
+            let buffer = storage.as_mut_slice();
             unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, 1, 0) }
         };
         (ptrs, descriptors)
@@ -291,7 +290,7 @@ impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldDescriptors<'a, Output: FieldDescriptorsOwned> + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub unsafe fn downcast_ref<'ctx, V>(
@@ -329,7 +328,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout<Item: Copy>,
+    T: AlignedStorageFromLayout<Item: Clone>,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -339,7 +338,7 @@ where
     ) -> Result<Self, FromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[MaybeUninit<T::Item>]>,
+        F: AsRef<[T::Item]>,
     {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
@@ -350,8 +349,8 @@ where
         let layout = offsets.into_layout();
         let mut storage = T::from_layout(layout).map_err(FromFieldsDescriptorsError::FromLayout)?;
 
-        write_copy_of_fields(
-            storage.as_mut_uninit_slice(),
+        write_clone_of_fields(
+            storage.as_mut_slice(),
             fields,
             descriptors.field_descriptors(),
         )?;
@@ -363,7 +362,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout<Item: Copy>,
+    T: AlignedStorageFromLayout<Item: Clone>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
@@ -372,7 +371,7 @@ where
     ) -> Result<Self, FromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = (F, E)>,
-        F: AsRef<[MaybeUninit<T::Item>]>,
+        F: AsRef<[T::Item]>,
         E: AsRef<FieldDescriptor>,
     {
         let (storage, descriptors) = storage_from_fields_with_descriptors(fields_with_descriptors)?;
@@ -514,9 +513,9 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<Item: Copy>,
+    T: AlignedStorage<Item: Clone>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, P>
@@ -533,7 +532,7 @@ impl<T, D, P> Debug for ErasedSoa<T, D, P>
 where
     T: AlignedStorage<Item: Debug>,
     D: FieldDescriptorsOwned + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
     for<'a> FieldDescriptorsIter<'a, D>: FieldDescriptorsOwned,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -542,24 +541,24 @@ where
     }
 }
 
-impl<T, D, P> AsRef<[MaybeUninit<T::Item>]> for ErasedSoa<T, D, P>
+impl<T, D, P> AsRef<[T::Item]> for ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<T::Item>] {
+    fn as_ref(&self) -> &[T::Item] {
         self.as_buffer()
     }
 }
 
-impl<T, D, P> AsMut<[MaybeUninit<T::Item>]> for ErasedSoa<T, D, P>
+impl<T, D, P> AsMut<[T::Item]> for ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [MaybeUninit<T::Item>] {
+    fn as_mut(&mut self) -> &mut [T::Item] {
         self.as_mut_buffer()
     }
 }
@@ -568,7 +567,7 @@ impl<'a, T, D, P> IntoIterator for &'a ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldDescriptors<'a> + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedRef<'a, P::Const>;
     type IntoIter = ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Const>;
@@ -583,7 +582,7 @@ impl<'a, T, D, P> IntoIterator for &'a mut ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldDescriptors<'a> + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedMutRef<'a, P::Mut>;
     type IntoIter = ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Mut>;
@@ -596,9 +595,9 @@ where
 
 impl<T, D, P> IntoIterator for ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout<Item: Copy>,
+    T: AlignedStorageFromLayout<Item: Clone>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = Result<Erased<T, P>, FromLayoutDataError<T::Error>>;
     type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P>;
@@ -698,10 +697,10 @@ where
 
 impl<T, I, F, P> Iterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage<Item: Copy>,
+    T: AlignedStorage<Item: Clone>,
     I: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = Result<Erased<F, P>, FromLayoutDataError<F::Error>>;
 
@@ -728,10 +727,10 @@ where
 
 impl<T, I, F, P> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage<Item: Copy>,
+    T: AlignedStorage<Item: Clone>,
     I: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -742,10 +741,10 @@ where
 
 impl<T, I, F, P> FusedIterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage<Item: Copy>,
+    T: AlignedStorage<Item: Clone>,
     I: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs<Item = T::Item>,
 {
 }
 
@@ -843,14 +842,14 @@ impl<T> From<WriteCopyOfFieldsError> for FromFieldsDescriptorsError<T> {
     }
 }
 
-fn write_copy_of_fields<T, F, D>(
-    dst: &mut [MaybeUninit<T>],
+fn write_clone_of_fields<T, F, D>(
+    dst: &mut [T],
     fields: F,
     descriptors: D,
 ) -> Result<(), WriteCopyOfFieldsError>
 where
-    T: Copy,
-    F: IntoIterator<Item: AsRef<[MaybeUninit<T>]>>,
+    T: Clone,
+    F: IntoIterator<Item: AsRef<[T]>>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     use IterOrFieldLenMismatchError::{FieldLenMismatch, IterLenMismatch};
@@ -874,7 +873,7 @@ where
         let offset = bytes_to_items::<T>(offset);
         let len = bytes_to_items::<T>(layout.size());
         let dst = &mut dst[offset..offset + len];
-        try_copy_from_slice(dst, src.as_ref())
+        try_clone_from_slice(dst, src.as_ref())
             .map_err(|error| FieldLenMismatch { error, field_index })?;
     }
     Ok(())
@@ -884,10 +883,10 @@ fn storage_from_fields_with_descriptors<I, T, F, E, D>(
     fields_with_descriptors: I,
 ) -> Result<(T, D), FromFieldsDescriptorsError<T::Error>>
 where
-    T: AlignedStorageFromLayout<Item: Copy>,
+    T: AlignedStorageFromLayout<Item: Clone>,
     D: FromIterator<FieldDescriptor>,
     I: IntoIterator<Item = (F, E)>,
-    F: AsRef<[MaybeUninit<T::Item>]>,
+    F: AsRef<[T::Item]>,
     E: AsRef<FieldDescriptor>,
 {
     use FromFieldsDescriptorsError::FromLayout;
@@ -913,8 +912,8 @@ where
 
             let offset = bytes_to_items::<T::Item>(offset);
             let len = bytes_to_items::<T::Item>(layout.size());
-            let dst = &mut storage.as_mut_uninit_slice()[offset..offset + len];
-            try_copy_from_slice(dst, src.as_ref())
+            let dst = &mut storage.as_mut_slice()[offset..offset + len];
+            try_clone_from_slice(dst, src.as_ref())
                 .map_err(|error| FieldLenMismatch { error, field_index })?;
 
             Ok(desc)

@@ -1,5 +1,3 @@
-use std::mem::MaybeUninit;
-
 use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 
 use crate::{
@@ -49,7 +47,7 @@ where
 impl<S, P> FromErasedComponent<S, P> for ErasedDropMeta
 where
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {

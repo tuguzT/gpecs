@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use gpecs_component::{
     Component,
     erased::{
@@ -106,7 +104,7 @@ where
         I: IntoIterator<Item = ErasedComponent<S, P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
         S: AlignedStorage,
-        P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+        P: SliceItemPtrs<Item = S::Item>,
     {
         let component_id = components
             .component_id::<T>()
@@ -223,7 +221,7 @@ macro_rules! bundle_tuple_impl {
                 Iter: IntoIterator<Item = ErasedComponent<S, P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
                 S: AlignedStorage,
-                P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+                P: SliceItemPtrs<Item = S::Item>,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 

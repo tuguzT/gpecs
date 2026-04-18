@@ -2,7 +2,6 @@ use core::{
     alloc::LayoutError,
     error::Error,
     fmt::{self, Debug, Display},
-    mem::MaybeUninit,
 };
 
 use gpecs_component::registry::{
@@ -30,7 +29,7 @@ where
     Meta: AsRef<FieldDescriptor> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
+    P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
     pub fn from_bundle<'a, B, M, T>(

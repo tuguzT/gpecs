@@ -17,6 +17,7 @@ use gpecs_soa_erased::{
     },
     storage::AlignedStorage,
 };
+use itertools::equal;
 
 use crate::{
     bundle::erased::{
@@ -272,6 +273,34 @@ where
         let index = self.archetype().get_index_of(component_id)?;
         self.iter_mut().nth(index)
     }
+
+    #[inline]
+    pub unsafe fn copy_from_compatible_exact_nonoverlapping<N>(
+        &mut self,
+        src: &ErasedBundlePtrs<N, CastConst<P>>,
+        count: usize,
+    ) where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let archetype = self.archetype();
+        let src_archetype = src.archetype();
+        archetype
+            .check_exact_compatibility(src_archetype)
+            .expect("archetypes should be exact compatible");
+
+        if equal(archetype.component_ids(), src_archetype.component_ids()) {
+            unsafe { self.copy_from_nonoverlapping(src, count) };
+            return;
+        }
+
+        for dst in self.iter_mut() {
+            let component_id = dst.component_id();
+            let src = src
+                .get(component_id)
+                .expect("src should have the same component as dst has");
+            unsafe { dst.copy_from_nonoverlapping(src, count) }
+        }
+    }
 }
 
 impl<D, P> ErasedBundleMutPtrs<D, P>
@@ -280,17 +309,16 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    // TODO: shuffle components if needed?..
     pub unsafe fn write<T, K, S>(&mut self, value: ErasedBundleKind<T, K, S, P::Ptrs>)
     where
         T: ErasedArchetypeKind,
         K: ErasedBundleDrop<T::Meta>,
         S: AlignedStorage<Item = P::Item>,
     {
-        let Self { inner } = self;
+        let src = value.as_ptrs();
+        unsafe { self.copy_from_compatible_exact_nonoverlapping(&src, 1) };
 
-        let value = value.into_inner();
-        unsafe { inner.write(value) }
+        let _ = value.into_inner().into_parts();
     }
 }
 

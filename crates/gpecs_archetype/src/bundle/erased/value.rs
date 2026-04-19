@@ -9,7 +9,7 @@ use core::{
 
 use gpecs_component::{
     erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
-    registry::{ComponentId, traits::WithComponentId},
+    registry::traits::WithComponentId,
 };
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaIntoFields,
@@ -255,10 +255,7 @@ where
             return Err(error);
         }
 
-        if equal(
-            this.iter().map(ComponentId::from),
-            other.iter().map(ComponentId::from),
-        ) {
+        if equal(this.component_ids(), other.component_ids()) {
             let shuffled = ShuffledBundle::Original(self);
             return Ok(shuffled);
         }

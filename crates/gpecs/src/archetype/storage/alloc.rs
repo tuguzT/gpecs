@@ -22,7 +22,7 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
-            ErasedBorrowedBundle, ErasedBundle, ShuffledBundle,
+            ErasedBundle,
             traits::{ErasedArchetypeKind, ErasedBundleDrop},
         },
     },
@@ -42,7 +42,7 @@ use crate::{
         traits::{
             RawSoaContext, ReadSoaContext, Refs as ErasedBundleRefs,
             RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles, SlicesMut as ErasedBundlesMut,
-            SoaRead, WriteSoaContext,
+            SoaRead, SoaWrite, WriteSoaContext,
         },
     },
 };
@@ -253,6 +253,31 @@ where
     #[inline]
     pub fn get_mut(&mut self, entity: Entity) -> Option<ErasedBundleRefsMut<'_, '_, T>> {
         self.as_mut_view().into_get_mut(entity)
+    }
+
+    #[inline]
+    #[expect(clippy::type_complexity)]
+    pub fn insert<'a, W, D, S>(
+        &'a mut self,
+        entity: Entity,
+        bundle: ErasedBundleKind<W, D, S, T::Ptrs>,
+    ) -> Result<
+        Option<ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>,
+        IncompatibleArchetypeExactError,
+    >
+    where
+        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>
+            + SoaWrite<ErasedBundleKind<W, D, S, T::Ptrs>>,
+        W: ErasedArchetypeKind<Meta = T::Meta>,
+        D: ErasedBundleDrop<T::Meta>,
+        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+    {
+        self.archetype()
+            .check_exact_compatibility(bundle.archetype())?;
+
+        let Self { sparse_set } = self;
+        let bundle = sparse_set.insert(entity.into(), bundle);
+        Ok(bundle)
     }
 
     #[inline]
@@ -508,31 +533,6 @@ impl ArchetypeStorage {
     #[inline]
     pub fn into_archetype(self) -> ErasedArchetype<ErasedDropMeta> {
         self.into_context().into_inner()
-    }
-
-    #[inline]
-    pub fn insert<T>(
-        &mut self,
-        entity: Entity,
-        bundle: crate::bundle::erased::ErasedBundleKind<T>,
-    ) -> Result<Option<ErasedBorrowedBundle<'_, ErasedDropMeta>>, IncompatibleArchetypeExactError>
-    where
-        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
-    {
-        let archetype = self.archetype();
-        archetype.check_exact_compatibility(bundle.archetype().as_view())?;
-
-        let entity = entity.into();
-        let bundle = bundle
-            .shuffle(ErasedArchetype::from(archetype))
-            .expect("exact archetype compatibility should have been already checked");
-
-        let Self { sparse_set } = self;
-        let bundle = match bundle {
-            ShuffledBundle::Original(bundle) => sparse_set.insert(entity, bundle),
-            ShuffledBundle::Other(bundle) => sparse_set.insert(entity, bundle),
-        };
-        Ok(bundle)
     }
 }
 

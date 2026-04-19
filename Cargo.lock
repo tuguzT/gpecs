@@ -681,7 +681,9 @@ dependencies = [
 name = "gpecs_archetype"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "gpecs_component",
+ "gpecs_entity",
  "gpecs_soa_erased",
  "gpecs_sparse",
  "itertools 0.14.0",

@@ -5,6 +5,7 @@
 pub mod bundle;
 pub mod erased;
 pub mod registry;
+pub mod storage;
 
 #[cfg(feature = "alloc")]
 mod alloc;

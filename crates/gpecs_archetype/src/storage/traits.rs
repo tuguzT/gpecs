@@ -1,24 +1,22 @@
-use std::ops::Deref;
+use core::ops::Deref;
 
-use gpecs_archetype::bundle::erased::{
-    ErasedBorrowedViewBundle, ErasedBundle, ErasedBundleMutRefs, ErasedBundleMutSlices,
-    ErasedBundleRefs, ErasedBundleSlices, traits::ErasedBundleDrop,
-};
 use gpecs_soa_erased::{
     ptr::slice::{ConstPtr, MutPtr, NonNullPtr, SliceItemPtrs},
-    storage::AlignedStorage,
-};
-
-use crate::{
-    archetype::erased::{ErasedArchetype, ErasedArchetypeView},
-    bundle::erased::{
-        ErasedBundleMutPtrs, ErasedBundleMutSlicePtrs, ErasedBundleNonNullPtrs, ErasedBundlePtrs,
-        ErasedBundleSlicePtrs, traits::ErasedArchetypeKind,
-    },
     soa::{
         field::FieldDescriptor,
         traits::{AllocSoa, SoaContext, SoaOwned},
     },
+    storage::AlignedStorage,
+};
+
+use crate::{
+    bundle::erased::{
+        ErasedBorrowedViewBundle, ErasedBundleMutPtrs, ErasedBundleMutRefs,
+        ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs, ErasedBundlePtrs,
+        ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices, traits::ErasedArchetypeKind,
+        traits::ErasedBundleDrop,
+    },
+    erased::ErasedArchetypeView,
 };
 
 pub trait ErasedArchetypeSoa:
@@ -52,17 +50,5 @@ where
 {
     type Meta = Meta;
     type Archetype<'a> = ErasedArchetypeView<'view, Meta>;
-    type Ptrs = P;
-}
-
-impl<Meta, D, S, P> ErasedArchetypeSoa for ErasedBundle<Meta, D, S, P>
-where
-    Meta: AsRef<FieldDescriptor> + 'static,
-    D: ErasedBundleDrop<Meta>,
-    S: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = S::Item>,
-{
-    type Meta = Meta;
-    type Archetype<'a> = &'a ErasedArchetype<Meta>;
     type Ptrs = P;
 }

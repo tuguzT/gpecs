@@ -1,41 +1,15 @@
-use std::fmt::{self, Debug};
+#![expect(clippy::module_inception)]
 
-use gpecs_archetype::bundle::erased::ErasedBundleKind;
-use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::PtrsItem, storage::AlignedStorage};
-use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet};
+use core::fmt::{self, Debug};
 
-use crate::{
-    archetype::{
-        erased::{
-            ErasedArchetype, ErasedArchetypeView,
-            error::{
-                ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-                IncompatibleArchetypeExactError,
-            },
-        },
-        error::IncompatibleBundleValueError,
-        storage::{
-            ArchetypeStorageView, ArchetypeStorageViewMut, ErasedDropMeta, NoEpochEntity,
-            traits::ErasedArchetypeSoa,
-        },
-    },
-    bundle::{
-        Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
-        erased::{
-            ErasedBundle,
-            traits::{ErasedArchetypeKind, ErasedBundleDrop},
-        },
-    },
-    component::{
-        erased::WithErasedDrop,
-        registry::{
-            ComponentId, ComponentRegistry, ComponentRegistryView,
-            traits::{
-                ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray,
-            },
-        },
-    },
-    entity::Entity,
+use gpecs_component::registry::{
+    ComponentId, ComponentRegistry, ComponentRegistryView,
+    traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
+};
+use gpecs_entity::Entity;
+use gpecs_soa_erased::{
+    ErasedSoaContext,
+    ptr::slice::{PtrsItem, SliceItemPtrs},
     soa::{
         self,
         field::{FieldDescriptor, FieldDescriptors},
@@ -45,9 +19,32 @@ use crate::{
             SoaRead, SoaWrite, WriteSoaContext,
         },
     },
+    storage::AlignedStorage,
+};
+use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet};
+
+use crate::{
+    bundle::{
+        Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
+        erased::{
+            ErasedBundle, ErasedBundleKind,
+            traits::{ErasedArchetypeKind, ErasedBundleDrop},
+        },
+    },
+    erased::{
+        ErasedArchetype, ErasedArchetypeView, FromComponentInfo,
+        error::{
+            ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
+            IncompatibleArchetypeExactError,
+        },
+    },
+    storage::{
+        ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, NoEpochEntity,
+        error::IncompatibleBundleValueError,
+    },
 };
 
-pub struct ArchetypeStorage<T = ErasedBundle<ErasedDropMeta>>
+pub struct ArchetypeStorage<T>
 where
     T: ErasedArchetypeSoa + ?Sized,
 {
@@ -482,15 +479,22 @@ type BundlesMutWithArchetype<'a, B, T> = (
     ErasedArchetypeView<'a, <T as ErasedArchetypeSoa>::Meta>,
 );
 
-impl ArchetypeStorage {
+impl<Meta, D, S, P> ArchetypeStorage<ErasedBundle<Meta, D, S, P>>
+where
+    Meta: AsRef<FieldDescriptor> + 'static,
+    D: ErasedBundleDrop<Meta>,
+    S: AlignedStorage<Item: 'static>,
+    P: SliceItemPtrs<Item = S::Item>,
+{
     #[inline]
-    pub fn new<I, T>(
-        components: &ComponentRegistryView<T, impl ?Sized>,
+    pub fn new<'a, I, T>(
+        components: &'a ComponentRegistryView<T, impl ?Sized>,
         component_ids: I,
     ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
-        T: AsRef<FieldDescriptor> + WithErasedDrop,
+        T: AsRef<FieldDescriptor>,
+        Meta: FromComponentInfo<'a, T>,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
         let me = Self::from_archetype(archetype);
@@ -498,11 +502,14 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn of<B, M, T>(components: &ComponentRegistryView<M, T>) -> Result<Self, ArchetypeError>
+    pub fn of<'a, B, M, T>(
+        components: &'a ComponentRegistryView<M, T>,
+    ) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: AsRef<FieldDescriptor>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        Meta: FromComponentInfo<'a, M>,
     {
         let archetype = ErasedArchetype::of::<B, M, T>(components)?;
         let me = Self::from_archetype(archetype);
@@ -510,13 +517,14 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn register<B, M, T>(
-        components: &mut ComponentRegistry<M, T>,
+    pub fn register<'a, B, M, T>(
+        components: &'a mut ComponentRegistry<M, T>,
     ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: AsRef<FieldDescriptor> + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        Meta: FromComponentInfo<'a, M::Item>,
     {
         let archetype = ErasedArchetype::register::<B, M, T>(components)?;
         let me = Self::from_archetype(archetype);
@@ -524,14 +532,14 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn from_archetype(archetype: ErasedArchetype<ErasedDropMeta>) -> Self {
+    pub fn from_archetype(archetype: ErasedArchetype<Meta>) -> Self {
         let context = ErasedSoaContext::new(archetype)
             .expect("alignment of byte should be suffisient for any type");
         Self::from_context(context)
     }
 
     #[inline]
-    pub fn into_archetype(self) -> ErasedArchetype<ErasedDropMeta> {
+    pub fn into_archetype(self) -> ErasedArchetype<Meta> {
         self.into_context().into_inner()
     }
 }

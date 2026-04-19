@@ -1,10 +1,19 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_soa_erased::ptr::slice::PtrsItem;
+use gpecs_entity::Entity;
+use gpecs_soa_erased::{
+    ptr::slice::PtrsItem,
+    soa::{
+        field::FieldDescriptors,
+        identity::Identity,
+        slice::SoaSlices,
+        traits::{Refs as ErasedBundleRefs, Slices as ErasedBundles},
+    },
+};
 use gpecs_sparse::{
     error::FromPartsError,
     item::{DenseSlices, SparseItem},
@@ -12,22 +21,8 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    archetype::{
-        erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
-        storage::{NoEpochEntity, traits::ErasedArchetypeSoa},
-    },
-    bundle::{Bundle, BundleRefs, BundleSlices},
-    component::registry::{
-        ComponentRegistryView,
-        traits::{ComponentIdFrom, FromComponentType},
-    },
-    entity::Entity,
-    soa::{
-        field::FieldDescriptors,
-        identity::Identity,
-        slice::SoaSlices,
-        traits::{Refs as ErasedBundleRefs, Slices as ErasedBundles},
-    },
+    erased::ErasedArchetypeView,
+    storage::{NoEpochEntity, traits::ErasedArchetypeSoa},
 };
 
 type Inner<'a, T> = EpochSparseViewPtr<'a, NoEpochEntity, T>;
@@ -81,7 +76,7 @@ where
     }
 
     #[inline]
-    pub(super) unsafe fn from_inner(inner: Inner<'ctx, T>) -> Self {
+    pub(crate) unsafe fn from_inner(inner: Inner<'ctx, T>) -> Self {
         let phantom = PhantomData;
         Self { inner, phantom }
     }
@@ -203,100 +198,6 @@ where
         let Self { inner, .. } = self;
         unsafe { inner.as_ref_unchecked() }.into_get(entity.into())
     }
-
-    #[inline]
-    pub fn as_bundles_with_archetype<B, M>(
-        &self,
-        components: &ComponentRegistryView<impl Sized, M>,
-    ) -> Result<BundlesWithArchetype<'_, '_, B, T>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        self.as_view()
-            .into_bundles_with_archetype::<B, M>(components)
-    }
-
-    #[inline]
-    pub fn into_bundles_with_archetype<B, M>(
-        self,
-        components: &ComponentRegistryView<impl Sized, M>,
-    ) -> Result<BundlesWithArchetype<'ctx, 'a, B, T>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let (entities, bundles, sparse, archetype) = self.into_parts();
-        archetype.check_compatibility_of::<B, M>(components)?;
-
-        let bundles = bundles
-            .downcast::<B, M>(components)
-            .map_err(|error| error.source)
-            .expect("archetype compatibility should have been already checked");
-        Ok((entities, bundles, sparse, archetype))
-    }
-
-    #[inline]
-    pub fn as_bundles<B, M>(
-        &self,
-        components: &ComponentRegistryView<impl Sized, M>,
-    ) -> Result<Bundles<'_, '_, B>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        self.as_view().into_bundles::<B, M>(components)
-    }
-
-    #[inline]
-    pub fn into_bundles<B, M>(
-        self,
-        components: &ComponentRegistryView<impl Sized, M>,
-    ) -> Result<Bundles<'ctx, 'a, B>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let (entities, bundles, sparse, _) =
-            self.into_bundles_with_archetype::<B, M>(components)?;
-        Ok((entities, bundles, sparse))
-    }
-
-    #[inline]
-    pub fn get_bundle<B, M>(
-        &self,
-        components: &ComponentRegistryView<impl Sized, M>,
-        entity: Entity,
-    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        self.as_view().into_get_bundle::<B, M>(components, entity)
-    }
-
-    #[inline]
-    pub fn into_get_bundle<B, M>(
-        self,
-        components: &ComponentRegistryView<impl Sized, M>,
-        entity: Entity,
-    ) -> Result<Option<BundleRefs<'a, B>>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        self.archetype()
-            .check_compatibility_of::<B, M>(components)?;
-
-        let Some(bundle) = self.into_get(entity) else {
-            return Ok(None);
-        };
-        let bundle = bundle
-            .downcast::<B, M>(components)
-            .map_err(|error| error.source)
-            .expect("archetype compatibility should have been already checked");
-        Ok(Some(bundle))
-    }
 }
 
 impl<T> Debug for ArchetypeStorageView<'_, '_, T>
@@ -340,17 +241,5 @@ type SlicesWithArchetype<'ctx, 'a, T> = (
 type Slices<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [SparseItem<NoEpochEntity>],
-);
-
-type BundlesWithArchetype<'ctx, 'a, B, T> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
-    &'a [SparseItem<NoEpochEntity>],
-    ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
-);
-type Bundles<'ctx, 'a, B> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
     &'a [SparseItem<NoEpochEntity>],
 );

@@ -1,7 +1,6 @@
 use bytemuck::{Pod, Zeroable};
+use gpecs_entity::Entity;
 use gpecs_sparse::key::Key;
-
-use crate::entity::Entity;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]

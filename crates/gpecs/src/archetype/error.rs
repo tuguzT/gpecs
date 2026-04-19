@@ -5,10 +5,7 @@ use std::{
 
 use crate::{
     archetype::{
-        erased::error::{
-            AlreadyHasComponentError, DuplicateComponentError, IncompatibleArchetypeExactError,
-            MissingComponentError,
-        },
+        erased::error::{AlreadyHasComponentError, DuplicateComponentError, MissingComponentError},
         registry::ArchetypeId,
     },
     bundle::{Bundle, erased::error::DowncastErrorKind},
@@ -806,39 +803,5 @@ impl Error for RemoveBundleAtError {
             Self::InvalidEntityLocation(error) => Some(error),
             Self::DuplicateComponent(error) => Some(error),
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
-pub struct IncompatibleBundleValueError<B>
-where
-    B: Bundle,
-{
-    pub value: B,
-    pub source: IncompatibleArchetypeExactError,
-}
-
-impl<B> Display for IncompatibleBundleValueError<B>
-where
-    B: Bundle + Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, source } = self;
-
-        let Some(source) = source.source() else {
-            unreachable!("incompatible bundle exact error should have a source")
-        };
-        write!(f, "incompatible bundle {value}: {source}")
-    }
-}
-
-impl<B> Error for IncompatibleBundleValueError<B>
-where
-    B: Bundle + Debug + Display,
-{
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { source, .. } = self;
-        source.source()
     }
 }

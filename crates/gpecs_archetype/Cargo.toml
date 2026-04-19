@@ -8,14 +8,17 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+gpecs_entity = { workspace = true }
 gpecs_component = { workspace = true }
 gpecs_soa_erased = { workspace = true }
 gpecs_sparse = { workspace = true }
 itertools = { workspace = true }
+bytemuck = { workspace = true }
 
 [features]
 default = ["alloc"]
 alloc = [
+    "gpecs_entity/alloc",
     "gpecs_component/alloc",
     "gpecs_soa_erased/alloc",
     "gpecs_sparse/alloc",

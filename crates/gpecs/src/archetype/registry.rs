@@ -21,6 +21,7 @@ use petgraph::{
 
 use crate::{
     archetype::{
+        ErasedDropMeta,
         erased::{
             ErasedArchetype, ErasedArchetypeView,
             error::{ArchetypeError, DuplicateComponentError, MissingComponentError},
@@ -32,7 +33,7 @@ use crate::{
             InvalidEntityLocationErrorKind, RemoveBundleAtError, RemoveBundleExactAtError,
             RemoveBundleExactError, RemoveExactAtError,
         },
-        storage::{ArchetypeStorage, ErasedDropMeta},
+        storage::ArchetypeStorage,
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,

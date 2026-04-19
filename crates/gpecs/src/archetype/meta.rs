@@ -51,9 +51,8 @@ where
 {
     #[inline]
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {
-        Self {
-            desc: FieldDescriptor::new(component.as_field().layout()),
-            erased_drop: component.erased_drop(),
-        }
+        let desc = FieldDescriptor::new(component.as_field().layout());
+        let erased_drop = component.erased_drop();
+        Self { desc, erased_drop }
     }
 }

@@ -187,6 +187,22 @@ where
             Self::WriteOnly(ptrs) => ptrs.into_inner(),
         }
     }
+
+    #[inline]
+    pub unsafe fn drop_in_place_then_write<W>(self, context: &T::Context, value: W)
+    where
+        T: SoaWrite<W>,
+    {
+        let dst = match self {
+            Self::ReadWrite(refs) => {
+                let ptrs = refs.into_ptrs();
+                unsafe { context.ptrs_drop_in_place(ptrs.clone()) }
+                ptrs
+            }
+            Self::WriteOnly(ptrs) => ptrs.into_inner(),
+        };
+        unsafe { context.write(dst, value) }
+    }
 }
 
 impl<'ctx, 'a, T> TryInsertAccess<'ctx, 'a, T>
@@ -283,19 +299,4 @@ where
             Self::WriteOnly(ptrs) => ptrs.hash(state),
         }
     }
-}
-
-pub unsafe fn drop_old_then_write<V, W>(context: &V::Context, dst: TryInsertAccess<V>, value: W)
-where
-    V: SoaWrite<W> + ?Sized,
-{
-    let dst = match dst {
-        TryInsertAccess::ReadWrite(refs) => {
-            let dst = refs.into_ptrs();
-            unsafe { context.ptrs_drop_in_place(dst.clone()) }
-            dst
-        }
-        TryInsertAccess::WriteOnly(ptrs) => ptrs.into_inner(),
-    };
-    unsafe { context.write(dst, value) }
 }

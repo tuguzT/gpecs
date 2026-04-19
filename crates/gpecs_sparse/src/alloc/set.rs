@@ -39,7 +39,7 @@ use crate::{
 };
 
 use super::{
-    access::{TryInsertAccess, drop_old_then_write},
+    access::TryInsertAccess,
     arena,
     assert::{try_entry_failed, try_insert_failed, try_push_failed},
     entry::generate_entry_types,
@@ -1857,7 +1857,8 @@ where
         let mut me = Self::with_capacity(iter_len, iter_len);
         for DenseItem { key, value } in iter {
             me.insert_from(key, |context, dst| {
-                dst.map(|dst| unsafe { drop_old_then_write(context, dst, value) })
+                let Some(dst) = dst else { return };
+                unsafe { dst.drop_in_place_then_write(context, value) }
             });
         }
 
@@ -1889,7 +1890,8 @@ where
                 self.reserve(lower.saturating_add(1), 0);
             }
             self.insert_from(key, |context, dst| {
-                dst.map(|dst| unsafe { drop_old_then_write(context, dst, value) })
+                let Some(dst) = dst else { return };
+                unsafe { dst.drop_in_place_then_write(context, value) }
             });
         }
     }

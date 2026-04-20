@@ -1,8 +1,7 @@
 use gpecs::{
     archetype::{
         erased::error::{AlreadyHasComponentError, MissingComponentError},
-        error::InsertBundleExactError,
-        registry::ArchetypeRegistry,
+        registry::{ArchetypeRegistry, error::InsertBundleExactError},
     },
     bundle::{Bundle, erased::error::DowncastErrorKind},
     context::Components,

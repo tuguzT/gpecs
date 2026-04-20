@@ -6,7 +6,7 @@ use std::{
 use crate::{
     archetype::{
         erased::error::{AlreadyHasComponentError, DuplicateComponentError, MissingComponentError},
-        error::{
+        registry::error::{
             InsertBundleError as ArchetypeInsertBundleError,
             InsertBundleExactError as ArchetypeInsertBundleExactError,
             InsertBundleExactErrorKind as ArchetypeInsertBundleExactErrorKind,

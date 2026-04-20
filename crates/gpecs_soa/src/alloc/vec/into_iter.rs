@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     alloc::raw_vec::RawSoaVec,
-    layout::BufferData,
+    buffer::BufferData,
     ptr::BufferDataPtr,
     slice::SoaSlices,
     traits::{

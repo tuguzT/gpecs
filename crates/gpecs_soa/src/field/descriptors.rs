@@ -1,9 +1,9 @@
 use core::{alloc::Layout, slice};
 
-use gpecs_layout::{FfiLayout, WithLayout};
-
 #[cfg(feature = "alloc")]
 use core_alloc::boxed::Box;
+
+use crate::layout::{FfiLayout, WithLayout};
 
 /// Descriptor for any field type used by [SoA](crate::traits::RawSoa) types.
 ///

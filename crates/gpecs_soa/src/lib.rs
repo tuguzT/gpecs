@@ -6,6 +6,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc as core_alloc;
 
+pub use gpecs_layout as layout;
+
 #[cfg(feature = "alloc")]
 pub use self::alloc::vec;
 
@@ -18,7 +20,7 @@ pub mod slice;
 pub mod traits;
 pub mod wrapper;
 
-mod layout;
+mod buffer;
 
 #[cfg(feature = "alloc")]
 mod alloc;

@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    layout::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
+    buffer::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
     slice::SoaSlice,
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext,
@@ -365,7 +365,7 @@ where
 
 mod private {
     use crate::{
-        layout::BufferData,
+        buffer::BufferData,
         slice::SoaSlice,
         traits::{AllocSoa, AllocSoaTrusted},
     };

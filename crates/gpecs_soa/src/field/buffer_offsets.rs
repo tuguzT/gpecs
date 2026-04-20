@@ -3,9 +3,10 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_layout::repeat_packed;
-
-use crate::field::{CopiedFieldDescriptors, FieldDescriptor};
+use crate::{
+    field::{CopiedFieldDescriptors, FieldDescriptor},
+    layout::repeat_packed,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BufferOffset {

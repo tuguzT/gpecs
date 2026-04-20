@@ -1,8 +1,8 @@
 use core::alloc::{Layout, LayoutError};
 
 use crate::{
+    buffer::packed_size_of_fields,
     field::{FieldDescriptors, FieldDescriptorsOwned, buffer_layout},
-    layout::packed_size_of_fields,
 };
 
 pub use self::tuple::*;

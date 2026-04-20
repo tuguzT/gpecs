@@ -12,7 +12,7 @@ use core_alloc::{
 };
 
 use crate::{
-    layout::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
+    buffer::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
     ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
     slice::SoaSlice,
     traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, NonNullPtrs, RawSoaContext},

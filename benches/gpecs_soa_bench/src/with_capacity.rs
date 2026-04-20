@@ -19,7 +19,7 @@ pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
     ) -> SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>> {
         let capacity = black_box(capacity);
         let context = Default::default();
-        let context = ErasedSoaContext::of::<Self>(&context).expect("descriptors should be valid");
+        let context = ErasedSoaContext::of::<Self>(&context).expect("layouts should be valid");
         let vec = SoaVec::with_context_and_capacity(context, capacity);
         black_box(vec)
     }

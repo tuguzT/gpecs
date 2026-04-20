@@ -1,10 +1,11 @@
 use core::fmt::Debug;
 
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    CovariantFieldLayouts, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
     ptr::slice::SliceItemPtrs,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldLayouts, FieldLayoutsOutput},
+        layout::WithLayout,
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
@@ -234,7 +235,7 @@ where
 
 unsafe impl<Meta, D, S, P> RawSoa for ErasedBundle<Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -247,7 +248,7 @@ unsafe impl<'a, Meta, D, S, P>
     ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -262,7 +263,7 @@ unsafe impl<'a, Meta, D, S, P>
     ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + Clone + 'static,
+    Meta: WithLayout + Clone + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -278,7 +279,7 @@ unsafe impl<Meta, W, D, N, S, U, P>
     WriteSoaContext<ErasedBundleKind<W, N, U, P>, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + Clone + 'static,
+    Meta: WithLayout + Clone + 'static,
     W: ErasedArchetypeKind,
     D: ErasedBundleDrop<Meta>,
     N: ErasedBundleDrop<W::Meta>,
@@ -292,10 +293,10 @@ where
     }
 }
 
-impl<'a, Meta, D, S, P> FieldDescriptors<'a, ErasedBundle<Meta, D, S, P>>
+impl<'a, Meta, D, S, P> FieldLayouts<'a, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -303,23 +304,23 @@ where
     type Output = &'a ErasedArchetype<Meta>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         self.as_inner()
     }
 }
 
-impl<Meta, D, S, P> CovariantFieldDescriptors<ErasedBundle<Meta, D, S, P>>
+impl<Meta, D, S, P> CovariantFieldLayouts<ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self, ErasedBundle<Meta, D, S, P>>,
-    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundle<Meta, D, S, P>> {
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self, ErasedBundle<Meta, D, S, P>>,
+    ) -> FieldLayoutsOutput<'short, Self, ErasedBundle<Meta, D, S, P>> {
         from
     }
 }
@@ -327,7 +328,7 @@ where
 unsafe impl<Meta, D, S, P> AllocSoaContext<ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -356,7 +357,7 @@ where
 unsafe impl<'data, Meta, D, S, P> SoaContext<'data, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'data>,
     P: SliceItemPtrs<Item = S::Item>,

@@ -2,7 +2,7 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::{
     buffer::packed_size_of_fields,
-    field::{FieldDescriptors, FieldDescriptorsOwned, buffer_layout},
+    field::{FieldLayouts, FieldLayoutsOwned, buffer_layout},
 };
 
 pub use self::tuple::*;
@@ -384,15 +384,15 @@ where
 ///
 /// # Safety
 ///
-/// - [Field descriptors](FieldDescriptors::Output) **MUST** accurately describe each stored field.
-/// - Count of such descriptors **MUST** be non-zero & equal to the number of stored fields.
-/// - Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
+/// - [Field layouts](FieldLayouts::Output) **MUST** accurately describe each stored field.
+/// - Count of such layouts **MUST** be non-zero & equal to the number of stored fields.
+/// - Order of such layouts **MUST** resemble their order inside of a buffer in memory.
 ///
 /// Note that the order of [pointers](RawSoaContext::Ptrs) & their derivatives
 /// **may not** resemble their order inside of a buffer in memory.
 /// Reordering of such pointers in other methods is up to the implementation of this trait.
 pub unsafe trait AllocSoaContext<T>:
-    RawSoaContext<T> + FieldDescriptorsOwned<T> + Sized
+    RawSoaContext<T> + FieldLayoutsOwned<T> + Sized
 where
     T: ?Sized,
 {
@@ -400,13 +400,13 @@ where
     ///
     /// This layout should not include self, as it is handled by the crate itself.
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-        let fields = self.field_descriptors();
+        let fields = self.field_layouts();
         self::buffer_layout(fields, capacity)
     }
 
     /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
-        let packed_size = packed_size_of_fields(self.field_descriptors());
+        let packed_size = packed_size_of_fields(self.field_layouts());
         let buffer_size = buffer_layout.size();
         let max_capacity = buffer_size.checked_div(packed_size).unwrap_or(0);
 
@@ -462,9 +462,9 @@ where
 /// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
 ///
 /// These safety requirements are:
-/// - sum of layouts' sizes of [field descriptors](FieldDescriptors::Output)
+/// - sum of layouts' sizes of [field layouts](FieldLayouts::Output)
 ///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
-/// - alignment of each layout of [field descriptors](FieldDescriptors::Output)
+/// - alignment of each layout of [field layouts](FieldLayouts::Output)
 ///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
 pub unsafe trait AllocSoaTrusted: AllocSoa {}
 

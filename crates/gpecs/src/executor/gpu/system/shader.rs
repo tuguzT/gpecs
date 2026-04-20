@@ -73,7 +73,7 @@ impl GpuSystemShader {
         let bind_components = ErasedArchetype::new_with(components, with)?;
 
         let component_entry = |index: usize, desc: &ComponentDescriptor, binding_access| {
-            let size_of_component = desc.descriptor().layout().size();
+            let size_of_component = desc.layout().size();
             let size_of_component = size_of_component
                 .try_into()
                 .expect("size of component should fit in `u64`");

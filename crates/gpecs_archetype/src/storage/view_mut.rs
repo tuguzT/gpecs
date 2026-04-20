@@ -8,7 +8,7 @@ use gpecs_entity::Entity;
 use gpecs_soa_erased::{
     ptr::slice::PtrsItem,
     soa::{
-        field::FieldDescriptors,
+        field::FieldLayouts,
         identity::Identity,
         slice::SoaSlicesMut,
         traits::{
@@ -89,7 +89,7 @@ where
         let Self { inner, .. } = self;
 
         let (context, dense, sparse) = inner.into_mut_slice_ptrs_with_context();
-        let archetype = (**context).field_descriptors();
+        let archetype = (**context).field_layouts();
         let sparse = unsafe { sparse.as_mut_unchecked() };
 
         let (entities, bundles) = unsafe { dense.as_mut_unchecked(context) }.into_parts();
@@ -161,7 +161,7 @@ where
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, T::Meta> {
         let Self { inner, .. } = self;
-        (**inner.context()).field_descriptors()
+        (**inner.context()).field_layouts()
     }
 
     #[inline]

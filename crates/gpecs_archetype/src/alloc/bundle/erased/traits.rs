@@ -1,4 +1,4 @@
-use gpecs_sparse::soa::field::FieldDescriptor;
+use gpecs_sparse::soa::layout::WithLayout;
 
 use crate::{
     bundle::erased::traits::{ErasedArchetypeIterator, ErasedArchetypeKind},
@@ -7,12 +7,9 @@ use crate::{
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
 {
     type Meta = Meta;
 }
 
-unsafe impl<Meta> ErasedArchetypeIterator for IntoIter<Meta> where
-    Meta: AsRef<FieldDescriptor> + 'static
-{
-}
+unsafe impl<Meta> ErasedArchetypeIterator for IntoIter<Meta> where Meta: WithLayout + 'static {}

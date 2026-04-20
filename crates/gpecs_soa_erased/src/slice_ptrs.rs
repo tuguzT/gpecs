@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoaMutSlicePtrs, ErasedSoaPtrs, ErasedSoaPtrsIter,
+    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaPtrs, ErasedSoaPtrsIter,
     ErasedSoaSlices,
     data::ErasedSlicePtr,
     error::{DowncastError, SlicePtrsError, check_offset, check_offset_len},
@@ -13,9 +13,9 @@ use crate::{
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput,
-            FieldDescriptorsOwned, buffer_offsets,
+            FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
+        layout::WithLayout,
         traits::{AllocSoa, RawSoaContext, SlicePtrs},
     },
 };
@@ -35,13 +35,13 @@ where
 {
     #[inline]
     pub unsafe fn new_unchecked(
-        descriptors: D,
+        layouts: D,
         buffer: *const [P::Item],
         capacity: usize,
         offset: usize,
         len: usize,
     ) -> Self {
-        let ptrs = unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, offset) };
+        let ptrs = unsafe { ErasedSoaPtrs::new_unchecked(layouts, buffer, capacity, offset) };
         unsafe { Self::from_ptrs(ptrs, len) }
     }
 
@@ -53,8 +53,8 @@ where
     #[inline]
     pub fn into_parts(self) -> (D, *const [P::Item], usize, usize, usize) {
         let Self { ptrs, len } = self;
-        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
-        (descriptors, buffer, capacity, offset, len)
+        let (layouts, buffer, capacity, offset) = ptrs.into_parts();
+        (layouts, buffer, capacity, offset, len)
     }
 
     #[inline]
@@ -64,13 +64,13 @@ where
     }
 
     #[inline]
-    pub unsafe fn map_descriptors<N, F>(self, f: F) -> ErasedSoaSlicePtrs<N, P>
+    pub unsafe fn map_layouts<N, F>(self, f: F) -> ErasedSoaSlicePtrs<N, P>
     where
         F: FnOnce(D) -> N,
     {
         let Self { ptrs, len } = self;
 
-        let ptrs = unsafe { ptrs.map_descriptors(f) };
+        let ptrs = unsafe { ptrs.map_layouts(f) };
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
     }
 
@@ -89,13 +89,13 @@ where
 
 impl<D, P> ErasedSoaSlicePtrs<D, P>
 where
-    D: FieldDescriptorsOwned,
+    D: FieldLayoutsOwned,
     P: ConstSliceItemPtr,
 {
     #[inline]
     #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
-        descriptors: D,
+        layouts: D,
         buffer: *const [P::Item],
         capacity: usize,
         offset: usize,
@@ -104,19 +104,19 @@ where
         check_offset(offset, capacity)?;
         check_offset_len(offset, len, capacity)?;
 
-        let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
+        let mut offsets = buffer_offsets(layouts.field_layouts(), capacity);
         offsets.by_ref().try_for_each(|offset| {
             check_sufficient_align(offset?.desc.layout(), Layout::new::<P::Item>())
                 .map_err(SlicePtrsError::from)
         })?;
 
-        let layout = offsets.into_layout();
+        let layout = offsets.into_buffer_layout();
         check_ptr_align(buffer.cast(), layout)?;
 
         let buffer_layout = Layout::array::<P::Item>(buffer.len())?;
         check_sufficient_len(buffer_layout.size(), layout.size())?;
 
-        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset, len) };
+        let me = unsafe { Self::new_unchecked(layouts, buffer, capacity, offset, len) };
         Ok(me)
     }
 
@@ -163,9 +163,9 @@ where
     }
 
     #[inline]
-    pub fn descriptors(&self) -> &D {
+    pub fn layouts(&self) -> &D {
         let Self { ptrs, .. } = self;
-        ptrs.descriptors()
+        ptrs.layouts()
     }
 
     #[inline]
@@ -182,11 +182,11 @@ where
 
 impl<'a, D, P> ErasedSoaSlicePtrs<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldLayoutsIter<'a, D>, P> {
         let Self { ref ptrs, len } = *self;
 
         let ptrs = ptrs.iter();
@@ -231,11 +231,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedSoaSlicePtrs<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
-    type IntoIter = ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P>;
+    type IntoIter = ErasedSoaSlicePtrsIter<FieldLayoutsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -245,7 +245,7 @@ where
 
 impl<D, P> IntoIterator for ErasedSoaSlicePtrs<D, P>
 where
-    D: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    D: IntoIterator<Item: WithLayout>,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
@@ -260,30 +260,30 @@ where
     }
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaSlicePtrs<D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedSoaSlicePtrs<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let Self { ptrs, .. } = self;
-        ptrs.field_descriptors()
+        ptrs.field_layouts()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedSoaSlicePtrs<D, P>
+impl<D, P> CovariantFieldLayouts for ErasedSoaSlicePtrs<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }
 
@@ -336,19 +336,19 @@ where
     }
 
     #[inline]
-    pub fn descriptors(&self) -> &D {
+    pub fn layouts(&self) -> &D {
         let Self { ptrs, .. } = self;
-        ptrs.descriptors()
+        ptrs.layouts()
     }
 }
 
 impl<'a, D, P> ErasedSoaSlicePtrsIter<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldLayoutsIter<'a, D>, P> {
         let Self { ref ptrs, len } = *self;
 
         let ptrs = ptrs.iter();
@@ -358,11 +358,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedSoaSlicePtrsIter<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
-    type IntoIter = ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P>;
+    type IntoIter = ErasedSoaSlicePtrsIter<FieldLayoutsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -372,7 +372,7 @@ where
 
 impl<D, P> Debug for ErasedSoaSlicePtrsIter<D, P>
 where
-    D: FieldDescriptorsOwned + ?Sized,
+    D: FieldLayoutsOwned + ?Sized,
     P: ConstSliceItemPtr + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -396,7 +396,7 @@ where
 
 impl<D, P> Iterator for ErasedSoaSlicePtrsIter<D, P>
 where
-    D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    D: Iterator<Item: WithLayout> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
@@ -419,7 +419,7 @@ where
 
 impl<D, P> ExactSizeIterator for ErasedSoaSlicePtrsIter<D, P>
 where
-    D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    D: ExactSizeIterator<Item: WithLayout> + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
@@ -431,34 +431,34 @@ where
 
 impl<D, P> FusedIterator for ErasedSoaSlicePtrsIter<D, P>
 where
-    D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    D: FusedIterator<Item: WithLayout> + ?Sized,
     P: ConstSliceItemPtr,
 {
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaSlicePtrsIter<D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedSoaSlicePtrsIter<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let Self { ptrs, .. } = self;
-        ptrs.field_descriptors()
+        ptrs.field_layouts()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedSoaSlicePtrsIter<D, P>
+impl<D, P> CovariantFieldLayouts for ErasedSoaSlicePtrsIter<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }

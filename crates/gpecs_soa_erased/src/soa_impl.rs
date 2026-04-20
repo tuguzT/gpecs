@@ -1,12 +1,12 @@
 use core::fmt::Debug;
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
     ErasedSoaMutRefs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlices, ErasedSoaNonNullPtrs,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaSlicePtrs, ErasedSoaSlices,
     ptr::slice::SliceItemPtrs,
     soa::{
-        field::{FieldDescriptors, FieldDescriptorsOutput, FieldDescriptorsOwned},
+        field::{FieldLayouts, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
@@ -16,20 +16,20 @@ use crate::{
 
 unsafe impl<T, D, P> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone> + ?Sized,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone> + ?Sized,
     P: SliceItemPtrs,
 {
-    type Ptrs<'a> = ErasedSoaPtrs<FieldDescriptorsOutput<'a, D>, P::Const>;
+    type Ptrs<'a> = ErasedSoaPtrs<FieldLayoutsOutput<'a, D>, P::Const>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
-        ErasedSoaPtrs::dangling(self.field_descriptors())
-            .expect("descriptors should have sufficient alignment")
+        ErasedSoaPtrs::dangling(self.field_layouts())
+            .expect("layouts should have sufficient alignment")
     }
 
     #[inline]
@@ -42,17 +42,17 @@ where
         unsafe { ptrs.offset_from(&origin) }
     }
 
-    type MutPtrs<'a> = ErasedSoaMutPtrs<FieldDescriptorsOutput<'a, D>, P::Mut>;
+    type MutPtrs<'a> = ErasedSoaMutPtrs<FieldLayoutsOutput<'a, D>, P::Mut>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
-        ErasedSoaMutPtrs::dangling(self.field_descriptors())
-            .expect("descriptors should have sufficient alignment")
+        ErasedSoaMutPtrs::dangling(self.field_layouts())
+            .expect("layouts should have sufficient alignment")
     }
 
     #[inline]
@@ -123,13 +123,13 @@ where
         // do nothing; it's safe to not drop anything
     }
 
-    type NonNullPtrs<'a> = ErasedSoaNonNullPtrs<FieldDescriptorsOutput<'a, D>, P::NonNull>;
+    type NonNullPtrs<'a> = ErasedSoaNonNullPtrs<FieldLayoutsOutput<'a, D>, P::NonNull>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
@@ -142,13 +142,13 @@ where
         ptrs.into()
     }
 
-    type SlicePtrs<'a> = ErasedSoaSlicePtrs<FieldDescriptorsOutput<'a, D>, P::Const>;
+    type SlicePtrs<'a> = ErasedSoaSlicePtrs<FieldLayoutsOutput<'a, D>, P::Const>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
@@ -170,13 +170,13 @@ where
         slices.into_ptrs()
     }
 
-    type SliceMutPtrs<'a> = ErasedSoaMutSlicePtrs<FieldDescriptorsOutput<'a, D>, P::Mut>;
+    type SliceMutPtrs<'a> = ErasedSoaMutSlicePtrs<FieldLayoutsOutput<'a, D>, P::Mut>;
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
@@ -216,7 +216,7 @@ where
 
 unsafe impl<T, D, P> RawSoa for ErasedSoa<T, D, P>
 where
-    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone> + ?Sized,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone> + ?Sized,
     P: SliceItemPtrs,
 {
     type Context = ErasedSoaContext<D, P>;
@@ -224,18 +224,15 @@ where
 }
 
 unsafe impl<'a, T, D, P>
-    ReadSoaContext<'a, ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P>, ErasedSoa<T, D, P>>
+    ReadSoaContext<'a, ErasedSoa<T, FieldLayoutsOutput<'a, D>, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
-    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone>,
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
-    unsafe fn read(
-        &'a self,
-        src: Self::Ptrs<'a>,
-    ) -> ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P> {
+    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedSoa<T, FieldLayoutsOutput<'a, D>, P> {
         let value = unsafe { src.read() };
         value.expect("erased SoA should be created successfully")
     }
@@ -245,8 +242,8 @@ unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorage,
-    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
-    N: FieldDescriptorsOwned<Output: FieldDescriptorsOwned>,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone>,
+    N: FieldLayoutsOwned<Output: FieldLayoutsOwned>,
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
@@ -255,35 +252,35 @@ where
     }
 }
 
-impl<'a, T, D, P> FieldDescriptors<'a, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+impl<'a, T, D, P> FieldLayouts<'a, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: SliceItemPtrs,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
-        Self::field_descriptors(self)
+    fn field_layouts(&'a self) -> Self::Output {
+        Self::field_layouts(self)
     }
 }
 
-impl<T, D, P> CovariantFieldDescriptors<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+impl<T, D, P> CovariantFieldLayouts<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: SliceItemPtrs,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self, ErasedSoa<T, D, P>>,
-    ) -> FieldDescriptorsOutput<'short, Self, ErasedSoa<T, D, P>> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self, ErasedSoa<T, D, P>>,
+    ) -> FieldLayoutsOutput<'short, Self, ErasedSoa<T, D, P>> {
+        D::upcast_field_layouts(from)
     }
 }
 
 unsafe impl<T, D, P> AllocSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone>,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone>,
     P: SliceItemPtrs,
 {
     #[inline]
@@ -299,14 +296,14 @@ where
 
 unsafe impl<'data, T, D, P> SoaContext<'data, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors<Output: FieldDescriptorsOwned + Clone> + ?Sized,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone> + ?Sized,
     P: SliceItemPtrs<Item: 'data>,
 {
-    type Refs<'a> = ErasedSoaRefs<'data, FieldDescriptorsOutput<'a, D>, P::Const>;
+    type Refs<'a> = ErasedSoaRefs<'data, FieldLayoutsOutput<'a, D>, P::Const>;
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
@@ -319,11 +316,11 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedSoaMutRefs<'data, FieldDescriptorsOutput<'a, D>, P::Mut>;
+    type RefsMut<'a> = ErasedSoaMutRefs<'data, FieldLayoutsOutput<'a, D>, P::Mut>;
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
@@ -341,11 +338,11 @@ where
         refs.into()
     }
 
-    type Slices<'a> = ErasedSoaSlices<'data, FieldDescriptorsOutput<'a, D>, P::Const>;
+    type Slices<'a> = ErasedSoaSlices<'data, FieldLayoutsOutput<'a, D>, P::Const>;
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]
@@ -363,13 +360,13 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedSoaMutSlices<'data, FieldDescriptorsOutput<'a, D>, P::Mut>;
+    type SlicesMut<'a> = ErasedSoaMutSlices<'data, FieldLayoutsOutput<'a, D>, P::Mut>;
 
     #[inline]
     fn upcast_mut_slices<'short, 'long: 'short>(
         from: Self::SlicesMut<'long>,
     ) -> Self::SlicesMut<'short> {
-        unsafe { from.map_descriptors(D::upcast_field_descriptors) }
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
     }
 
     #[inline]

@@ -1,5 +1,5 @@
 use gpecs_soa_erased::{
-    ptr::slice::SliceItemPtrs, soa::field::FieldDescriptor, storage::AlignedStorage,
+    ptr::slice::SliceItemPtrs, soa::layout::WithLayout, storage::AlignedStorage,
 };
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 
 impl<Meta, D, S, P> ErasedArchetypeSoa for ErasedBundle<Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
     P: SliceItemPtrs<Item = S::Item>,

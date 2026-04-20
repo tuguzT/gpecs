@@ -3,36 +3,34 @@ use core::{
     iter::FusedIterator,
 };
 
-use crate::{
-    field::{CopiedFieldDescriptors, FieldDescriptor},
-    layout::repeat_packed,
-};
+use crate::layout::{WithLayout, repeat_packed};
 
 #[derive(Debug, Clone, Copy)]
-pub struct BufferOffset {
-    /// Descriptor of the processed field.
-    pub desc: FieldDescriptor,
+pub struct BufferOffset<T> {
     /// Offset from the start of the buffer, in bytes.
     pub offset: usize,
+    /// Descriptor of the processed field.
+    pub desc: T,
 }
 
-impl BufferOffset {
+impl<T> BufferOffset<T> {
     #[inline]
-    pub const fn new(desc: FieldDescriptor, offset: usize) -> Self {
-        Self { desc, offset }
+    pub const fn new(desc: T, offset: usize) -> Self {
+        Self { offset, desc }
     }
 }
 
 /// Iterator of offsets for each provided field in a single buffer of provided capacity.
 ///
-/// Resulting layout could be retrieved using [`layout()`](BufferOffsets::layout()) method.
+/// Resulting layout could be retrieved using
+/// [`buffer_layout()`](BufferOffsets::buffer_layout()) method.
 #[derive(Debug, Clone)]
 pub struct BufferOffsets<I>
 where
     I: ?Sized,
 {
     state: RawBufferOffsets,
-    inner: CopiedFieldDescriptors<I>,
+    inner: I,
 }
 
 impl<I> BufferOffsets<I>
@@ -47,9 +45,9 @@ where
 
     /// Retrieves layout of a buffer needed to store all fields processed by self.
     #[inline]
-    pub const fn layout(&self) -> Layout {
+    pub const fn buffer_layout(&self) -> Layout {
         let Self { state, .. } = self;
-        state.layout()
+        state.buffer_layout()
     }
 
     /// Capacity of a buffer needed to store all fields processed by self.
@@ -63,15 +61,14 @@ where
     #[inline]
     pub const fn as_inner(&self) -> &I {
         let Self { inner, .. } = self;
-        inner.as_inner()
+        inner
     }
 }
 
 impl<I> BufferOffsets<I> {
     /// Creates a new buffer offsets iterator from its parts.
     #[inline]
-    pub unsafe fn from_parts(state: RawBufferOffsets, fields: I) -> Self {
-        let inner = fields.into();
+    pub unsafe fn from_parts(state: RawBufferOffsets, inner: I) -> Self {
         Self { state, inner }
     }
 
@@ -86,37 +83,35 @@ impl<I> BufferOffsets<I> {
     #[inline]
     pub fn into_parts(self) -> (RawBufferOffsets, I) {
         let Self { state, inner } = self;
-        (state, inner.into_inner())
+        (state, inner)
     }
 
     /// Turns self into layout of a buffer needed to store all fields processed by self.
     #[inline]
-    pub fn into_layout(self) -> Layout {
-        self.layout()
+    pub fn into_buffer_layout(self) -> Layout {
+        self.buffer_layout()
     }
 }
 
 impl<I> BufferOffsets<I>
 where
-    I: Iterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
+    I: Iterator<Item: WithLayout> + ?Sized,
 {
     #[inline]
-    pub unsafe fn next_unchecked(&mut self) -> BufferOffset {
+    pub unsafe fn next_unchecked(&mut self) -> BufferOffset<I::Item> {
         let Self { inner, state } = self;
 
         let desc = unsafe { inner.next().unwrap_unchecked() };
-        let offset = unsafe { state.next_unchecked(desc) };
+        let offset = unsafe { state.next_unchecked(desc.layout()) };
         BufferOffset::new(desc, offset)
     }
 }
 
 impl<I> Iterator for BufferOffsets<I>
 where
-    I: Iterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
+    I: Iterator<Item: WithLayout> + ?Sized,
 {
-    type Item = Result<BufferOffset, LayoutError>;
+    type Item = Result<BufferOffset<I::Item>, LayoutError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -124,7 +119,7 @@ where
 
         let desc = inner.next()?;
         let item = state
-            .next(desc)
+            .next(desc.layout())
             .map(|offset| BufferOffset::new(desc, offset));
         Some(item)
     }
@@ -138,8 +133,7 @@ where
 
 impl<I> ExactSizeIterator for BufferOffsets<I>
 where
-    I: ExactSizeIterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
+    I: ExactSizeIterator<Item: WithLayout> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -148,35 +142,33 @@ where
     }
 }
 
-impl<I> FusedIterator for BufferOffsets<I>
-where
-    I: FusedIterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
-{
-}
+impl<I> FusedIterator for BufferOffsets<I> where I: FusedIterator<Item: WithLayout> + ?Sized {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RawBufferOffsets {
-    layout: Layout,
+    buffer_layout: Layout,
     capacity: usize,
 }
 
 impl RawBufferOffsets {
     #[inline]
     pub const fn new(capacity: usize) -> Self {
-        let layout = Layout::new::<()>();
-        Self::from_parts(layout, capacity)
+        let buffer_layout = Layout::new::<()>();
+        Self::from_parts(buffer_layout, capacity)
     }
 
     #[inline]
-    pub const fn from_parts(layout: Layout, capacity: usize) -> Self {
-        Self { layout, capacity }
+    pub const fn from_parts(buffer_layout: Layout, capacity: usize) -> Self {
+        Self {
+            buffer_layout,
+            capacity,
+        }
     }
 
     #[inline]
-    pub const fn layout(self) -> Layout {
-        let Self { layout, .. } = self;
-        layout
+    pub const fn buffer_layout(self) -> Layout {
+        let Self { buffer_layout, .. } = self;
+        buffer_layout
     }
 
     #[inline]
@@ -187,25 +179,28 @@ impl RawBufferOffsets {
 
     #[inline]
     pub const fn into_parts(self) -> (Layout, usize) {
-        let Self { layout, capacity } = self;
-        (layout, capacity)
+        let Self {
+            buffer_layout,
+            capacity,
+        } = self;
+        (buffer_layout, capacity)
     }
 
     #[inline]
-    pub const fn next(&mut self, desc: FieldDescriptor) -> Result<usize, LayoutError> {
+    pub const fn next(&mut self, layout: Layout) -> Result<usize, LayoutError> {
         let Self {
-            ref mut layout,
+            ref mut buffer_layout,
             capacity,
         } = *self;
 
-        let padded_layout = desc.layout().pad_to_align();
-        let next = match repeat_packed(padded_layout, capacity) {
+        let layout = layout.pad_to_align();
+        let next = match repeat_packed(layout, capacity) {
             Ok(layout) => layout,
             Err(error) => return Err(error),
         };
 
         let offset;
-        (*layout, offset) = match layout.extend(next) {
+        (*buffer_layout, offset) = match buffer_layout.extend(next) {
             Ok(ok) => ok,
             Err(error) => return Err(error),
         };
@@ -214,17 +209,17 @@ impl RawBufferOffsets {
     }
 
     #[inline]
-    pub const unsafe fn next_unchecked(&mut self, desc: FieldDescriptor) -> usize {
+    pub const unsafe fn next_unchecked(&mut self, layout: Layout) -> usize {
         let Self {
-            ref mut layout,
+            ref mut buffer_layout,
             capacity,
         } = *self;
 
-        let padded_layout = desc.layout().pad_to_align();
-        let next = unsafe { repeat_packed_unchecked(padded_layout, capacity) };
+        let layout = layout.pad_to_align();
+        let next = unsafe { repeat_packed_unchecked(layout, capacity) };
 
         let offset;
-        (*layout, offset) = unsafe { extend_unchecked(*layout, next) };
+        (*buffer_layout, offset) = unsafe { extend_unchecked(*buffer_layout, next) };
 
         offset
     }

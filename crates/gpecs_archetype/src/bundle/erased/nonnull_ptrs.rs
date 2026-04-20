@@ -9,11 +9,9 @@ use gpecs_component::{
     registry::{ComponentId, traits::WithComponentId},
 };
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
+    CovariantFieldLayouts, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
-    soa::field::{
-        FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
-    },
+    soa::field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
 };
 
 use crate::{
@@ -109,22 +107,22 @@ where
     }
 
     #[inline]
-    pub fn descriptors(&self) -> &D {
+    pub fn layouts(&self) -> &D {
         let Self { inner } = self;
-        inner.descriptors()
+        inner.layouts()
     }
 }
 
 impl<'a, D, P> ErasedBundleNonNullPtrs<D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     #[inline]
     #[track_caller]
     pub unsafe fn offset_from<'n, N>(&'a self, origin: &'n ErasedBundleNonNullPtrs<N, P>) -> isize
     where
-        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
     {
         let Self { inner } = self;
 
@@ -133,7 +131,7 @@ where
     }
 
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedBundleNonNullPtrsIter<FieldLayoutsIter<'a, D>, P> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -144,7 +142,7 @@ where
     #[track_caller]
     pub unsafe fn swap<'n, N>(&'a mut self, with: &'n mut ErasedBundleNonNullPtrs<N, P>)
     where
-        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
     {
         let Self { inner } = self;
 
@@ -159,7 +157,7 @@ where
         src: &'n ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
     {
         let Self { inner } = self;
 
@@ -174,7 +172,7 @@ where
         src: &'n ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
     {
         let Self { inner } = self;
 
@@ -189,7 +187,7 @@ where
         src: &'n ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldDescriptors<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, Output: IntoErasedArchetypeIterator> + ?Sized,
     {
         let Self { inner } = self;
 
@@ -205,7 +203,7 @@ where
 {
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
-        self.field_descriptors()
+        self.field_layouts()
     }
 
     #[inline]
@@ -251,11 +249,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleNonNullPtrs<D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedComponentNonNullPtr<P>;
-    type IntoIter = ErasedBundleNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P>;
+    type IntoIter = ErasedBundleNonNullPtrsIter<FieldLayoutsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -292,30 +290,30 @@ where
     }
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedBundleNonNullPtrs<D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedBundleNonNullPtrs<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let Self { inner } = self;
-        inner.field_descriptors()
+        inner.field_layouts()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedBundleNonNullPtrs<D, P>
+impl<D, P> CovariantFieldLayouts for ErasedBundleNonNullPtrs<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }
 
@@ -361,19 +359,19 @@ where
     }
 
     #[inline]
-    pub fn descriptors(&self) -> &D {
+    pub fn layouts(&self) -> &D {
         let Self { inner, .. } = self;
-        inner.descriptors()
+        inner.layouts()
     }
 }
 
 impl<'a, D, P> ErasedBundleNonNullPtrsIter<D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedBundleNonNullPtrsIter<FieldLayoutsIter<'a, D>, P> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -383,11 +381,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleNonNullPtrsIter<D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedComponentNonNullPtr<P>;
-    type IntoIter = ErasedBundleNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P>;
+    type IntoIter = ErasedBundleNonNullPtrsIter<FieldLayoutsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -397,7 +395,7 @@ where
 
 impl<D, P> Debug for ErasedBundleNonNullPtrsIter<D, P>
 where
-    D: FieldDescriptorsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayoutsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
     P: NonNullSliceItemPtr + Debug,
 {
     #[inline]
@@ -431,7 +429,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
 
-        let component_id = inner.field_descriptors().into_iter().next()?.component_id();
+        let component_id = inner.field_layouts().into_iter().next()?.component_id();
         let fields = inner.next()?;
         let item = unsafe { ErasedComponentNonNullPtr::from_parts(component_id, fields) };
         Some(item)
@@ -463,29 +461,29 @@ where
 {
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedBundleNonNullPtrsIter<D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedBundleNonNullPtrsIter<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let Self { inner } = self;
-        inner.field_descriptors()
+        inner.field_layouts()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedBundleNonNullPtrsIter<D, P>
+impl<D, P> CovariantFieldLayouts for ErasedBundleNonNullPtrsIter<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }

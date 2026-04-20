@@ -7,7 +7,7 @@ use gpecs_soa_bench::{
 use gpecs_soa_erased::{
     BoxedErasedSoaContext,
     ptr::slice::CoreSliceItemPtrs,
-    soa::field::{FieldDescriptors, IntoCopiedFieldDescriptors, buffer_layout},
+    soa::field::{FieldLayouts, IntoFieldLayoutsIter, buffer_layout},
 };
 
 fn with_capacity<T>(c: &mut Criterion)
@@ -23,8 +23,8 @@ where
         let context = BoxedErasedSoaContext::<CoreSliceItemPtrs<MaybeUninit<u8>>>::of::<T>(
             &Default::default(),
         )
-        .expect("descriptors should be valid");
-        let fields = context.field_descriptors();
+        .expect("layouts should be valid");
+        let fields = context.field_layouts();
         let buffer_layout = buffer_layout(fields, capacity).unwrap();
         let bytes = buffer_layout.size();
         group
@@ -40,7 +40,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = T::Context::default();
-        let buffer_layout = buffer_layout(context.field_descriptors(), capacity).unwrap();
+        let buffer_layout = buffer_layout(context.field_layouts(), capacity).unwrap();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
@@ -51,9 +51,9 @@ where
             );
 
         let bytes = context
-            .field_descriptors()
-            .copied_field_descriptors()
-            .map(|desc| capacity * desc.layout().size())
+            .field_layouts()
+            .into_field_layouts()
+            .map(|desc| capacity * desc.size())
             .sum::<usize>();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))

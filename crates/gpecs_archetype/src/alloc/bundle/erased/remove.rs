@@ -6,7 +6,7 @@ use core::{
 use gpecs_component::erased::WithErasedDrop;
 use gpecs_soa_erased::{
     ErasedSoa,
-    error::FromFieldsDescriptorsError,
+    error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
@@ -64,7 +64,7 @@ where
     where
         ToRemove: ErasedArchetypeKind<Meta = T::Meta>,
     {
-        let archetype_to_remove = to_remove.field_descriptors();
+        let archetype_to_remove = to_remove.field_layouts();
         let bundle = self.check_remove(archetype_to_remove.component_ids())?;
 
         let retained_refs = bundle
@@ -77,7 +77,7 @@ where
             .filter(|component_info| !archetype_to_remove.contains(component_info.component_id()))
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let retained_archetype = unsafe { ErasedArchetype::from_iter_unchecked(retained_iter) };
-        let result = ErasedSoa::try_from_fields_descriptors(retained_refs, retained_archetype);
+        let result = ErasedSoa::try_from_fields_layouts(retained_refs, retained_archetype);
         let retained_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -91,7 +91,7 @@ where
             .into_iter()
             .filter(|component| archetype_to_remove.contains(component.component_id()));
         let result =
-            ErasedSoa::<_, _, P>::try_from_fields_descriptors(removed_refs, archetype_to_remove);
+            ErasedSoa::<_, _, P>::try_from_fields_layouts(removed_refs, archetype_to_remove);
         let removed_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -146,7 +146,7 @@ where
             Some(component_info.into_parts())
         });
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
-        let result = ErasedSoa::try_from_fields_descriptors(fields, archetype);
+        let result = ErasedSoa::try_from_fields_layouts(fields, archetype);
         let inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -185,16 +185,16 @@ where
 }
 
 #[inline]
-fn into_remove_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> RemoveErrorKind<E> {
+fn into_remove_error_kind<E>(error: FromFieldsLayoutsError<E>) -> RemoveErrorKind<E> {
     match error {
-        FromFieldsDescriptorsError::FromLayout(error) => RemoveErrorKind::FromLayout(error),
-        FromFieldsDescriptorsError::LenMismatch(error) => {
+        FromFieldsLayoutsError::FromLayout(error) => RemoveErrorKind::FromLayout(error),
+        FromFieldsLayoutsError::LenMismatch(error) => {
             unreachable!("failed to remove some components of bundle: {error}")
         }
-        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+        FromFieldsLayoutsError::InsufficientAlign(error) => {
             unreachable!("failed to remove some components of bundle: {error}")
         }
-        FromFieldsDescriptorsError::InvalidLayout(error) => {
+        FromFieldsLayoutsError::InvalidLayout(error) => {
             unreachable!("failed to remove some components of bundle: {error}")
         }
     }

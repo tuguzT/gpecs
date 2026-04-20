@@ -9,20 +9,20 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaPtrs,
     error::{InsufficientAlignError, check_sufficient_align},
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput, FieldDescriptorsOwned,
-            IntoCopiedFieldDescriptors, buffer_layout,
+            FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_layout,
         },
+        layout::WithLayout,
         traits::AllocSoa,
     },
 };
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>, P>;
+pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[Layout]>, P>;
 
 #[repr(transparent)]
 pub struct ErasedSoaContext<D, P>
@@ -31,7 +31,7 @@ where
     P: SliceItemPtrs,
 {
     phantom: PhantomData<P>,
-    descriptors: D,
+    layouts: D,
 }
 
 impl<D, P> ErasedSoaContext<D, P>
@@ -39,33 +39,33 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
-    pub unsafe fn from_inner(descriptors: D) -> Self {
+    pub unsafe fn from_inner(layouts: D) -> Self {
         Self {
             phantom: PhantomData,
-            descriptors,
+            layouts,
         }
     }
 
     #[inline]
     pub fn into_inner(self) -> D {
-        let Self { descriptors, .. } = self;
-        descriptors
+        let Self { layouts, .. } = self;
+        layouts
     }
 }
 
 impl<D, P> ErasedSoaContext<D, P>
 where
-    D: FieldDescriptorsOwned,
+    D: FieldLayoutsOwned,
     P: SliceItemPtrs,
 {
     #[inline]
-    pub fn new(descriptors: D) -> Result<Self, InsufficientAlignError> {
-        descriptors
-            .field_descriptors()
-            .copied_field_descriptors()
-            .try_for_each(|desc| check_sufficient_align(desc.layout(), Layout::new::<P::Item>()))?;
+    pub fn new(layouts: D) -> Result<Self, InsufficientAlignError> {
+        layouts
+            .field_layouts()
+            .into_iter()
+            .try_for_each(|item| check_sufficient_align(item.layout(), Layout::new::<P::Item>()))?;
 
-        let me = unsafe { Self::from_inner(descriptors) };
+        let me = unsafe { Self::from_inner(layouts) };
         Ok(me)
     }
 }
@@ -76,68 +76,68 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
-    pub const unsafe fn from_inner_ref(descriptors: &D) -> &Self {
+    pub const unsafe fn from_inner_ref(layouts: &D) -> &Self {
         // SAFETY: Self is `#[repr(transparent)]` over `D`.
-        unsafe { (ptr::from_ref(descriptors) as *const Self).as_ref_unchecked() }
+        unsafe { (ptr::from_ref(layouts) as *const Self).as_ref_unchecked() }
     }
 
     #[inline]
-    pub const unsafe fn from_inner_mut(descriptors: &mut D) -> &mut Self {
+    pub const unsafe fn from_inner_mut(layouts: &mut D) -> &mut Self {
         // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
-        unsafe { (ptr::from_mut(descriptors) as *mut Self).as_mut_unchecked() }
+        unsafe { (ptr::from_mut(layouts) as *mut Self).as_mut_unchecked() }
     }
 
     #[inline]
     pub const fn as_inner(&self) -> &D {
-        let Self { descriptors, .. } = self;
-        descriptors
+        let Self { layouts, .. } = self;
+        layouts
     }
 
     #[inline]
     pub const fn as_inner_mut(&mut self) -> &mut D {
-        let Self { descriptors, .. } = self;
-        descriptors
+        let Self { layouts, .. } = self;
+        layouts
     }
 }
 
 impl<D, P> ErasedSoaContext<D, P>
 where
-    D: FromIterator<FieldDescriptor>,
     P: SliceItemPtrs,
 {
     #[inline]
-    pub fn of<T>(context: &T::Context) -> Result<Self, InsufficientAlignError>
+    pub fn of<'a, T>(context: &'a T::Context) -> Result<Self, InsufficientAlignError>
     where
         T: AllocSoa + ?Sized,
+        D: FromIterator<FieldLayoutsItem<'a, T::Context, T>>,
     {
-        let descriptors = context
-            .field_descriptors()
-            .copied_field_descriptors()
-            .map(|desc| {
-                check_sufficient_align(desc.layout(), Layout::new::<P::Item>())?;
-                Ok(desc)
+        let layouts = context
+            .field_layouts()
+            .into_iter()
+            .map(|item| {
+                check_sufficient_align(item.layout(), Layout::new::<P::Item>())?;
+                Ok(item)
             })
             .collect::<Result<_, _>>()?;
 
-        let me = unsafe { Self::from_inner(descriptors) };
+        let me = unsafe { Self::from_inner(layouts) };
         Ok(me)
     }
 }
 
 impl<'a, D, P> ErasedSoaContext<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: SliceItemPtrs,
 {
     #[inline]
-    pub fn field_descriptors(&'a self) -> D::Output {
-        let Self { descriptors, .. } = self;
-        descriptors.field_descriptors()
+    pub fn field_layouts(&'a self) -> D::Output {
+        let Self { layouts, .. } = self;
+        layouts.field_layouts()
     }
 
     #[inline]
     pub fn buffer_layout(&'a self, capacity: usize) -> Result<Layout, LayoutError> {
-        let fields = self.field_descriptors();
+        let fields = self.field_layouts();
         buffer_layout(fields, capacity)
     }
 
@@ -147,10 +147,10 @@ where
         buffer: *const u8,
         capacity: usize,
     ) -> ErasedSoaPtrs<D::Output, P::Const> {
-        let descriptors = self.field_descriptors();
+        let field_layouts = self.field_layouts();
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
         let buffer = ptr::slice_from_raw_parts(buffer.cast(), layout.size());
-        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
+        unsafe { ErasedSoaPtrs::new_unchecked(field_layouts, buffer, capacity, 0) }
     }
 
     #[inline]
@@ -159,10 +159,10 @@ where
         buffer: *mut u8,
         capacity: usize,
     ) -> ErasedSoaMutPtrs<D::Output, P::Mut> {
-        let descriptors = self.field_descriptors();
+        let field_layouts = self.field_layouts();
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
         let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), layout.size());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
+        unsafe { ErasedSoaMutPtrs::new_unchecked(field_layouts, buffer, capacity, 0) }
     }
 }
 
@@ -172,10 +172,8 @@ where
     P: SliceItemPtrs,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { descriptors, .. } = self;
-        f.debug_tuple("ErasedSoaContext")
-            .field(&descriptors)
-            .finish()
+        let Self { layouts, .. } = self;
+        f.debug_tuple("ErasedSoaContext").field(&layouts).finish()
     }
 }
 
@@ -186,8 +184,8 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { descriptors, .. } = self;
-        unsafe { Self::from_inner(descriptors.clone()) }
+        let Self { layouts, .. } = self;
+        unsafe { Self::from_inner(layouts.clone()) }
     }
 }
 
@@ -204,11 +202,8 @@ where
     P: SliceItemPtrs,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self {
-            phantom,
-            descriptors,
-        } = self;
-        *phantom == other.phantom && *descriptors == other.descriptors
+        let Self { phantom, layouts } = self;
+        *phantom == other.phantom && *layouts == other.layouts
     }
 }
 
@@ -225,16 +220,13 @@ where
     P: SliceItemPtrs,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self {
-            phantom,
-            descriptors,
-        } = self;
+        let Self { phantom, layouts } = self;
 
         match phantom.partial_cmp(&other.phantom) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        descriptors.partial_cmp(&other.descriptors)
+        layouts.partial_cmp(&other.layouts)
     }
 }
 
@@ -244,16 +236,13 @@ where
     P: SliceItemPtrs,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self {
-            phantom,
-            descriptors,
-        } = self;
+        let Self { phantom, layouts } = self;
 
         match phantom.cmp(&other.phantom) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        descriptors.cmp(&other.descriptors)
+        layouts.cmp(&other.layouts)
     }
 }
 
@@ -263,13 +252,10 @@ where
     P: SliceItemPtrs,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self {
-            phantom,
-            descriptors,
-        } = self;
+        let Self { phantom, layouts } = self;
 
         phantom.hash(state);
-        descriptors.hash(state);
+        layouts.hash(state);
     }
 }
 
@@ -297,28 +283,28 @@ where
     }
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaContext<D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedSoaContext<D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: SliceItemPtrs,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
-        Self::field_descriptors(self)
+    fn field_layouts(&'a self) -> Self::Output {
+        Self::field_layouts(self)
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedSoaContext<D, P>
+impl<D, P> CovariantFieldLayouts for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: SliceItemPtrs,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }

@@ -1,60 +1,42 @@
-use gpecs_soa_erased::{
-    ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, soa::field::FieldDescriptor,
-};
+use std::alloc::Layout;
 
-use crate::common::ArrayDescriptors;
+use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::CoreSliceItemPtrs};
+
+use crate::common::ArrayLayouts;
+
+type Ptrs = CoreSliceItemPtrs<u8>;
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn context() {
-    let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::<_, CoreSliceItemPtrs<u8>>::new(descriptors).unwrap();
+    let layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
+    let _context = ErasedSoaContext::<_, Ptrs>::new(layouts).unwrap();
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn context_of() {
-    let context = Default::default();
-    let context =
-        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 3>, CoreSliceItemPtrs<u8>>::of::<(
-            u32,
-            u16,
-            u8,
-        )>(&context)
-        .unwrap();
+    type Layouts = ArrayLayouts<Layout, 3>;
 
-    let descriptors = [
-        FieldDescriptor::of::<u8>(),
-        FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u32>(),
+    let context = Default::default();
+    let context = ErasedSoaContext::<Layouts, Ptrs>::of::<(u32, u16, u8)>(&context).unwrap();
+
+    let layouts = [
+        Layout::new::<u8>(),
+        Layout::new::<u16>(),
+        Layout::new::<u32>(),
     ];
-    itertools::assert_equal(
-        context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    itertools::assert_equal(context.field_layouts().iter().copied(), layouts);
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn context_of_zst() {
-    let context = Default::default();
-    let context =
-        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 1>, CoreSliceItemPtrs<u8>>::of::<()>(
-            &context,
-        )
-        .unwrap();
+    type Layouts = ArrayLayouts<Layout, 1>;
 
-    let descriptors = [];
-    itertools::assert_equal(
-        context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    let context = Default::default();
+    let context = ErasedSoaContext::<Layouts, Ptrs>::of::<()>(&context).unwrap();
+
+    let layouts = [];
+    itertools::assert_equal(context.field_layouts().iter().copied(), layouts);
 }

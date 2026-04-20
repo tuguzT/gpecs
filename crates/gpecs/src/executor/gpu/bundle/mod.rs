@@ -11,7 +11,7 @@ mod impls;
 /// # Safety
 ///
 /// Order of component identifiers defined by [`GetGpuComponents`](GpuBundle::GetGpuComponents) and [`RegisterGpuComponents`](GpuBundle::RegisterGpuComponents)
-/// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
+/// should be the same as the order of corresponding [layouts](crate::soa::field::FieldLayouts::Output).
 pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     /// Non-empty collection of all already registered GPU components of this bundle.
     ///

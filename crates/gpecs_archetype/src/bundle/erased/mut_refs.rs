@@ -8,11 +8,9 @@ use gpecs_component::{
     registry::{ComponentId, traits::WithComponentId},
 };
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoaMutRefs, ErasedSoaMutRefsIter,
+    CovariantFieldLayouts, ErasedSoaMutRefs, ErasedSoaMutRefsIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
-    soa::field::{
-        FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput, FieldDescriptorsOwned,
-    },
+    soa::field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
 };
 
 use crate::{
@@ -92,19 +90,19 @@ where
     }
 
     #[inline]
-    pub fn descriptors(&self) -> &D {
+    pub fn layouts(&self) -> &D {
         let Self { inner } = self;
-        inner.descriptors()
+        inner.layouts()
     }
 }
 
 impl<'a, D, P> ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConst<P>> {
+    pub fn iter(&'a self) -> ErasedBundleRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -112,7 +110,7 @@ where
     }
 
     #[inline]
-    pub fn iter_mut(&'a mut self) -> ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter_mut(&'a mut self) -> ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P> {
         let Self { inner } = self;
 
         let inner = inner.iter_mut();
@@ -127,7 +125,7 @@ where
 {
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
-        self.field_descriptors()
+        self.field_layouts()
     }
 
     #[inline]
@@ -158,11 +156,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentRef<'a, CastConst<P>>;
-    type IntoIter = ErasedBundleRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConst<P>>;
+    type IntoIter = ErasedBundleRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -172,11 +170,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a mut ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentMutRef<'a, P>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -213,30 +211,30 @@ where
     }
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedBundleMutRefs<'_, D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let Self { inner } = self;
-        inner.field_descriptors()
+        inner.field_layouts()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedBundleMutRefs<'_, D, P>
+impl<D, P> CovariantFieldLayouts for ErasedBundleMutRefs<'_, D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: MutSliceItemPtr,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }
 
@@ -288,19 +286,19 @@ where
     }
 
     #[inline]
-    pub fn descriptors(&self) -> &D {
+    pub fn layouts(&self) -> &D {
         let Self { inner, .. } = self;
-        inner.descriptors()
+        inner.layouts()
     }
 }
 
 impl<'a, D, P> ErasedBundleMutRefsIter<'_, D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -310,11 +308,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleMutRefsIter<'_, D, P>
 where
-    D: FieldDescriptors<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentMutRef<'a, P>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -324,7 +322,7 @@ where
 
 impl<D, P> Debug for ErasedBundleMutRefsIter<'_, D, P>
 where
-    D: FieldDescriptorsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayoutsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr<Item: Debug>,
 {
     #[inline]
@@ -344,7 +342,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
 
-        let component_id = inner.field_descriptors().into_iter().next()?.component_id();
+        let component_id = inner.field_layouts().into_iter().next()?.component_id();
         let fields = inner.next()?;
         let item = unsafe { ErasedComponentMutRef::from_parts(component_id, fields) };
         Some(item)
@@ -376,29 +374,29 @@ where
 {
 }
 
-impl<'a, D, P> FieldDescriptors<'a> for ErasedBundleMutRefsIter<'_, D, P>
+impl<'a, D, P> FieldLayouts<'a> for ErasedBundleMutRefsIter<'_, D, P>
 where
-    D: FieldDescriptors<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Output = D::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let Self { inner } = self;
-        inner.field_descriptors()
+        inner.field_layouts()
     }
 }
 
-impl<D, P> CovariantFieldDescriptors for ErasedBundleMutRefsIter<'_, D, P>
+impl<D, P> CovariantFieldLayouts for ErasedBundleMutRefsIter<'_, D, P>
 where
-    D: CovariantFieldDescriptors + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
     P: MutSliceItemPtr,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
-        D::upcast_field_descriptors(from)
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
+        D::upcast_field_layouts(from)
     }
 }

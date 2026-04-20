@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    field::{FieldDescriptor, FieldDescriptors},
+    field::FieldLayouts,
     traits::{
         AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
         ReadSoaContext, SoaContext, WriteSoaContext,
@@ -315,16 +315,16 @@ where
     }
 }
 
-impl<'a, T, U> FieldDescriptors<'a, Identity<U>> for Identity<T>
+impl<'a, T, U> FieldLayouts<'a, Identity<U>> for Identity<T>
 where
-    T: FieldDescriptors<'a, U> + ?Sized,
+    T: FieldLayouts<'a, U> + ?Sized,
     U: ?Sized,
 {
     type Output = T::Output;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
-        self.as_inner().field_descriptors()
+    fn field_layouts(&'a self) -> Self::Output {
+        self.as_inner().field_layouts()
     }
 }
 
@@ -542,12 +542,12 @@ unsafe impl<T> WriteSoaContext<Identity<T>, Identity<T>> for () {
     }
 }
 
-impl<'a, T> FieldDescriptors<'a, Identity<T>> for () {
-    type Output = [FieldDescriptor; 1];
+impl<'a, T> FieldLayouts<'a, Identity<T>> for () {
+    type Output = [Layout; 1];
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
-        [FieldDescriptor::of::<T>()]
+    fn field_layouts(&'a self) -> Self::Output {
+        [Layout::new::<T>()]
     }
 }
 

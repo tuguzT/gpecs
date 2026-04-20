@@ -1,10 +1,11 @@
 use core::fmt::Debug;
 
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    CovariantFieldLayouts, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
     ptr::slice::SliceItemPtrs,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldLayouts, FieldLayoutsOutput},
+        layout::WithLayout,
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
@@ -233,7 +234,7 @@ where
 
 unsafe impl<'a, Meta, D, S, P> RawSoa for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -281,7 +282,7 @@ where
     }
 }
 
-impl<'a, T, D, S, P> FieldDescriptors<'a, ErasedBundleKind<T, D, S, P>>
+impl<'a, T, D, S, P> FieldLayouts<'a, ErasedBundleKind<T, D, S, P>>
     for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
@@ -292,12 +293,12 @@ where
     type Output = ErasedArchetypeView<'a, T::Meta>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         *self.as_inner()
     }
 }
 
-impl<T, D, S, P> CovariantFieldDescriptors<ErasedBundleKind<T, D, S, P>>
+impl<T, D, S, P> CovariantFieldLayouts<ErasedBundleKind<T, D, S, P>>
     for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
@@ -306,9 +307,9 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self, ErasedBundleKind<T, D, S, P>>,
-    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundleKind<T, D, S, P>> {
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self, ErasedBundleKind<T, D, S, P>>,
+    ) -> FieldLayoutsOutput<'short, Self, ErasedBundleKind<T, D, S, P>> {
         from
     }
 }

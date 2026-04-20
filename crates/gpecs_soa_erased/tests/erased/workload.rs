@@ -1,17 +1,15 @@
 #![cfg(feature = "alloc")]
 
-use std::{iter, mem::MaybeUninit};
+use std::{alloc::Layout, iter, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa,
-    ptr::slice::CoreSliceItemPtrs,
-    soa::{field::FieldDescriptor, vec::SoaVec},
-    storage::BoxedAlignedUninitStorage,
+    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa, ptr::slice::CoreSliceItemPtrs,
+    soa::vec::SoaVec, storage::BoxedAlignedUninitStorage,
 };
 
 type Item = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 type ReadItem<'a> =
-    ErasedSoa<BoxedAlignedUninitStorage, &'a [FieldDescriptor], CoreSliceItemPtrs<MaybeUninit<u8>>>;
+    ErasedSoa<BoxedAlignedUninitStorage, &'a [Layout], CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
 #[test]
 fn new() {
@@ -21,20 +19,13 @@ fn new() {
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [
-        FieldDescriptor::of::<u8>(),
-        FieldDescriptor::of::<()>(),
-        FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u128>(),
+    let layouts = [
+        Layout::new::<u8>(),
+        Layout::new::<()>(),
+        Layout::new::<u16>(),
+        Layout::new::<u128>(),
     ];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let vec = Vec::with_context(erased_context);
     assert!(vec.is_empty());
@@ -79,15 +70,8 @@ fn new_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    let layouts = [];
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let vec = Vec::with_context(erased_context);
     assert!(vec.is_empty());
@@ -132,20 +116,13 @@ fn with_capacity() {
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [
-        FieldDescriptor::of::<u8>(),
-        FieldDescriptor::of::<()>(),
-        FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u128>(),
+    let layouts = [
+        Layout::new::<u8>(),
+        Layout::new::<()>(),
+        Layout::new::<u16>(),
+        Layout::new::<u128>(),
     ];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let vec = Vec::with_context_and_capacity(erased_context, 10);
     assert!(vec.is_empty());
@@ -191,15 +168,8 @@ fn with_capacity_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    let layouts = [];
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let vec = Vec::with_context_and_capacity(erased_context, 10);
     assert!(vec.is_empty());
@@ -245,20 +215,13 @@ fn one_item() {
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [
-        FieldDescriptor::of::<u8>(),
-        FieldDescriptor::of::<()>(),
-        FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u128>(),
+    let layouts = [
+        Layout::new::<u8>(),
+        Layout::new::<()>(),
+        Layout::new::<u16>(),
+        Layout::new::<u128>(),
     ];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let mut vec = Vec::with_context(erased_context);
 
@@ -359,15 +322,8 @@ fn one_item_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    let layouts = [];
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let mut vec = Vec::with_context(erased_context);
 
@@ -448,20 +404,13 @@ fn three_items() {
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [
-        FieldDescriptor::of::<()>(),
-        FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<String>(),
-        FieldDescriptor::of::<u128>(),
+    let layouts = [
+        Layout::new::<()>(),
+        Layout::new::<u16>(),
+        Layout::new::<String>(),
+        Layout::new::<u128>(),
     ];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let mut vec = Vec::with_context(erased_context);
 
@@ -804,15 +753,8 @@ fn three_items_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [];
-    itertools::assert_equal(
-        erased_context
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    let layouts = [];
+    itertools::assert_equal(erased_context.field_layouts().iter().copied(), layouts);
 
     let mut vec = Vec::with_context(erased_context);
 

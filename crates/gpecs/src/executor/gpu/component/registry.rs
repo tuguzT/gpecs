@@ -1,4 +1,5 @@
 use std::{
+    alloc::Layout,
     any::{self, TypeId},
     borrow::Cow,
     fmt::{self, Debug},
@@ -13,7 +14,6 @@ pub use gpecs_component::registry::GpuComponentId;
 use crate::{
     component::registry::ComponentId,
     context::{ComponentDescriptor, Components},
-    soa::field::FieldDescriptor,
 };
 
 use super::GpuComponent;
@@ -22,12 +22,12 @@ use super::GpuComponent;
 pub struct GpuComponentDescriptor {
     name: Cow<'static, str>,
     type_id: Option<TypeId>,
-    desc: FieldDescriptor,
+    layout: Layout,
 }
 
 impl GpuComponentDescriptor {
     #[inline]
-    pub fn new<N, I>(name: N, type_id: I, desc: FieldDescriptor) -> Self
+    pub fn new<N, I>(name: N, type_id: I, layout: Layout) -> Self
     where
         N: Into<Cow<'static, str>>,
         I: Into<Option<TypeId>>,
@@ -35,7 +35,7 @@ impl GpuComponentDescriptor {
         Self {
             name: name.into(),
             type_id: type_id.into(),
-            desc,
+            layout,
         }
     }
 
@@ -47,7 +47,7 @@ impl GpuComponentDescriptor {
         Self {
             name: any::type_name::<T>().into(),
             type_id: Some(TypeId::of::<T>()),
-            desc: FieldDescriptor::of::<T>(),
+            layout: Layout::new::<T>(),
         }
     }
 
@@ -64,9 +64,9 @@ impl GpuComponentDescriptor {
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
-        desc
+    pub fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
     }
 }
 
@@ -75,9 +75,9 @@ impl From<GpuComponentDescriptor> for ComponentDescriptor {
         let GpuComponentDescriptor {
             name,
             type_id,
-            desc,
+            layout,
         } = value;
-        Self::new(name, type_id, desc, None)
+        Self::new(name, type_id, layout, None)
     }
 }
 

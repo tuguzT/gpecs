@@ -1,4 +1,5 @@
 use std::{
+    alloc::Layout,
     any::{self, TypeId},
     borrow::Cow,
 };
@@ -10,7 +11,7 @@ use crate::{
         registry::{self, ComponentIdMap, ComponentRegistry, traits::FromComponentType},
     },
     hash::BuildHasher,
-    soa::field::FieldDescriptor,
+    soa::layout::WithLayout,
 };
 
 pub type ComponentTypeIdMap = ComponentIdMap<TypeId, BuildHasher>;
@@ -21,7 +22,7 @@ pub type ComponentInfo<'a> = registry::ComponentInfo<&'a ComponentDescriptor>;
 pub struct ComponentDescriptor {
     name: Cow<'static, str>,
     type_id: Option<TypeId>,
-    desc: FieldDescriptor,
+    layout: Layout,
     erased_drop: Option<ErasedDrop>,
 }
 
@@ -30,7 +31,7 @@ impl ComponentDescriptor {
     pub fn new<N>(
         name: N,
         type_id: Option<TypeId>,
-        desc: FieldDescriptor,
+        layout: Layout,
         erased_drop: Option<ErasedDrop>,
     ) -> Self
     where
@@ -39,7 +40,7 @@ impl ComponentDescriptor {
         Self {
             name: name.into(),
             type_id,
-            desc,
+            layout,
             erased_drop,
         }
     }
@@ -51,7 +52,7 @@ impl ComponentDescriptor {
     {
         let name = any::type_name::<T>();
         let type_id = Some(TypeId::of::<T>());
-        let desc = FieldDescriptor::of::<T>();
+        let desc = Layout::new::<T>();
         let erased_drop = ErasedDrop::of::<T>();
         Self::new(name, type_id, desc, erased_drop)
     }
@@ -69,9 +70,9 @@ impl ComponentDescriptor {
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
-        desc
+    pub fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
     }
 
     #[inline]
@@ -88,18 +89,17 @@ impl AsRef<str> for ComponentDescriptor {
     }
 }
 
-impl AsRef<FieldDescriptor> for ComponentDescriptor {
-    #[inline]
-    fn as_ref(&self) -> &FieldDescriptor {
-        let Self { desc, .. } = self;
-        desc
-    }
-}
-
 unsafe impl FromComponentType for ComponentDescriptor {
     #[inline]
     fn from_component<T: Component>() -> Self {
         Self::of::<T>()
+    }
+}
+
+impl WithLayout for ComponentDescriptor {
+    #[inline]
+    fn layout(&self) -> Layout {
+        Self::layout(self)
     }
 }
 

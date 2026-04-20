@@ -1,3 +1,5 @@
+use std::alloc::Layout;
+
 use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 
 use crate::{
@@ -7,20 +9,20 @@ use crate::{
         erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
         registry::ComponentInfo,
     },
-    soa::field::FieldDescriptor,
+    soa::layout::WithLayout,
 };
 
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedDropMeta {
-    desc: FieldDescriptor,
+    layout: Layout,
     erased_drop: Option<ErasedDrop>,
 }
 
-impl AsRef<FieldDescriptor> for ErasedDropMeta {
+impl WithLayout for ErasedDropMeta {
     #[inline]
-    fn as_ref(&self) -> &FieldDescriptor {
-        let Self { desc, .. } = self;
-        desc
+    fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
     }
 }
 
@@ -34,13 +36,14 @@ impl WithErasedDrop for ErasedDropMeta {
 
 impl<Meta> FromComponentInfo<'_, Meta> for ErasedDropMeta
 where
-    Meta: AsRef<FieldDescriptor> + WithErasedDrop,
+    Meta: WithLayout + WithErasedDrop,
 {
     #[inline]
     fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
-        let desc = FromComponentInfo::from_component_info(info);
-        let erased_drop = FromComponentInfo::from_component_info(info);
-        Self { desc, erased_drop }
+        Self {
+            layout: info.layout(),
+            erased_drop: FromComponentInfo::from_component_info(info),
+        }
     }
 }
 
@@ -51,8 +54,9 @@ where
 {
     #[inline]
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {
-        let desc = FieldDescriptor::new(component.as_field().layout());
-        let erased_drop = component.erased_drop();
-        Self { desc, erased_drop }
+        Self {
+            layout: component.as_field().layout(),
+            erased_drop: component.erased_drop(),
+        }
     }
 }

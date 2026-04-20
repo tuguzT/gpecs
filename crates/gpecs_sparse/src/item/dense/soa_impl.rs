@@ -2,11 +2,11 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::{
     item::{
-        DenseFieldDescriptors, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs, DenseRefs,
+        DenseFieldLayouts, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs, DenseRefs,
         DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },
     soa::{
-        field::{FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldLayouts, FieldLayoutsOutput},
         identity::Identity,
         traits::{
             AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
@@ -250,17 +250,17 @@ where
     }
 }
 
-impl<'a, K, V> FieldDescriptors<'a, DenseItem<K, V>> for Identity<V::Context>
+impl<'a, K, V> FieldLayouts<'a, DenseItem<K, V>> for Identity<V::Context>
 where
     V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'a, V>,
+    V::Context: FieldLayouts<'a, V>,
 {
-    type Output = DenseFieldDescriptors<FieldDescriptorsOutput<'a, V::Context, V>>;
+    type Output = DenseFieldLayouts<FieldLayoutsOutput<'a, V::Context, V>>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         let context = self.as_inner();
-        DenseFieldDescriptors::new::<K, V>(context)
+        DenseFieldLayouts::new::<K, V>(context)
     }
 }
 

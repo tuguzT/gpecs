@@ -12,10 +12,10 @@ use gpecs_component::{
     registry::traits::WithComponentId,
 };
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoa, ErasedSoaIntoFields,
-    error::FromFieldsDescriptorsError,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaIntoFields,
+    error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
-    soa::field::{FieldDescriptors, FieldDescriptorsItem, FieldDescriptorsOutput},
+    soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput},
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 use itertools::equal;
@@ -80,7 +80,7 @@ where
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, T::Meta> {
         let Self { inner, .. } = self;
-        inner.field_descriptors()
+        inner.field_layouts()
     }
 
     #[inline]
@@ -123,9 +123,9 @@ where
     ) {
         let Self { inner, .. } = self;
 
-        let (inner, descriptors) = inner.as_ptrs_with_descriptors();
+        let (inner, layouts) = inner.as_ptrs_with_layouts();
         let ptrs = unsafe { ErasedBundlePtrs::from_inner(inner) };
-        (ptrs, descriptors.field_descriptors())
+        (ptrs, layouts.field_layouts())
     }
 
     #[inline]
@@ -144,9 +144,9 @@ where
     ) {
         let Self { inner, .. } = self;
 
-        let (inner, descriptors) = inner.as_mut_ptrs_with_descriptors();
+        let (inner, layouts) = inner.as_mut_ptrs_with_layouts();
         let ptrs = unsafe { ErasedBundleMutPtrs::from_inner(inner) };
-        (ptrs, descriptors.field_descriptors())
+        (ptrs, layouts.field_layouts())
     }
 
     #[inline]
@@ -163,9 +163,9 @@ where
         ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Const>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
-        let (ptrs, descriptors) = self.as_ptrs_with_archetype();
+        let (ptrs, layouts) = self.as_ptrs_with_archetype();
         let refs = unsafe { ptrs.as_ref_unchecked() };
-        (refs, descriptors)
+        (refs, layouts)
     }
 
     #[inline]
@@ -184,9 +184,9 @@ where
         ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Mut>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
-        let (ptrs, descriptors) = self.as_mut_ptrs_with_archetype();
+        let (ptrs, layouts) = self.as_mut_ptrs_with_archetype();
         let refs = unsafe { ptrs.as_mut_unchecked() };
-        (refs, descriptors)
+        (refs, layouts)
     }
 
     #[inline]
@@ -245,7 +245,7 @@ where
         Other: ErasedArchetypeKind<Meta = Original::Meta>,
     {
         let this = self.archetype();
-        let other = archetype.field_descriptors();
+        let other = archetype.field_layouts();
         if let Err(error) = this.check_exact_compatibility(other.as_view()) {
             let error = ShuffleError {
                 bundle: self,
@@ -266,7 +266,7 @@ where
             refs.get(component_id).expect("component should be present")
         });
 
-        let result = ErasedSoa::<_, _, P>::try_from_fields_descriptors(fields, other);
+        let result = ErasedSoa::<_, _, P>::try_from_fields_layouts(fields, other);
         let inner = match result.map_err(into_shuffle_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -290,14 +290,14 @@ where
 }
 
 #[inline]
-fn into_shuffle_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> ShuffleErrorKind<E> {
+fn into_shuffle_error_kind<E>(error: FromFieldsLayoutsError<E>) -> ShuffleErrorKind<E> {
     match error {
-        FromFieldsDescriptorsError::FromLayout(error) => ShuffleErrorKind::FromLayout(error),
-        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-        FromFieldsDescriptorsError::LenMismatch(error) => {
+        FromFieldsLayoutsError::FromLayout(error) => ShuffleErrorKind::FromLayout(error),
+        FromFieldsLayoutsError::InvalidLayout(error) => error.into(),
+        FromFieldsLayoutsError::LenMismatch(error) => {
             unreachable!("failed to shuffle bundle: {error}")
         }
-        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+        FromFieldsLayoutsError::InsufficientAlign(error) => {
             unreachable!("failed to shuffle bundle: {error}")
         }
     }
@@ -382,7 +382,7 @@ where
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
     P: SliceItemPtrs<Item = S::Item>,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
+    for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<S, P>, S::Error>;
     type IntoIter = ErasedBundleIntoIterKind<S, T, S, P>;
@@ -396,7 +396,7 @@ where
     }
 }
 
-impl<'a, T, D, S, P> FieldDescriptors<'a> for ErasedBundleKind<T, D, S, P>
+impl<'a, T, D, S, P> FieldLayouts<'a> for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
@@ -406,12 +406,12 @@ where
     type Output = ErasedArchetypeView<'a, T::Meta>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         self.archetype()
     }
 }
 
-impl<T, D, S, P> CovariantFieldDescriptors for ErasedBundleKind<T, D, S, P>
+impl<T, D, S, P> CovariantFieldLayouts for ErasedBundleKind<T, D, S, P>
 where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
@@ -419,9 +419,9 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
         from
     }
 }
@@ -442,7 +442,7 @@ where
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     F: AlignedStorageFromLayout<Item = S::Item>,
     P: SliceItemPtrs<Item = S::Item>,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
+    for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<F, P>, F::Error>;
 
@@ -454,7 +454,7 @@ where
 
         let Self { inner } = self;
 
-        let component = inner.field_descriptors().into_iter().next()?;
+        let component = inner.field_layouts().into_iter().next()?;
         let erased_drop = component.erased_drop();
         let id = component.component_id();
         drop(component);
@@ -487,7 +487,7 @@ where
     F: AlignedStorageFromLayout<Item = S::Item>,
     P: SliceItemPtrs<Item = S::Item>,
     T::IntoIter: ExactSizeIterator,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
+    for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -503,6 +503,6 @@ where
     F: AlignedStorageFromLayout<Item = S::Item>,
     P: SliceItemPtrs<Item = S::Item>,
     T::IntoIter: FusedIterator,
-    for<'a> FieldDescriptorsItem<'a, T::IntoIter>: WithErasedDrop,
+    for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
 }

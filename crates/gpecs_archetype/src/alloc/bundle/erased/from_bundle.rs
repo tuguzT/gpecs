@@ -10,9 +10,9 @@ use gpecs_component::registry::{
 };
 use gpecs_soa_erased::{
     ErasedSoa,
-    error::{FromDescriptorsValueError, FromDescriptorsValueErrorKind, InsufficientAlignError},
+    error::{FromLayoutsValueError, FromLayoutsValueErrorKind, InsufficientAlignError},
     ptr::slice::SliceItemPtrs,
-    soa::field::FieldDescriptor,
+    soa::layout::WithLayout,
     storage::AlignedStorageFromLayout,
 };
 
@@ -26,7 +26,7 @@ use crate::{
 
 impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout,
     P: SliceItemPtrs<Item = S::Item>,
@@ -46,7 +46,7 @@ where
             Ok(archetype) => archetype,
             Err(source) => return Err(FromBundleError::new(bundle, source.into())),
         };
-        let inner = ErasedSoa::try_from_descriptors_value::<B, B>(archetype, B::CONTEXT, bundle)
+        let inner = ErasedSoa::try_from_layouts_value::<B, B>(archetype, B::CONTEXT, bundle)
             .map_err(into_from_bundle_error)?;
 
         let me = unsafe { Self::from_inner(inner) };
@@ -55,16 +55,16 @@ where
 }
 
 #[inline]
-fn into_from_bundle_error<B, T>(error: FromDescriptorsValueError<B, T>) -> FromBundleError<B, T> {
-    let FromDescriptorsValueError { value, source, .. } = error;
+fn into_from_bundle_error<B, T>(error: FromLayoutsValueError<B, T>) -> FromBundleError<B, T> {
+    let FromLayoutsValueError { value, source, .. } = error;
     let source = match source {
-        FromDescriptorsValueErrorKind::FromLayout(error) => FromBundleErrorKind::FromLayout(error),
-        FromDescriptorsValueErrorKind::InsufficientAlign(error) => error.into(),
-        FromDescriptorsValueErrorKind::InvalidLayout(error) => error.into(),
-        FromDescriptorsValueErrorKind::LenMismatch(error) => {
+        FromLayoutsValueErrorKind::FromLayout(error) => FromBundleErrorKind::FromLayout(error),
+        FromLayoutsValueErrorKind::InsufficientAlign(error) => error.into(),
+        FromLayoutsValueErrorKind::InvalidLayout(error) => error.into(),
+        FromLayoutsValueErrorKind::LenMismatch(error) => {
             unreachable!("failed to erase some bundle: {error}")
         }
-        FromDescriptorsValueErrorKind::LayoutMismatch(error) => {
+        FromLayoutsValueErrorKind::LayoutMismatch(error) => {
             unreachable!("failed to erase some bundle: {error}")
         }
     };

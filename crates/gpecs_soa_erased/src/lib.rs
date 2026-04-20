@@ -10,8 +10,8 @@ pub use gpecs_soa as soa;
 
 pub use self::{
     context::ErasedSoaContext,
-    descriptors::CovariantFieldDescriptors,
     fields::ErasedSoaFields,
+    layouts::CovariantFieldLayouts,
     mut_ptrs::{ErasedSoaMutPtrs, ErasedSoaMutPtrsIter},
     mut_refs::{ErasedSoaMutRefs, ErasedSoaMutRefsIter},
     mut_slice_ptrs::{ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter},
@@ -32,8 +32,8 @@ pub mod error;
 mod assert;
 mod context;
 mod dangling;
-mod descriptors;
 mod fields;
+mod layouts;
 mod mut_ptrs;
 mod mut_refs;
 mod mut_slice_ptrs;

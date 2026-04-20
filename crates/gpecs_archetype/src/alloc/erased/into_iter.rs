@@ -7,10 +7,7 @@ use core::{
 use gpecs_component::registry::{ComponentId, ComponentInfo};
 use gpecs_sparse::{
     iter::{IntoIter as SparseIntoIter, RawIter},
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors},
-        identity::Identity,
-    },
+    soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
 };
 
 use crate::erased::Iter;
@@ -140,14 +137,14 @@ impl<Meta> ExactSizeIterator for IntoIter<Meta> {
 
 impl<Meta> FusedIterator for IntoIter<Meta> {}
 
-impl<'a, Meta> FieldDescriptors<'a> for IntoIter<Meta>
+impl<'a, Meta> FieldLayouts<'a> for IntoIter<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'a,
+    Meta: WithLayout + 'a,
 {
     type Output = Iter<'a, Meta>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         self.into_iter()
     }
 }

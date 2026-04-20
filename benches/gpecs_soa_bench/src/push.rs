@@ -2,11 +2,12 @@ use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
 
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
-    CovariantFieldDescriptors, ErasedSoa,
+    CovariantFieldLayouts, ErasedSoa,
     error::FromValueError,
     ptr::slice::CoreSliceItemPtrs,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldLayouts, FieldLayoutsOutput},
+        layout::WithLayout,
         prelude::*,
         traits::SoaWrite,
     },
@@ -15,9 +16,9 @@ use gpecs_soa_erased::{
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
-type BoxedErasedSoa = gpecs_soa_erased::BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
-type ArrayErasedSoa<T, const CAP: usize> =
-    ErasedSoa<T, ArrayDescriptors<FieldDescriptor, CAP>, CoreSliceItemPtrs<MaybeUninit<u8>>>;
+type Ptrs = CoreSliceItemPtrs<MaybeUninit<u8>>;
+type BoxedErasedSoa = gpecs_soa_erased::BoxedErasedSoa<Ptrs>;
+type ArrayErasedSoa<T, const CAP: usize> = ErasedSoa<T, ArrayLayouts<Layout, CAP>, Ptrs>;
 
 pub trait Push: SoaVecs<Context: Default> + SoaWrite<Self> + Sized {
     fn soa_slf_push(vec: &mut SoaVec<Self>, value: Self) {
@@ -237,15 +238,15 @@ impl Push for Large {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-struct ArrayDescriptors<T, const CAP: usize>(ArrayVec<T, CAP>);
+struct ArrayLayouts<T, const CAP: usize>(ArrayVec<T, CAP>);
 
-impl<T, const CAP: usize> Default for ArrayDescriptors<T, CAP> {
+impl<T, const CAP: usize> Default for ArrayLayouts<T, CAP> {
     fn default() -> Self {
         Self(ArrayVec::default())
     }
 }
 
-impl<T, const CAP: usize> Deref for ArrayDescriptors<T, CAP> {
+impl<T, const CAP: usize> Deref for ArrayLayouts<T, CAP> {
     type Target = ArrayVec<T, CAP>;
 
     fn deref(&self) -> &Self::Target {
@@ -254,7 +255,7 @@ impl<T, const CAP: usize> Deref for ArrayDescriptors<T, CAP> {
     }
 }
 
-impl<T, const CAP: usize> IntoIterator for ArrayDescriptors<T, CAP> {
+impl<T, const CAP: usize> IntoIterator for ArrayLayouts<T, CAP> {
     type Item = T;
     type IntoIter = IntoIter<T, CAP>;
 
@@ -264,7 +265,7 @@ impl<T, const CAP: usize> IntoIterator for ArrayDescriptors<T, CAP> {
     }
 }
 
-impl<A, T, const CAP: usize> FromIterator<A> for ArrayDescriptors<T, CAP>
+impl<A, T, const CAP: usize> FromIterator<A> for ArrayLayouts<T, CAP>
 where
     T: From<A>,
 {
@@ -274,7 +275,7 @@ where
     }
 }
 
-impl<A, T, const CAP: usize> Extend<A> for ArrayDescriptors<T, CAP>
+impl<A, T, const CAP: usize> Extend<A> for ArrayLayouts<T, CAP>
 where
     T: From<A>,
 {
@@ -284,24 +285,24 @@ where
     }
 }
 
-impl<'a, T, const CAP: usize> FieldDescriptors<'a> for ArrayDescriptors<T, CAP>
+impl<'a, T, const CAP: usize> FieldLayouts<'a> for ArrayLayouts<T, CAP>
 where
-    T: AsRef<FieldDescriptor> + 'a,
+    T: WithLayout + 'a,
 {
     type Output = &'a [T];
 
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         self
     }
 }
 
-impl<T, const CAP: usize> CovariantFieldDescriptors for ArrayDescriptors<T, CAP>
+impl<T, const CAP: usize> CovariantFieldLayouts for ArrayLayouts<T, CAP>
 where
-    T: AsRef<FieldDescriptor> + 'static,
+    T: WithLayout + 'static,
 {
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
         from
     }
 }

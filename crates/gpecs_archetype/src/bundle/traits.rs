@@ -34,7 +34,7 @@ pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 /// # Safety
 ///
 /// Order of component identifiers defined by [`GetComponents`](Bundle::GetComponents) and [`RegisterComponents`](Bundle::RegisterComponents)
-/// should be the same as the order of corresponding [descriptors](gpecs_soa_erased::soa::field::FieldDescriptors::Output).
+/// should be the same as the order of corresponding [layouts](gpecs_soa_erased::soa::field::FieldLayouts::Output).
 pub unsafe trait Bundle:
     SoaOwned + AllocSoa + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
 {

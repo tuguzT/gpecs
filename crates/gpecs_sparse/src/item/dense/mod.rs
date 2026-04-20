@@ -1,11 +1,11 @@
 pub use self::{
-    field_descriptors::DenseFieldDescriptors, mut_ptrs::DenseMutPtrs, mut_refs::DenseRefsMut,
+    field_layouts::DenseFieldLayouts, mut_ptrs::DenseMutPtrs, mut_refs::DenseRefsMut,
     mut_slice_ptrs::DenseSliceMutPtrs, mut_slices::DenseSlicesMut, nonnull_ptrs::DenseNonNullPtrs,
     ptrs::DensePtrs, refs::DenseRefs, slice_ptrs::DenseSlicePtrs, slices::DenseSlices,
     value::DenseItem,
 };
 
-mod field_descriptors;
+mod field_layouts;
 mod mut_ptrs;
 mod mut_refs;
 mod mut_slice_ptrs;

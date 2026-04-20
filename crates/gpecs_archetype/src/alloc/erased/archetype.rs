@@ -11,13 +11,14 @@ use gpecs_component::{
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
     },
 };
-use gpecs_soa_erased::CovariantFieldDescriptors;
+use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     item::SparseItem,
     set::EpochSparseSet,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldLayouts, FieldLayoutsOutput},
         identity::Identity,
+        layout::WithLayout,
     },
 };
 
@@ -108,16 +109,6 @@ where
 {
     #[inline]
     fn from_component_info(_: ComponentInfo<&Meta>) -> Self {}
-}
-
-impl<Meta> FromComponentInfo<'_, Meta> for FieldDescriptor
-where
-    Meta: AsRef<FieldDescriptor> + ?Sized,
-{
-    #[inline]
-    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
-        *info.as_ref()
-    }
 }
 
 impl<Meta> FromComponentInfo<'_, Meta> for Option<ErasedDrop>
@@ -502,26 +493,26 @@ impl<Meta> IntoIterator for ErasedArchetype<Meta> {
     }
 }
 
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetype<Meta>
+impl<'a, Meta> FieldLayouts<'a> for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'a,
+    Meta: WithLayout + 'a,
 {
     type Output = ErasedArchetypeView<'a, Meta>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         self.as_view()
     }
 }
 
-impl<Meta> CovariantFieldDescriptors for ErasedArchetype<Meta>
+impl<Meta> CovariantFieldLayouts for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
         from
     }
 }

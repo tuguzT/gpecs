@@ -1,7 +1,5 @@
 use core::alloc::Layout;
 
-use crate::FfiLayout;
-
 pub trait WithLayout {
     fn layout(&self) -> Layout;
 }
@@ -30,12 +28,5 @@ impl WithLayout for Layout {
     #[inline]
     fn layout(&self) -> Layout {
         *self
-    }
-}
-
-impl WithLayout for FfiLayout {
-    #[inline]
-    fn layout(&self) -> Layout {
-        (*self).into()
     }
 }

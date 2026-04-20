@@ -5,12 +5,9 @@ use core::{
     slice,
 };
 
-use crate::{
-    field::FieldDescriptor,
-    traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, RawSoa,
-        RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
-    },
+use crate::traits::{
+    AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldLayouts, RawSoa, RawSoaContext,
+    ReadSoaContext, SoaContext, WriteSoaContext,
 };
 
 // https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
@@ -73,10 +70,10 @@ macro_rules! soa_tuple_impl {
                 let layouts = [$(Layout::new::<$types>(),)*];
                 layout_permutation(layouts)
             };
-            pub const FIELD_DESCRIPTORS: [FieldDescriptor; count_idents!($($types,)*)] = {
+            pub const FIELD_LAYOUTS: [Layout; count_idents!($($types,)*)] = {
                 let permutation = Self::PERMUTATION;
-                let descriptors = [$(FieldDescriptor::of::<$types>(),)*];
-                [$(descriptors[permutation[$indices]],)*]
+                let layouts = [$(Layout::new::<$types>(),)*];
+                [$(layouts[permutation[$indices]],)*]
             };
         }
 
@@ -338,12 +335,12 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        impl<'a, $($types,)*> FieldDescriptors<'a, ($($types,)*)> for () {
-            type Output = [FieldDescriptor; count_idents!($($types,)*)];
+        impl<'a, $($types,)*> FieldLayouts<'a, ($($types,)*)> for () {
+            type Output = [Layout; count_idents!($($types,)*)];
 
             #[inline]
-            fn field_descriptors(&'a self) -> Self::Output {
-                TupleHelper::<($($types,)*)>::FIELD_DESCRIPTORS
+            fn field_layouts(&'a self) -> Self::Output {
+                TupleHelper::<($($types,)*)>::FIELD_LAYOUTS
             }
         }
 

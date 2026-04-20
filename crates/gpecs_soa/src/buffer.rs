@@ -4,7 +4,8 @@ use core::{
 };
 
 use crate::{
-    field::{FieldDescriptor, FieldDescriptors, IntoCopiedFieldDescriptors},
+    field::FieldLayouts,
+    layout::WithLayout,
     traits::{AllocSoa, AllocSoaContext, RawSoa},
 };
 
@@ -36,24 +37,19 @@ where
 #[inline]
 pub fn packed_size_of_fields<I>(fields: I) -> usize
 where
-    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    I: IntoIterator<Item: WithLayout>,
 {
-    fields
-        .into_iter()
-        .copied_field_descriptors()
-        .map(|desc| desc.layout().size())
-        .sum()
+    fields.into_iter().map(|item| item.layout().size()).sum()
 }
 
 #[inline]
 pub fn align_of_fields<I>(fields: I) -> usize
 where
-    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    I: IntoIterator<Item: WithLayout>,
 {
     fields
         .into_iter()
-        .copied_field_descriptors()
-        .map(|desc| desc.layout().align())
+        .map(|item| item.layout().align())
         .max()
         .unwrap_or(1)
 }
@@ -63,7 +59,7 @@ pub fn is_zst<T>(context: &T::Context) -> bool
 where
     T: AllocSoa + ?Sized,
 {
-    size_of::<T::Fields>() == 0 || packed_size_of_fields(context.field_descriptors()) == 0
+    size_of::<T::Fields>() == 0 || packed_size_of_fields(context.field_layouts()) == 0
 }
 
 #[inline]
@@ -101,7 +97,7 @@ where
     let (size, align) = if is_zst::<T>(context) || capacity == 0 {
         let prefix = size_of::<BufferPrefix<T>>();
         let size = if is_context_zst::<T>() { 0 } else { prefix };
-        let align = align_of_fields(context.field_descriptors());
+        let align = align_of_fields(context.field_layouts());
         (size, align)
     } else {
         let buffer = context.buffer_layout(capacity)?;
@@ -124,7 +120,7 @@ where
         return 0;
     }
 
-    let align = align_of_fields(context.field_descriptors());
+    let align = align_of_fields(context.field_layouts());
     let next = Layout::from_size_align(0, align)
         .expect("ZST layout should be valid for any possible alignment");
     let (_, offset) = prefix

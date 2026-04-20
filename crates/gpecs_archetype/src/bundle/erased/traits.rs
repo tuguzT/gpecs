@@ -1,10 +1,7 @@
 use gpecs_component::{erased::WithErasedDrop, registry::traits::WithComponentId};
 use gpecs_soa_erased::{
     ptr::slice::MutSliceItemPtr,
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors},
-        identity::Identity,
-    },
+    soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
 };
 use itertools::zip_eq;
 
@@ -14,9 +11,9 @@ use crate::{
 };
 
 pub trait ErasedArchetypeKind:
-    for<'a> FieldDescriptors<'a, Output = ErasedArchetypeView<'a, Self::Meta>>
+    for<'a> FieldLayouts<'a, Output = ErasedArchetypeView<'a, Self::Meta>>
 {
-    type Meta: AsRef<FieldDescriptor> + 'static;
+    type Meta: WithLayout + 'static;
 }
 
 impl<T> ErasedArchetypeKind for &T
@@ -35,21 +32,17 @@ where
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetypeView<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
 {
     type Meta = Meta;
 }
 
 pub unsafe trait ErasedArchetypeIterator:
-    Iterator<Item: AsRef<FieldDescriptor>>
-    + for<'a> FieldDescriptors<'a, Output: IntoIterator<Item: WithComponentId>>
+    Iterator<Item: WithLayout> + for<'a> FieldLayouts<'a, Output: IntoIterator<Item: WithComponentId>>
 {
 }
 
-unsafe impl<Meta> ErasedArchetypeIterator for Iter<'_, Meta> where
-    Meta: AsRef<FieldDescriptor> + 'static
-{
-}
+unsafe impl<Meta> ErasedArchetypeIterator for Iter<'_, Meta> where Meta: WithLayout + 'static {}
 
 pub trait IntoErasedArchetypeIterator: IntoIterator<IntoIter: ErasedArchetypeIterator> {}
 
@@ -101,7 +94,7 @@ where
         U: ErasedArchetypeKind + ?Sized,
         P: MutSliceItemPtr,
     {
-        let archetype = archetype.field_descriptors();
+        let archetype = archetype.field_layouts();
         for (component_info, to_drop) in zip_eq(archetype, ptrs) {
             let Some(erased_drop) = component_info.erased_drop() else {
                 continue;
@@ -119,7 +112,7 @@ where
         U: ErasedArchetypeKind + ?Sized,
         P: MutSliceItemPtr,
     {
-        let archetype = archetype.field_descriptors();
+        let archetype = archetype.field_layouts();
         for (component_info, to_drop) in zip_eq(archetype, slices) {
             let Some(erased_drop) = component_info.erased_drop() else {
                 continue;

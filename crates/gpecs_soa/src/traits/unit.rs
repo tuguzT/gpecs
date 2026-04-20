@@ -3,12 +3,9 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use crate::{
-    field::FieldDescriptor,
-    traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, RawSoa,
-        RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
-    },
+use crate::traits::{
+    AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldLayouts, RawSoa, RawSoaContext,
+    ReadSoaContext, SoaContext, WriteSoaContext,
 };
 
 unsafe impl RawSoaContext<()> for () {
@@ -221,11 +218,11 @@ unsafe impl WriteSoaContext<(), ()> for () {
     }
 }
 
-impl<'a> FieldDescriptors<'a> for () {
-    type Output = [FieldDescriptor; 0];
+impl<'a> FieldLayouts<'a> for () {
+    type Output = [Layout; 0];
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         []
     }
 }

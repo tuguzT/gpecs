@@ -40,7 +40,7 @@ use crate::{
         },
     },
     entity::Entity,
-    soa::field::FieldDescriptor,
+    soa::layout::WithLayout,
 };
 
 use super::algo;
@@ -67,7 +67,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::register::<B, _, _>(components)?;
@@ -83,7 +83,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
         let archetype_id = self.register_archetype(components, archetype);
@@ -97,7 +97,7 @@ impl ArchetypeRegistry {
         archetype: impl Into<ErasedArchetypeCow<'a, ErasedDropMeta>>,
     ) -> ArchetypeId
     where
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let Self { archetypes, graph } = self;
         algo::register(archetypes, graph, components, archetype.into())
@@ -492,7 +492,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), InsertExactError<ErasedBundleKind<T>>>
     where
         T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let location = self.find_location(entity);
         self.insert_exact_at(components, entity, value, location)
@@ -510,7 +510,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, InsertExactAtError<ErasedBundleKind<T>>>
     where
         T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let Self { archetypes, graph } = self;
         let result = algo::insert_exact_archetypes(
@@ -549,7 +549,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), InsertBundleExactError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -568,7 +568,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, InsertBundleExactAtError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
@@ -623,7 +623,7 @@ impl ArchetypeRegistry {
         value: ErasedBundleKind<T>,
     ) where
         T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let location = self.find_location(entity);
         let Ok(_) = self
@@ -641,7 +641,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, InsertAtError<ErasedBundleKind<T>>>
     where
         T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let Self { archetypes, graph } = self;
         let result = algo::insert_archetypes(
@@ -680,7 +680,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), InsertBundleError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -699,7 +699,7 @@ impl ArchetypeRegistry {
     ) -> Result<ArchetypeId, InsertBundleAtError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
@@ -754,7 +754,7 @@ impl ArchetypeRegistry {
         components_to_remove: ErasedArchetypeView<'me, ErasedDropMeta>,
     ) -> Result<Option<ErasedBorrowedViewBundle<'me, ErasedDropMeta>>, MissingComponentError>
     where
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let location = self.find_location(entity);
         let (value, _) = self
@@ -778,7 +778,7 @@ impl ArchetypeRegistry {
         RemoveExactAtError,
     >
     where
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let Self { archetypes, graph } = self;
         let remove_archetypes = algo::remove_exact_archetypes(
@@ -819,7 +819,7 @@ impl ArchetypeRegistry {
     ) -> Result<Option<B>, RemoveBundleExactError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -838,7 +838,7 @@ impl ArchetypeRegistry {
     ) -> Result<(Option<B>, EntityLocation), RemoveBundleExactAtError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_remove = ErasedArchetype::register::<B, M, T>(components)?;
@@ -886,7 +886,7 @@ impl ArchetypeRegistry {
         entity: Entity,
         components_to_remove: ErasedArchetypeView<impl Sized>,
     ) where
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let location = self.find_location(entity);
         let Ok(_) = self
@@ -903,7 +903,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<EntityLocation, InvalidEntityLocationError>
     where
-        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        M: WithLayout + WithErasedDrop,
     {
         let Self { archetypes, graph } = self;
         let remove_archetypes = algo::remove_archetypes(
@@ -941,7 +941,7 @@ impl ArchetypeRegistry {
     ) -> Result<(), DuplicateComponentError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
@@ -959,7 +959,7 @@ impl ArchetypeRegistry {
     ) -> Result<EntityLocation, RemoveBundleAtError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components_to_remove = ErasedArchetype::<()>::register::<B, M, T>(components)?;

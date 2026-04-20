@@ -39,7 +39,7 @@ use crate::{
     },
     entity::Entity,
     hash::IndexSet,
-    soa::field::FieldDescriptor,
+    soa::layout::WithLayout,
 };
 
 use super::{
@@ -386,7 +386,7 @@ pub fn register<M>(
     archetype: ErasedArchetypeCow<ErasedDropMeta>,
 ) -> ArchetypeId
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     let archetype_view = archetype.as_view();
     assert!(
@@ -421,7 +421,7 @@ pub fn register_before<M>(
     archetype: ErasedArchetypeView<impl Sized>,
 ) -> Option<impl IntoIterator<Item = (ArchetypeId, ComponentId)>>
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     #[cold]
     #[inline(never)]
@@ -518,7 +518,7 @@ pub fn remove_bundle_from_archetype<B, M, T>(
 ) -> B
 where
     B: Bundle,
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
     T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
     let info = unwrap_archetype_info_mut(archetypes, archetype_id);
@@ -556,7 +556,7 @@ pub fn insert_exact_archetypes<M>(
     components_to_insert: ErasedArchetypeView<ErasedDropMeta>,
 ) -> Result<(Option<ArchetypeId>, ArchetypeId), InsertExactAtErrorKind>
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     check_location(archetypes, entity, location)?;
 
@@ -588,7 +588,7 @@ pub fn insert_archetypes<M>(
     components_to_insert: ErasedArchetypeView<ErasedDropMeta>,
 ) -> Result<(Option<ArchetypeId>, ArchetypeId), InvalidEntityLocationError>
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     check_location(archetypes, entity, location)?;
 
@@ -613,7 +613,7 @@ pub fn remove_exact_archetypes<M>(
     components_to_remove: ErasedArchetypeView<impl Sized>,
 ) -> Result<Option<(ArchetypeId, Option<ArchetypeId>)>, RemoveExactAtError>
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     check_location(archetypes, entity, location)?;
     let EntityLocation::WithComponents(old_archetype) = location else {
@@ -645,7 +645,7 @@ pub fn remove_archetypes<M>(
     components_to_remove: ErasedArchetypeView<impl Sized>,
 ) -> Result<Option<(ArchetypeId, Option<ArchetypeId>)>, InvalidEntityLocationError>
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     check_location(archetypes, entity, location)?;
     let EntityLocation::WithComponents(old_archetype) = location else {
@@ -671,7 +671,7 @@ fn register_archetype_with_components<M>(
     with_components: ErasedArchetypeView<ErasedDropMeta>,
 ) -> ArchetypeId
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     let Some(start) = start else {
         return register(archetypes, graph, components, with_components.into());
@@ -691,7 +691,7 @@ where
         .sorted_unstable_by_key(|&component_id| {
             components
                 .get_component_info(component_id)
-                .map(|info| info.as_ref().layout().align())
+                .map(|info| info.layout().align())
         })
         .unique();
     let archetype = ErasedArchetype::new(components, component_ids)
@@ -708,7 +708,7 @@ fn register_archetype_without_components<M>(
     without_components: ErasedArchetypeView<impl Sized>,
 ) -> Option<ArchetypeId>
 where
-    M: AsRef<FieldDescriptor> + WithErasedDrop,
+    M: WithLayout + WithErasedDrop,
 {
     if let Some([component_id]) = without_components.component_ids().collect_array()
         && let Some(archetype_id) = find_archetype_with_component(graph, start, component_id)

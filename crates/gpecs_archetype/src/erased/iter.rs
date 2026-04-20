@@ -4,12 +4,13 @@ use core::{
 };
 
 use gpecs_component::registry::{ComponentId, ComponentInfo};
-use gpecs_soa_erased::CovariantFieldDescriptors;
+use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     iter::RawIter,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldLayouts, FieldLayoutsOutput},
         identity::Identity,
+        layout::WithLayout,
     },
 };
 
@@ -122,26 +123,26 @@ impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
 
 impl<Meta> FusedIterator for Iter<'_, Meta> {}
 
-impl<'a, Meta> FieldDescriptors<'a> for Iter<'_, Meta>
+impl<'a, Meta> FieldLayouts<'a> for Iter<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'a,
+    Meta: WithLayout + 'a,
 {
     type Output = Iter<'a, Meta>;
 
     #[inline]
-    fn field_descriptors(&'a self) -> Self::Output {
+    fn field_layouts(&'a self) -> Self::Output {
         self.clone()
     }
 }
 
-impl<Meta> CovariantFieldDescriptors for Iter<'_, Meta>
+impl<Meta> CovariantFieldLayouts for Iter<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
 {
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: FieldDescriptorsOutput<'long, Self>,
-    ) -> FieldDescriptorsOutput<'short, Self> {
+    fn upcast_field_layouts<'short, 'long: 'short>(
+        from: FieldLayoutsOutput<'long, Self>,
+    ) -> FieldLayoutsOutput<'short, Self> {
         from
     }
 }

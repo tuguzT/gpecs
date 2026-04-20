@@ -12,7 +12,8 @@ use gpecs_soa_erased::{
     ptr::slice::{PtrsItem, SliceItemPtrs},
     soa::{
         self,
-        field::{FieldDescriptor, FieldDescriptors},
+        field::FieldLayouts,
+        layout::WithLayout,
         traits::{
             RawSoaContext, ReadSoaContext, Refs as ErasedBundleRefs,
             RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles, SlicesMut as ErasedBundlesMut,
@@ -88,7 +89,7 @@ where
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, T::Meta> {
         let Self { sparse_set } = self;
-        (**sparse_set.context()).field_descriptors()
+        (**sparse_set.context()).field_layouts()
     }
 
     #[inline]
@@ -481,7 +482,7 @@ type BundlesMutWithArchetype<'a, B, T> = (
 
 impl<Meta, D, S, P> ArchetypeStorage<ErasedBundle<Meta, D, S, P>>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -493,7 +494,7 @@ where
     ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
-        T: AsRef<FieldDescriptor>,
+        T: WithLayout,
         Meta: FromComponentInfo<'a, T>,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
@@ -507,7 +508,7 @@ where
     ) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
-        M: AsRef<FieldDescriptor>,
+        M: WithLayout,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
         Meta: FromComponentInfo<'a, M>,
     {
@@ -522,7 +523,7 @@ where
     ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
-        M: PushBackArray<Item: AsRef<FieldDescriptor> + FromComponentType>,
+        M: PushBackArray<Item: WithLayout + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
         Meta: FromComponentInfo<'a, M::Item>,
     {

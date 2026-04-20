@@ -3,7 +3,7 @@ use core::ops::Deref;
 use gpecs_soa_erased::{
     ptr::slice::{ConstPtr, MutPtr, NonNullPtr, SliceItemPtrs},
     soa::{
-        field::FieldDescriptor,
+        layout::WithLayout,
         traits::{AllocSoa, SoaContext, SoaOwned},
     },
     storage::AlignedStorage,
@@ -36,14 +36,14 @@ pub trait ErasedArchetypeSoa:
         > + Deref<Target: ErasedArchetypeKind<Meta = Self::Meta>>,
     > + AllocSoa
 {
-    type Meta: AsRef<FieldDescriptor> + 'static;
+    type Meta: WithLayout + 'static;
     type Archetype<'a>: ErasedArchetypeKind<Meta = Self::Meta>;
     type Ptrs: SliceItemPtrs;
 }
 
 impl<'view, Meta, D, S, P> ErasedArchetypeSoa for ErasedBorrowedViewBundle<'view, Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + 'static,
+    Meta: WithLayout + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
     P: SliceItemPtrs<Item = S::Item>,

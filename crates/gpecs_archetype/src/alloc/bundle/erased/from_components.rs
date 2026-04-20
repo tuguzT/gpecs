@@ -7,9 +7,9 @@ use core::{
 use gpecs_component::{erased::ErasedComponent, registry::ComponentRegistryView};
 use gpecs_soa_erased::{
     ErasedSoa,
-    error::FromFieldsDescriptorsError,
+    error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
-    soa::field::FieldDescriptor,
+    soa::layout::WithLayout,
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
@@ -28,7 +28,7 @@ where
 
 impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
 where
-    Meta: AsRef<FieldDescriptor> + FromErasedComponent<S, P> + 'static,
+    Meta: WithLayout + FromErasedComponent<S, P> + 'static,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -57,7 +57,7 @@ where
             .into_iter()
             .map(|component_info| component_info.into_meta().into_field());
 
-        let inner = ErasedSoa::try_from_fields_descriptors(fields, archetype)
+        let inner = ErasedSoa::try_from_fields_layouts(fields, archetype)
             .map_err(into_from_components_error)?;
 
         let me = unsafe { Self::from_inner(inner) };
@@ -66,14 +66,14 @@ where
 }
 
 #[inline]
-fn into_from_components_error<T>(error: FromFieldsDescriptorsError<T>) -> FromComponentsError<T> {
+fn into_from_components_error<T>(error: FromFieldsLayoutsError<T>) -> FromComponentsError<T> {
     match error {
-        FromFieldsDescriptorsError::FromLayout(error) => FromComponentsError::FromLayout(error),
-        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-        FromFieldsDescriptorsError::LenMismatch(error) => {
+        FromFieldsLayoutsError::FromLayout(error) => FromComponentsError::FromLayout(error),
+        FromFieldsLayoutsError::InvalidLayout(error) => error.into(),
+        FromFieldsLayoutsError::LenMismatch(error) => {
             unreachable!("failed to create erased bundle from components: {error}")
         }
-        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+        FromFieldsLayoutsError::InsufficientAlign(error) => {
             unreachable!("failed to create erased bundle from components: {error}")
         }
     }

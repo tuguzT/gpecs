@@ -305,42 +305,42 @@ impl Error for IterOrFieldLenMismatchError {
 }
 
 #[derive(Debug, Clone)]
-pub enum FromStorageFieldsDescriptorsError {
+pub enum FromStorageFieldsLayoutsError {
     LenMismatch(IterOrFieldLenMismatchError),
     LayoutMismatch(LayoutMismatchError),
     InsufficientAlign(InsufficientAlignError),
     InvalidLayout(LayoutError),
 }
 
-impl From<IterOrFieldLenMismatchError> for FromStorageFieldsDescriptorsError {
+impl From<IterOrFieldLenMismatchError> for FromStorageFieldsLayoutsError {
     #[inline]
     fn from(error: IterOrFieldLenMismatchError) -> Self {
         Self::LenMismatch(error)
     }
 }
 
-impl From<LayoutMismatchError> for FromStorageFieldsDescriptorsError {
+impl From<LayoutMismatchError> for FromStorageFieldsLayoutsError {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl From<InsufficientAlignError> for FromStorageFieldsDescriptorsError {
+impl From<InsufficientAlignError> for FromStorageFieldsLayoutsError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl From<LayoutError> for FromStorageFieldsDescriptorsError {
+impl From<LayoutError> for FromStorageFieldsLayoutsError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl Display for FromStorageFieldsDescriptorsError {
+impl Display for FromStorageFieldsLayoutsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LenMismatch(error) => Display::fmt(error, f),
@@ -351,7 +351,7 @@ impl Display for FromStorageFieldsDescriptorsError {
     }
 }
 
-impl Error for FromStorageFieldsDescriptorsError {
+impl Error for FromStorageFieldsLayoutsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::LenMismatch(error) => Some(error),
@@ -363,35 +363,35 @@ impl Error for FromStorageFieldsDescriptorsError {
 }
 
 #[derive(Debug, Clone)]
-pub enum FromFieldsDescriptorsError<T> {
+pub enum FromFieldsLayoutsError<T> {
     LenMismatch(IterOrFieldLenMismatchError),
     InsufficientAlign(InsufficientAlignError),
     InvalidLayout(LayoutError),
     FromLayout(T),
 }
 
-impl<T> From<IterOrFieldLenMismatchError> for FromFieldsDescriptorsError<T> {
+impl<T> From<IterOrFieldLenMismatchError> for FromFieldsLayoutsError<T> {
     #[inline]
     fn from(value: IterOrFieldLenMismatchError) -> Self {
         Self::LenMismatch(value)
     }
 }
 
-impl<T> From<InsufficientAlignError> for FromFieldsDescriptorsError<T> {
+impl<T> From<InsufficientAlignError> for FromFieldsLayoutsError<T> {
     #[inline]
     fn from(value: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(value)
     }
 }
 
-impl<T> From<LayoutError> for FromFieldsDescriptorsError<T> {
+impl<T> From<LayoutError> for FromFieldsLayoutsError<T> {
     #[inline]
     fn from(value: LayoutError) -> Self {
         Self::InvalidLayout(value)
     }
 }
 
-impl<T> Display for FromFieldsDescriptorsError<T>
+impl<T> Display for FromFieldsLayoutsError<T>
 where
     T: Display,
 {
@@ -405,7 +405,7 @@ where
     }
 }
 
-impl<T> Error for FromFieldsDescriptorsError<T>
+impl<T> Error for FromFieldsLayoutsError<T>
 where
     T: Error,
 {
@@ -529,31 +529,31 @@ impl Error for FromStorageValueErrorKind {
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct FromDescriptorsValueError<T, E>
+pub struct FromLayoutsValueError<T, E>
 where
     T: ?Sized,
 {
-    pub source: FromDescriptorsValueErrorKind<E>,
+    pub source: FromLayoutsValueErrorKind<E>,
     pub value: T,
 }
 
-impl<T, E> FromDescriptorsValueError<T, E> {
+impl<T, E> FromLayoutsValueError<T, E> {
     #[inline]
-    pub(crate) fn new(value: T, source: FromDescriptorsValueErrorKind<E>) -> Self {
+    pub(crate) fn new(value: T, source: FromLayoutsValueErrorKind<E>) -> Self {
         Self { source, value }
     }
 
     #[inline]
-    pub fn map_value<U, F>(self, f: F) -> FromDescriptorsValueError<U, E>
+    pub fn map_value<U, F>(self, f: F) -> FromLayoutsValueError<U, E>
     where
         F: FnOnce(T) -> U,
     {
         let Self { source, value } = self;
-        FromDescriptorsValueError::new(f(value), source)
+        FromLayoutsValueError::new(f(value), source)
     }
 }
 
-impl<T, E> Display for FromDescriptorsValueError<T, E>
+impl<T, E> Display for FromLayoutsValueError<T, E>
 where
     T: Display + ?Sized,
     E: Display,
@@ -564,7 +564,7 @@ where
     }
 }
 
-impl<T, E> Error for FromDescriptorsValueError<T, E>
+impl<T, E> Error for FromLayoutsValueError<T, E>
 where
     T: Debug + Display + ?Sized,
     E: Error,
@@ -576,21 +576,21 @@ where
 }
 
 #[inline]
-pub(super) fn check_from_descriptors_value<F, R, T, E>(
+pub(super) fn check_from_layouts_value<F, R, T, E>(
     f: F,
     value: T,
-) -> Result<(T, R), FromDescriptorsValueError<T, E>>
+) -> Result<(T, R), FromLayoutsValueError<T, E>>
 where
-    F: FnOnce() -> Result<R, FromDescriptorsValueErrorKind<E>>,
+    F: FnOnce() -> Result<R, FromLayoutsValueErrorKind<E>>,
 {
     match f() {
         Ok(ok) => Ok((value, ok)),
-        Err(source) => Err(FromDescriptorsValueError::new(value, source)),
+        Err(source) => Err(FromLayoutsValueError::new(value, source)),
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum FromDescriptorsValueErrorKind<T> {
+pub enum FromLayoutsValueErrorKind<T> {
     LenMismatch(LenMismatchError),
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
@@ -598,35 +598,35 @@ pub enum FromDescriptorsValueErrorKind<T> {
     FromLayout(T),
 }
 
-impl<T> From<LenMismatchError> for FromDescriptorsValueErrorKind<T> {
+impl<T> From<LenMismatchError> for FromLayoutsValueErrorKind<T> {
     #[inline]
     fn from(error: LenMismatchError) -> Self {
         Self::LenMismatch(error)
     }
 }
 
-impl<T> From<LayoutMismatchError> for FromDescriptorsValueErrorKind<T> {
+impl<T> From<LayoutMismatchError> for FromLayoutsValueErrorKind<T> {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl<T> From<LayoutError> for FromDescriptorsValueErrorKind<T> {
+impl<T> From<LayoutError> for FromLayoutsValueErrorKind<T> {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl<T> From<InsufficientAlignError> for FromDescriptorsValueErrorKind<T> {
+impl<T> From<InsufficientAlignError> for FromLayoutsValueErrorKind<T> {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl<T> Display for FromDescriptorsValueErrorKind<T>
+impl<T> Display for FromLayoutsValueErrorKind<T>
 where
     T: Display,
 {
@@ -641,7 +641,7 @@ where
     }
 }
 
-impl<T> Error for FromDescriptorsValueErrorKind<T>
+impl<T> Error for FromLayoutsValueErrorKind<T>
 where
     T: Error,
 {

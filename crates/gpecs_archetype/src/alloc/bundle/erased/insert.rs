@@ -6,7 +6,7 @@ use core::{
 };
 
 use gpecs_soa_erased::{
-    ErasedSoa, error::FromFieldsDescriptorsError, ptr::slice::SliceItemPtrs,
+    ErasedSoa, error::FromFieldsLayoutsError, ptr::slice::SliceItemPtrs,
     storage::AlignedStorageFromLayout,
 };
 
@@ -56,7 +56,7 @@ where
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
-        let result = ErasedSoa::try_from_fields_descriptors(refs, archetype);
+        let result = ErasedSoa::try_from_fields_layouts(refs, archetype);
         let inner = match result.map_err(into_insert_error_kind) {
             Ok(inner) => inner,
             Err(source) => {
@@ -76,14 +76,14 @@ where
 }
 
 #[inline]
-fn into_insert_error_kind<E>(error: FromFieldsDescriptorsError<E>) -> InsertErrorKind<E> {
+fn into_insert_error_kind<E>(error: FromFieldsLayoutsError<E>) -> InsertErrorKind<E> {
     match error {
-        FromFieldsDescriptorsError::FromLayout(error) => InsertErrorKind::FromLayout(error),
-        FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
-        FromFieldsDescriptorsError::LenMismatch(error) => {
+        FromFieldsLayoutsError::FromLayout(error) => InsertErrorKind::FromLayout(error),
+        FromFieldsLayoutsError::InvalidLayout(error) => error.into(),
+        FromFieldsLayoutsError::LenMismatch(error) => {
             unreachable!("failed to insert some components into bundle: {error}")
         }
-        FromFieldsDescriptorsError::InsufficientAlign(error) => {
+        FromFieldsLayoutsError::InsufficientAlign(error) => {
             unreachable!("failed to insert some components into bundle: {error}")
         }
     }

@@ -2,20 +2,17 @@ use std::{alloc::Layout, mem::MaybeUninit};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    ErasedSoa,
-    data::ErasedRef,
-    ptr::slice::CoreSliceItemPtrs,
-    soa::field::{FieldDescriptor, FieldDescriptors},
+    ErasedSoa, data::ErasedRef, ptr::slice::CoreSliceItemPtrs, soa::field::FieldLayouts,
     storage::AlignedStorageSlice,
 };
 
 #[cfg(feature = "alloc")]
 use gpecs_soa_erased::{data::BoxedErased, storage::BoxedAlignedUninitStorage};
 
-use crate::common::ArrayDescriptors;
+use crate::common::ArrayLayouts;
 
 type ArrayErasedSoa<T, const CAP: usize> =
-    ErasedSoa<T, ArrayDescriptors<FieldDescriptor, CAP>, CoreSliceItemPtrs<MaybeUninit<u8>>>;
+    ErasedSoa<T, ArrayLayouts<Layout, CAP>, CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
 #[test]
 #[cfg(feature = "alloc")]
@@ -41,21 +38,14 @@ fn value() {
     let erased_value =
         ArrayErasedSoa::<_, 5>::try_from_storage_value::<Value, _>(bytes, &context, value).unwrap();
 
-    let descriptors = [
-        FieldDescriptor::of::<()>(),
-        FieldDescriptor::of::<u8>(),
-        FieldDescriptor::of::<u32>(),
-        FieldDescriptor::of::<String>(),
-        FieldDescriptor::of::<u128>(),
+    let layouts = [
+        Layout::new::<()>(),
+        Layout::new::<u8>(),
+        Layout::new::<u32>(),
+        Layout::new::<String>(),
+        Layout::new::<u128>(),
     ];
-    itertools::assert_equal(
-        erased_value
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    itertools::assert_equal(erased_value.field_layouts().iter().copied(), layouts);
 
     let erased_refs = erased_value.as_refs();
     assert_eq!(erased_refs.iter().len(), 5);
@@ -115,10 +105,10 @@ fn value() {
     );
 
     let field_refs = [
-        ErasedRef::<*const _>::new(descriptors[0].layout(), bytemuck::bytes_of(&())).unwrap(),
-        ErasedRef::<*const _>::new(descriptors[1].layout(), bytemuck::bytes_of(&i3)).unwrap(),
-        ErasedRef::<*const _>::new(descriptors[2].layout(), bytemuck::bytes_of(&i1)).unwrap(),
-        ErasedRef::<*const _>::new(descriptors[4].layout(), bytemuck::bytes_of(&i2)).unwrap(),
+        ErasedRef::<*const _>::new(layouts[0], bytemuck::bytes_of(&())).unwrap(),
+        ErasedRef::<*const _>::new(layouts[1], bytemuck::bytes_of(&i3)).unwrap(),
+        ErasedRef::<*const _>::new(layouts[2], bytemuck::bytes_of(&i1)).unwrap(),
+        ErasedRef::<*const _>::new(layouts[4], bytemuck::bytes_of(&i2)).unwrap(),
     ];
     itertools::assert_equal(
         erased_refs
@@ -139,13 +129,10 @@ fn value() {
         str,
     );
 
-    let fields_with_descriptors = fields.into_iter().map(|field| {
-        let (storage, layout) = field.into_parts();
-        (storage, FieldDescriptor::new(layout))
-    });
+    let fields_with_layouts = fields.into_iter().map(BoxedErased::into_parts);
     let erased_value =
-        ArrayErasedSoa::<BoxedAlignedUninitStorage, 4>::try_from_fields_with_descriptors(
-            fields_with_descriptors,
+        ArrayErasedSoa::<BoxedAlignedUninitStorage, 4>::try_from_fields_with_layouts(
+            fields_with_layouts,
         )
         .expect("all the fields should be valid here");
 
@@ -172,15 +159,8 @@ fn value_zst() {
     let erased_value =
         ArrayErasedSoa::<_, 1>::try_from_storage_value::<(), _>(bytes, &context, value).unwrap();
 
-    let descriptors = [];
-    itertools::assert_equal(
-        erased_value
-            .field_descriptors()
-            .iter()
-            .copied()
-            .map(FieldDescriptor::layout),
-        descriptors.map(FieldDescriptor::layout),
-    );
+    let layouts = [];
+    itertools::assert_equal(erased_value.field_layouts().iter().copied(), layouts);
 
     let field_refs = [];
     itertools::assert_equal(

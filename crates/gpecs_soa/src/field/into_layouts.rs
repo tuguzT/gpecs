@@ -1,23 +1,23 @@
-use core::iter::FusedIterator;
+use core::{alloc::Layout, iter::FusedIterator};
 
-use crate::field::FieldDescriptor;
+use crate::layout::WithLayout;
 
-pub trait IntoCopiedFieldDescriptors: IntoIterator + Sized {
+pub trait IntoFieldLayoutsIter: IntoIterator + Sized {
     #[inline]
-    fn copied_field_descriptors(self) -> CopiedFieldDescriptors<Self::IntoIter> {
+    fn into_field_layouts(self) -> IntoFieldLayouts<Self::IntoIter> {
         self.into_iter().into()
     }
 }
 
-impl<T> IntoCopiedFieldDescriptors for T where T: IntoIterator {}
+impl<T> IntoFieldLayoutsIter for T where T: IntoIterator {}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct CopiedFieldDescriptors<T>(pub T)
+pub struct IntoFieldLayouts<T>(pub T)
 where
     T: ?Sized;
 
-impl<T> CopiedFieldDescriptors<T> {
+impl<T> IntoFieldLayouts<T> {
     #[inline]
     pub fn into_inner(self) -> T {
         let Self(inner) = self;
@@ -25,7 +25,7 @@ impl<T> CopiedFieldDescriptors<T> {
     }
 }
 
-impl<T> CopiedFieldDescriptors<T>
+impl<T> IntoFieldLayouts<T>
 where
     T: ?Sized,
 {
@@ -42,24 +42,23 @@ where
     }
 }
 
-impl<T> From<T> for CopiedFieldDescriptors<T> {
+impl<T> From<T> for IntoFieldLayouts<T> {
     #[inline]
     fn from(value: T) -> Self {
         Self(value)
     }
 }
 
-impl<T> Iterator for CopiedFieldDescriptors<T>
+impl<T> Iterator for IntoFieldLayouts<T>
 where
-    T: Iterator + ?Sized,
-    T::Item: AsRef<FieldDescriptor>,
+    T: Iterator<Item: WithLayout> + ?Sized,
 {
-    type Item = FieldDescriptor;
+    type Item = Layout;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self(inner) = self;
-        inner.next().map(|desc| *desc.as_ref())
+        inner.next().map(|item| item.layout())
     }
 
     #[inline]
@@ -71,32 +70,30 @@ where
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self(inner) = self;
-        inner.nth(n).map(|desc| *desc.as_ref())
+        inner.nth(n).map(|item| item.layout())
     }
 }
 
-impl<T> DoubleEndedIterator for CopiedFieldDescriptors<T>
+impl<T> DoubleEndedIterator for IntoFieldLayouts<T>
 where
-    T: DoubleEndedIterator + ?Sized,
-    T::Item: AsRef<FieldDescriptor>,
+    T: DoubleEndedIterator<Item: WithLayout> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self(inner) = self;
-        inner.next_back().map(|desc| *desc.as_ref())
+        inner.next_back().map(|item| item.layout())
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self(inner) = self;
-        inner.nth_back(n).map(|desc| *desc.as_ref())
+        inner.nth_back(n).map(|item| item.layout())
     }
 }
 
-impl<T> ExactSizeIterator for CopiedFieldDescriptors<T>
+impl<T> ExactSizeIterator for IntoFieldLayouts<T>
 where
-    T: ExactSizeIterator + ?Sized,
-    T::Item: AsRef<FieldDescriptor>,
+    T: ExactSizeIterator<Item: WithLayout> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -105,9 +102,4 @@ where
     }
 }
 
-impl<T> FusedIterator for CopiedFieldDescriptors<T>
-where
-    T: FusedIterator + ?Sized,
-    T::Item: AsRef<FieldDescriptor>,
-{
-}
+impl<T> FusedIterator for IntoFieldLayouts<T> where T: FusedIterator<Item: WithLayout> + ?Sized {}

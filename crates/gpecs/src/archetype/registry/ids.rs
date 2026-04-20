@@ -4,9 +4,12 @@ use std::{
     ops::Range,
 };
 
-use crate::archetype::registry::{ArchetypeId, ArchetypeRegistry};
+use crate::archetype::registry::ArchetypeId;
 
-use super::id::{archetype_id_from_usize, archetype_id_trusted};
+use super::{
+    algo,
+    id::{archetype_id_from_usize, archetype_id_trusted},
+};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ArchetypeIds {
@@ -15,7 +18,7 @@ pub struct ArchetypeIds {
 
 impl ArchetypeIds {
     #[inline]
-    pub fn new(archetypes: &ArchetypeRegistry) -> Self {
+    pub(super) fn new(archetypes: &algo::Archetypes) -> Self {
         let len = archetypes.len();
         let end = archetype_id_from_usize(len).into_u32();
         Self { inner: 0..end }

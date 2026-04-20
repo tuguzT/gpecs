@@ -11,6 +11,8 @@ pub use self::{
     id::ArchetypeId,
     ids::ArchetypeIds,
     info::ArchetypeInfo,
+    iter::Iter,
+    iter_mut::IterMut,
     location::EntityLocation,
     registry::ArchetypeRegistry,
 };
@@ -30,6 +32,8 @@ mod cow;
 mod id;
 mod ids;
 mod info;
+mod iter;
+mod iter_mut;
 mod key;
 mod location;
 mod registry;

@@ -12,7 +12,7 @@ use crate::{
         registry::{
             ArchetypeId, ArchetypeIds, ArchetypeInfo, ArchetypesAfter, ArchetypesAfterMut,
             ArchetypesBefore, ArchetypesBeforeMut, Bundles, BundlesMut, CompatibleArchetypes,
-            CompatibleArchetypesMut, EntityLocation, ErasedArchetypeCow,
+            CompatibleArchetypesMut, EntityLocation, ErasedArchetypeCow, Iter, IterMut,
             error::{
                 GetAtError, InsertAtError, InsertBundleAtError, InsertBundleError,
                 InsertBundleExactAtError, InsertBundleExactError, InsertExactAtError,
@@ -173,7 +173,20 @@ impl ArchetypeRegistry {
 
     #[inline]
     pub fn archetype_ids(&self) -> ArchetypeIds {
-        ArchetypeIds::new(self)
+        let Self { archetypes, .. } = self;
+        ArchetypeIds::new(archetypes)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_> {
+        let Self { archetypes, .. } = self;
+        Iter::new(archetypes)
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_> {
+        let Self { archetypes, .. } = self;
+        IterMut::new(archetypes)
     }
 
     #[inline]
@@ -1048,5 +1061,25 @@ impl Debug for ArchetypeRegistry {
                 .field("graph", graph)
                 .finish()
         })
+    }
+}
+
+impl<'a> IntoIterator for &'a ArchetypeRegistry {
+    type Item = ArchetypeInfo<&'a ArchetypeStorage>;
+    type IntoIter = Iter<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut ArchetypeRegistry {
+    type Item = ArchetypeInfo<&'a mut ArchetypeStorage>;
+    type IntoIter = IterMut<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }

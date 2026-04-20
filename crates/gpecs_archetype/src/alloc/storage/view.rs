@@ -6,7 +6,7 @@ use gpecs_entity::Entity;
 use gpecs_sparse::item::SparseItem;
 
 use crate::{
-    bundle::{Bundle, BundleRefs, BundleSlices},
+    bundle::{Bundle, BundleRefs, BundleSlices, erased::error::DowncastError},
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     storage::{ArchetypeStorageView, ErasedArchetypeSoa, NoEpochEntity},
 };
@@ -42,7 +42,7 @@ where
 
         let bundles = bundles
             .downcast::<B, M>(components)
-            .map_err(|error| error.source)
+            .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
         Ok((entities, bundles, sparse, archetype))
     }
@@ -104,7 +104,7 @@ where
         };
         let bundle = bundle
             .downcast::<B, M>(components)
-            .map_err(|error| error.source)
+            .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
         Ok(Some(bundle))
     }

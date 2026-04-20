@@ -83,6 +83,12 @@ impl<B, T> FromBundleError<B, T> {
     fn new(bundle: B, source: FromBundleErrorKind<T>) -> Self {
         Self { source, bundle }
     }
+
+    #[inline]
+    pub fn into_source(self) -> FromBundleErrorKind<T> {
+        let Self { source, .. } = self;
+        source
+    }
 }
 
 impl<B, T> Display for FromBundleError<B, T>

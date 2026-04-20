@@ -39,7 +39,8 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBorrowedBundle, ErasedBorrowedViewBundle, ErasedBundle, ErasedBundleKind,
-            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair, error::DowncastErrorKind,
+            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair,
+            error::{DowncastError, DowncastErrorKind, FromBundleError},
             traits::ErasedArchetypeKind,
         },
     },
@@ -850,7 +851,7 @@ impl ArchetypeRegistry {
 
         let bundle = bundle
             .downcast::<B, T>(components)
-            .map_err(|error| error.source)?;
+            .map_err(DowncastError::into_source)?;
         Ok(Some(bundle))
     }
 
@@ -919,7 +920,7 @@ impl ArchetypeRegistry {
 
         let bundle = bundle
             .downcast::<B, T>(components)
-            .map_err(|error| error.source)?;
+            .map_err(DowncastError::into_source)?;
         Ok(Some(bundle))
     }
 
@@ -1073,7 +1074,7 @@ impl ArchetypeRegistry {
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
         let to_insert = ErasedBundle::from_bundle(components, value)
-            .map_err(|error| error.source)
+            .map_err(FromBundleError::into_source)
             .expect("bundle compatibility should have been already checked");
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
             .insert(to_insert)
@@ -1204,7 +1205,7 @@ impl ArchetypeRegistry {
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
         let to_replace = ErasedBundle::from_bundle(components, value)
-            .map_err(|error| error.source)
+            .map_err(FromBundleError::into_source)
             .expect("bundle compatibility should have been already checked");
         let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
             .replace(to_replace)
@@ -1531,7 +1532,7 @@ impl ArchetypeRegistry {
     {
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if let Err(error) = info.storage.insert_bundle(components, entity, value) {
-            let error = error.source;
+            let error = error.into_source();
             unreachable!("failed to insert {entity} into {archetype_id}: {error}")
         }
     }

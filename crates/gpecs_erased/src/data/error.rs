@@ -90,6 +90,12 @@ impl<T> DowncastError<T> {
         let Self { source, value } = self;
         DowncastError::new(f(value), source)
     }
+
+    #[inline]
+    pub fn into_source(self) -> LayoutMismatchError {
+        let Self { source, .. } = self;
+        source
+    }
 }
 
 impl<T> Display for DowncastError<T>

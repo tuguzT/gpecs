@@ -1007,7 +1007,8 @@ where
         V: SoaRead<'a, R> + SoaWrite<W>,
     {
         self.try_insert(key, value)
-            .unwrap_or_else(|error| try_insert_failed(error.source))
+            .map_err(TryModifyError::into_source)
+            .unwrap_or_else(|error| try_insert_failed(error))
     }
 
     pub fn try_insert_from<'a, F, R>(&'a mut self, key: K, f: F) -> R
@@ -1162,7 +1163,8 @@ where
         V: SoaWrite<W>,
     {
         self.try_push(value)
-            .unwrap_or_else(|error| try_push_failed(error.source))
+            .map_err(TryModifyError::into_source)
+            .unwrap_or_else(|error| try_push_failed(error))
     }
 
     pub fn try_push_from<'a, F, R>(&'a mut self, f: F) -> R

@@ -164,12 +164,13 @@ impl<Meta> EntityRegistry<Meta> {
         #[cold]
         #[inline(never)]
         #[track_caller]
-        fn spawn_failed<Meta>(error: TrySpawnError<Meta>) -> ! {
-            let source = error.source;
-            panic!("failed to spawn entity: {source}")
+        #[expect(clippy::needless_pass_by_value)]
+        fn spawn_failed(error: error::TryModifyErrorKind<Entity>) -> ! {
+            panic!("failed to spawn entity: {error}")
         }
 
         self.try_spawn(world, meta)
+            .map_err(TrySpawnError::into_source)
             .unwrap_or_else(|error| spawn_failed(error))
     }
 

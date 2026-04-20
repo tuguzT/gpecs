@@ -3,6 +3,7 @@ use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoa,
+    error::FromValueError,
     ptr::slice::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
@@ -27,7 +28,7 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite<Self> + Sized {
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
         let context = Self::Context::default();
         let value = BoxedErasedSoa::try_from::<Self, _>(&context, black_box(value))
-            .map_err(|error| error.source)
+            .map_err(FromValueError::into_source)
             .expect("failed to convert value into erased SoA");
         vec.push(value);
     }

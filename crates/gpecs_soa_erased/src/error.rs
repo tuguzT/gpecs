@@ -690,6 +690,12 @@ impl<T, E> FromValueError<T, E> {
         let Self { source, value } = self;
         FromValueError::new(f(value), source)
     }
+
+    #[inline]
+    pub fn into_source(self) -> FromValueErrorKind<E> {
+        let Self { source, .. } = self;
+        source
+    }
 }
 
 impl<T, E> Display for FromValueError<T, E>

@@ -406,7 +406,7 @@ where
             .archetype()
             .check_exact_compatibility_of::<B, M>(components)
         {
-            let error = IncompatibleBundleValueError { value, source };
+            let error = IncompatibleBundleValueError { source, value };
             return Err(error);
         }
 

@@ -153,6 +153,12 @@ where
         let value = f(value);
         TryModifyError { source, value }
     }
+
+    #[inline]
+    pub fn into_source(self) -> TryModifyErrorKind<K> {
+        let Self { source, .. } = self;
+        source
+    }
 }
 
 impl<K, V> Debug for TryModifyError<K, V>

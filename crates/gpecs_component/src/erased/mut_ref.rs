@@ -116,7 +116,7 @@ where
         let source = polonius!(|this| -> Result<&'polonius mut C, _> {
             match unsafe { this.field.downcast_mut() } {
                 Ok(component) => polonius_return!(Ok(component)),
-                Err(error) => error.source.into(),
+                Err(error) => error.into_source().into(),
             }
         });
         Err(DowncastError::new(this, source))

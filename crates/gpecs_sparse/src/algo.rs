@@ -1,4 +1,4 @@
-use core::{borrow::Borrow, fmt::Debug, ops};
+use core::{borrow::Borrow, fmt::Debug};
 
 use crate::{
     assert::{
@@ -14,55 +14,6 @@ use crate::{
     key::Key,
     soa::{slice::SoaSlices, traits::RawSoa},
 };
-
-// https://stackoverflow.com/a/73428605/14928295
-fn get_range<T>(
-    iterator: impl IntoIterator<Item = T>,
-    range: impl ops::RangeBounds<usize>,
-) -> impl Iterator<Item = T> {
-    let start_bound = match range.start_bound() {
-        ops::Bound::Included(&num) => num,
-        ops::Bound::Excluded(&num) => num + 1,
-        ops::Bound::Unbounded => 0,
-    };
-
-    let mut end_bound = match range.end_bound() {
-        ops::Bound::Included(&num) => Some(num + 1),
-        ops::Bound::Excluded(&num) => Some(num),
-        ops::Bound::Unbounded => None,
-    };
-
-    iterator
-        .into_iter()
-        .take_while(move |_| {
-            if let Some(num) = &mut end_bound {
-                if *num == 0 {
-                    false
-                } else {
-                    *num -= 1;
-                    true
-                }
-            } else {
-                true
-            }
-        })
-        .skip(start_bound)
-}
-
-pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Option<(T, T)> {
-    let (first, second) = (usize::min(a, b), usize::max(a, b));
-
-    let mut iter = get_range(iter, first..=second);
-    let first = iter.next()?;
-    let second = iter.last()?;
-
-    let pair = if a < b {
-        (first, second)
-    } else {
-        (second, first)
-    };
-    Some(pair)
-}
 
 #[inline]
 unsafe fn sparse_item_unchecked<K>(

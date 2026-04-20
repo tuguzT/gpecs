@@ -13,6 +13,7 @@ members = [
     "crates/gpecs_num",
     "crates/gpecs_layout",
     "crates/gpecs_erased",
+    "crates/gpecs_itertools",
     "crates/gpecs_soa",
     "crates/gpecs_soa_erased",
     "crates/gpecs_sparse",
@@ -49,6 +50,7 @@ gpecs_ptr = { path = "crates/gpecs_ptr", default-features = false }
 gpecs_num = { path = "crates/gpecs_num", default-features = false }
 gpecs_layout = { path = "crates/gpecs_layout", default-features = false }
 gpecs_erased = { path = "crates/gpecs_erased", default-features = false }
+gpecs_itertools = { path = "crates/gpecs_itertools", default-features = false }
 gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false }
 gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }

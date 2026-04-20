@@ -1,5 +1,6 @@
+use gpecs_itertools::Itertools;
+
 use crate::{
-    algo::get_pair,
     item::{SparseItem, SparseItemKind},
     key::{Epoch, Key},
 };
@@ -107,7 +108,7 @@ pub fn unwrap_dense_pair<T>(
     first_index: usize,
     second_index: usize,
 ) -> (T, T) {
-    let Some(pair) = get_pair(iter, first_index, second_index) else {
+    let Some(pair) = iter.into_iter().get_pair(first_index, second_index) else {
         unwrap_dense_value_pair_mut_failed()
     };
     pair
@@ -130,7 +131,7 @@ pub fn unwrap_sparse_items_pair_mut<K>(
 where
     K: Key,
 {
-    let Some(pair) = get_pair(sparse, first_index, second_index) else {
+    let Some(pair) = sparse.iter_mut().get_pair(first_index, second_index) else {
         unwrap_sparse_items_pair_mut_failed()
     };
     pair

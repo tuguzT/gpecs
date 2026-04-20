@@ -10,6 +10,7 @@ use gpecs_archetype::{
     erased::ErasedArchetype,
 };
 use gpecs_component::registry::traits::{ComponentIdFrom, FromComponentType};
+use gpecs_itertools::Itertools as _;
 use indexmap::{Equivalent, set::MutableValues};
 use itertools::Itertools;
 use petgraph::{
@@ -24,7 +25,7 @@ use crate::{
         ErasedDropMeta,
         erased::ErasedArchetypeView,
         registry::{
-            ArchetypeId, EntityLocation, ErasedArchetypeCow,
+            ArchetypeId, EntityLocation, ErasedArchetypeCow, IterMut,
             error::{
                 InsertExactAtErrorKind, InvalidEntityLocationError, InvalidEntityLocationErrorKind,
                 RemoveExactAtError,
@@ -258,10 +259,10 @@ pub fn unwrap_archetype_storage(
     archetypes: &Archetypes,
     archetype_id: ArchetypeId,
 ) -> &ArchetypeStorage {
-    let Some(info) = get_archetype_storage(archetypes, archetype_id) else {
+    let Some(storage) = get_archetype_storage(archetypes, archetype_id) else {
         unreachable!("{archetype_id} should exist")
     };
-    info
+    storage
 }
 
 #[inline]
@@ -279,10 +280,36 @@ pub fn unwrap_archetype_storage_mut(
     archetypes: &mut Archetypes,
     archetype_id: ArchetypeId,
 ) -> &mut ArchetypeStorage {
-    let Some(info) = get_archetype_storage_mut(archetypes, archetype_id) else {
+    let Some(storage) = get_archetype_storage_mut(archetypes, archetype_id) else {
         unreachable!("{archetype_id} should exist")
     };
-    info
+    storage
+}
+
+#[inline]
+pub fn get_archetype_storage_pair_mut(
+    archetypes: &mut Archetypes,
+    a: ArchetypeId,
+    b: ArchetypeId,
+) -> Option<(&mut ArchetypeStorage, &mut ArchetypeStorage)> {
+    let a = archetype_id_into_usize(a);
+    let b = archetype_id_into_usize(b);
+    IterMut::new(archetypes)
+        .get_pair(a, b)
+        .map(|(a, b)| (a.into_meta(), b.into_meta()))
+}
+
+#[inline]
+#[track_caller]
+pub fn unwrap_archetype_storage_pair_mut(
+    archetypes: &mut Archetypes,
+    a: ArchetypeId,
+    b: ArchetypeId,
+) -> (&mut ArchetypeStorage, &mut ArchetypeStorage) {
+    let Some(pair) = get_archetype_storage_pair_mut(archetypes, a, b) else {
+        unreachable!("{a} and {b} should exist & differ from each other")
+    };
+    pair
 }
 
 #[inline]

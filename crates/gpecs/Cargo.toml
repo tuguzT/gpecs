@@ -9,6 +9,7 @@ edition.workspace = true
 [dependencies]
 gpecs_sparse = { workspace = true, features = ["alloc"] }
 gpecs_soa_erased = { workspace = true, features = ["alloc"] }
+gpecs_itertools = { workspace = true }
 gpecs_world = { workspace = true }
 gpecs_entity = { workspace = true, features = ["alloc"] }
 gpecs_component = { workspace = true, features = ["alloc"] }

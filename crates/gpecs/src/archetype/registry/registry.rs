@@ -552,6 +552,9 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let (_old_storage, _new_storage) =
+            algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
+
         let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
             .insert(value)
             .expect("old archetype should not have components of the inserted bundle");
@@ -624,6 +627,9 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let (_old_storage, _new_storage) =
+            algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
+
         let to_insert = ErasedBundle::from_bundle(components, value)
             .map_err(FromBundleError::into_source)
             .expect("bundle compatibility should have been already checked");
@@ -683,6 +689,16 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        if let Some((_old_storage, _new_storage)) =
+            algo::get_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype)
+        {
+            // update some components & move into new archetype
+        } else {
+            // update all the components
+            assert_eq!(old_archetype, new_archetype);
+            let _storage = algo::unwrap_archetype_storage_mut(archetypes, old_archetype);
+        }
+
         let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
             .replace(value)
             .expect("combined bundle should be created successfully");
@@ -755,6 +771,16 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        if let Some((_old_storage, _new_storage)) =
+            algo::get_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype)
+        {
+            // update some components & move into new archetype
+        } else {
+            // update all the components
+            assert_eq!(old_archetype, new_archetype);
+            let _storage = algo::unwrap_archetype_storage_mut(archetypes, old_archetype);
+        }
+
         let to_replace = ErasedBundle::from_bundle(components, value)
             .map_err(FromBundleError::into_source)
             .expect("bundle compatibility should have been already checked");
@@ -819,6 +845,9 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let (_old_storage, _new_storage) =
+            algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
+
         let RemovePair {
             retained: bundle,
             removed: value,
@@ -884,6 +913,9 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let (_old_storage, _new_storage) =
+            algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
+
         let RemovePair {
             retained: bundle,
             removed,
@@ -944,6 +976,9 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let (_old_storage, _new_storage) =
+            algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
+
         let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
             .destroy(components_to_remove)
             .expect("all the bundle components should be present in the old archetype");
@@ -1005,6 +1040,9 @@ impl ArchetypeRegistry {
         };
 
         // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let (_old_storage, _new_storage) =
+            algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
+
         let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
             .destroy(components_to_remove)
             .expect("all the bundle components should be present in the old archetype");

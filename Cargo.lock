@@ -665,6 +665,7 @@ dependencies = [
  "gpecs_archetype",
  "gpecs_component",
  "gpecs_entity",
+ "gpecs_itertools",
  "gpecs_soa_erased",
  "gpecs_sparse",
  "gpecs_world",

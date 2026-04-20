@@ -24,7 +24,7 @@ use crate::{
         ErasedDropMeta,
         erased::ErasedArchetypeView,
         registry::{
-            ArchetypeId, ArchetypeInfo, EntityLocation, ErasedArchetypeCow,
+            ArchetypeId, EntityLocation, ErasedArchetypeCow,
             error::{
                 InsertExactAtErrorKind, InvalidEntityLocationError, InvalidEntityLocationErrorKind,
                 RemoveExactAtError,
@@ -52,28 +52,23 @@ pub type Graph = DiGraph<(), ComponentId, u32>;
 
 #[repr(transparent)]
 pub struct ArchetypesItem {
-    info: ArchetypeInfo,
+    storage: ArchetypeStorage,
 }
 
 impl ArchetypesItem {
     #[inline]
-    fn new(info: ArchetypeInfo) -> Self {
-        Self { info }
-    }
-
-    #[inline]
     fn as_key(&self) -> ArchetypeKey<'_, ErasedDropMeta> {
-        let Self { info } = self;
+        let Self { storage } = self;
 
-        let archetype = info.storage().archetype();
+        let archetype = storage.archetype();
         ArchetypeKey::new(archetype)
     }
 }
 
 impl Debug for ArchetypesItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { info } = self;
-        Debug::fmt(info, f)
+        let Self { storage } = self;
+        Debug::fmt(storage, f)
     }
 }
 
@@ -106,20 +101,20 @@ impl Hash for ArchetypesItem {
 }
 
 impl Deref for ArchetypesItem {
-    type Target = ArchetypeInfo;
+    type Target = ArchetypeStorage;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        let Self { info } = self;
-        info
+        let Self { storage } = self;
+        storage
     }
 }
 
 impl DerefMut for ArchetypesItem {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let Self { info } = self;
-        info
+        let Self { storage } = self;
+        storage
     }
 }
 
@@ -249,37 +244,43 @@ pub fn find_archetype(
 }
 
 #[inline]
-pub fn get_archetype_info(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeInfo> {
-    let index = archetype_id_into_usize(id);
+pub fn get_archetype_storage(
+    archetypes: &Archetypes,
+    archetype_id: ArchetypeId,
+) -> Option<&ArchetypeStorage> {
+    let index = archetype_id_into_usize(archetype_id);
     archetypes.get_index(index).map(Deref::deref)
 }
 
 #[inline]
 #[track_caller]
-pub fn unwrap_archetype_info(archetypes: &Archetypes, id: ArchetypeId) -> &ArchetypeInfo {
-    let Some(info) = get_archetype_info(archetypes, id) else {
-        unreachable!("{id} should exist")
+pub fn unwrap_archetype_storage(
+    archetypes: &Archetypes,
+    archetype_id: ArchetypeId,
+) -> &ArchetypeStorage {
+    let Some(info) = get_archetype_storage(archetypes, archetype_id) else {
+        unreachable!("{archetype_id} should exist")
     };
     info
 }
 
 #[inline]
-pub fn get_archetype_info_mut(
+pub fn get_archetype_storage_mut(
     archetypes: &mut Archetypes,
-    id: ArchetypeId,
-) -> Option<&mut ArchetypeInfo> {
-    let index = archetype_id_into_usize(id);
+    archetype_id: ArchetypeId,
+) -> Option<&mut ArchetypeStorage> {
+    let index = archetype_id_into_usize(archetype_id);
     archetypes.get_index_mut2(index).map(DerefMut::deref_mut)
 }
 
 #[inline]
 #[track_caller]
-pub fn unwrap_archetype_info_mut(
+pub fn unwrap_archetype_storage_mut(
     archetypes: &mut Archetypes,
-    id: ArchetypeId,
-) -> &mut ArchetypeInfo {
-    let Some(info) = get_archetype_info_mut(archetypes, id) else {
-        unreachable!("{id} should exist")
+    archetype_id: ArchetypeId,
+) -> &mut ArchetypeStorage {
+    let Some(info) = get_archetype_storage_mut(archetypes, archetype_id) else {
+        unreachable!("{archetype_id} should exist")
     };
     info
 }
@@ -288,7 +289,7 @@ pub fn unwrap_archetype_info_mut(
 pub fn find_location(archetypes: &Archetypes, entity: Entity) -> EntityLocation {
     let index = archetypes
         .iter()
-        .position(|info| info.storage().contains(entity));
+        .position(|info| info.storage.contains(entity));
     let Some(index) = index else {
         return EntityLocation::WithoutComponents;
     };
@@ -315,13 +316,13 @@ pub fn check_location(
         return Ok(());
     };
 
-    let Some(info) = get_archetype_info(archetypes, archetype_id) else {
+    let Some(storage) = get_archetype_storage(archetypes, archetype_id) else {
         let kind = InvalidEntityLocationErrorKind::UnknownArchetype;
         let error = InvalidEntityLocationError::new(entity, archetype_id, kind);
         return Err(error);
     };
 
-    if !info.storage().contains(entity) {
+    if !storage.contains(entity) {
         let kind = InvalidEntityLocationErrorKind::EntityNotFound;
         let error = InvalidEntityLocationError::new(entity, archetype_id, kind);
         return Err(error);
@@ -342,8 +343,8 @@ where
     ];
     let node_attrs = |_, (index, &()): (NodeIndex<_>, _)| {
         let archetype_id = archetype_id_from_usize(index.index());
-        let info = unwrap_archetype_info(archetypes, archetype_id);
-        let component_ids = info.storage().archetype().into_component_ids();
+        let storage = unwrap_archetype_storage(archetypes, archetype_id);
+        let component_ids = storage.archetype().into_component_ids();
         format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
     };
     let edge_attrs = |_, edge: EdgeReference<'_, _, _>| {
@@ -363,8 +364,7 @@ pub fn insert_storage(
     let index = archetypes.len();
     let id = archetype_id_from_usize(index);
 
-    let info = ArchetypeInfo::new(id, storage);
-    let item = ArchetypesItem::new(info);
+    let item = ArchetypesItem { storage };
     if archetypes.replace(item).is_some() {
         unreachable!("duplicate archetype registration")
     }
@@ -469,8 +469,7 @@ pub fn insert_into_archetype<T>(
         "bundle should contain at least one component",
     );
 
-    let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-    let storage = unsafe { info.storage_mut() };
+    let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     if let Err(error) = storage.insert(entity, bundle) {
         unreachable!("failed to insert {entity} into {archetype_id}: {error}")
     }
@@ -487,8 +486,7 @@ pub fn insert_bundle_into_archetype<B, T>(
     B: Bundle,
     T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
-    let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-    let storage = unsafe { info.storage_mut() };
+    let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     if let Err(error) = storage.insert_bundle(components, entity, value) {
         let error = error.into_source();
         unreachable!("failed to insert {entity} into {archetype_id}: {error}")
@@ -501,8 +499,7 @@ pub fn remove_from_archetype(
     archetype_id: ArchetypeId,
     entity: Entity,
 ) -> ErasedBorrowedBundle<'_, ErasedDropMeta> {
-    let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-    let storage = unsafe { info.storage_mut() };
+    let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     let Some(bundle) = storage.remove(entity) else {
         unreachable!("{entity} should exist in {archetype_id}")
     };
@@ -521,8 +518,7 @@ where
     M: WithLayout + WithErasedDrop,
     T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
-    let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-    let storage = unsafe { info.storage_mut() };
+    let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     let bundle = match storage.remove_bundle(components, entity) {
         Ok(bundle) => bundle,
         Err(error) => unreachable!("failed to remove {entity} from {archetype_id}: {error}"),
@@ -539,8 +535,7 @@ pub fn destroy_in_archetype(
     archetype_id: ArchetypeId,
     entity: Entity,
 ) {
-    let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-    let storage = unsafe { info.storage_mut() };
+    let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     if !storage.destroy(entity) {
         unreachable!("{entity} should exist in {archetype_id}")
     }
@@ -562,8 +557,8 @@ where
 
     let old_archetype = location.into();
     if let Some(archetype_id) = old_archetype {
-        let info = unwrap_archetype_info(archetypes, archetype_id);
-        info.storage()
+        let storage = unwrap_archetype_storage(archetypes, archetype_id);
+        storage
             .archetype()
             .has_no_components(components_to_insert.as_view())?;
     }
@@ -620,8 +615,8 @@ where
         return Ok(None);
     };
 
-    let info = unwrap_archetype_info(archetypes, old_archetype);
-    info.storage()
+    let storage = unwrap_archetype_storage(archetypes, old_archetype);
+    storage
         .archetype()
         .has_components(components_to_remove.as_view())?;
 
@@ -682,9 +677,8 @@ where
         return archetype_id;
     }
 
-    let info = unwrap_archetype_info(archetypes, start);
-    let component_ids = info
-        .storage()
+    let storage = unwrap_archetype_storage(archetypes, start);
+    let component_ids = storage
         .archetype()
         .component_ids()
         .chain(with_components.component_ids())
@@ -716,8 +710,8 @@ where
         return Some(archetype_id);
     }
 
-    let info = unwrap_archetype_info(archetypes, start);
-    let archetype_component_ids = info.storage().archetype().into_component_ids();
+    let storage = unwrap_archetype_storage(archetypes, start);
+    let archetype_component_ids = storage.archetype().into_component_ids();
     if archetype_component_ids.len() <= 1 {
         return None;
     }

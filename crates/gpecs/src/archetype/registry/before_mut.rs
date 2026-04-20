@@ -5,7 +5,10 @@ use std::{
 
 use petgraph::visit::Reversed;
 
-use crate::archetype::registry::{ArchetypeId, ArchetypeInfo};
+use crate::archetype::{
+    registry::{ArchetypeId, ArchetypeInfo},
+    storage::ArchetypeStorage,
+};
 
 use super::algo;
 
@@ -22,7 +25,7 @@ impl<'a> ArchetypesBeforeMut<'a> {
         start: ArchetypeId,
         exclusive: bool,
     ) -> Option<Self> {
-        let _ = algo::get_archetype_info(archetypes, start)?;
+        let _ = algo::get_archetype_storage(archetypes, start)?;
         let graph = Reversed(graph);
         let walker = algo::GraphWalker::new(graph, start, exclusive);
 
@@ -65,17 +68,18 @@ impl Debug for ArchetypesBeforeMut<'_> {
 }
 
 impl<'a> Iterator for ArchetypesBeforeMut<'a> {
-    type Item = &'a mut ArchetypeInfo;
+    type Item = ArchetypeInfo<&'a mut ArchetypeStorage>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { walker, archetypes } = self;
 
         let archetype_id = walker.next()?;
-        let info = algo::unwrap_archetype_info_mut(archetypes, archetype_id);
+        let storage = algo::unwrap_archetype_storage_mut(archetypes, archetype_id);
 
         // SAFETY: BFS walker is non-recursive, so it must not yield the same node twice
-        let info = unsafe { NonNull::from_mut(info).as_mut() };
+        let storage = unsafe { NonNull::from_mut(storage).as_mut() };
+        let info = ArchetypeInfo::new(archetype_id, storage);
         Some(info)
     }
 

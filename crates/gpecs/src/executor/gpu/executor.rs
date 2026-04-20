@@ -512,7 +512,8 @@ impl ScheduleCache {
                 unreachable!("{system_id} should have compatible archetypes");
             };
             for archetype_info in compatible_archetypes {
-                let Some(archetype_id) = archetypes.map_archetype_id(archetype_info.id()) else {
+                let archetype_id = archetype_info.archetype_id();
+                let Some(archetype_id) = archetypes.map_archetype_id(archetype_id) else {
                     continue;
                 };
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {

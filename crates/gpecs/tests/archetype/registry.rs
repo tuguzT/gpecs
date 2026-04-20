@@ -161,7 +161,7 @@ fn exchange_components() {
     let storage = archetypes
         .get_archetype_info(archetype_subset)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(!storage.contains(entity));
 
     let bundle = archetypes
@@ -190,7 +190,7 @@ fn exchange_components() {
     let storage = archetypes
         .get_archetype_info(archetype_subset)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(storage.contains(entity));
 
     let refs = archetypes
@@ -236,13 +236,13 @@ fn exchange_components() {
     let storage = archetypes
         .get_archetype_info(archetype_subset)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(!storage.contains(entity));
 
     let storage = archetypes
         .get_archetype_info(archetype)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(storage.contains(entity));
 
     let refs = archetypes
@@ -268,13 +268,13 @@ fn exchange_components() {
     let storage = archetypes
         .get_archetype_info(archetype_subset)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(storage.contains(entity));
 
     let storage = archetypes
         .get_archetype_info(archetype)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(!storage.contains(entity));
 
     let error = archetypes
@@ -313,13 +313,13 @@ fn exchange_components() {
     let storage = archetypes
         .get_archetype_info(archetype_subset)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(!storage.contains(entity));
 
     let storage = archetypes
         .get_archetype_info(archetype)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(!storage.contains(entity));
 
     let bundle = archetypes
@@ -377,7 +377,7 @@ fn exchange_components_empty_registry() {
     let storage = archetypes
         .get_archetype_info(archetype)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(storage.contains(entity));
 
     archetypes
@@ -392,7 +392,7 @@ fn exchange_components_empty_registry() {
     let storage = archetypes
         .get_archetype_info(archetype)
         .expect("archetype should exist")
-        .storage();
+        .into_meta();
     assert!(!storage.contains(entity));
 }
 

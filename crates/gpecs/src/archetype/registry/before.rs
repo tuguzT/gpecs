@@ -2,7 +2,10 @@ use std::fmt::{self, Debug};
 
 use petgraph::visit::Reversed;
 
-use crate::archetype::registry::{ArchetypeId, ArchetypeInfo};
+use crate::archetype::{
+    registry::{ArchetypeId, ArchetypeInfo},
+    storage::ArchetypeStorage,
+};
 
 use super::algo;
 
@@ -20,7 +23,7 @@ impl<'a> ArchetypesBefore<'a> {
         start: ArchetypeId,
         exclusive: bool,
     ) -> Option<Self> {
-        let _ = algo::get_archetype_info(archetypes, start)?;
+        let _ = algo::get_archetype_storage(archetypes, start)?;
         let graph = Reversed(graph);
         let walker = algo::GraphWalker::new(graph, start, exclusive);
 
@@ -63,7 +66,7 @@ impl Debug for ArchetypesBefore<'_> {
 }
 
 impl<'a> Iterator for ArchetypesBefore<'a> {
-    type Item = &'a ArchetypeInfo;
+    type Item = ArchetypeInfo<&'a ArchetypeStorage>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -73,7 +76,9 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
         } = *self;
 
         let archetype_id = walker.next()?;
-        let info = algo::unwrap_archetype_info(archetypes, archetype_id);
+        let storage = algo::unwrap_archetype_storage(archetypes, archetype_id);
+
+        let info = ArchetypeInfo::new(archetype_id, storage);
         Some(info)
     }
 

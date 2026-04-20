@@ -12,6 +12,7 @@ use crate::{
                 RemoveBundleExactAtError,
             },
         },
+        storage::ArchetypeStorage,
     },
     bundle::{Bundle, BundleRefs, BundleRefsMut},
     component::{Component, registry::ComponentId},
@@ -239,7 +240,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_archetype_info(&self, archetype_id: ArchetypeId) -> Option<&ArchetypeInfo> {
+    pub fn get_archetype_info(
+        &self,
+        archetype_id: ArchetypeId,
+    ) -> Option<ArchetypeInfo<&ArchetypeStorage>> {
         let Self { archetypes, .. } = self;
         archetypes.get_archetype_info(archetype_id)
     }

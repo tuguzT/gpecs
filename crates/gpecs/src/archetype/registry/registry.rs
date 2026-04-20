@@ -20,6 +20,7 @@ use crate::{
                 RemoveBundleExactAtError, RemoveBundleExactError, RemoveExactAtError,
             },
         },
+        storage::ArchetypeStorage,
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -116,15 +117,24 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get_archetype_info(&self, id: ArchetypeId) -> Option<&ArchetypeInfo> {
+    pub fn get_archetype_info(&self, id: ArchetypeId) -> Option<ArchetypeInfo<&ArchetypeStorage>> {
         let Self { archetypes, .. } = self;
-        algo::get_archetype_info(archetypes, id)
+
+        let storage = algo::get_archetype_storage(archetypes, id)?;
+        let info = ArchetypeInfo::new(id, storage);
+        Some(info)
     }
 
     #[inline]
-    pub unsafe fn get_archetype_info_mut(&mut self, id: ArchetypeId) -> Option<&mut ArchetypeInfo> {
+    pub unsafe fn get_archetype_info_mut(
+        &mut self,
+        id: ArchetypeId,
+    ) -> Option<ArchetypeInfo<&mut ArchetypeStorage>> {
         let Self { archetypes, .. } = self;
-        algo::get_archetype_info_mut(archetypes, id)
+
+        let storage = algo::get_archetype_storage_mut(archetypes, id)?;
+        let info = ArchetypeInfo::new(id, storage);
+        Some(info)
     }
 
     #[inline]
@@ -344,8 +354,8 @@ impl ArchetypeRegistry {
 
         let Self { archetypes, .. } = self;
 
-        let info = algo::unwrap_archetype_info(archetypes, archetype_id);
-        let bundle = info.storage().get(entity);
+        let storage = algo::unwrap_archetype_storage(archetypes, archetype_id);
+        let bundle = storage.get(entity);
         Ok(bundle)
     }
 
@@ -413,8 +423,7 @@ impl ArchetypeRegistry {
 
         let Self { archetypes, .. } = self;
 
-        let info = algo::unwrap_archetype_info_mut(archetypes, archetype_id);
-        let storage = unsafe { info.storage_mut() };
+        let storage = algo::unwrap_archetype_storage_mut(archetypes, archetype_id);
         let bundle = storage.get_mut(entity);
         Ok(bundle)
     }
@@ -454,8 +463,6 @@ impl ArchetypeRegistry {
             .map_err(DowncastError::into_source)?;
         Ok(Some(bundle))
     }
-
-    // TODO: get erased bundles
 
     #[inline]
     pub fn bundles<'ctx, B, M, T>(
@@ -1025,8 +1032,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
 
         for archetype_id in archetype_ids {
-            let info = algo::unwrap_archetype_info_mut(archetypes, archetype_id);
-            let storage = unsafe { info.storage_mut() };
+            let storage = algo::unwrap_archetype_storage_mut(archetypes, archetype_id);
             storage.destroy_all();
         }
     }

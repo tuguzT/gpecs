@@ -1,6 +1,9 @@
 use std::fmt::{self, Debug};
 
-use crate::archetype::registry::{ArchetypeId, ArchetypeInfo};
+use crate::archetype::{
+    registry::{ArchetypeId, ArchetypeInfo},
+    storage::ArchetypeStorage,
+};
 
 use super::algo;
 
@@ -18,7 +21,7 @@ impl<'a> ArchetypesAfter<'a> {
         start: ArchetypeId,
         exclusive: bool,
     ) -> Option<Self> {
-        let _ = algo::get_archetype_info(archetypes, start)?;
+        let _ = algo::get_archetype_storage(archetypes, start)?;
         let walker = algo::GraphWalker::new(graph, start, exclusive);
 
         let me = Self { archetypes, walker };
@@ -60,7 +63,7 @@ impl Debug for ArchetypesAfter<'_> {
 }
 
 impl<'a> Iterator for ArchetypesAfter<'a> {
-    type Item = &'a ArchetypeInfo;
+    type Item = ArchetypeInfo<&'a ArchetypeStorage>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -70,7 +73,9 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
         } = *self;
 
         let archetype_id = walker.next()?;
-        let info = algo::unwrap_archetype_info(archetypes, archetype_id);
+        let storage = algo::unwrap_archetype_storage(archetypes, archetype_id);
+
+        let info = ArchetypeInfo::new(archetype_id, storage);
         Some(info)
     }
 

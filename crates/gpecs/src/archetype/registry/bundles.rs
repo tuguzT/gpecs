@@ -9,6 +9,7 @@ use crate::{
     archetype::{
         erased::{ErasedArchetype, error::ArchetypeError},
         registry::{ArchetypeInfo, CompatibleArchetypes},
+        storage::ArchetypeStorage,
     },
     bundle::{Bundle, BundleRefs},
     component::registry::{
@@ -143,11 +144,11 @@ where
 {
     #[inline]
     fn new_inner(
-        info: &'a ArchetypeInfo,
+        info: ArchetypeInfo<&'a ArchetypeStorage>,
         components: &ComponentRegistryView<'ctx, M, T>,
     ) -> BundlesIntoIterInner<'a, B> {
-        let storage = info.storage();
-        let (entities, bundles, _) = storage
+        let (entities, bundles, _) = info
+            .into_meta()
             .as_bundles_with_archetype::<B, T>(components)
             .expect("archetype should be compatible with requested bundle");
 

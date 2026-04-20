@@ -1,4 +1,7 @@
-use core::{alloc::Layout, ops::Deref};
+use core::{
+    alloc::Layout,
+    ops::{Deref, DerefMut},
+};
 
 use gpecs_erased::layout::WithLayout;
 
@@ -61,6 +64,12 @@ where
         let Self { meta, .. } = self;
         meta
     }
+
+    #[inline]
+    pub const fn as_mut_meta(&mut self) -> &mut Meta {
+        let Self { meta, .. } = self;
+        meta
+    }
 }
 
 impl<Meta> From<ComponentInfo<Meta>> for (ComponentId, Meta) {
@@ -89,6 +98,16 @@ where
     }
 }
 
+impl<Meta> DerefMut for ComponentInfo<Meta>
+where
+    Meta: ?Sized,
+{
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_meta()
+    }
+}
+
 impl<Meta, T> AsRef<T> for ComponentInfo<Meta>
 where
     T: ?Sized,
@@ -97,6 +116,17 @@ where
     #[inline]
     fn as_ref(&self) -> &T {
         self.deref().as_ref()
+    }
+}
+
+impl<Meta, T> AsMut<T> for ComponentInfo<Meta>
+where
+    T: ?Sized,
+    <Self as Deref>::Target: AsMut<T>,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut T {
+        self.deref_mut().as_mut()
     }
 }
 

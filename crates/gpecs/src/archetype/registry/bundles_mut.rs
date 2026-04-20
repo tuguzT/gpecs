@@ -9,6 +9,7 @@ use crate::{
     archetype::{
         erased::{ErasedArchetype, error::ArchetypeError},
         registry::{ArchetypeInfo, CompatibleArchetypesMut},
+        storage::ArchetypeStorage,
     },
     bundle::{Bundle, BundleRefsMut},
     component::registry::{
@@ -129,11 +130,11 @@ where
 {
     #[inline]
     fn new_inner(
-        info: &'a mut ArchetypeInfo,
+        info: ArchetypeInfo<&'a mut ArchetypeStorage>,
         components: &ComponentRegistryView<'ctx, M, T>,
     ) -> BundlesMutIntoIterInner<'a, B> {
-        let storage = unsafe { info.storage_mut() };
-        let (entities, bundles, _) = storage
+        let (entities, bundles, _) = info
+            .into_meta()
             .as_mut_bundles_with_archetype::<B, T>(components)
             .expect("archetype should be compatible with requested bundle");
 

@@ -1,4 +1,7 @@
-use core::alloc::{Layout, LayoutError};
+use core::{
+    alloc::{Layout, LayoutError},
+    num::NonZeroUsize,
+};
 
 use crate::layout::WithLayout;
 
@@ -20,7 +23,7 @@ pub fn buffer_offsets<I>(fields: I, capacity: usize) -> BufferOffsets<I::IntoIte
 where
     I: IntoIterator<Item: WithLayout>,
 {
-    let state = RawBufferOffsets::new(capacity);
+    let state = RawBufferOffsets::new(capacity, NonZeroUsize::MIN);
     let fields = fields.into_iter();
     unsafe { BufferOffsets::from_parts(state, fields) }
 }

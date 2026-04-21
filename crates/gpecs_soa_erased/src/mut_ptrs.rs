@@ -2,6 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
+    num::NonZeroUsize,
     ptr,
 };
 
@@ -225,7 +226,7 @@ where
     #[inline]
     pub(super) fn raw_buffer_offsets(&self) -> RawBufferOffsets {
         let Self { capacity, .. } = *self;
-        RawBufferOffsets::new(capacity)
+        RawBufferOffsets::new(capacity, NonZeroUsize::MIN)
     }
 }
 

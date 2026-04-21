@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    num::NonZeroUsize,
     ptr::NonNull,
 };
 
@@ -180,7 +181,7 @@ where
     #[inline]
     fn raw_buffer_offsets(&self) -> RawBufferOffsets {
         let Self { capacity, .. } = *self;
-        RawBufferOffsets::new(capacity)
+        RawBufferOffsets::new(capacity, NonZeroUsize::MIN)
     }
 }
 

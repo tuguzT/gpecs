@@ -4,10 +4,10 @@ use core::{
     fmt::{self, Debug, Display},
     iter::FusedIterator,
     marker::PhantomData,
+    num::NonZeroUsize,
     ptr, slice,
 };
 
-use gpecs_soa::field::FieldLayoutsItem;
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
@@ -26,8 +26,8 @@ use crate::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput,
-            FieldLayoutsOwned, RawBufferOffsets, buffer_offsets,
+            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
+            FieldLayoutsOutput, FieldLayoutsOwned, RawBufferOffsets, buffer_offsets,
         },
         layout::WithLayout,
         traits::{
@@ -877,7 +877,7 @@ where
             let layout = item.layout();
             check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-            let mut state = RawBufferOffsets::from_parts(storage.layout(), 1);
+            let mut state = RawBufferOffsets::from_parts(storage.layout(), 1, NonZeroUsize::MIN);
             let offset = state.next(layout)?;
 
             storage

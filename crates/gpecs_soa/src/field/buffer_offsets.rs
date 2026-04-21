@@ -1,6 +1,7 @@
 use core::{
     alloc::{Layout, LayoutError},
     iter::FusedIterator,
+    num::NonZeroUsize,
 };
 
 use crate::layout::{WithLayout, repeat_packed};
@@ -148,20 +149,26 @@ impl<I> FusedIterator for BufferOffsets<I> where I: FusedIterator<Item: WithLayo
 pub struct RawBufferOffsets {
     buffer_layout: Layout,
     capacity: usize,
+    slice_align: NonZeroUsize,
 }
 
 impl RawBufferOffsets {
     #[inline]
-    pub const fn new(capacity: usize) -> Self {
+    pub const fn new(capacity: usize, slice_align: NonZeroUsize) -> Self {
         let buffer_layout = Layout::new::<()>();
-        Self::from_parts(buffer_layout, capacity)
+        Self::from_parts(buffer_layout, capacity, slice_align)
     }
 
     #[inline]
-    pub const fn from_parts(buffer_layout: Layout, capacity: usize) -> Self {
+    pub const fn from_parts(
+        buffer_layout: Layout,
+        capacity: usize,
+        slice_align: NonZeroUsize,
+    ) -> Self {
         Self {
             buffer_layout,
             capacity,
+            slice_align,
         }
     }
 
@@ -178,12 +185,19 @@ impl RawBufferOffsets {
     }
 
     #[inline]
-    pub const fn into_parts(self) -> (Layout, usize) {
+    pub const fn slice_align(self) -> NonZeroUsize {
+        let Self { slice_align, .. } = self;
+        slice_align
+    }
+
+    #[inline]
+    pub const fn into_parts(self) -> (Layout, usize, NonZeroUsize) {
         let Self {
             buffer_layout,
             capacity,
+            slice_align,
         } = self;
-        (buffer_layout, capacity)
+        (buffer_layout, capacity, slice_align)
     }
 
     #[inline]
@@ -191,10 +205,16 @@ impl RawBufferOffsets {
         let Self {
             ref mut buffer_layout,
             capacity,
+            slice_align,
         } = *self;
 
         let layout = layout.pad_to_align();
-        let next = match repeat_packed(layout, capacity) {
+        let layout = match repeat_packed(layout, capacity) {
+            Ok(layout) => layout,
+            Err(error) => return Err(error),
+        };
+
+        let next = match layout.align_to(slice_align.get()) {
             Ok(layout) => layout,
             Err(error) => return Err(error),
         };
@@ -213,10 +233,13 @@ impl RawBufferOffsets {
         let Self {
             ref mut buffer_layout,
             capacity,
+            slice_align,
         } = *self;
 
         let layout = layout.pad_to_align();
-        let next = unsafe { repeat_packed_unchecked(layout, capacity) };
+        let layout = unsafe { repeat_packed_unchecked(layout, capacity) };
+
+        let next = unsafe { align_to_unchecked(layout, slice_align.get()) };
 
         let offset;
         (*buffer_layout, offset) = unsafe { extend_unchecked(*buffer_layout, next) };
@@ -233,7 +256,14 @@ const unsafe fn repeat_packed_unchecked(layout: Layout, n: usize) -> Layout {
     unsafe { Layout::from_size_align_unchecked(size, layout.align()) }
 }
 
-/// Copy of [`Layout::extend()`] which Rust-GPU struggles to inline by itself.
+/// Unchecked copy of [`Layout::align_to()`] which Rust-GPU struggles to inline by itself.
+#[inline]
+const unsafe fn align_to_unchecked(layout: Layout, align: usize) -> Layout {
+    let align = usize_max(layout.align(), align);
+    unsafe { Layout::from_size_align_unchecked(layout.size(), align) }
+}
+
+/// Unchecked copy of [`Layout::extend()`] which Rust-GPU struggles to inline by itself.
 #[inline]
 const unsafe fn extend_unchecked(layout: Layout, next: Layout) -> (Layout, usize) {
     let new_align = usize_max(layout.align(), next.align());

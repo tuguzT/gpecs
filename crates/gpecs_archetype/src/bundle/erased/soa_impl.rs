@@ -12,6 +12,7 @@ use gpecs_soa_erased::{
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
+use itertools::zip_eq;
 
 use crate::{
     bundle::erased::{
@@ -135,9 +136,11 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place(&self, mut ptrs: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
         let archetype = self.as_inner();
-        unsafe { D::ptrs_drop_in_place(archetype, &mut ptrs) }
+        for (component_info, to_drop) in zip_eq(archetype, ptrs) {
+            unsafe { D::drop_in_place_with(to_drop, component_info.as_meta()) }
+        }
     }
 
     type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<ErasedArchetypeView<'view, T::Meta>, P::NonNull>;
@@ -226,9 +229,11 @@ where
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place(&self, mut slices: Self::SliceMutPtrs<'_>) {
+    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
         let archetype = self.as_inner();
-        unsafe { D::slices_drop_in_place(archetype, &mut slices) }
+        for (component_info, to_drop) in zip_eq(archetype, slices) {
+            unsafe { D::drop_in_place_slice_with(to_drop, component_info.as_meta()) }
+        }
     }
 }
 

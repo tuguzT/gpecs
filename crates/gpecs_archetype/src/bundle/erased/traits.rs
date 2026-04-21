@@ -1,14 +1,13 @@
-use gpecs_component::{erased::WithErasedDrop, registry::traits::WithComponentId};
+use gpecs_component::{
+    erased::{ErasedComponentMutPtr, ErasedComponentMutSlicePtr, WithErasedDrop},
+    registry::traits::WithComponentId,
+};
 use gpecs_soa_erased::{
     ptr::slice::MutSliceItemPtr,
     soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
 };
-use itertools::zip_eq;
 
-use crate::{
-    bundle::erased::{ErasedBundleMutPtrs, ErasedBundleMutSlicePtrs},
-    erased::{ErasedArchetypeView, Iter},
-};
+use crate::erased::{ErasedArchetypeView, Iter};
 
 pub trait ErasedArchetypeKind:
     for<'a> FieldLayouts<'a, Output = ErasedArchetypeView<'a, Self::Meta>>
@@ -53,25 +52,19 @@ impl<T> IntoErasedArchetypeIterator for T where
 
 pub unsafe trait ErasedBundleDrop<Meta> {
     #[inline]
-    unsafe fn ptrs_drop_in_place<T, U, P>(archetype: &T, ptrs: &mut ErasedBundleMutPtrs<U, P>)
+    unsafe fn drop_in_place_with<P>(to_drop: ErasedComponentMutPtr<P>, meta: &Meta)
     where
-        T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
-        U: ErasedArchetypeKind + ?Sized,
         P: MutSliceItemPtr,
     {
-        let _ = (archetype, ptrs);
+        let _ = (to_drop, meta);
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place<T, U, P>(
-        archetype: &T,
-        slices: &mut ErasedBundleMutSlicePtrs<U, P>,
-    ) where
-        T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
-        U: ErasedArchetypeKind + ?Sized,
+    unsafe fn drop_in_place_slice_with<P>(to_drop: ErasedComponentMutSlicePtr<P>, meta: &Meta)
+    where
         P: MutSliceItemPtr,
     {
-        let _ = (archetype, slices);
+        let _ = (to_drop, meta);
     }
 }
 
@@ -88,36 +81,24 @@ where
     Meta: WithErasedDrop,
 {
     #[inline]
-    unsafe fn ptrs_drop_in_place<T, U, P>(archetype: &T, ptrs: &mut ErasedBundleMutPtrs<U, P>)
+    unsafe fn drop_in_place_with<P>(to_drop: ErasedComponentMutPtr<P>, meta: &Meta)
     where
-        T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
-        U: ErasedArchetypeKind + ?Sized,
         P: MutSliceItemPtr,
     {
-        let archetype = archetype.field_layouts();
-        for (component_info, to_drop) in zip_eq(archetype, ptrs) {
-            let Some(erased_drop) = component_info.erased_drop() else {
-                continue;
-            };
-            unsafe { erased_drop.drop_in_place(to_drop) }
-        }
+        let Some(erased_drop) = meta.erased_drop() else {
+            return;
+        };
+        unsafe { erased_drop.drop_in_place(to_drop) }
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place<T, U, P>(
-        archetype: &T,
-        slices: &mut ErasedBundleMutSlicePtrs<U, P>,
-    ) where
-        T: ErasedArchetypeKind<Meta = Meta> + ?Sized,
-        U: ErasedArchetypeKind + ?Sized,
+    unsafe fn drop_in_place_slice_with<P>(to_drop: ErasedComponentMutSlicePtr<P>, meta: &Meta)
+    where
         P: MutSliceItemPtr,
     {
-        let archetype = archetype.field_layouts();
-        for (component_info, to_drop) in zip_eq(archetype, slices) {
-            let Some(erased_drop) = component_info.erased_drop() else {
-                continue;
-            };
-            unsafe { erased_drop.drop_in_place_slice(to_drop) }
-        }
+        let Some(erased_drop) = meta.erased_drop() else {
+            return;
+        };
+        unsafe { erased_drop.drop_in_place_slice(to_drop) }
     }
 }

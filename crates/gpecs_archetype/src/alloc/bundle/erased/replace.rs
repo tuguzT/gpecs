@@ -5,7 +5,6 @@ use core::{
     iter::chain,
 };
 
-use gpecs_component::erased::WithErasedDrop;
 use gpecs_soa_erased::{
     ErasedSoa, error::FromFieldsLayoutsError, ptr::slice::SliceItemPtrs,
     storage::AlignedStorageFromLayout,
@@ -22,7 +21,7 @@ use crate::{
 
 impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
-    T: ErasedArchetypeKind<Meta: Clone + WithErasedDrop>,
+    T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -44,9 +43,7 @@ where
 
         let ptrs = zip_eq(ptrs, archetype).map(|(dst, component_info)| {
             if to_replace.archetype().contains(dst.component_id()) {
-                if let Some(erased_drop) = component_info.erased_drop() {
-                    unsafe { erased_drop.drop_in_place(dst) }
-                }
+                unsafe { D::drop_in_place_with(dst, component_info.as_meta()) };
                 let src = to_replace
                     .as_ptrs()
                     .get(dst.component_id())

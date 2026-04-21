@@ -18,7 +18,7 @@ use gpecs_soa_erased::{
     soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput},
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
-use itertools::equal;
+use itertools::{equal, zip_eq};
 
 use crate::{
     bundle::erased::{
@@ -339,8 +339,10 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     fn drop(&mut self) {
-        let (mut ptrs, archetype) = self.as_mut_ptrs_with_archetype();
-        unsafe { D::ptrs_drop_in_place(&archetype, &mut ptrs) }
+        let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
+        for (component_info, to_drop) in zip_eq(archetype, ptrs) {
+            unsafe { D::drop_in_place_with(to_drop, component_info.as_meta()) }
+        }
     }
 }
 

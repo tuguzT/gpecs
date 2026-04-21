@@ -4,10 +4,7 @@ use core::{
 };
 
 use gpecs_component::{
-    erased::{
-        ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, WithErasedDrop,
-        error::NotRegisteredError,
-    },
+    erased::{ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, error::NotRegisteredError},
     registry::{ComponentId, ComponentRegistryView, traits::WithComponentId},
 };
 use gpecs_soa_erased::{
@@ -20,7 +17,10 @@ use crate::{
     bundle::erased::{
         ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundleSlicePtrs,
         ErasedBundleSlicePtrsIter, ErasedBundleSlices,
-        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+        traits::{
+            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+            IntoErasedArchetypeIterator,
+        },
     },
     erased::ErasedArchetypeView,
 };
@@ -157,10 +157,13 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn drop_in_place(
+    pub unsafe fn drop_in_place<M, K>(
         &mut self,
-        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
-    ) -> Result<(), NotRegisteredError> {
+        components: &ComponentRegistryView<M, impl ?Sized>,
+    ) -> Result<(), NotRegisteredError>
+    where
+        K: ErasedBundleDrop<M>,
+    {
         self.iter()
             .map(ErasedComponentSlicePtr::component_id)
             .try_for_each(|id| {
@@ -170,10 +173,12 @@ where
                     .ok_or_else(NotRegisteredError::new)
             })?;
 
-        self.iter_mut().for_each(|slice| {
-            if let Err(error) = unsafe { slice.drop_in_place(components) } {
-                unreachable!("{error}, but it was checked earlier to be registered")
-            }
+        self.iter_mut().for_each(|to_drop| {
+            let component_id = to_drop.component_id();
+            let info = components
+                .get_component_info(component_id)
+                .expect("component info should exist");
+            unsafe { K::drop_in_place_slice_with(to_drop, info.as_meta()) }
         });
         Ok(())
     }

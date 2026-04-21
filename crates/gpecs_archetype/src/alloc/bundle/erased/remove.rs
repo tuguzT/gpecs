@@ -3,7 +3,6 @@ use core::{
     fmt::{self, Debug, Display},
 };
 
-use gpecs_component::erased::WithErasedDrop;
 use gpecs_soa_erased::{
     ErasedSoa,
     error::FromFieldsLayoutsError,
@@ -113,7 +112,7 @@ where
 
 impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
 where
-    T: ErasedArchetypeKind<Meta: WithErasedDrop + Clone>,
+    T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -131,9 +130,7 @@ where
         let fields = zip_eq(refs, archetype).filter_map(|(mut field, component_info)| {
             if to_destroy.contains(component_info.component_id()) {
                 let to_drop = field.as_mut_component_ptr();
-                if let Some(erased_drop) = component_info.erased_drop() {
-                    unsafe { erased_drop.drop_in_place(to_drop) }
-                }
+                unsafe { D::drop_in_place_with(to_drop, component_info.as_meta()) };
                 return None;
             }
             Some(field)

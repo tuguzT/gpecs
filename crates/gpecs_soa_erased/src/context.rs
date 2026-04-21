@@ -24,7 +24,6 @@ use crate::{
 #[cfg(feature = "alloc")]
 pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[Layout]>, P>;
 
-#[repr(transparent)]
 pub struct ErasedSoaContext<D, P>
 where
     D: ?Sized,
@@ -39,7 +38,7 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
-    pub unsafe fn from_inner(layouts: D) -> Self {
+    pub const unsafe fn from_inner(layouts: D) -> Self {
         Self {
             phantom: PhantomData,
             layouts,
@@ -75,18 +74,6 @@ where
     D: ?Sized,
     P: SliceItemPtrs,
 {
-    #[inline]
-    pub const unsafe fn from_inner_ref(layouts: &D) -> &Self {
-        // SAFETY: Self is `#[repr(transparent)]` over `D`.
-        unsafe { (ptr::from_ref(layouts) as *const Self).as_ref_unchecked() }
-    }
-
-    #[inline]
-    pub const unsafe fn from_inner_mut(layouts: &mut D) -> &mut Self {
-        // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
-        unsafe { (ptr::from_mut(layouts) as *mut Self).as_mut_unchecked() }
-    }
-
     #[inline]
     pub const fn as_inner(&self) -> &D {
         let Self { layouts, .. } = self;

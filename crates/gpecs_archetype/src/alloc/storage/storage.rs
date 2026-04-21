@@ -43,7 +43,7 @@ use crate::{
         ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, NoEpochEntity,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
-            UpdateWithError,
+            UpdateWithBundleError, UpdateWithError,
         },
     },
 };
@@ -372,15 +372,11 @@ where
             let source = error.into();
             return Err(UpdateWithError { source, value });
         }
-
-        if !self.contains(entity) {
+        let Some(bundle) = self.get_mut(entity) else {
             let source = EntityNotFoundError::new(entity).into();
             return Err(UpdateWithError { source, value });
-        }
-
-        let Some(bundle) = self.get_mut(entity) else {
-            unreachable!("{entity} should exist in this storage")
         };
+
         unsafe {
             let mut dst = bundle.into_ptrs();
             let src = &value.as_ptrs();
@@ -533,6 +529,33 @@ where
             let bundle = unsafe { B::CONTEXT.read(src) };
             Some(bundle)
         });
+        Ok(bundle)
+    }
+
+    #[inline]
+    pub fn update_with_bundle<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        entity: Entity,
+        value: B,
+    ) -> Result<B, UpdateWithBundleError<B>>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let dest = match self.get_bundle_mut::<B, _>(components, entity) {
+            Ok(Some(bundle)) => bundle,
+            Ok(None) => {
+                let source = EntityNotFoundError::new(entity).into();
+                return Err(UpdateWithBundleError { source, value });
+            }
+            Err(error) => {
+                let source = error.into();
+                return Err(UpdateWithBundleError { source, value });
+            }
+        };
+
+        let bundle = soa::mem::replace::<B, B, B>(B::CONTEXT, dest, value);
         Ok(bundle)
     }
 }

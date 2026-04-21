@@ -20,7 +20,7 @@ use crate::{
                 RemoveBundleExactAtError, RemoveBundleExactError, RemoveExactAtError,
             },
         },
-        storage::ArchetypeStorage,
+        storage::{ArchetypeStorage, error::UpdateWithBundleError},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -41,7 +41,7 @@ use crate::{
         },
     },
     entity::Entity,
-    soa::{self, layout::WithLayout},
+    soa::layout::WithLayout,
 };
 
 use super::algo;
@@ -688,11 +688,10 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         };
 
-        // FIXME: can we optimize this (by writing into a new archetype directly)?
         if let Some((_old_storage, _new_storage)) =
             algo::get_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype)
         {
-            // update some components & move into new archetype
+            // FIXME: update existing components & move new ones into new archetype
             let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
                 .replace(value)
                 .expect("combined bundle should be created successfully");
@@ -785,14 +784,10 @@ impl ArchetypeRegistry {
         } else {
             assert_eq!(old_archetype, new_archetype);
             let storage = algo::unwrap_archetype_storage_mut(archetypes, new_archetype);
-
-            let bundle = storage
-                .get_bundle_mut::<B, _>(components_view, entity)
-                .expect("bundle compatibility should have been already checked");
-            let Some(dest) = bundle else {
-                algo::assert_entity_should_exist(entity, new_archetype)
-            };
-            let _ = soa::mem::replace::<B, B, B>(B::CONTEXT, dest, value);
+            storage
+                .update_with_bundle(components_view, entity, value)
+                .map_err(UpdateWithBundleError::into_source)
+                .expect("entity should exist in storage & bundle compatibility should have been already checked");
         }
 
         Ok(new_archetype)

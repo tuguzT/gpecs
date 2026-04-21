@@ -6,7 +6,8 @@ use core::{
 use gpecs_entity::Entity;
 
 use crate::erased::error::{
-    IncompatibleArchetypeExactError, IncompatibleArchetypeViewExactError, MissingComponentError,
+    IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+    IncompatibleArchetypeViewExactError, MissingComponentError,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -121,6 +122,14 @@ where
     pub value: T,
 }
 
+impl<T> UpdateWithError<T> {
+    #[inline]
+    pub fn into_source(self) -> UpdateWithErrorKind {
+        let Self { source, .. } = self;
+        source
+    }
+}
+
 impl<T> Display for UpdateWithError<T>
 where
     T: Display + ?Sized,
@@ -175,6 +184,82 @@ impl Error for UpdateWithErrorKind {
         match self {
             Self::EntityNotFound(error) => Some(error),
             Self::MissingComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct UpdateWithBundleError<T>
+where
+    T: ?Sized,
+{
+    pub source: UpdateWithBundleErrorKind,
+    pub value: T,
+}
+
+impl<T> UpdateWithBundleError<T> {
+    #[inline]
+    pub fn into_source(self) -> UpdateWithBundleErrorKind {
+        let Self { source, .. } = self;
+        source
+    }
+}
+
+impl<T> Display for UpdateWithBundleError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { source, value } = self;
+        write!(f, "failed to update with {value}: {source}")
+    }
+}
+
+impl<T> Error for UpdateWithBundleError<T>
+where
+    T: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { source, .. } = self;
+        Some(source)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum UpdateWithBundleErrorKind {
+    EntityNotFound(EntityNotFoundError),
+    IncompatibleArchetype(IncompatibleArchetypeError),
+}
+
+impl From<EntityNotFoundError> for UpdateWithBundleErrorKind {
+    #[inline]
+    fn from(error: EntityNotFoundError) -> Self {
+        Self::EntityNotFound(error)
+    }
+}
+
+impl From<IncompatibleArchetypeError> for UpdateWithBundleErrorKind {
+    #[inline]
+    fn from(error: IncompatibleArchetypeError) -> Self {
+        Self::IncompatibleArchetype(error)
+    }
+}
+
+impl Display for UpdateWithBundleErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EntityNotFound(error) => Display::fmt(error, f),
+            Self::IncompatibleArchetype(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for UpdateWithBundleErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::EntityNotFound(error) => Some(error),
+            Self::IncompatibleArchetype(error) => Some(error),
         }
     }
 }

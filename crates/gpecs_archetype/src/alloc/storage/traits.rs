@@ -17,5 +17,6 @@ where
 {
     type Meta = Meta;
     type Archetype<'a> = &'a ErasedArchetype<Meta>;
+    type DropKind = D;
     type Ptrs = P;
 }

@@ -693,16 +693,17 @@ impl ArchetypeRegistry {
             algo::get_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype)
         {
             // update some components & move into new archetype
+            let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
+                .replace(value)
+                .expect("combined bundle should be created successfully");
+            algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
         } else {
-            // update all the components
             assert_eq!(old_archetype, new_archetype);
-            let _storage = algo::unwrap_archetype_storage_mut(archetypes, old_archetype);
+            let storage = algo::unwrap_archetype_storage_mut(archetypes, new_archetype);
+            storage
+                .update_with(entity, value)
+                .expect("entity should exist in storage & all value components should be present");
         }
-
-        let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
-            .replace(value)
-            .expect("combined bundle should be created successfully");
-        algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
     }
@@ -783,13 +784,15 @@ impl ArchetypeRegistry {
             algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
         } else {
             assert_eq!(old_archetype, new_archetype);
-            let storage = algo::unwrap_archetype_storage_mut(archetypes, old_archetype);
+            let storage = algo::unwrap_archetype_storage_mut(archetypes, new_archetype);
 
-            let desc = storage
+            let bundle = storage
                 .get_bundle_mut::<B, _>(components_view, entity)
-                .expect("bundle compatibility should have been already checked")
-                .expect("storage should contain entity");
-            let _ = soa::mem::replace::<B, B, B>(B::CONTEXT, desc, value);
+                .expect("bundle compatibility should have been already checked");
+            let Some(dest) = bundle else {
+                algo::assert_entity_should_exist(entity, new_archetype)
+            };
+            let _ = soa::mem::replace::<B, B, B>(B::CONTEXT, dest, value);
         }
 
         Ok(new_archetype)

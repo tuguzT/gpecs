@@ -43,6 +43,7 @@ use crate::{
         ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, NoEpochEntity,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
+            UpdateWithError,
         },
     },
 };
@@ -352,6 +353,40 @@ where
                 }
             });
         });
+        Ok(())
+    }
+
+    #[inline]
+    #[expect(clippy::type_complexity)]
+    pub fn update_with<N, D, S>(
+        &mut self,
+        entity: Entity,
+        value: ErasedBundleKind<N, D, S, T::Ptrs>,
+    ) -> Result<(), UpdateWithError<ErasedBundleKind<N, D, S, T::Ptrs>>>
+    where
+        N: ErasedArchetypeKind<Meta = T::Meta>,
+        D: ErasedBundleDrop<T::Meta>,
+        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+    {
+        if let Err(error) = self.archetype().check_compatibility(value.archetype()) {
+            let source = error.into();
+            return Err(UpdateWithError { source, value });
+        }
+
+        if !self.contains(entity) {
+            let source = EntityNotFoundError::new(entity).into();
+            return Err(UpdateWithError { source, value });
+        }
+
+        let Some(bundle) = self.get_mut(entity) else {
+            unreachable!("{entity} should exist in this storage")
+        };
+        unsafe {
+            let mut dst = bundle.into_ptrs();
+            let src = &value.as_ptrs();
+            dst.move_from_compatible_nonoverlapping::<_, T::DropKind>(src, 1);
+        }
+        let _ = value.into_inner();
         Ok(())
     }
 

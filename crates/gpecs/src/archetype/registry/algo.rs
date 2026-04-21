@@ -520,6 +520,13 @@ pub fn insert_bundle_into_archetype<B, T>(
     }
 }
 
+#[cold]
+#[track_caller]
+#[inline(never)]
+pub fn assert_entity_should_exist(entity: Entity, archetype_id: ArchetypeId) -> ! {
+    unreachable!("{entity} should exist in {archetype_id}")
+}
+
 #[inline]
 pub fn remove_from_archetype(
     archetypes: &mut Archetypes,
@@ -528,7 +535,7 @@ pub fn remove_from_archetype(
 ) -> ErasedBorrowedBundle<'_, ErasedDropMeta> {
     let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     let Some(bundle) = storage.remove(entity) else {
-        unreachable!("{entity} should exist in {archetype_id}")
+        assert_entity_should_exist(entity, archetype_id)
     };
     bundle
 }
@@ -551,7 +558,7 @@ where
         Err(error) => unreachable!("failed to remove {entity} from {archetype_id}: {error}"),
     };
     let Some(bundle) = bundle else {
-        unreachable!("{entity} should exist in {archetype_id}")
+        assert_entity_should_exist(entity, archetype_id)
     };
     bundle
 }
@@ -564,7 +571,7 @@ pub fn destroy_in_archetype(
 ) {
     let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     if !storage.destroy(entity) {
-        unreachable!("{entity} should exist in {archetype_id}")
+        assert_entity_should_exist(entity, archetype_id)
     }
 }
 

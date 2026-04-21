@@ -5,7 +5,9 @@ use core::{
 
 use gpecs_entity::Entity;
 
-use crate::erased::error::{IncompatibleArchetypeExactError, IncompatibleArchetypeViewExactError};
+use crate::erased::error::{
+    IncompatibleArchetypeExactError, IncompatibleArchetypeViewExactError, MissingComponentError,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EntityNotFoundError {
@@ -105,6 +107,74 @@ impl Error for MoveIntoError {
             Self::IncompatibleArchetype(error) => Some(error),
             Self::SourceHasNoEntity(error) => Some(error),
             Self::TargetHasEntity(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct UpdateWithError<T>
+where
+    T: ?Sized,
+{
+    pub source: UpdateWithErrorKind,
+    pub value: T,
+}
+
+impl<T> Display for UpdateWithError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { source, value } = self;
+        write!(f, "failed to update with {value}: {source}")
+    }
+}
+
+impl<T> Error for UpdateWithError<T>
+where
+    T: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { source, .. } = self;
+        Some(source)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum UpdateWithErrorKind {
+    EntityNotFound(EntityNotFoundError),
+    MissingComponent(MissingComponentError),
+}
+
+impl From<EntityNotFoundError> for UpdateWithErrorKind {
+    #[inline]
+    fn from(error: EntityNotFoundError) -> Self {
+        Self::EntityNotFound(error)
+    }
+}
+
+impl From<MissingComponentError> for UpdateWithErrorKind {
+    #[inline]
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
+    }
+}
+
+impl Display for UpdateWithErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EntityNotFound(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for UpdateWithErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::EntityNotFound(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
         }
     }
 }

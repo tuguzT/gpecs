@@ -38,6 +38,7 @@ pub trait ErasedArchetypeSoa:
 {
     type Meta: WithLayout + 'static;
     type Archetype<'a>: ErasedArchetypeKind<Meta = Self::Meta>;
+    type DropKind: ErasedBundleDrop<Self::Meta>;
     type Ptrs: SliceItemPtrs;
 }
 
@@ -50,5 +51,6 @@ where
 {
     type Meta = Meta;
     type Archetype<'a> = ErasedArchetypeView<'view, Meta>;
+    type DropKind = D;
     type Ptrs = P;
 }

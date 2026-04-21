@@ -4,7 +4,10 @@ use core::{
 };
 
 use gpecs_component::{
-    erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::NotRegisteredError},
+    erased::{
+        ErasedComponentMutPtr, ErasedComponentMutSlicePtr, ErasedComponentPtr,
+        error::NotRegisteredError,
+    },
     registry::{ComponentId, ComponentRegistryView, traits::WithComponentId},
 };
 use gpecs_soa_erased::{
@@ -318,6 +321,38 @@ where
             .expect("archetypes should be exact compatible");
 
         unsafe { self.copy_from_compatible_nonoverlapping(src, count) }
+    }
+
+    #[inline]
+    pub unsafe fn move_from_compatible_nonoverlapping<N, K>(
+        &mut self,
+        src: &ErasedBundlePtrs<N, CastConst<P>>,
+        count: usize,
+    ) where
+        N: ErasedArchetypeKind + ?Sized,
+        K: ErasedBundleDrop<D::Meta>,
+    {
+        let archetype = self.archetype();
+        let src_archetype = src.archetype();
+        archetype
+            .check_compatibility(src_archetype)
+            .expect("archetypes should be compatible");
+
+        for src in src.iter() {
+            let component_id = src.component_id();
+            let dst = self
+                .get_mut(component_id)
+                .expect("dst should have the same component as src has");
+            let meta = self
+                .archetype()
+                .into_get(component_id)
+                .expect("archetype should contain component");
+
+            let to_drop = unsafe { ErasedComponentMutSlicePtr::from_ptr(dst, count) };
+            unsafe { K::drop_in_place_slice_with(to_drop, meta) }
+
+            unsafe { dst.copy_from_nonoverlapping(src, count) }
+        }
     }
 }
 

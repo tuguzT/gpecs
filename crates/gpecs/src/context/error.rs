@@ -12,37 +12,11 @@ use crate::{
             InsertBundleExactErrorKind as ArchetypeInsertBundleExactErrorKind,
             RemoveBundleExactError as ArchetypeRemoveBundleExactError,
         },
+        storage::error::EntityNotFoundError,
     },
     bundle::{Bundle, erased::error::DowncastErrorKind},
     entity::Entity,
 };
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EntityNotFoundError {
-    entity: Entity,
-}
-
-impl EntityNotFoundError {
-    #[inline]
-    pub fn new(entity: Entity) -> Self {
-        Self { entity }
-    }
-
-    #[inline]
-    pub fn entity(&self) -> Entity {
-        let Self { entity } = *self;
-        entity
-    }
-}
-
-impl Display for EntityNotFoundError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { entity } = self;
-        write!(f, "{entity} not found")
-    }
-}
-
-impl Error for EntityNotFoundError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EntityHasNoDataError {

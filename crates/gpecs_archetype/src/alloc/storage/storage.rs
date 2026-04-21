@@ -41,7 +41,9 @@ use crate::{
     },
     storage::{
         ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, NoEpochEntity,
-        error::IncompatibleBundleValueError,
+        error::{
+            EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
+        },
     },
 };
 
@@ -307,6 +309,50 @@ where
     pub fn destroy_all(&mut self) {
         let Self { sparse_set } = self;
         sparse_set.clear_sparse();
+    }
+
+    #[inline]
+    pub fn move_into(
+        &mut self,
+        other: &mut ArchetypeStorage<T>,
+        entity: Entity,
+    ) -> Result<(), MoveIntoError> {
+        self.archetype()
+            .check_exact_compatibility(other.archetype())?;
+
+        if !self.contains(entity) {
+            let error = EntityNotFoundError::new(entity);
+            return Err(error.into());
+        }
+        if other.contains(entity) {
+            let error = EntityFoundError::new(entity);
+            return Err(error.into());
+        }
+
+        let Self { sparse_set } = self;
+        let Self { sparse_set: other } = other;
+
+        sparse_set.swap_remove_into(entity.into(), |_, src| {
+            let Some(src) = src else {
+                unreachable!("this storage should contain {entity}")
+            };
+
+            other.insert_from(entity.into(), |_, dst| {
+                let Some(dst) = dst else {
+                    unreachable!("epoch of the {entity} should not be relevant")
+                };
+                let TryInsertAccess::WriteOnly(dst) = dst else {
+                    unreachable!("other storage should not contain {entity}");
+                };
+
+                let src = src.cast_const();
+                unsafe {
+                    dst.into_inner()
+                        .copy_from_compatible_exact_nonoverlapping(&src, 1);
+                }
+            });
+        });
+        Ok(())
     }
 
     #[inline]

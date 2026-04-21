@@ -1,7 +1,5 @@
 use std::any::TypeId;
 
-use error::{EntityNotFoundError, RemoveBundleError};
-
 use crate::{
     archetype::{
         erased::error::{ArchetypeError, DuplicateComponentError},
@@ -12,7 +10,7 @@ use crate::{
                 RemoveBundleExactAtError,
             },
         },
-        storage::ArchetypeStorage,
+        storage::{ArchetypeStorage, error::EntityNotFoundError},
     },
     bundle::{Bundle, BundleRefs, BundleRefsMut},
     component::{Component, registry::ComponentId},
@@ -27,7 +25,7 @@ pub use self::components::{ComponentDescriptor, ComponentInfo, ComponentTypeIdMa
 
 use self::error::{
     EntityHasNoDataError, IncompatibleBundleError, InsertBundleError, InsertBundleExactError,
-    RemoveBundleExactError,
+    RemoveBundleError, RemoveBundleExactError,
 };
 
 pub mod error;

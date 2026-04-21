@@ -1,5 +1,5 @@
 use gpecs::{
-    context::error::{EntityHasNoDataError, EntityNotFoundError},
+    archetype::storage::error::EntityNotFoundError, context::error::EntityHasNoDataError,
     prelude::*,
 };
 

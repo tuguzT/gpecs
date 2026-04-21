@@ -273,6 +273,34 @@ where
     }
 
     #[inline]
+    pub unsafe fn copy_from_compatible_nonoverlapping<N>(
+        &mut self,
+        src: &ErasedBundlePtrs<N, CastConst<P>>,
+        count: usize,
+    ) where
+        N: ErasedArchetypeKind + ?Sized,
+    {
+        let archetype = self.archetype();
+        let src_archetype = src.archetype();
+        archetype
+            .check_compatibility(src_archetype)
+            .expect("archetypes should be compatible");
+
+        if equal(archetype.component_ids(), src_archetype.component_ids()) {
+            unsafe { self.copy_from_nonoverlapping(src, count) };
+            return;
+        }
+
+        for src in src.iter() {
+            let component_id = src.component_id();
+            let dst = self
+                .get_mut(component_id)
+                .expect("dst should have the same component as src has");
+            unsafe { dst.copy_from_nonoverlapping(src, count) }
+        }
+    }
+
+    #[inline]
     pub unsafe fn copy_from_compatible_exact_nonoverlapping<N>(
         &mut self,
         src: &ErasedBundlePtrs<N, CastConst<P>>,
@@ -286,18 +314,7 @@ where
             .check_exact_compatibility(src_archetype)
             .expect("archetypes should be exact compatible");
 
-        if equal(archetype.component_ids(), src_archetype.component_ids()) {
-            unsafe { self.copy_from_nonoverlapping(src, count) };
-            return;
-        }
-
-        for dst in self.iter_mut() {
-            let component_id = dst.component_id();
-            let src = src
-                .get(component_id)
-                .expect("src should have the same component as dst has");
-            unsafe { dst.copy_from_nonoverlapping(src, count) }
-        }
+        unsafe { self.copy_from_compatible_nonoverlapping(src, count) }
     }
 }
 

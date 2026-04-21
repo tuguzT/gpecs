@@ -2,26 +2,23 @@
 
 #![cfg_attr(not(test), no_std)]
 
-pub use itertools;
-
-pub trait Itertools: itertools::Itertools {
-    fn get_pair(self, a: usize, b: usize) -> Option<(Self::Item, Self::Item)>
+pub trait Itertools: Iterator {
+    fn get_pair(mut self, a: usize, b: usize) -> Option<(Self::Item, Self::Item)>
     where
         Self: Sized,
     {
         let (first, second) = (usize::min(a, b), usize::max(a, b));
 
-        let mut range = self.get(first..=second);
-        let first = range.next()?;
-        let second = range.last()?;
+        let first_item = self.nth(first)?;
+        let second_item = self.nth((second - first).checked_sub(1)?)?;
 
         let pair = if a < b {
-            (first, second)
+            (first_item, second_item)
         } else {
-            (second, first)
+            (second_item, first_item)
         };
         Some(pair)
     }
 }
 
-impl<T> Itertools for T where T: itertools::Itertools + ?Sized {}
+impl<T> Itertools for T where T: Iterator + ?Sized {}

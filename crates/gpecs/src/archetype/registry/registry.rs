@@ -41,7 +41,7 @@ use crate::{
         },
     },
     entity::Entity,
-    soa::layout::WithLayout,
+    soa::{self, layout::WithLayout},
 };
 
 use super::algo;
@@ -770,24 +770,27 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         };
 
-        // FIXME: can we optimize this (by writing into a new archetype directly)?
         if let Some((_old_storage, _new_storage)) =
             algo::get_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype)
         {
-            // update some components & move into new archetype
+            // FIXME: update existing components & move new ones into new archetype
+            let to_replace = ErasedBundle::from_bundle(components, value)
+                .map_err(FromBundleError::into_source)
+                .expect("bundle compatibility should have been already checked");
+            let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
+                .replace(to_replace)
+                .expect("combined bundle should be created successfully");
+            algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
         } else {
-            // update all the components
             assert_eq!(old_archetype, new_archetype);
-            let _storage = algo::unwrap_archetype_storage_mut(archetypes, old_archetype);
-        }
+            let storage = algo::unwrap_archetype_storage_mut(archetypes, old_archetype);
 
-        let to_replace = ErasedBundle::from_bundle(components, value)
-            .map_err(FromBundleError::into_source)
-            .expect("bundle compatibility should have been already checked");
-        let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
-            .replace(to_replace)
-            .expect("combined bundle should be created successfully");
-        algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+            let desc = storage
+                .get_bundle_mut::<B, _>(components_view, entity)
+                .expect("bundle compatibility should have been already checked")
+                .expect("storage should contain entity");
+            let _ = soa::mem::replace::<B, B, B>(B::CONTEXT, desc, value);
+        }
 
         Ok(new_archetype)
     }

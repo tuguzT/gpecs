@@ -856,17 +856,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpecs_spirv_analysis"
-version = "0.0.0"
-dependencies = [
- "rspirv",
-]
-
-[[package]]
-name = "gpecs_task_graph"
-version = "0.0.0"
-
-[[package]]
 name = "gpecs_world"
 version = "0.0.0"
 dependencies = [

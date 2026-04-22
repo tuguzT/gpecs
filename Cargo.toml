@@ -17,8 +17,6 @@ members = [
     "crates/gpecs_soa",
     "crates/gpecs_soa_erased",
     "crates/gpecs_sparse",
-    "crates/gpecs_spirv_analysis",
-    "crates/gpecs_task_graph",
     # standalone examples
     "examples/gpecs_simple",
     "examples/gpecs_simple_types",
@@ -69,7 +67,6 @@ arrayvec = { version = "0.7", default-features = false }
 itertools = { version = "0.14", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 polonius-the-crab = { version = "0.5", default-features = false }
-rspirv = { version = "0.12", default-features = false }
 criterion = { version = "0.8", features = ["html_reports"] }
 pollster = { version = "0.4", default-features = false }
 bytemuck = { version = "1.25", default-features = false }

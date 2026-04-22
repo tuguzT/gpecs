@@ -5,7 +5,7 @@ use wgpu::{
     QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
 };
 
-use crate::executor::gpu::cache::{ScheduleCache, SystemCache};
+use crate::executor::gpu::cache::{GpuCache, SystemCache};
 
 #[derive(Debug)]
 pub struct TimestampQueryResources {
@@ -16,7 +16,7 @@ pub struct TimestampQueryResources {
 
 impl TimestampQueryResources {
     #[inline]
-    pub(super) fn new(gpu_device: &Device, schedule_cache: &ScheduleCache) -> Option<Self> {
+    pub(super) fn new(gpu_device: &Device, cache: &GpuCache) -> Option<Self> {
         let can_write_timestamps = gpu_device
             .features()
             .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
@@ -24,7 +24,7 @@ impl TimestampQueryResources {
             return None;
         }
 
-        let count = schedule_cache
+        let count = cache
             .iter()
             .map(|info| timestamp_count_for_system_cache(&info))
             .sum::<usize>()

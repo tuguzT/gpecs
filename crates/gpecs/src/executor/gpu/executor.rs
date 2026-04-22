@@ -15,7 +15,7 @@ use crate::{
             storage::GpuArchetypeStorage,
         },
         bundle::GpuBundle,
-        cache::ScheduleCache,
+        cache::GpuCache,
         component::{
             GpuComponent,
             registry::{GpuComponentId, GpuComponentRegistry},
@@ -39,7 +39,7 @@ pub struct GpuExecutor<'ctx> {
     archetypes: GpuArchetypeRegistry,
     systems: GpuSystemRegistry,
     schedule: GpuSystemSchedule,
-    schedule_cache: Option<ScheduleCache>,
+    cache: Option<GpuCache>,
     timestamp_query_resources: Option<TimestampQueryResources>,
 }
 
@@ -53,7 +53,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             archetypes: GpuArchetypeRegistry::new(),
             systems: GpuSystemRegistry::new(),
             schedule: GpuSystemSchedule::new(),
-            schedule_cache: None,
+            cache: None,
             timestamp_query_resources: None,
         }
     }
@@ -241,11 +241,11 @@ impl<'ctx> GpuExecutor<'ctx> {
             ref archetypes,
             ref systems,
             ref schedule,
-            ref mut schedule_cache,
+            ref mut cache,
             ..
         } = *self;
 
-        let new_cache = ScheduleCache::with_additional_bindings(
+        let new_cache = GpuCache::with_additional_bindings(
             context,
             device,
             archetypes,
@@ -253,10 +253,9 @@ impl<'ctx> GpuExecutor<'ctx> {
             schedule,
             additional_bindings,
         );
-        schedule_cache.replace(new_cache);
+        cache.replace(new_cache);
     }
 
-    #[inline]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
         let Self {
             ref context,
@@ -264,16 +263,16 @@ impl<'ctx> GpuExecutor<'ctx> {
             ref archetypes,
             ref systems,
             ref schedule,
-            ref mut schedule_cache,
+            ref mut cache,
             ref mut timestamp_query_resources,
             ..
         } = *self;
 
-        let cache_schedule = || ScheduleCache::new(context, device, archetypes, systems, schedule);
-        let schedule_cache = &*schedule_cache.get_or_insert_with(cache_schedule);
+        let new_cache = || GpuCache::new(context, device, archetypes, systems, schedule);
+        let cache = &*cache.get_or_insert_with(new_cache);
 
         if timestamp_query_resources.is_none() {
-            *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);
+            *timestamp_query_resources = TimestampQueryResources::new(device, cache);
         }
         let timestamp_query_resources = timestamp_query_resources.as_ref();
 
@@ -285,7 +284,7 @@ impl<'ctx> GpuExecutor<'ctx> {
         };
 
         let mut query_index = 0;
-        for system_cache in schedule_cache.iter() {
+        for system_cache in cache.iter() {
             let system_id = system_cache.system_id();
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("{system_id} should exist");

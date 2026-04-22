@@ -20,11 +20,11 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct ScheduleCache {
+pub struct GpuCache {
     systems: IndexMap<GpuSystemId, SystemCache>,
 }
 
-impl ScheduleCache {
+impl GpuCache {
     #[inline]
     pub fn new(
         context: &Context,
@@ -32,7 +32,7 @@ impl ScheduleCache {
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         schedule: &GpuSystemSchedule,
-    ) -> ScheduleCache {
+    ) -> Self {
         let additional_bindings = [];
         Self::with_additional_bindings::<_, [_; 0]>(
             context,
@@ -51,7 +51,7 @@ impl ScheduleCache {
         systems: &GpuSystemRegistry,
         schedule: &GpuSystemSchedule,
         additional_bindings: I,
-    ) -> ScheduleCache
+    ) -> Self
     where
         I: IntoIterator<Item = (GpuSystemId, B)>,
         B: IntoIterator<Item = BindGroupEntry<'a>>,
@@ -62,7 +62,7 @@ impl ScheduleCache {
             cached_entries.extend(additional_bindings);
         }
 
-        let mut schedule_cache = ScheduleCache::default();
+        let mut cache = Self::default();
         for system_id in schedule {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("{system_id} should exist");
@@ -100,14 +100,13 @@ impl ScheduleCache {
                     continue;
                 };
 
-                let SystemCache { archetypes } =
-                    schedule_cache.systems.entry(system_id).or_default();
+                let SystemCache { archetypes } = cache.systems.entry(system_id).or_default();
                 if archetypes.insert(archetype_id, archetype_cache).is_some() {
                     unreachable!("{archetype_id} cannot have multiple bind groups for {system_id}");
                 }
             }
         }
-        schedule_cache
+        cache
     }
 
     #[inline]

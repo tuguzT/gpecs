@@ -29,6 +29,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedBundle, ErasedBundleKind,
+            error::DowncastError,
             traits::{ErasedArchetypeKind, ErasedBundleDrop},
         },
     },
@@ -43,7 +44,8 @@ use crate::{
         ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, NoEpochEntity,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
-            UpdateWithBundleError, UpdateWithError,
+            MoveIntoWithInsertBundleError, MoveIntoWithInsertBundleErrorKind,
+            MoveIntoWithInsertError, UpdateWithBundleError, UpdateWithError,
         },
     },
 };
@@ -387,6 +389,66 @@ where
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
+    pub fn move_into_with_insert<N, D, S>(
+        &mut self,
+        other: &mut ArchetypeStorage<T>,
+        entity: Entity,
+        value: ErasedBundleKind<N, D, S, T::Ptrs>,
+    ) -> Result<(), MoveIntoWithInsertError<ErasedBundleKind<N, D, S, T::Ptrs>>>
+    where
+        N: ErasedArchetypeKind<Meta = T::Meta>,
+        D: ErasedBundleDrop<T::Meta>,
+        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+    {
+        if let Err(error) = self.archetype().has_no_components(value.archetype()) {
+            let source = error.into();
+            return Err(MoveIntoWithInsertError { source, value });
+        }
+        if let Err(error) = other.archetype().has_components(value.archetype()) {
+            let source = error.into();
+            return Err(MoveIntoWithInsertError { source, value });
+        }
+
+        if !self.contains(entity) {
+            let source = EntityNotFoundError::new(entity).into();
+            return Err(MoveIntoWithInsertError { source, value });
+        }
+        if other.contains(entity) {
+            let source = EntityFoundError::new(entity).into();
+            return Err(MoveIntoWithInsertError { source, value });
+        }
+
+        let Self { sparse_set } = self;
+        let Self { sparse_set: other } = other;
+
+        sparse_set.swap_remove_into(entity.into(), |_, src| {
+            let Some(src) = src else {
+                unreachable!("this storage should contain {entity}")
+            };
+
+            other.insert_from(entity.into(), |_, dst| {
+                let Some(dst) = dst else {
+                    unreachable!("epoch of the {entity} should not be relevant")
+                };
+                let TryInsertAccess::WriteOnly(dst) = dst else {
+                    unreachable!("other storage should not contain {entity}");
+                };
+                let mut dst = dst.into_inner();
+
+                let src = &src.cast_const();
+                unsafe { dst.copy_from_compatible_nonoverlapping(src, 1) }
+
+                let src = &value.as_ptrs();
+                unsafe { dst.copy_from_compatible_nonoverlapping(src, 1) }
+
+                let _ = value.into_inner();
+            });
+        });
+        Ok(())
+    }
+
+    #[inline]
     pub fn as_bundles_with_archetype<B, M>(
         &self,
         components: &ComponentRegistryView<impl Sized, M>,
@@ -557,6 +619,70 @@ where
 
         let bundle = soa::mem::replace::<B, B, B>(B::CONTEXT, dest, value);
         Ok(bundle)
+    }
+
+    #[inline]
+    pub fn move_into_with_insert_bundle<B, M>(
+        &mut self,
+        components: &ComponentRegistryView<impl Sized, M>,
+        other: &mut ArchetypeStorage<T>,
+        entity: Entity,
+        value: B,
+    ) -> Result<(), MoveIntoWithInsertBundleError<B>>
+    where
+        B: Bundle,
+        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        if self
+            .archetype()
+            .check_compatibility_of::<B, _>(components)
+            .is_ok()
+        {
+            let source = MoveIntoWithInsertBundleErrorKind::SourceCompatible;
+            return Err(MoveIntoWithInsertBundleError { source, value });
+        }
+        if let Err(error) = other.archetype().check_compatibility_of::<B, _>(components) {
+            let source = error.into();
+            return Err(MoveIntoWithInsertBundleError { source, value });
+        }
+
+        if !self.contains(entity) {
+            let source = EntityNotFoundError::new(entity).into();
+            return Err(MoveIntoWithInsertBundleError { source, value });
+        }
+        if other.contains(entity) {
+            let source = EntityFoundError::new(entity).into();
+            return Err(MoveIntoWithInsertBundleError { source, value });
+        }
+
+        let Self { sparse_set } = self;
+        let Self { sparse_set: other } = other;
+
+        sparse_set.swap_remove_into(entity.into(), |_, src| {
+            let Some(src) = src else {
+                unreachable!("this storage should contain {entity}")
+            };
+
+            other.insert_from(entity.into(), |_, dst| {
+                let Some(dst) = dst else {
+                    unreachable!("epoch of the {entity} should not be relevant")
+                };
+                let TryInsertAccess::WriteOnly(dst) = dst else {
+                    unreachable!("other storage should not contain {entity}");
+                };
+                let mut dst = dst.into_inner();
+
+                let src = &src.cast_const();
+                unsafe { dst.copy_from_compatible_nonoverlapping(src, 1) }
+
+                let dst = dst
+                    .downcast::<B, _>(components)
+                    .map_err(DowncastError::into_source)
+                    .expect("archetype compatibility should have been checked earlier");
+                let _ = unsafe { soa::ptr::replace::<B, B, B>(B::CONTEXT, dst, value) };
+            });
+        });
+        Ok(())
     }
 }
 

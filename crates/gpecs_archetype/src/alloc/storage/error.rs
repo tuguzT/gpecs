@@ -6,7 +6,7 @@ use core::{
 use gpecs_entity::Entity;
 
 use crate::erased::error::{
-    IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+    AlreadyHasComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
     IncompatibleArchetypeViewExactError, MissingComponentError,
 };
 
@@ -190,6 +190,154 @@ impl Error for UpdateWithErrorKind {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
+pub struct MoveIntoWithInsertError<T>
+where
+    T: ?Sized,
+{
+    pub source: MoveIntoWithInsertErrorKind,
+    pub value: T,
+}
+
+impl<T> MoveIntoWithInsertError<T> {
+    #[inline]
+    pub fn into_source(self) -> MoveIntoWithInsertErrorKind {
+        let Self { source, .. } = self;
+        source
+    }
+}
+
+impl<T> Display for MoveIntoWithInsertError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { source, value } = self;
+        write!(
+            f,
+            "failed to move {value} into another storage with insert: {source}"
+        )
+    }
+}
+
+impl<T> Error for MoveIntoWithInsertError<T>
+where
+    T: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { source, .. } = self;
+        Some(source)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum MoveIntoWithInsertErrorKind {
+    SourceAlreadyHasComponent(AlreadyHasComponentError),
+    TagretMissingComponent(MissingComponentError),
+    SourceHasNoEntity(EntityNotFoundError),
+    TargetHasEntity(EntityFoundError),
+}
+
+impl From<AlreadyHasComponentError> for MoveIntoWithInsertErrorKind {
+    #[inline]
+    fn from(error: AlreadyHasComponentError) -> Self {
+        Self::SourceAlreadyHasComponent(error)
+    }
+}
+
+impl From<MissingComponentError> for MoveIntoWithInsertErrorKind {
+    #[inline]
+    fn from(error: MissingComponentError) -> Self {
+        Self::TagretMissingComponent(error)
+    }
+}
+
+impl From<EntityNotFoundError> for MoveIntoWithInsertErrorKind {
+    #[inline]
+    fn from(error: EntityNotFoundError) -> Self {
+        Self::SourceHasNoEntity(error)
+    }
+}
+
+impl From<EntityFoundError> for MoveIntoWithInsertErrorKind {
+    #[inline]
+    fn from(error: EntityFoundError) -> Self {
+        Self::TargetHasEntity(error)
+    }
+}
+
+impl Display for MoveIntoWithInsertErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SourceAlreadyHasComponent(error) => Display::fmt(error, f),
+            Self::TagretMissingComponent(error) => Display::fmt(error, f),
+            Self::SourceHasNoEntity(error) => Display::fmt(error, f),
+            Self::TargetHasEntity(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for MoveIntoWithInsertErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::SourceAlreadyHasComponent(error) => Some(error),
+            Self::TagretMissingComponent(error) => Some(error),
+            Self::SourceHasNoEntity(error) => Some(error),
+            Self::TargetHasEntity(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct IncompatibleBundleValueError<V>
+where
+    V: ?Sized,
+{
+    pub source: IncompatibleArchetypeExactError,
+    pub value: V,
+}
+
+impl<V> IncompatibleBundleValueError<V> {
+    #[inline]
+    pub fn into_source(self) -> IncompatibleArchetypeExactError {
+        let Self { source, .. } = self;
+        source
+    }
+}
+
+impl<V> Display for IncompatibleBundleValueError<V>
+where
+    V: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use IncompatibleArchetypeExactError::{
+            ComponentNotRegistered, DuplicateComponent, MissingComponent, TooFewComponents,
+        };
+
+        let Self { value, source } = self;
+
+        write!(f, "incompatible bundle {value}: ")?;
+        match source {
+            DuplicateComponent(error) => Display::fmt(error, f),
+            MissingComponent(error) => Display::fmt(error, f),
+            ComponentNotRegistered(error) => Display::fmt(error, f),
+            TooFewComponents(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<V> Error for IncompatibleBundleValueError<V>
+where
+    V: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { source, .. } = self;
+        Some(source)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
 pub struct UpdateWithBundleError<T>
 where
     T: ?Sized,
@@ -266,49 +414,94 @@ impl Error for UpdateWithBundleErrorKind {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
-pub struct IncompatibleBundleValueError<V>
+pub struct MoveIntoWithInsertBundleError<T>
 where
-    V: ?Sized,
+    T: ?Sized,
 {
-    pub source: IncompatibleArchetypeExactError,
-    pub value: V,
+    pub source: MoveIntoWithInsertBundleErrorKind,
+    pub value: T,
 }
 
-impl<V> IncompatibleBundleValueError<V> {
+impl<T> MoveIntoWithInsertBundleError<T> {
     #[inline]
-    pub fn into_source(self) -> IncompatibleArchetypeExactError {
+    pub fn into_source(self) -> MoveIntoWithInsertBundleErrorKind {
         let Self { source, .. } = self;
         source
     }
 }
 
-impl<V> Display for IncompatibleBundleValueError<V>
+impl<T> Display for MoveIntoWithInsertBundleError<T>
 where
-    V: Display + ?Sized,
+    T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use IncompatibleArchetypeExactError::{
-            ComponentNotRegistered, DuplicateComponent, MissingComponent, TooFewComponents,
-        };
-
-        let Self { value, source } = self;
-
-        write!(f, "incompatible bundle {value}: ")?;
-        match source {
-            DuplicateComponent(error) => Display::fmt(error, f),
-            MissingComponent(error) => Display::fmt(error, f),
-            ComponentNotRegistered(error) => Display::fmt(error, f),
-            TooFewComponents(error) => Display::fmt(error, f),
-        }
+        let Self { source, value } = self;
+        write!(
+            f,
+            "failed to move {value} into another storage with insert: {source}"
+        )
     }
 }
 
-impl<V> Error for IncompatibleBundleValueError<V>
+impl<T> Error for MoveIntoWithInsertBundleError<T>
 where
-    V: Debug + Display + ?Sized,
+    T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { source, .. } = self;
         Some(source)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum MoveIntoWithInsertBundleErrorKind {
+    SourceCompatible,
+    TagretIncompatible(IncompatibleArchetypeError),
+    SourceHasNoEntity(EntityNotFoundError),
+    TargetHasEntity(EntityFoundError),
+}
+
+impl From<IncompatibleArchetypeError> for MoveIntoWithInsertBundleErrorKind {
+    #[inline]
+    fn from(error: IncompatibleArchetypeError) -> Self {
+        Self::TagretIncompatible(error)
+    }
+}
+
+impl From<EntityNotFoundError> for MoveIntoWithInsertBundleErrorKind {
+    #[inline]
+    fn from(error: EntityNotFoundError) -> Self {
+        Self::SourceHasNoEntity(error)
+    }
+}
+
+impl From<EntityFoundError> for MoveIntoWithInsertBundleErrorKind {
+    #[inline]
+    fn from(error: EntityFoundError) -> Self {
+        Self::TargetHasEntity(error)
+    }
+}
+
+impl Display for MoveIntoWithInsertBundleErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SourceCompatible => {
+                write!(f, "source storage should not be compatible with bundle")
+            }
+            Self::TagretIncompatible(error) => Display::fmt(error, f),
+            Self::SourceHasNoEntity(error) => Display::fmt(error, f),
+            Self::TargetHasEntity(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for MoveIntoWithInsertBundleErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::SourceCompatible => None,
+            Self::TagretIncompatible(error) => Some(error),
+            Self::SourceHasNoEntity(error) => Some(error),
+            Self::TargetHasEntity(error) => Some(error),
+        }
     }
 }

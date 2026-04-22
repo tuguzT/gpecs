@@ -38,13 +38,9 @@ where
     where
         ToInsert: ErasedArchetypeKind<Meta = T::Meta>,
     {
-        if let Some(has_component_id) = to_insert
-            .archetype()
-            .component_ids()
-            .find(|&id| self.archetype().contains(id))
-        {
+        if let Err(error) = self.archetype().has_no_components(to_insert.archetype()) {
             let error = InsertError {
-                source: AlreadyHasComponentError::new(has_component_id).into(),
+                source: error.into(),
                 bundle: self,
                 to_insert,
             };

@@ -1,5 +1,7 @@
 #[cfg(feature = "alloc")]
 pub use crate::alloc::storage::error::{
     EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
-    UpdateWithBundleError, UpdateWithBundleErrorKind, UpdateWithError, UpdateWithErrorKind,
+    MoveIntoWithInsertBundleError, MoveIntoWithInsertBundleErrorKind, MoveIntoWithInsertError,
+    MoveIntoWithInsertErrorKind, UpdateWithBundleError, UpdateWithBundleErrorKind, UpdateWithError,
+    UpdateWithErrorKind,
 };

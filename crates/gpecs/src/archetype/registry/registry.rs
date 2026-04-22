@@ -20,7 +20,10 @@ use crate::{
                 RemoveBundleExactAtError, RemoveBundleExactError, RemoveExactAtError,
             },
         },
-        storage::{ArchetypeStorage, error::UpdateWithBundleError},
+        storage::{
+            ArchetypeStorage,
+            error::{MoveIntoWithInsertBundleError, UpdateWithBundleError},
+        },
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -551,14 +554,11 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         };
 
-        // FIXME: can we optimize this (by writing into a new archetype directly)?
-        let (_old_storage, _new_storage) =
+        let (old_storage, new_storage) =
             algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
-
-        let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
-            .insert(value)
-            .expect("old archetype should not have components of the inserted bundle");
-        algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+        old_storage
+            .move_into_with_insert(new_storage, entity, value)
+            .expect("bundle should be moved successfully");
 
         Ok(new_archetype)
     }
@@ -626,17 +626,12 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         };
 
-        // FIXME: can we optimize this (by writing into a new archetype directly)?
-        let (_old_storage, _new_storage) =
+        let (old_storage, new_storage) =
             algo::unwrap_archetype_storage_pair_mut(archetypes, old_archetype, new_archetype);
-
-        let to_insert = ErasedBundle::from_bundle(components, value)
-            .map_err(FromBundleError::into_source)
-            .expect("bundle compatibility should have been already checked");
-        let bundle = algo::remove_from_archetype(archetypes, old_archetype, entity)
-            .insert(to_insert)
-            .expect("old archetype should not have components of the inserted bundle");
-        algo::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+        old_storage
+            .move_into_with_insert_bundle(components_view, new_storage, entity, value)
+            .map_err(MoveIntoWithInsertBundleError::into_source)
+            .expect("bundle should be moved successfully");
 
         Ok(new_archetype)
     }

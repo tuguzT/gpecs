@@ -418,7 +418,7 @@ fn _init_wgpu_position_tag_download_buffer(
     let position_tag_gpu_archetype_info = executor
         .get_archetype_info(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_info.storage().slices();
+    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_info.slices();
     log::debug!(
         "{position_tag_gpu_archetype_id:?} buffer slices:\n{position_tag_storage_buffer_slices:#?}"
     );
@@ -474,7 +474,7 @@ fn _wgpu_copy_into_position_tag_download_buffer(
     let position_tag_gpu_archetype_info = executor
         .get_archetype_info(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_info.storage().slices();
+    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_info.slices();
 
     let position_tag_storage_buffer_component_slices: HashMap<_, _> =
         position_tag_storage_buffer_slices.components.collect();

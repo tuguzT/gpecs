@@ -173,7 +173,10 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn get_archetype_info(&self, archetype_id: GpuArchetypeId) -> Option<&GpuArchetypeInfo> {
+    pub fn get_archetype_info(
+        &self,
+        archetype_id: GpuArchetypeId,
+    ) -> Option<GpuArchetypeInfo<&GpuArchetypeStorage>> {
         let Self { archetypes, .. } = self;
         archetypes.get_archetype_info(archetype_id)
     }
@@ -306,7 +309,8 @@ impl<'ctx> GpuExecutor<'ctx> {
             };
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
-            for (archetype_id, archetype_cache) in system_cache.iter() {
+            for archetype_cache in system_cache.iter() {
+                let archetype_id = archetype_cache.archetype_id();
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
                     unreachable!("{archetype_id} should exist");
                 };
@@ -317,7 +321,7 @@ impl<'ctx> GpuExecutor<'ctx> {
                 write_timestamp(&mut compute_pass, query_index);
                 query_index += 1;
 
-                let archetype_storage = archetype_info.storage();
+                let archetype_storage = archetype_info.into_meta();
                 let workgroup_size = shader.workgroup_size().unwrap_or(DEFAULT_WORKGROUP_SIZE);
                 let workgroup_count = workgroup_count(archetype_storage, workgroup_size);
                 compute_pass.dispatch_workgroups(workgroup_count, 1, 1);

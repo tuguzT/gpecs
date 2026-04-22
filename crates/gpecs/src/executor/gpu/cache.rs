@@ -7,7 +7,7 @@ use crate::{
     executor::gpu::{
         archetype::{
             registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
-            storage::GpuArchetypeStorageSlice,
+            storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
         },
         component::registry::GpuComponentId,
         system::{
@@ -130,9 +130,11 @@ impl SystemCache {
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (GpuArchetypeId, &ArchetypeCache)> {
+    pub fn iter(&self) -> impl Iterator<Item = GpuArchetypeInfo<&ArchetypeCache>> {
         let Self { archetypes } = self;
-        archetypes.iter().map(|(&id, cache)| (id, cache))
+        archetypes
+            .iter()
+            .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
     }
 }
 
@@ -146,14 +148,14 @@ impl ArchetypeCache {
     pub fn new<'a, I>(
         device: &Device,
         system_info: &GpuSystemInfo,
-        archetype_info: &GpuArchetypeInfo,
+        archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
         additional_bindings: I,
     ) -> Option<Self>
     where
         I: IntoIterator<Item = BindGroupEntry<'a>>,
     {
-        let archetype_id = archetype_info.id();
-        let archetype_storage = archetype_info.storage();
+        let archetype_id = archetype_info.archetype_id();
+        let archetype_storage = archetype_info.into_meta();
         if archetype_storage.is_empty() {
             return None;
         }

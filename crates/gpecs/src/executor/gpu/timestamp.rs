@@ -26,7 +26,7 @@ impl TimestampQueryResources {
 
         let count = schedule_cache
             .iter()
-            .map(|(_, cache)| timestamp_count_for_system_cache(cache))
+            .map(|info| timestamp_count_for_system_cache(&info))
             .sum::<usize>()
             .try_into()
             .expect("total timestamp count of schedule cache should fit into `u32`");

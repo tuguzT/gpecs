@@ -26,6 +26,7 @@ use crate::{
                 GpuSystemInfo, GpuSystemRegistry,
             },
             schedule::GpuSystemSchedule,
+            shader::GpuSystemShader,
         },
     },
 };
@@ -220,7 +221,10 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn get_system_info(&self, system_id: GpuSystemId) -> Option<&GpuSystemInfo> {
+    pub fn get_system_info(
+        &self,
+        system_id: GpuSystemId,
+    ) -> Option<GpuSystemInfo<&GpuSystemShader>> {
         let Self { systems, .. } = self;
         systems.get_system_info(system_id)
     }
@@ -293,11 +297,12 @@ impl<'ctx> GpuExecutor<'ctx> {
         };
 
         let mut query_index = 0;
-        for (system_id, system_cache) in schedule_cache.iter() {
+        for system_cache in schedule_cache.iter() {
+            let system_id = system_cache.system_id();
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("{system_id} should exist");
             };
-            let shader = system_info.shader();
+            let shader = system_info.into_meta();
 
             let compute_pass_label = match shader.label() {
                 Some(label) => format!("`gpecs` {system_id:#} [{label}] compute pass"),

@@ -13,7 +13,7 @@ use crate::{
         system::{
             registry::{GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
             schedule::GpuSystemSchedule,
-            shader::GpuSystemShaderEntry,
+            shader::{GpuSystemShader, GpuSystemShaderEntry},
         },
     },
     hash::IndexMap,
@@ -68,7 +68,7 @@ impl ScheduleCache {
                 unreachable!("{system_id} should exist");
             };
 
-            let shader = system_info.shader();
+            let shader = system_info.into_meta();
             let components = &context.components().as_view();
             let component_ids = shader
                 .bind_group_layout_entries()
@@ -111,9 +111,11 @@ impl ScheduleCache {
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (GpuSystemId, &SystemCache)> {
+    pub fn iter(&self) -> impl Iterator<Item = GpuSystemInfo<&SystemCache>> {
         let Self { systems } = self;
-        systems.iter().map(|(&id, cache)| (id, cache))
+        systems
+            .iter()
+            .map(|(&id, cache)| GpuSystemInfo::new(id, cache))
     }
 }
 
@@ -147,7 +149,7 @@ impl ArchetypeCache {
     #[inline]
     pub fn new<'a, I>(
         device: &Device,
-        system_info: &GpuSystemInfo,
+        system_info: GpuSystemInfo<&GpuSystemShader>,
         archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
         additional_bindings: I,
     ) -> Option<Self>
@@ -160,8 +162,8 @@ impl ArchetypeCache {
             return None;
         }
 
-        let shader = system_info.shader();
-        let system_id = system_info.id();
+        let shader = system_info.into_meta();
+        let system_id = system_info.system_id();
 
         let slices = archetype_storage.slices();
         let shader_entries = shader.bind_group_layout_entries();

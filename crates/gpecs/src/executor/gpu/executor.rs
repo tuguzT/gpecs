@@ -1,35 +1,32 @@
 use std::{any::TypeId, num::NonZeroU32};
 
-use itertools::chain;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device,
-    Features, QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
+    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, ComputePass, ComputePassDescriptor,
+    Device,
 };
 
 use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     context::{ComponentInfo, Context},
-    hash::IndexMap,
-};
-
-use super::{
-    archetype::{
-        registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
-        storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
-    },
-    bundle::GpuBundle,
-    component::{
-        GpuComponent,
-        registry::{GpuComponentId, GpuComponentRegistry},
-    },
-    system::{
-        registry::{
-            DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
-            GpuSystemInfo, GpuSystemRegistry,
+    executor::gpu::{
+        TimestampQueryResources,
+        archetype::{
+            registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
+            storage::GpuArchetypeStorage,
         },
-        schedule::GpuSystemSchedule,
-        shader::GpuSystemShaderEntry,
+        bundle::GpuBundle,
+        cache::ScheduleCache,
+        component::{
+            GpuComponent,
+            registry::{GpuComponentId, GpuComponentRegistry},
+        },
+        system::{
+            registry::{
+                DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
+                GpuSystemInfo, GpuSystemRegistry,
+            },
+            schedule::GpuSystemSchedule,
+        },
     },
 };
 
@@ -293,7 +290,7 @@ impl<'ctx> GpuExecutor<'ctx> {
         };
 
         let mut query_index = 0;
-        for (&system_id, system_cache) in &schedule_cache.systems {
+        for (system_id, system_cache) in schedule_cache.iter() {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("{system_id} should exist");
             };
@@ -309,13 +306,13 @@ impl<'ctx> GpuExecutor<'ctx> {
             };
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
-            for (&archetype_id, archetype_cache) in &system_cache.archetypes {
+            for (archetype_id, archetype_cache) in system_cache.iter() {
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
                     unreachable!("{archetype_id} should exist");
                 };
 
                 compute_pass.set_pipeline(shader.compute_pipeline());
-                compute_pass.set_bind_group(0, &archetype_cache.bind_group, &[]);
+                compute_pass.set_bind_group(0, archetype_cache.bind_group(), &[]);
 
                 write_timestamp(&mut compute_pass, query_index);
                 query_index += 1;
@@ -350,294 +347,4 @@ fn workgroup_count(archetype_storage: &GpuArchetypeStorage, workgroup_size: NonZ
         .div_ceil(workgroup_size)
         .try_into()
         .expect("workgroup count should fit into `u32`")
-}
-
-#[derive(Debug)]
-pub struct TimestampQueryResources {
-    query_set: QuerySet,
-    count: NonZeroU32,
-    resolve_buffer: Buffer,
-}
-
-impl TimestampQueryResources {
-    #[inline]
-    fn new(gpu_device: &Device, schedule_cache: &ScheduleCache) -> Option<Self> {
-        let can_write_timestamps = gpu_device
-            .features()
-            .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
-        if !can_write_timestamps {
-            return None;
-        }
-
-        let ScheduleCache { systems } = schedule_cache;
-        let count = systems
-            .values()
-            .map(timestamp_count_for_system_cache)
-            .sum::<usize>()
-            .try_into()
-            .expect("total timestamp count of schedule cache should fit into `u32`");
-        let count = NonZeroU32::new(count)?;
-
-        let query_set_desc = QuerySetDescriptor {
-            label: Some("`gpecs` executor query set"),
-            ty: QueryType::Timestamp,
-            count: count.get(),
-        };
-        let query_set = gpu_device.create_query_set(&query_set_desc);
-
-        let resolve_buffer_desc = BufferDescriptor {
-            label: Some("`gpecs` executor query set resolve buffer"),
-            size: resolve_buffer_size(count),
-            usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        };
-        let resolve_buffer = gpu_device.create_buffer(&resolve_buffer_desc);
-
-        Some(TimestampQueryResources {
-            query_set,
-            count,
-            resolve_buffer,
-        })
-    }
-
-    #[inline]
-    pub unsafe fn query_set(&self) -> &QuerySet {
-        let Self { query_set, .. } = self;
-        query_set
-    }
-
-    #[inline]
-    pub fn count(&self) -> NonZeroU32 {
-        let Self { count, .. } = *self;
-        count
-    }
-
-    #[inline]
-    pub unsafe fn resolve_buffer(&self) -> &Buffer {
-        let Self { resolve_buffer, .. } = self;
-        resolve_buffer
-    }
-
-    #[inline]
-    fn resolve(&self, command_encoder: &mut CommandEncoder) {
-        let Self {
-            query_set,
-            count,
-            resolve_buffer,
-        } = self;
-        command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
-    }
-}
-
-#[inline]
-fn timestamp_count_for_system_cache(system_cache: &SystemCache) -> usize {
-    let count = system_cache.archetypes.len();
-    if count == 0 {
-        return 0;
-    }
-    count + 1
-}
-
-#[inline]
-fn resolve_buffer_size(query_set_count: NonZeroU32) -> BufferAddress {
-    // cast operands first to avoid potential `u32` overflow
-    let query_set_count = BufferAddress::from(query_set_count.get());
-    let query_size = BufferAddress::from(QUERY_SIZE);
-
-    let Some(size) = query_set_count.checked_mul(query_size) else {
-        unreachable!("{query_set_count} * `wgpu::QUERY_SIZE` (which is {query_size}) overflow")
-    };
-    size
-}
-
-#[derive(Debug, Default)]
-struct ScheduleCache {
-    systems: IndexMap<GpuSystemId, SystemCache>,
-}
-
-impl ScheduleCache {
-    #[inline]
-    fn new(
-        context: &Context,
-        device: &Device,
-        archetypes: &GpuArchetypeRegistry,
-        systems: &GpuSystemRegistry,
-        schedule: &GpuSystemSchedule,
-    ) -> ScheduleCache {
-        let additional_bindings = [];
-        Self::with_additional_bindings::<_, [_; 0]>(
-            context,
-            device,
-            archetypes,
-            systems,
-            schedule,
-            additional_bindings,
-        )
-    }
-
-    fn with_additional_bindings<'a, I, B>(
-        context: &Context,
-        device: &Device,
-        archetypes: &GpuArchetypeRegistry,
-        systems: &GpuSystemRegistry,
-        schedule: &GpuSystemSchedule,
-        additional_bindings: I,
-    ) -> ScheduleCache
-    where
-        I: IntoIterator<Item = (GpuSystemId, B)>,
-        B: IntoIterator<Item = BindGroupEntry<'a>>,
-    {
-        let mut additional_bindings_cache = IndexMap::<GpuSystemId, Vec<BindGroupEntry>>::default();
-        for (system_id, additional_bindings) in additional_bindings {
-            let cached_entries = additional_bindings_cache.entry(system_id).or_default();
-            cached_entries.extend(additional_bindings);
-        }
-
-        let mut schedule_cache = ScheduleCache::default();
-        for system_id in schedule {
-            let Some(system_info) = systems.get_system_info(system_id) else {
-                unreachable!("{system_id} should exist");
-            };
-
-            let shader = system_info.shader();
-            let components = &context.components().as_view();
-            let component_ids = shader
-                .bind_group_layout_entries()
-                .components
-                .map(|(component_id, _)| component_id.into());
-            let Ok(compatible_archetypes) = context
-                .archetypes()
-                .compatible_archetypes_from(components, component_ids)
-            else {
-                unreachable!("{system_id} should have compatible archetypes");
-            };
-            for archetype_info in compatible_archetypes {
-                let archetype_id = archetype_info.archetype_id();
-                let Some(archetype_id) = archetypes.map_archetype_id(archetype_id) else {
-                    continue;
-                };
-                let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
-                    unreachable!("{archetype_id} should exist");
-                };
-
-                let additional_bindings = additional_bindings_cache
-                    .get(&system_id)
-                    .into_iter()
-                    .flatten()
-                    .cloned();
-                let Some(archetype_cache) =
-                    ArchetypeCache::new(device, system_info, archetype_info, additional_bindings)
-                else {
-                    continue;
-                };
-
-                let SystemCache { archetypes } =
-                    schedule_cache.systems.entry(system_id).or_default();
-                if archetypes.insert(archetype_id, archetype_cache).is_some() {
-                    unreachable!("{archetype_id} cannot have multiple bind groups for {system_id}");
-                }
-            }
-        }
-        schedule_cache
-    }
-}
-
-#[derive(Debug, Default)]
-struct SystemCache {
-    archetypes: IndexMap<GpuArchetypeId, ArchetypeCache>,
-}
-
-#[derive(Debug)]
-struct ArchetypeCache {
-    bind_group: BindGroup,
-}
-
-impl ArchetypeCache {
-    #[inline]
-    fn new<'a, I>(
-        device: &Device,
-        system_info: &GpuSystemInfo,
-        archetype_info: &GpuArchetypeInfo,
-        additional_bindings: I,
-    ) -> Option<Self>
-    where
-        I: IntoIterator<Item = BindGroupEntry<'a>>,
-    {
-        let archetype_id = archetype_info.id();
-        let archetype_storage = archetype_info.storage();
-        if archetype_storage.is_empty() {
-            return None;
-        }
-
-        let shader = system_info.shader();
-        let system_id = system_info.id();
-
-        let slices = archetype_storage.slices();
-        let shader_entries = shader.bind_group_layout_entries();
-
-        let entity_binding = bind_group_entry(shader_entries.entities, slices.entities);
-        let component_bindings =
-            component_entries_slices(shader_entries.components, slices.components)
-                .into_iter()
-                .filter_map(|(_, entry, slice)| bind_group_entry(entry, slice));
-
-        let additional_bindings = additional_bindings.into_iter().map(upcast_bind_group_entry);
-
-        let bind_group_label = match shader.label() {
-            Some(label) => format!("`gpecs` {system_id:#} [{label}] {archetype_id:#} bind group"),
-            None => format!("`gpecs` {system_id:#} {archetype_id:#} bind group"),
-        };
-        let bind_group_entries = chain(entity_binding, component_bindings)
-            .chain(additional_bindings)
-            .collect::<Box<_>>();
-        let bind_group_desc = BindGroupDescriptor {
-            label: Some(&bind_group_label),
-            layout: shader.bind_group_layout(),
-            entries: bind_group_entries.as_ref(),
-        };
-        let bind_group = device.create_bind_group(&bind_group_desc);
-
-        Some(Self { bind_group })
-    }
-}
-
-#[inline]
-fn upcast_bind_group_entry<'short, 'long: 'short>(
-    entry: BindGroupEntry<'long>,
-) -> BindGroupEntry<'short> {
-    entry
-}
-
-#[inline]
-fn bind_group_entry<'a>(
-    entry: Option<&GpuSystemShaderEntry>,
-    slice: Option<GpuArchetypeStorageSlice<'a>>,
-) -> Option<BindGroupEntry<'a>> {
-    let binding = entry?.binding_index;
-    let resource = unsafe { slice?.as_slice() }.into();
-    Some(BindGroupEntry { binding, resource })
-}
-
-type ComponentEntriesSlicesOutputItem<'a> = (
-    GpuComponentId,
-    Option<&'a GpuSystemShaderEntry>,
-    Option<GpuArchetypeStorageSlice<'a>>,
-);
-
-#[inline]
-fn component_entries_slices<'a, E, S>(
-    entries: E,
-    slices: S,
-) -> impl IntoIterator<Item = ComponentEntriesSlicesOutputItem<'a>>
-where
-    E: IntoIterator<Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>)>,
-    S: IntoIterator<Item = (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>)>,
-{
-    let mut slices: IndexMap<_, _> = slices.into_iter().collect();
-    entries.into_iter().map(move |(component_id, entry)| {
-        let Some(slice) = slices.swap_remove(&component_id) else {
-            unreachable!("{component_id} should exist");
-        };
-        (component_id, entry, slice)
-    })
 }

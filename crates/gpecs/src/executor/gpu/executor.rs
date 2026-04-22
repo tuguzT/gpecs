@@ -59,12 +59,6 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn context(&self) -> &Context {
-        let Self { context, .. } = self;
-        context
-    }
-
-    #[inline]
     pub fn device(&self) -> &Device {
         let Self { device, .. } = self;
         device
@@ -101,12 +95,6 @@ impl<'ctx> GpuExecutor<'ctx> {
     pub fn components_mut(&mut self) -> &mut GpuComponentRegistry {
         let Self { components, .. } = self;
         components
-    }
-
-    #[inline]
-    pub fn into_context(self) -> &'ctx mut Context {
-        let Self { context, .. } = self;
-        context
     }
 
     #[inline]
@@ -342,7 +330,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     // TODO: methods to copy data from CPU to GPU and vice versa
-    //       do not grant mutable access to the context
+    //       do not grant mutable access to the context (yet)
 }
 
 #[inline]

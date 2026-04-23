@@ -95,12 +95,9 @@ pub fn run(context: &mut Context) {
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
-        let timestamp_query_download_buffer = executor
+        executor
             .timestamp_query_resources()
-            .map(|resources| unsafe { resources.download_buffer() });
-        let timestamp_query_download_slice = timestamp_query_download_buffer
-            .map(|buffer| buffer.slice(..))
-            .inspect(|slice| slice.map_async(wgpu::MapMode::Read, |_| {}));
+            .inspect(|resources| resources.request_statistics());
 
         // Map download buffer to CPU memory
         // let position_tag_download_slice =
@@ -152,21 +149,19 @@ pub fn run(context: &mut Context) {
         // }
 
         // Check data inside of the timestamp query download buffer
-        if let Some(timestamp_query_download_slice) = timestamp_query_download_slice {
-            let timestamp_query_view = timestamp_query_download_slice.get_mapped_range();
-            let timestamp_query_raw: &[u64] = bytemuck::cast_slice(&timestamp_query_view);
-            log::info!("Timestamp query raw data: {timestamp_query_raw:#?}");
+        if let Some(timestamp_query_download_slice) = executor.timestamp_query_resources() {
+            let raw_statistics = timestamp_query_download_slice
+                .raw_statistics()
+                .expect("timestamp query statistics should be ready");
+            let raw_statistics = raw_statistics.as_slice();
+            log::info!("Timestamp query raw data: {raw_statistics:#?}");
 
             let timestamp_period_nanos = queue.get_timestamp_period().to_u64().unwrap();
-            for (index, (&first, &second)) in timestamp_query_raw.iter().tuple_windows().enumerate()
-            {
+            for (index, (&first, &second)) in raw_statistics.iter().tuple_windows().enumerate() {
                 let nanos = (second - first) * timestamp_period_nanos;
                 let duration = Duration::from_nanos(nanos);
                 log::info!("Timestamp query {index} duration: {duration:?}");
             }
-        }
-        if let Some(timestamp_query_download_buffer) = timestamp_query_download_buffer.as_ref() {
-            timestamp_query_download_buffer.unmap();
         }
 
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);

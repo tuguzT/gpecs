@@ -1,4 +1,7 @@
-pub use self::{executor::GpuExecutor, timestamp::TimestampQueryResources};
+pub use self::{
+    executor::GpuExecutor,
+    timestamp::{TimestampQueryError, TimestampQueryResources},
+};
 
 pub mod archetype;
 pub mod bundle;

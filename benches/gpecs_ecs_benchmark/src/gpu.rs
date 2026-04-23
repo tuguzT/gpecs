@@ -114,12 +114,15 @@ pub fn run(context: &mut Context) {
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
-        let timestamp_query_download_buffer = executor
+        // let timestamp_query_download_buffer = executor
+        //     .timestamp_query_resources()
+        //     .map(|resources| unsafe { resources.download_buffer() });
+        // let timestamp_query_download_slice = timestamp_query_download_buffer
+        //     .map(|buffer| buffer.slice(..))
+        //     .inspect(|slice| slice.map_async(wgpu::MapMode::Read, |_| {}));
+        executor
             .timestamp_query_resources()
-            .map(|resources| unsafe { resources.download_buffer() });
-        let timestamp_query_download_slice = timestamp_query_download_buffer
-            .map(|buffer| buffer.slice(..))
-            .inspect(|slice| slice.map_async(wgpu::MapMode::Read, |_| {}));
+            .inspect(|resources| resources.request_statistics());
 
         let framebuffer_data = framebuffer_download_buffer.slice(..);
         framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
@@ -133,12 +136,14 @@ pub fn run(context: &mut Context) {
         let elapsed = timestamp.elapsed();
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
 
-        if let Some(timestamp_query_download_slice) = timestamp_query_download_slice {
-            let timestamp_query_view = timestamp_query_download_slice.get_mapped_range();
-            let timestamp_query_raw: &[u64] = bytemuck::cast_slice(&timestamp_query_view);
+        if let Some(timestamp_query_download_slice) = executor.timestamp_query_resources() {
+            let raw_statistics = timestamp_query_download_slice
+                .raw_statistics()
+                .expect("timestamp query statistics should be ready");
+            let raw_statistics = raw_statistics.as_slice();
             let timestamp_period_nanos = queue.get_timestamp_period();
             let mut timestamp_query_result =
-                timestamp_query_raw
+                raw_statistics
                     .iter()
                     .tuple_windows()
                     .map(|(first, second)| {
@@ -167,9 +172,9 @@ pub fn run(context: &mut Context) {
             let render_sprite: Duration = timestamp_query_result.skip(1).sum();
             log::info!(">>>> `render_sprite` system took {render_sprite:?}");
         }
-        if let Some(timestamp_query_download_buffer) = timestamp_query_download_buffer {
-            timestamp_query_download_buffer.unmap();
-        }
+        // if let Some(timestamp_query_download_buffer) = timestamp_query_download_buffer {
+        //     timestamp_query_download_buffer.unmap();
+        // }
         log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
 
         time_delta = TimeDelta(elapsed.as_secs_f32());

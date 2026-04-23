@@ -1,8 +1,16 @@
-use std::num::NonZeroU32;
+use std::{
+    error::Error,
+    fmt::{self, Debug, Display},
+    num::NonZeroU32,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use wgpu::{
-    Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Features,
-    QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
+    Buffer, BufferAddress, BufferDescriptor, BufferUsages, BufferView, CommandEncoder, Device,
+    Features, MapMode, QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
 };
 
 use crate::executor::gpu::cache::{GpuCache, SystemCache};
@@ -13,6 +21,7 @@ pub struct TimestampQueryResources {
     count: NonZeroU32,
     resolve_buffer: Buffer,
     download_buffer: Buffer,
+    statistics_requested: Arc<AtomicBool>,
 }
 
 impl TimestampQueryResources {
@@ -56,12 +65,14 @@ impl TimestampQueryResources {
         let resolve_buffer = gpu_device.create_buffer(&resolve_buffer_desc);
         let download_buffer = gpu_device.create_buffer(&download_buffer_desc);
 
-        Some(TimestampQueryResources {
+        let me = TimestampQueryResources {
             query_set,
             count,
             resolve_buffer,
             download_buffer,
-        })
+            statistics_requested: AtomicBool::new(false).into(),
+        };
+        Some(me)
     }
 
     #[inline]
@@ -91,15 +102,50 @@ impl TimestampQueryResources {
     }
 
     #[inline]
+    pub fn request_statistics(&self) {
+        let Self {
+            download_buffer,
+            statistics_requested,
+            ..
+        } = self;
+
+        let statictics_requested = Arc::clone(statistics_requested);
+        let callback = move |_| statictics_requested.store(true, Ordering::Release);
+        download_buffer.map_async(MapMode::Read, .., callback);
+    }
+
+    #[inline]
+    pub fn raw_statistics(&self) -> Result<TimestampQueryRawStatistics, TimestampQueryError> {
+        let Self {
+            download_buffer,
+            statistics_requested,
+            ..
+        } = self;
+
+        if !statistics_requested.load(Ordering::Acquire) {
+            return Err(TimestampQueryError);
+        }
+
+        let download_buffer = download_buffer.get_mapped_range(..);
+        let statistics = TimestampQueryRawStatistics { download_buffer };
+        Ok(statistics)
+    }
+
+    #[inline]
     pub(super) fn resolve(&self, command_encoder: &mut CommandEncoder) {
         let Self {
             query_set,
             count,
             resolve_buffer,
             download_buffer,
+            statistics_requested,
         } = self;
 
         command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
+
+        if statistics_requested.swap(false, Ordering::AcqRel) {
+            download_buffer.unmap();
+        }
         command_encoder.copy_buffer_to_buffer(
             resolve_buffer,
             0,
@@ -109,6 +155,42 @@ impl TimestampQueryResources {
         );
     }
 }
+
+pub struct TimestampQueryRawStatistics {
+    download_buffer: BufferView,
+}
+
+impl TimestampQueryRawStatistics {
+    #[inline]
+    pub fn as_slice(&self) -> &[u64] {
+        let Self { download_buffer } = self;
+        bytemuck::cast_slice(download_buffer)
+    }
+}
+
+impl Debug for TimestampQueryRawStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let slice = self.as_slice();
+        f.debug_tuple("TimestampQueryStatistics")
+            .field(&slice)
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct TimestampQueryError;
+
+impl Display for TimestampQueryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "executor timestamp query statistics was not requested or is not ready yet"
+        )
+    }
+}
+
+impl Error for TimestampQueryError {}
 
 #[inline]
 fn timestamp_count_for_system_cache(system_cache: &SystemCache) -> usize {

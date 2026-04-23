@@ -1,6 +1,10 @@
 pub use self::{
     executor::GpuExecutor,
-    timestamp::{TimestampQueryError, TimestampQueryResources},
+    timestamp::{
+        TimestampQueryArchetypeStatistics, TimestampQueryError, TimestampQueryRawStatistics,
+        TimestampQueryResources, TimestampQueryStatistics, TimestampQueryStatisticsIter,
+        TimestampQuerySystemStatistics, TimestampQuerySystemStatisticsIter,
+    },
 };
 
 pub mod archetype;

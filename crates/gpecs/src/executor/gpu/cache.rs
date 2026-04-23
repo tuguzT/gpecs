@@ -211,6 +211,12 @@ impl GpuCache {
     }
 
     #[inline]
+    pub fn len(&self) -> usize {
+        let Self { systems } = self;
+        systems.len()
+    }
+
+    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = GpuSystemInfo<&SystemCache>> {
         let Self { systems } = self;
         systems

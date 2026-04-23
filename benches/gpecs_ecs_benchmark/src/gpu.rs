@@ -14,8 +14,6 @@ use gpecs_ecs_benchmark_types::{
     framebuffer::{Framebuffer, FramebufferDesc},
     utils::{RandomXoshiro128, TimeDelta},
 };
-use itertools::Itertools;
-use num_traits::ToPrimitive;
 use renderdoc::{RenderDoc, V141};
 use wgpu::util::DeviceExt;
 
@@ -114,12 +112,6 @@ pub fn run(context: &mut Context) {
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
-        // let timestamp_query_download_buffer = executor
-        //     .timestamp_query_resources()
-        //     .map(|resources| unsafe { resources.download_buffer() });
-        // let timestamp_query_download_slice = timestamp_query_download_buffer
-        //     .map(|buffer| buffer.slice(..))
-        //     .inspect(|slice| slice.map_async(wgpu::MapMode::Read, |_| {}));
         executor
             .timestamp_query_resources()
             .inspect(|resources| resources.request_statistics());
@@ -136,45 +128,22 @@ pub fn run(context: &mut Context) {
         let elapsed = timestamp.elapsed();
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
 
-        if let Some(timestamp_query_download_slice) = executor.timestamp_query_resources() {
-            let raw_statistics = timestamp_query_download_slice
-                .raw_statistics()
-                .expect("timestamp query statistics should be ready");
-            let raw_statistics = raw_statistics.as_slice();
-            let timestamp_period_nanos = queue.get_timestamp_period();
-            let mut timestamp_query_result =
-                raw_statistics
+        if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
+            let statistics = statistics.expect("timestamp query statistics should be ready");
+            for system_statistics in &statistics {
+                let system_id = system_statistics.system_id();
+                let Some(system_shader) = executor.systems().get_system_info(system_id) else {
+                    unreachable!("{system_id} should exist")
+                };
+
+                let total_duration: Duration = system_statistics
                     .iter()
-                    .tuple_windows()
-                    .map(|(first, second)| {
-                        let nanos = (second - first).to_f32().unwrap() * timestamp_period_nanos;
-                        Duration::from_nanos(nanos.to_u64().unwrap())
-                    });
-
-            let update_position: Duration = timestamp_query_result.by_ref().take(3).sum();
-            log::info!(">>>> `update_position` system took {update_position:?}");
-
-            let update_data: Duration = timestamp_query_result.by_ref().skip(1).take(3).sum();
-            log::info!(">>>> `update_data` system took {update_data:?}");
-
-            let update_components: Duration = timestamp_query_result.by_ref().skip(1).take(2).sum();
-            log::info!(">>>> `update_components` system took {update_components:?}");
-
-            let update_health: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
-            log::info!(">>>> `update_health` system took {update_health:?}");
-
-            let update_damage: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
-            log::info!(">>>> `update_damage` system took {update_damage:?}");
-
-            let update_sprite: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
-            log::info!(">>>> `update_sprite` system took {update_sprite:?}");
-
-            let render_sprite: Duration = timestamp_query_result.skip(1).sum();
-            log::info!(">>>> `render_sprite` system took {render_sprite:?}");
+                    .map(|archetype_stats| archetype_stats.duration)
+                    .sum();
+                let name = system_shader.label().unwrap_or("<unknown>");
+                log::info!(">>>> `{name}` system took {total_duration:?}");
+            }
         }
-        // if let Some(timestamp_query_download_buffer) = timestamp_query_download_buffer {
-        //     timestamp_query_download_buffer.unmap();
-        // }
         log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
 
         time_delta = TimeDelta(elapsed.as_secs_f32());

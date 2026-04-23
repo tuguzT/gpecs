@@ -9,8 +9,6 @@ use std::{
 
 use gpecs::prelude::*;
 use gpecs_simple_types::{Mass, Position, Tag};
-use itertools::Itertools;
-use num_traits::ToPrimitive;
 use renderdoc::{RenderDoc, V141};
 
 use crate::{ITER_COUNT, setup::setup};
@@ -77,7 +75,7 @@ pub fn run(context: &mut Context) {
     log::info!("Starting to execute systems on GPU...");
     for i in 0..ITER_COUNT {
         renderdoc_start_frame_capture(renderdoc.as_mut(), &device);
-        let start = Instant::now();
+        let timestamp = Instant::now();
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
@@ -108,9 +106,6 @@ pub fn run(context: &mut Context) {
             timeout: None,
         };
         device.poll(poll_type).expect("device should poll");
-
-        let duration = start.elapsed();
-        log::info!("GPU system execution {i} overall took {duration:?}");
 
         // Check data inside of the download buffer
         // if let Some(position_tag_download_slice) = position_tag_download_slice {
@@ -148,23 +143,27 @@ pub fn run(context: &mut Context) {
         //     position_tag_download_buffer.unmap();
         // }
 
-        // Check data inside of the timestamp query download buffer
-        if let Some(timestamp_query_download_slice) = executor.timestamp_query_resources() {
-            let raw_statistics = timestamp_query_download_slice
-                .raw_statistics()
-                .expect("timestamp query statistics should be ready");
-            let raw_statistics = raw_statistics.as_slice();
-            log::info!("Timestamp query raw data: {raw_statistics:#?}");
+        let elapsed = timestamp.elapsed();
+        renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
 
-            let timestamp_period_nanos = queue.get_timestamp_period().to_u64().unwrap();
-            for (index, (&first, &second)) in raw_statistics.iter().tuple_windows().enumerate() {
-                let nanos = (second - first) * timestamp_period_nanos;
-                let duration = Duration::from_nanos(nanos);
-                log::info!("Timestamp query {index} duration: {duration:?}");
+        // Check data inside of the timestamp query download buffer
+        if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
+            let statistics = statistics.expect("timestamp query statistics should be ready");
+            for system_statistics in &statistics {
+                let system_id = system_statistics.system_id();
+                let Some(system_shader) = executor.systems().get_system_info(system_id) else {
+                    unreachable!("{system_id} should exist")
+                };
+
+                let total_duration: Duration = system_statistics
+                    .iter()
+                    .map(|archetype_stats| archetype_stats.duration)
+                    .sum();
+                let name = system_shader.label().unwrap_or("<unknown>");
+                log::info!(">>>> `{name}` system took {total_duration:?}");
             }
         }
-
-        renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
+        log::info!("Execution of GPU systems {i} took {elapsed:?}");
     }
 
     let context = executor.into_context(&queue);

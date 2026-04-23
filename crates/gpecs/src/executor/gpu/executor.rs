@@ -9,7 +9,7 @@ use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     context::{ComponentInfo, Context},
     executor::gpu::{
-        TimestampQueryResources,
+        TimestampQueryError, TimestampQueryResources, TimestampQueryStatistics,
         archetype::{
             registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
             storage::GpuArchetypeStorage,
@@ -326,6 +326,28 @@ impl<'ctx> GpuExecutor<'ctx> {
         if let Some(timestamp_query_resources) = timestamp_query_resources {
             timestamp_query_resources.resolve(command_encoder);
         }
+    }
+
+    pub fn timestamp_query_statistics(
+        &self,
+        queue: &Queue,
+    ) -> Option<Result<TimestampQueryStatistics, TimestampQueryError>> {
+        let Self {
+            cache,
+            timestamp_query_resources,
+            ..
+        } = self;
+
+        let (cache, timestamp_query_resources) =
+            cache.as_ref().zip(timestamp_query_resources.as_ref())?;
+
+        let raw_statistics = match timestamp_query_resources.raw_statistics() {
+            Ok(raw_statistics) => raw_statistics,
+            Err(error) => return Some(Err(error)),
+        };
+
+        let statistics = TimestampQueryStatistics::new(&raw_statistics, cache, queue);
+        Some(Ok(statistics))
     }
 
     pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {

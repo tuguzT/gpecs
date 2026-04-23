@@ -10,6 +10,7 @@ edition.workspace = true
 gpecs = { workspace = true }
 gpecs_ecs_benchmark_types = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
+num-traits = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 wgpu = { workspace = true, features = ["spirv"] }

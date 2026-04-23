@@ -3,10 +3,12 @@ use gpecs::{
 };
 use gpecs_ecs_benchmark_types::{
     components::{
-        Damage, Data, Health, Player, PlayerType, Position, SPAWN_SPRITE, Sprite, Velocity,
+        Damage, Data, Health, Player, PlayerType, Position, SPAWN_SPRITE, Sprite, StatusEffect,
+        Velocity,
     },
     utils::RandomXoshiro128,
 };
+use num_traits::ToPrimitive;
 
 use crate::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_WIDTH, SPAWN_AREA_MARGIN};
 
@@ -43,6 +45,10 @@ pub fn create_entities_with_mixed_components(context: &mut Context, count: usize
     entities
 }
 
+#[expect(
+    clippy::nonminimal_bool,
+    reason = "preserve exactly from the reference impl"
+)]
 pub fn prepare_entities_with_mixed_components(
     context: &mut Context,
     rng: &mut RandomXoshiro128,
@@ -114,7 +120,7 @@ fn remove_component_three(context: &mut Context, entity: Entity) {
 fn add_components(context: &mut Context, entity: Entity) {
     let player = Player {
         rng: RandomXoshiro128::new(0),
-        r#type: Default::default(),
+        r#type: PlayerType::default(),
         padding: Default::default(),
     };
     let health = Health::default();
@@ -147,8 +153,8 @@ fn init_components(
     let r#type = player_type.unwrap_or_else(|| {
         let rate = rng.range(1..100);
         match rate {
-            ..=3 => PlayerType::NPC,
-            ..=30 => PlayerType::Hero,
+            0..=3 => PlayerType::NPC,
+            4..=30 => PlayerType::Hero,
             _ => PlayerType::Monster,
         }
     });
@@ -161,24 +167,24 @@ fn init_components(
     *health = Health {
         hp: 0,
         max_hp: match player.r#type {
-            PlayerType::Hero => player.rng.range(5..15) as i32,
-            PlayerType::Monster => player.rng.range(4..12) as i32,
-            PlayerType::NPC => player.rng.range(6..12) as i32,
+            PlayerType::Hero => player.rng.range(5..15).cast_signed(),
+            PlayerType::Monster => player.rng.range(4..12).cast_signed(),
+            PlayerType::NPC => player.rng.range(6..12).cast_signed(),
         },
-        status: Default::default(),
+        status: StatusEffect::default(),
         padding: Default::default(),
     };
 
     *damage = Damage {
         attack: match player.r#type {
-            PlayerType::Hero => player.rng.range(4..10) as i32,
-            PlayerType::Monster => player.rng.range(3..9) as i32,
+            PlayerType::Hero => player.rng.range(4..10).cast_signed(),
+            PlayerType::Monster => player.rng.range(3..9).cast_signed(),
             PlayerType::NPC => 0,
         },
         defense: match player.r#type {
-            PlayerType::Hero => player.rng.range(2..6) as i32,
-            PlayerType::Monster => player.rng.range(2..8) as i32,
-            PlayerType::NPC => player.rng.range(3..8) as i32,
+            PlayerType::Hero => player.rng.range(2..6).cast_signed(),
+            PlayerType::Monster => player.rng.range(2..8).cast_signed(),
+            PlayerType::NPC => player.rng.range(3..8).cast_signed(),
         },
     };
 
@@ -186,14 +192,13 @@ fn init_components(
         character: SPAWN_SPRITE,
     };
 
+    let framebuffer_width = u32::try_from(FRAMEBUFFER_WIDTH).unwrap();
+    let framebuffer_height = u32::try_from(FRAMEBUFFER_HEIGHT).unwrap();
+    let spawn_area_margin_float = SPAWN_AREA_MARGIN.to_f32().unwrap();
+    let x_rng = player.rng.range(0..framebuffer_width + SPAWN_AREA_MARGIN);
+    let y_rng = player.rng.range(0..framebuffer_height + SPAWN_AREA_MARGIN);
     *position = Position {
-        x: player
-            .rng
-            .range(0..FRAMEBUFFER_WIDTH as u32 + SPAWN_AREA_MARGIN) as f32
-            - SPAWN_AREA_MARGIN as f32,
-        y: player
-            .rng
-            .range(0..FRAMEBUFFER_HEIGHT as u32 + SPAWN_AREA_MARGIN) as f32
-            - SPAWN_AREA_MARGIN as f32,
+        x: x_rng.to_f32().unwrap() - spawn_area_margin_float,
+        y: y_rng.to_f32().unwrap() - SPAWN_AREA_MARGIN.to_f32().unwrap(),
     };
 }

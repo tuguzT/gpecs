@@ -15,6 +15,7 @@ use gpecs_ecs_benchmark_types::{
     utils::{RandomXoshiro128, TimeDelta},
 };
 use itertools::Itertools;
+use num_traits::ToPrimitive;
 use renderdoc::{RenderDoc, V141};
 use wgpu::util::DeviceExt;
 
@@ -24,6 +25,7 @@ use crate::{
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
+#[expect(clippy::too_many_lines)]
 pub fn run(context: &mut Context) {
     log::info!("> Running on GPU...");
 
@@ -36,8 +38,8 @@ pub fn run(context: &mut Context) {
 
     let mut time_delta = TimeDelta::default();
     let mut framebuffer = Framebuffer::new(
-        FRAMEBUFFER_WIDTH as u32,
-        FRAMEBUFFER_HEIGHT as u32,
+        u32::try_from(FRAMEBUFFER_WIDTH).unwrap(),
+        u32::try_from(FRAMEBUFFER_HEIGHT).unwrap(),
         vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
     );
 
@@ -141,15 +143,15 @@ pub fn run(context: &mut Context) {
 
         if let Some(timestamp_query_download_slice) = timestamp_query_download_slice {
             let timestamp_query_view = timestamp_query_download_slice.get_mapped_range();
-            let timestamp_query_raw: &[u64] = bytemuck::cast_slice(&*timestamp_query_view);
+            let timestamp_query_raw: &[u64] = bytemuck::cast_slice(&timestamp_query_view);
             let timestamp_period_nanos = queue.get_timestamp_period();
             let mut timestamp_query_result =
                 timestamp_query_raw
                     .iter()
                     .tuple_windows()
                     .map(|(first, second)| {
-                        let nanos = (second - first) as f32 * timestamp_period_nanos;
-                        Duration::from_nanos(nanos as u64)
+                        let nanos = (second - first).to_f32().unwrap() * timestamp_period_nanos;
+                        Duration::from_nanos(nanos.to_u64().unwrap())
                     });
 
             let update_position: Duration = timestamp_query_result.by_ref().take(3).sum();
@@ -187,7 +189,7 @@ pub fn run(context: &mut Context) {
         );
 
         let framebuffer_view = framebuffer_data.get_mapped_range();
-        let framebuffer_data = bytemuck::cast_slice(&*framebuffer_view);
+        let framebuffer_data = bytemuck::cast_slice(&framebuffer_view);
         framebuffer.buffer_mut().copy_from_slice(framebuffer_data);
 
         drop(framebuffer_view);
@@ -204,15 +206,16 @@ pub fn run(context: &mut Context) {
 #[derive(Debug, Clone, Copy)]
 #[expect(unused)]
 struct GpuSystems {
-    update_position_system: GpuSystemId,
-    update_data_system: GpuSystemId,
-    update_components_system: GpuSystemId,
-    update_health_system: GpuSystemId,
-    update_damage_system: GpuSystemId,
-    update_sprite_system: GpuSystemId,
-    render_sprite_system: GpuSystemId,
+    update_position: GpuSystemId,
+    update_data: GpuSystemId,
+    update_components: GpuSystemId,
+    update_health: GpuSystemId,
+    update_damage: GpuSystemId,
+    update_sprite: GpuSystemId,
+    render_sprite: GpuSystemId,
 }
 
+#[expect(clippy::too_many_lines)]
 fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     let shader_module = init_wgpu_shader(executor.device());
 
@@ -389,13 +392,13 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     executor.add_system(render_sprite_system);
 
     GpuSystems {
-        update_position_system,
-        update_data_system,
-        update_components_system,
-        update_health_system,
-        update_damage_system,
-        update_sprite_system,
-        render_sprite_system,
+        update_position: update_position_system,
+        update_data: update_data_system,
+        update_components: update_components_system,
+        update_health: update_health_system,
+        update_damage: update_damage_system,
+        update_sprite: update_sprite_system,
+        render_sprite: render_sprite_system,
     }
 }
 
@@ -438,15 +441,15 @@ fn setup_gpu_systems(
     let render_sprite_system_entries = [framebuffer_data_entry, framebuffer_desc_entry];
     executor.set_additional_bindings([
         (
-            systems.update_position_system,
+            systems.update_position,
             update_position_system_entries.iter().cloned(),
         ),
         (
-            systems.update_data_system,
+            systems.update_data,
             update_data_system_entries.iter().cloned(),
         ),
         (
-            systems.render_sprite_system,
+            systems.render_sprite,
             render_sprite_system_entries.iter().cloned(),
         ),
     ]);
@@ -477,9 +480,10 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     }
 
     let features = adapter.features();
-    if !features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES) {
-        panic!("adapter does not support timestamp queries inside passes, which are required");
-    }
+    assert!(
+        features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
+        "adapter does not support timestamp queries inside passes, which are required",
+    );
 
     let device_desc = wgpu::DeviceDescriptor {
         label: Some("`gpecs` `ecs_benchmark` device"),
@@ -578,10 +582,9 @@ fn wgpu_raw_device_window(device: &wgpu::Device) -> (*const c_void, *const c_voi
     let device_raw = unsafe {
         device
             .as_hal::<wgpu::hal::api::Vulkan>()
-            .map(|device| transmute(device.raw_device().handle()))
-            .unwrap_or(null::<c_void>())
+            .map_or(null(), |device| transmute(device.raw_device().handle()))
     };
-    let window_raw = null::<c_void>();
+    let window_raw = null();
     (device_raw, window_raw)
 }
 

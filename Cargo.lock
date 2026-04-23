@@ -712,6 +712,7 @@ dependencies = [
  "gpecs_ecs_benchmark_types",
  "itertools 0.14.0",
  "log",
+ "num-traits",
  "pollster",
  "renderdoc",
  "wgpu",

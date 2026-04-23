@@ -31,8 +31,8 @@ pub fn run(context: &mut Context) {
 
     let time_delta = TimeDelta::default();
     let framebuffer = Framebuffer::new(
-        FRAMEBUFFER_WIDTH as u32,
-        FRAMEBUFFER_HEIGHT as u32,
+        u32::try_from(FRAMEBUFFER_WIDTH).unwrap(),
+        u32::try_from(FRAMEBUFFER_HEIGHT).unwrap(),
         vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
     );
 
@@ -80,7 +80,7 @@ fn register_cpu_systems<B>(
             update_position(position, velocity, time_delta);
         }
         let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_position` system took {elapsed:?}",);
+        log::info!(">>>> `update_position` system took {elapsed:?}");
     });
     executor.add_system(system);
 

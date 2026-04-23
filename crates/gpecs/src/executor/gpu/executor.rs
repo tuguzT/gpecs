@@ -300,6 +300,7 @@ impl<'ctx> GpuExecutor<'ctx> {
                 timestamp_writes: None,
             };
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+            compute_pass.set_pipeline(shader.compute_pipeline());
 
             for archetype_cache in system_cache.iter() {
                 let archetype_id = archetype_cache.archetype_id();
@@ -307,7 +308,6 @@ impl<'ctx> GpuExecutor<'ctx> {
                     unreachable!("{archetype_id} should exist");
                 };
 
-                compute_pass.set_pipeline(shader.compute_pipeline());
                 compute_pass.set_bind_group(0, archetype_cache.bind_group(), &[]);
 
                 write_timestamp(&mut compute_pass, query_index);

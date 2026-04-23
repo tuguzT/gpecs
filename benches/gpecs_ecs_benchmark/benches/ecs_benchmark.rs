@@ -91,6 +91,8 @@ fn run_cpu(context: &mut Context) {
         save_framebuffer_to_file(framebuffer, CPU_PATH, i);
     }
 
+    // Return context from the executor
+    let context = executor.into_context();
     context.destroy_all();
 }
 

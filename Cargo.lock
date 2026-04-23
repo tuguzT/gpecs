@@ -785,6 +785,7 @@ dependencies = [
 name = "gpecs_simple"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "cargo-gpu-install",
  "const_format",
  "env_logger",

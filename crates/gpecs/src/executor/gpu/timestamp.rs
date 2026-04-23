@@ -12,6 +12,7 @@ pub struct TimestampQueryResources {
     query_set: QuerySet,
     count: NonZeroU32,
     resolve_buffer: Buffer,
+    download_buffer: Buffer,
 }
 
 impl TimestampQueryResources {
@@ -33,24 +34,33 @@ impl TimestampQueryResources {
         let count = NonZeroU32::new(count)?;
 
         let query_set_desc = QuerySetDescriptor {
-            label: Some("`gpecs` executor query set"),
+            label: Some("`gpecs` executor timestamp query set"),
             ty: QueryType::Timestamp,
             count: count.get(),
         };
         let query_set = gpu_device.create_query_set(&query_set_desc);
 
+        let size = resolve_buffer_size(count);
         let resolve_buffer_desc = BufferDescriptor {
-            label: Some("`gpecs` executor query set resolve buffer"),
-            size: resolve_buffer_size(count),
+            label: Some("`gpecs` executor timestamp query resolve buffer"),
+            size,
             usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         };
+        let download_buffer_desc = BufferDescriptor {
+            label: Some("`gpecs` executor timestamp query download buffer"),
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            ..resolve_buffer_desc
+        };
+
         let resolve_buffer = gpu_device.create_buffer(&resolve_buffer_desc);
+        let download_buffer = gpu_device.create_buffer(&download_buffer_desc);
 
         Some(TimestampQueryResources {
             query_set,
             count,
             resolve_buffer,
+            download_buffer,
         })
     }
 
@@ -73,13 +83,30 @@ impl TimestampQueryResources {
     }
 
     #[inline]
+    pub unsafe fn download_buffer(&self) -> &Buffer {
+        let Self {
+            download_buffer, ..
+        } = self;
+        download_buffer
+    }
+
+    #[inline]
     pub(super) fn resolve(&self, command_encoder: &mut CommandEncoder) {
         let Self {
             query_set,
             count,
             resolve_buffer,
+            download_buffer,
         } = self;
+
         command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
+        command_encoder.copy_buffer_to_buffer(
+            resolve_buffer,
+            0,
+            download_buffer,
+            0,
+            resolve_buffer.size(),
+        );
     }
 }
 

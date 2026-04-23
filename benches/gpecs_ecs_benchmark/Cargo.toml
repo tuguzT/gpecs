@@ -6,7 +6,7 @@ license.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[dev-dependencies]
+[dependencies]
 gpecs = { workspace = true }
 gpecs_ecs_benchmark_types = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }

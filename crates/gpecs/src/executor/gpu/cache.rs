@@ -1,6 +1,9 @@
 use std::iter::chain;
 
-use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, Device};
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferAsyncError, BufferDescriptor,
+    BufferSlice, BufferUsages, CommandEncoder, Device, MapMode, WasmNotSend,
+};
 
 use crate::{
     context::Context,
@@ -116,6 +119,14 @@ impl GpuCache {
             .iter()
             .map(|(&id, cache)| GpuSystemInfo::new(id, cache))
     }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = GpuSystemInfo<&mut SystemCache>> {
+        let Self { systems } = self;
+        systems
+            .iter_mut()
+            .map(|(&id, cache)| GpuSystemInfo::new(id, cache))
+    }
 }
 
 #[derive(Debug, Default)]
@@ -137,11 +148,21 @@ impl SystemCache {
             .iter()
             .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
     }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = GpuArchetypeInfo<&mut ArchetypeCache>> {
+        let Self { archetypes } = self;
+        archetypes
+            .iter_mut()
+            .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
+    }
 }
 
 #[derive(Debug)]
 pub struct ArchetypeCache {
     bind_group: BindGroup,
+    entities_download_buffer: DownloadBuffer,
+    component_download_buffers: IndexMap<GpuComponentId, DownloadBuffer>,
 }
 
 impl ArchetypeCache {
@@ -189,14 +210,55 @@ impl ArchetypeCache {
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
 
-        let me = Self { bind_group };
+        let me = Self {
+            bind_group,
+            entities_download_buffer: DownloadBuffer::new(),
+            component_download_buffers: IndexMap::default(),
+        };
         Some(me)
     }
 
     #[inline]
     pub fn bind_group(&self) -> &BindGroup {
-        let Self { bind_group } = self;
+        let Self { bind_group, .. } = self;
         bind_group
+    }
+
+    #[inline]
+    pub fn entities_download_buffer(&mut self) -> &mut DownloadBuffer {
+        let Self {
+            entities_download_buffer,
+            ..
+        } = self;
+        entities_download_buffer
+    }
+
+    #[inline]
+    pub fn component_download_buffer(
+        &mut self,
+        component_id: GpuComponentId,
+    ) -> &mut DownloadBuffer {
+        let Self {
+            component_download_buffers,
+            ..
+        } = self;
+
+        component_download_buffers
+            .entry(component_id)
+            .or_insert_with(DownloadBuffer::new)
+    }
+
+    #[inline]
+    pub fn component_download_buffers(
+        &mut self,
+    ) -> impl Iterator<Item = (GpuComponentId, &mut DownloadBuffer)> {
+        let Self {
+            component_download_buffers,
+            ..
+        } = self;
+        component_download_buffers
+            .iter_mut()
+            .map(|(&id, buffer)| (id, buffer))
     }
 }
 
@@ -239,4 +301,62 @@ where
         };
         (component_id, entry, slice)
     })
+}
+
+#[derive(Debug)]
+pub struct DownloadBuffer {
+    buffer: Option<Buffer>,
+}
+
+impl DownloadBuffer {
+    #[inline]
+    pub fn new() -> Self {
+        let buffer = None;
+        Self { buffer }
+    }
+
+    #[inline]
+    pub fn copy_from_buffer(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        source: BufferSlice<'_>,
+    ) {
+        let Self { buffer } = self;
+
+        let size = source.size().get();
+        let new_buffer = || {
+            let desc = BufferDescriptor {
+                label: Some(&format!("`gpecs` cache download buffer")),
+                size,
+                usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            };
+            device.create_buffer(&desc)
+        };
+        let buffer = buffer.get_or_insert_with(new_buffer);
+
+        if buffer.size() != size {
+            *buffer = new_buffer();
+        }
+
+        encoder.copy_buffer_to_buffer(source.buffer(), source.offset(), buffer, 0, size);
+    }
+
+    #[inline]
+    pub fn map_async<F>(&self, callback: F)
+    where
+        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + 'static,
+    {
+        let Self { buffer } = self;
+        if let Some(buffer) = buffer {
+            buffer.map_async(MapMode::Read, .., callback);
+        }
+    }
+
+    #[inline]
+    pub fn get_buffer(&self) -> Option<&Buffer> {
+        let Self { buffer } = self;
+        buffer.as_ref()
+    }
 }

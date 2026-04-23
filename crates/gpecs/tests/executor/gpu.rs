@@ -5,10 +5,12 @@ use gpecs::prelude::*;
 fn execute_simple() {
     let mut context = Context::new();
 
-    let (device, _queue) = init_wgpu();
-    let _executor = GpuExecutor::new(&mut context, device);
+    let (device, queue) = init_wgpu();
+    let executor = GpuExecutor::new(&mut context, device);
 
-    // TODO: find a way to safely map data from GPU to CPU
+    // TODO: execute GPU systems
+
+    let _context = executor.into_context(&queue);
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

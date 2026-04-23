@@ -1,8 +1,9 @@
 use std::{any::TypeId, num::NonZeroU32};
 
+use bytemuck::must_cast_slice_mut;
 use wgpu::{
-    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, ComputePass, ComputePassDescriptor,
-    Device,
+    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, CommandEncoderDescriptor, ComputePass,
+    ComputePassDescriptor, Device, PollType, Queue,
 };
 
 use crate::{
@@ -328,7 +329,118 @@ impl<'ctx> GpuExecutor<'ctx> {
         }
     }
 
-    // TODO: methods to copy data from CPU to GPU and vice versa
+    pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {
+        let Self {
+            context,
+            archetypes,
+            ref device,
+            ref mut cache,
+            ..
+        } = self;
+
+        if let Some(cache) = cache {
+            let command_encoder_label = format!("`gpecs` context download command encoder");
+            let command_encoder_desc = CommandEncoderDescriptor {
+                label: Some(&command_encoder_label),
+            };
+            let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
+
+            for archetype_cache in cache
+                .iter_mut()
+                .flat_map(|system_cache| system_cache.into_meta().iter_mut())
+            {
+                let archetype_id = archetype_cache.archetype_id();
+                let archetype_cache = archetype_cache.into_meta();
+
+                let Some(storage) = archetypes.get_archetype_info(archetype_id) else {
+                    unreachable!("{archetype_id} should exist")
+                };
+                let storage_slices = storage.slices();
+
+                let entities = storage_slices
+                    .entities
+                    .expect("cache exists, so should the entities");
+                let download_entities = archetype_cache.entities_download_buffer();
+                download_entities
+                    .copy_from_buffer(device, &mut command_encoder, unsafe { entities.as_slice() });
+
+                for (id, components) in storage_slices.components {
+                    let Some(components) = components else {
+                        continue;
+                    };
+
+                    let source = unsafe { components.as_slice() };
+                    let download_components = archetype_cache.component_download_buffer(id);
+                    download_components.copy_from_buffer(device, &mut command_encoder, source);
+                }
+            }
+
+            let command_buffer = command_encoder.finish();
+            let submission_index = queue.submit([command_buffer]);
+
+            for mut archetype_cache in cache
+                .iter_mut()
+                .flat_map(|system_cache| system_cache.into_meta().iter_mut())
+            {
+                archetype_cache.entities_download_buffer().map_async(|_| {});
+                for (_, download_buffer) in archetype_cache.component_download_buffers() {
+                    download_buffer.map_async(|_| {});
+                }
+            }
+
+            let poll_type = PollType::Wait {
+                submission_index: Some(submission_index),
+                timeout: None,
+            };
+            device
+                .poll(poll_type)
+                .expect("context download should be successful");
+
+            for archetype_cache in cache
+                .iter_mut()
+                .flat_map(|system_cache| system_cache.into_meta().iter_mut())
+            {
+                let archetype_id = archetype_cache.archetype_id();
+                let archetype_cache = archetype_cache.into_meta();
+
+                let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
+                let storage = unsafe { archetypes.get_archetype_info_mut(archetype_id.into()) };
+                let Some(storage) = storage else {
+                    unreachable!("{archetype_id} should exist")
+                };
+                let storage = storage.into_meta();
+                let (entities, bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
+
+                let mapped_entities = archetype_cache
+                    .entities_download_buffer()
+                    .get_buffer()
+                    .expect("entities download buffer should be already allocated");
+                must_cast_slice_mut(entities)
+                    .copy_from_slice(&mapped_entities.get_mapped_range(..));
+                mapped_entities.unmap();
+
+                for mut components in bundles {
+                    let component_id = components.component_id();
+                    let components = unsafe { components.as_mut_buffer() };
+
+                    let component_id = unsafe { GpuComponentId::from_id(component_id) };
+                    let mapped_components = archetype_cache
+                        .component_download_buffer(component_id)
+                        .get_buffer();
+                    let Some(mapped_components) = mapped_components else {
+                        continue;
+                    };
+
+                    components.write_copy_of_slice(&mapped_components.get_mapped_range(..));
+                    mapped_components.unmap();
+                }
+            }
+        }
+
+        context
+    }
+
+    // TODO: methods to copy data from CPU to GPU
     //       do not grant mutable access to the context (yet)
 }
 

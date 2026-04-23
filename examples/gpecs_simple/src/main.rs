@@ -144,7 +144,7 @@ fn main() {
         );
 
         let command_buffer = command_encoder.finish();
-        queue.submit([command_buffer]);
+        let submission_index = queue.submit([command_buffer]);
 
         // Map download buffer to CPU memory
         // let position_tag_download_slice =
@@ -154,9 +154,11 @@ fn main() {
         let timestamp_query_download_slice =
             wgpu_map_whole_buffer(timestamp_query_download_buffer.as_ref());
 
-        device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .expect("device should poll");
+        let poll_type = wgpu::PollType::Wait {
+            submission_index: Some(submission_index),
+            timeout: None,
+        };
+        device.poll(poll_type).expect("device should poll");
 
         let duration = start.elapsed();
         log::info!("GPU system execution {i} overall took {duration:?}");
@@ -229,6 +231,8 @@ fn main() {
 
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
     }
+
+    let _context = executor.into_context(&queue);
 }
 
 fn setup_context(context: &mut Context) {

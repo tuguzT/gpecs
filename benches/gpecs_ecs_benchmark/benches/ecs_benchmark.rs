@@ -190,7 +190,7 @@ fn run_gpu(context: &mut Context) {
         );
 
         let command_buffer = command_encoder.finish();
-        queue.submit([command_buffer]);
+        let submission_index = queue.submit([command_buffer]);
 
         let timestamp_query_download_slice =
             wgpu_map_whole_buffer(timestamp_query_download_buffer.as_ref());
@@ -198,9 +198,11 @@ fn run_gpu(context: &mut Context) {
         let framebuffer_data = framebuffer_download_buffer.slice(..);
         framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 
-        device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .expect("device should poll");
+        let poll_type = wgpu::PollType::Wait {
+            submission_index: Some(submission_index),
+            timeout: None,
+        };
+        device.poll(poll_type).expect("device should poll");
 
         let elapsed = timestamp.elapsed();
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
@@ -263,6 +265,7 @@ fn run_gpu(context: &mut Context) {
         save_framebuffer_to_file(&framebuffer, GPU_PATH, i);
     }
 
+    let context = executor.into_context(&queue);
     context.destroy_all();
 }
 

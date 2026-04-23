@@ -24,7 +24,7 @@ use crate::{
     hash::IndexMap,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct GpuCache {
     systems: IndexMap<GpuSystemId, SystemCache>,
 }
@@ -67,7 +67,7 @@ impl GpuCache {
             cached_entries.extend(additional_bindings);
         }
 
-        let mut cache = Self::default();
+        let mut system_caches = IndexMap::default();
         for system_id in schedule {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("{system_id} should exist");
@@ -105,13 +105,15 @@ impl GpuCache {
                     continue;
                 };
 
-                let SystemCache { archetypes } = cache.systems.entry(system_id).or_default();
+                let SystemCache { archetypes } = system_caches.entry(system_id).or_default();
                 if archetypes.insert(archetype_id, archetype_cache).is_some() {
                     unreachable!("{archetype_id} cannot have multiple bind groups for {system_id}");
                 }
             }
         }
-        cache
+
+        let systems = system_caches;
+        Self { systems }
     }
 
     pub fn download_from(

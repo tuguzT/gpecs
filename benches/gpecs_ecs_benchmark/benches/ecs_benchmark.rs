@@ -156,8 +156,10 @@ fn run_gpu(context: &mut Context) {
     let mut timestamp_query_download_buffer = None;
 
     log::info!(">> Registering GPU systems...");
-    register_gpu_systems(
+    let gpu_systems = register_gpu_systems(&mut executor);
+    setup_gpu_systems(
         &mut executor,
+        &gpu_systems,
         &time_delta_uniform_buffer,
         &framebuffer_data_storage_buffer,
         &framebuffer_desc_uniform_buffer,
@@ -539,12 +541,19 @@ fn register_cpu_systems<B>(
     executor.add_system(system);
 }
 
-fn register_gpu_systems(
-    executor: &mut GpuExecutor,
-    time_delta_uniform_buffer: &wgpu::Buffer,
-    framebuffer_data_storage_buffer: &wgpu::Buffer,
-    framebuffer_desc_uniform_buffer: &wgpu::Buffer,
-) {
+#[derive(Debug, Clone, Copy)]
+#[expect(unused)]
+struct GpuSystems {
+    update_position_system: GpuSystemId,
+    update_data_system: GpuSystemId,
+    update_components_system: GpuSystemId,
+    update_health_system: GpuSystemId,
+    update_damage_system: GpuSystemId,
+    update_sprite_system: GpuSystemId,
+    render_sprite_system: GpuSystemId,
+}
+
+fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     let shader_module = init_wgpu_shader(executor.device());
 
     let position_id = executor.register_component::<Position>();
@@ -719,6 +728,24 @@ fn register_gpu_systems(
         .expect("archetype components should be unique");
     executor.add_system(render_sprite_system);
 
+    GpuSystems {
+        update_position_system,
+        update_data_system,
+        update_components_system,
+        update_health_system,
+        update_damage_system,
+        update_sprite_system,
+        render_sprite_system,
+    }
+}
+
+fn setup_gpu_systems(
+    executor: &mut GpuExecutor,
+    systems: &GpuSystems,
+    time_delta_uniform_buffer: &wgpu::Buffer,
+    framebuffer_data_storage_buffer: &wgpu::Buffer,
+    framebuffer_desc_uniform_buffer: &wgpu::Buffer,
+) {
     let time_delta_uniform_buffer_entry = wgpu::BindGroupEntry {
         binding: 2,
         resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -751,15 +778,15 @@ fn register_gpu_systems(
     let render_sprite_system_entries = [framebuffer_data_entry, framebuffer_desc_entry];
     executor.set_additional_bindings([
         (
-            update_position_system,
+            systems.update_position_system,
             update_position_system_entries.iter().cloned(),
         ),
         (
-            update_data_system,
+            systems.update_data_system,
             update_data_system_entries.iter().cloned(),
         ),
         (
-            render_sprite_system,
+            systems.render_sprite_system,
             render_sprite_system_entries.iter().cloned(),
         ),
     ]);

@@ -19,7 +19,7 @@ use crate::{
             GpuComponent,
             registry::{GpuComponentId, GpuComponentRegistry},
         },
-        context::MappedContext,
+        context::ContextMapper,
         system::{
             registry::{
                 DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
@@ -383,7 +383,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn map_context(&mut self, command_encoder: &mut CommandEncoder) -> MappedContext<'_> {
+    pub fn context_mapper(&mut self) -> ContextMapper<'_> {
         let Self {
             context,
             device,
@@ -392,15 +392,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             transfer_cache,
             ..
         } = self;
-
-        MappedContext::new(
-            context,
-            device,
-            transfer_cache,
-            schedule_cache,
-            command_encoder,
-            archetypes,
-        )
+        ContextMapper::new(context, device, transfer_cache, schedule_cache, archetypes)
     }
 
     #[inline]
@@ -413,7 +405,8 @@ impl<'ctx> GpuExecutor<'ctx> {
         };
         let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
 
-        let mut mapped_context = self.map_context(&mut command_encoder);
+        let mut context_mapper = self.context_mapper();
+        context_mapper.map_full(&mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
@@ -426,8 +419,8 @@ impl<'ctx> GpuExecutor<'ctx> {
             .poll(poll_type)
             .expect("device should be polled successfully");
 
-        mapped_context
-            .context()
+        context_mapper
+            .get_full()
             .expect("all the data should be mapped successfully");
 
         let Self { context, .. } = self;

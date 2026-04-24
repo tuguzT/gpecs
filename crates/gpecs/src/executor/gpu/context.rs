@@ -14,33 +14,50 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct MappedContext<'a> {
+pub struct ContextMapper<'a> {
     context: &'a mut Context,
+    device: &'a Device,
+    schedule_cache: &'a mut ScheduleCache,
     transfer_cache: &'a mut TransferCache,
+    archetypes: &'a mut GpuArchetypeRegistry,
 }
 
-impl<'a> MappedContext<'a> {
+impl<'a> ContextMapper<'a> {
     #[inline]
     pub(super) fn new(
         context: &'a mut Context,
-        device: &Device,
+        device: &'a Device,
         transfer_cache: &'a mut TransferCache,
-        schedule_cache: &mut ScheduleCache,
-        command_encoder: &mut CommandEncoder,
-        archetypes: &mut GpuArchetypeRegistry,
+        schedule_cache: &'a mut ScheduleCache,
+        archetypes: &'a mut GpuArchetypeRegistry,
     ) -> Self {
-        transfer_cache.download_from(device, command_encoder, schedule_cache, archetypes);
         Self {
             context,
+            device,
+            schedule_cache,
             transfer_cache,
+            archetypes,
         }
     }
 
     #[inline]
-    pub fn context(&mut self) -> Result<&Context, MappedContextNotReadyError> {
+    pub fn map_full(&mut self, command_encoder: &mut CommandEncoder) {
+        let Self {
+            device,
+            schedule_cache,
+            transfer_cache,
+            archetypes,
+            ..
+        } = self;
+        transfer_cache.download_from(device, command_encoder, schedule_cache, archetypes);
+    }
+
+    #[inline]
+    pub fn get_full(&mut self) -> Result<&Context, MappedContextNotReadyError> {
         let Self {
             context,
             transfer_cache,
+            ..
         } = self;
 
         let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };

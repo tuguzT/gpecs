@@ -114,7 +114,8 @@ pub fn run(context: &mut Context) {
             |_| {},
         );
 
-        // let mut mapped_context = executor.map_context(&mut command_encoder);
+        // let mut context_mapper = executor.context_mapper();
+        // context_mapper.map_full(&mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
@@ -127,11 +128,11 @@ pub fn run(context: &mut Context) {
             .poll(poll_type)
             .expect("device should be polled successfully");
 
-        // let _context = mapped_context
-        //     .context()
+        // let _context = context_mapper
+        //     .get_full()
         //     .expect("waiting poll should be successful");
-        // let _context = mapped_context
-        //     .context()
+        // let _context = context_mapper
+        //     .get_full()
         //     .expect("should be already at ready state");
 
         let elapsed = timestamp.elapsed();

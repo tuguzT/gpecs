@@ -33,7 +33,7 @@ pub struct TimestampQueryResources {
     count: NonZeroU32,
     resolve_buffer: Buffer,
     download_buffer: Buffer,
-    statistics_requested: Arc<AtomicBool>,
+    is_ready: Arc<AtomicBool>,
 }
 
 impl TimestampQueryResources {
@@ -82,7 +82,7 @@ impl TimestampQueryResources {
             count,
             resolve_buffer,
             download_buffer,
-            statistics_requested: AtomicBool::new(false).into(),
+            is_ready: AtomicBool::new(false).into(),
         };
         Some(me)
     }
@@ -114,27 +114,14 @@ impl TimestampQueryResources {
     }
 
     #[inline]
-    pub fn request_statistics(&self) {
-        let Self {
-            download_buffer,
-            statistics_requested,
-            ..
-        } = self;
-
-        let statictics_requested = Arc::clone(statistics_requested);
-        let callback = move |_| statictics_requested.store(true, Ordering::Release);
-        download_buffer.map_async(MapMode::Read, .., callback);
-    }
-
-    #[inline]
     pub fn raw_statistics(&self) -> Result<TimestampQueryRawStatistics, TimestampQueryError> {
         let Self {
             download_buffer,
-            statistics_requested,
+            is_ready,
             ..
         } = self;
 
-        if !statistics_requested.load(Ordering::Acquire) {
+        if !is_ready.load(Ordering::Acquire) {
             return Err(TimestampQueryError);
         }
 
@@ -150,12 +137,12 @@ impl TimestampQueryResources {
             count,
             resolve_buffer,
             download_buffer,
-            statistics_requested,
+            is_ready,
         } = self;
 
         command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
 
-        if statistics_requested.swap(false, Ordering::AcqRel) {
+        if is_ready.swap(false, Ordering::AcqRel) {
             download_buffer.unmap();
         }
         command_encoder.copy_buffer_to_buffer(
@@ -165,6 +152,10 @@ impl TimestampQueryResources {
             0,
             resolve_buffer.size(),
         );
+
+        let is_ready = Arc::clone(is_ready);
+        let callback = move |_| is_ready.store(true, Ordering::Release);
+        command_encoder.map_buffer_on_submit(download_buffer, MapMode::Read, .., callback);
     }
 }
 
@@ -446,10 +437,7 @@ pub struct TimestampQueryError;
 
 impl Display for TimestampQueryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "executor timestamp query statistics was not requested or is not ready yet"
-        )
+        write!(f, "executor timestamp query statistics is not ready yet")
     }
 }
 

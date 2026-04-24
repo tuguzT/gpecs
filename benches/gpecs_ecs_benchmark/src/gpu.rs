@@ -111,10 +111,6 @@ pub fn run(context: &mut Context) {
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
-        executor
-            .timestamp_query_resources()
-            .inspect(|resources| resources.request_statistics());
-
         let framebuffer_data = framebuffer_download_buffer.slice(..);
         framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 

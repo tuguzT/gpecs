@@ -90,10 +90,6 @@ pub fn run(context: &mut Context) {
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
-        executor
-            .timestamp_query_resources()
-            .inspect(|resources| resources.request_statistics());
-
         // Map download buffer to CPU memory
         // let position_tag_download_slice =
         //     wgpu_map_whole_buffer(position_tag_download_buffer.as_ref());

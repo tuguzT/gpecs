@@ -1,8 +1,8 @@
 use std::{any::TypeId, num::NonZeroU32};
 
 use wgpu::{
-    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, CommandEncoderDescriptor, ComputePass,
-    ComputePassDescriptor, Device, PollType, Queue,
+    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, ComputePass, ComputePassDescriptor,
+    Device, Queue,
 };
 
 use crate::{
@@ -19,6 +19,7 @@ use crate::{
             GpuComponent,
             registry::{GpuComponentId, GpuComponentRegistry},
         },
+        context::MappedContext,
         system::{
             registry::{
                 DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
@@ -350,44 +351,26 @@ impl<'ctx> GpuExecutor<'ctx> {
         Some(Ok(statistics))
     }
 
-    pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {
+    #[inline]
+    pub fn map_context(&mut self, queue: &Queue) -> MappedContext<'_> {
         let Self {
             context,
-            ref device,
-            ref mut archetypes,
-            ref mut cache,
+            device,
+            archetypes,
+            cache,
             ..
         } = self;
-
-        if let Some(cache) = cache {
-            let command_encoder_desc = CommandEncoderDescriptor {
-                label: Some("`gpecs` context download command encoder"),
-            };
-            let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
-
-            cache.download_from(device, &mut command_encoder, archetypes);
-            let command_buffer = command_encoder.finish();
-
-            let submission_index = queue.submit([command_buffer]);
-            cache.map_async_all(|_| {});
-
-            let poll_type = PollType::Wait {
-                submission_index: Some(submission_index),
-                timeout: None,
-            };
-            device
-                .poll(poll_type)
-                .expect("context download should be successful");
-
-            let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
-            cache.move_into(archetypes);
-        }
-
-        context
+        MappedContext::new(context, device, cache.as_mut(), queue, archetypes)
     }
 
-    // TODO: methods to copy data from CPU to GPU
-    //       do not grant mutable access to the context (yet)
+    #[inline]
+    pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {
+        // Wait for context to be available
+        self.map_context(queue).context();
+
+        let Self { context, .. } = self;
+        context
+    }
 }
 
 #[inline]

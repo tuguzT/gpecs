@@ -107,12 +107,15 @@ pub fn run(context: &mut Context) {
             0,
             framebuffer_data_storage_buffer.size(),
         );
+        command_encoder.map_buffer_on_submit(
+            &framebuffer_download_buffer,
+            wgpu::MapMode::Read,
+            ..,
+            |_| {},
+        );
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
-
-        let framebuffer_data = framebuffer_download_buffer.slice(..);
-        framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 
         let poll_type = wgpu::PollType::Wait {
             submission_index: Some(submission_index),
@@ -161,7 +164,7 @@ pub fn run(context: &mut Context) {
             bytemuck::cast_slice(&time_delta_slice),
         );
 
-        let framebuffer_view = framebuffer_data.get_mapped_range();
+        let framebuffer_view = framebuffer_download_buffer.get_mapped_range(..);
         let framebuffer_data = bytemuck::cast_slice(&framebuffer_view);
         framebuffer.buffer_mut().copy_from_slice(framebuffer_data);
 

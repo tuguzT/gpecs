@@ -11,8 +11,8 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::storage::ArchetypeStorage, executor::gpu::component::registry::GpuComponentId,
-    hash::IndexMap,
+    archetype::storage::ArchetypeStorage, entity::Entity,
+    executor::gpu::component::registry::GpuComponentId, hash::IndexMap,
 };
 
 use super::registry::GpuArchetypeId;
@@ -20,6 +20,7 @@ use super::registry::GpuArchetypeId;
 #[derive(Debug)]
 pub struct GpuArchetypeStorage {
     len: usize,
+    capacity: usize,
     entities_buffer: Option<StorageBuffer>,
     component_buffers: IndexMap<GpuComponentId, Option<StorageBuffer>>,
 }
@@ -33,10 +34,17 @@ impl GpuArchetypeStorage {
     ) -> Self {
         let (entities, bundles) = archetype_storage.as_slices();
         let len = archetype_storage.len();
+        let capacity = archetype_storage.capacity();
 
         let entities_contents = must_cast_slice(entities);
         let entities_label = || format!("`gpecs` {archetype_id:#} entities storage buffer");
-        let entities_buffer = StorageBuffer::new(gpu_device, entities_contents, entities_label);
+        let entities_capacity_in_bytes = size_of::<Entity>().strict_mul(capacity);
+        let entities_buffer = StorageBuffer::new(
+            gpu_device,
+            entities_contents,
+            entities_capacity_in_bytes,
+            entities_label,
+        );
 
         let component_buffers = bundles
             .into_iter()
@@ -45,15 +53,23 @@ impl GpuArchetypeStorage {
                 let components_label =
                     || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
 
-                // SAFETY: GPU components implement `NoUninit`, and so all the bytes of their slice should be initialized, too
+                // SAFETY: GPU components implement `NoUninit`, and so all the bytes of its slice should be initialized, too
                 let components_contents = unsafe { components.as_buffer().assume_init_ref() };
-                let buffer = StorageBuffer::new(gpu_device, components_contents, components_label);
+                let components_capacity_in_bytes =
+                    components.fields().layout().size().strict_mul(capacity);
+                let buffer = StorageBuffer::new(
+                    gpu_device,
+                    components_contents,
+                    components_capacity_in_bytes,
+                    components_label,
+                );
                 (component_id, buffer)
             })
             .collect();
 
         Self {
             len,
+            capacity,
             entities_buffer,
             component_buffers,
         }
@@ -68,6 +84,12 @@ impl GpuArchetypeStorage {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
     }
 
     #[inline]
@@ -216,7 +238,12 @@ struct StorageBuffer {
 
 impl StorageBuffer {
     #[inline]
-    fn new<L>(device: &Device, contents: &[u8], label: impl FnOnce() -> L) -> Option<Self>
+    fn new<L>(
+        device: &Device,
+        contents: &[u8],
+        capacity_in_bytes: usize,
+        label: impl FnOnce() -> L,
+    ) -> Option<Self>
     where
         L: AsRef<str>,
     {
@@ -225,10 +252,13 @@ impl StorageBuffer {
             .try_into()
             .ok()?;
 
+        let mut contents = contents.to_vec();
+        contents.resize(capacity_in_bytes, 0);
+
         let label = label();
         let desc = BufferInitDescriptor {
             label: Some(label.as_ref()),
-            contents,
+            contents: contents.as_slice(),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
         };
         let buffer = device.create_buffer_init(&desc);

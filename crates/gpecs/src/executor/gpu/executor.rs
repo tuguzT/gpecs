@@ -267,15 +267,19 @@ impl<'ctx> GpuExecutor<'ctx> {
             ref systems,
             ref schedule,
             ref mut schedule_cache,
+            ref mut transfer_cache,
             ref mut timestamp_query_resources,
             ..
         } = *self;
 
-        let new_cache = || ScheduleCache::new(context, device, archetypes, systems, schedule);
-        let cache = &*schedule_cache.get_or_insert_with(new_cache);
+        transfer_cache.invalidate();
+
+        let new_schedule_cache =
+            || ScheduleCache::new(context, device, archetypes, systems, schedule);
+        let schedule_cache = &*schedule_cache.get_or_insert_with(new_schedule_cache);
 
         if timestamp_query_resources.is_none() {
-            *timestamp_query_resources = TimestampQueryResources::new(device, cache);
+            *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);
         }
         let timestamp_query_resources = timestamp_query_resources.as_ref();
 
@@ -287,7 +291,7 @@ impl<'ctx> GpuExecutor<'ctx> {
         };
 
         let mut query_index = 0;
-        for system_cache in cache.iter() {
+        for system_cache in schedule_cache.iter() {
             let system_id = system_cache.system_id();
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("{system_id} should exist");

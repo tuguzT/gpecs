@@ -53,7 +53,7 @@ impl<'a> MappedContext<'a> {
 #[derive(Debug)]
 struct MappedContextState<'a> {
     device: &'a Device,
-    transfer_cache: &'a TransferCache,
+    transfer_cache: &'a mut TransferCache,
     submission_index: SubmissionIndex,
     ready: bool,
 }

@@ -65,6 +65,10 @@ impl TransferCache {
                     ArchetypeCache::new(b)
                 });
 
+            if archetype_cache.is_moved {
+                continue;
+            }
+
             for (component_id, components) in storage_slices.components {
                 let Some(components) = components else {
                     continue;
@@ -86,12 +90,16 @@ impl TransferCache {
     }
 
     pub fn move_into(
-        &self,
+        &mut self,
         cpu_archetypes: &mut ArchetypeRegistry,
     ) -> Result<(), MappedArchetypeNotReadyError> {
         let Self { archetypes } = self;
 
         for (&archetype_id, archetype_cache) in archetypes {
+            if archetype_cache.is_moved {
+                continue;
+            }
+
             let storage = unsafe { cpu_archetypes.get_archetype_info_mut(archetype_id.into()) };
             let Some(storage) = storage else {
                 unreachable!("{archetype_id} should exist")
@@ -117,13 +125,24 @@ impl TransferCache {
 
                 components.write_copy_of_slice(&mapped_components);
             }
+
+            archetype_cache.is_moved = true;
         }
         Ok(())
+    }
+
+    pub fn invalidate(&mut self) {
+        let Self { archetypes } = self;
+
+        for archetype_cache in archetypes.values_mut() {
+            archetype_cache.is_moved = false;
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct ArchetypeCache {
+    is_moved: bool,
     entities: DownloadBuffer,
     components: IndexMap<GpuComponentId, DownloadBuffer>,
 }
@@ -131,6 +150,7 @@ pub struct ArchetypeCache {
 impl ArchetypeCache {
     pub fn new(entities: DownloadBuffer) -> Self {
         Self {
+            is_moved: false,
             entities,
             components: IndexMap::default(),
         }

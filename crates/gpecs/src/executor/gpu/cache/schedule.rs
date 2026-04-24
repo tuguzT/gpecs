@@ -1,13 +1,8 @@
 use std::iter::chain;
 
-use bytemuck::must_cast_slice_mut;
-use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferAsyncError, BufferDescriptor,
-    BufferSlice, BufferUsages, CommandEncoder, Device, MapMode, WasmNotSend,
-};
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, Device};
 
 use crate::{
-    archetype::registry::ArchetypeRegistry,
     context::Context,
     executor::gpu::{
         archetype::{
@@ -25,11 +20,11 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct GpuCache {
+pub struct ScheduleCache {
     systems: IndexMap<GpuSystemId, SystemCache>,
 }
 
-impl GpuCache {
+impl ScheduleCache {
     #[inline]
     pub fn new(
         context: &Context,
@@ -116,100 +111,6 @@ impl GpuCache {
         Self { systems }
     }
 
-    pub fn download_from(
-        &mut self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        archetypes: &GpuArchetypeRegistry,
-    ) {
-        let Self { systems } = self;
-
-        for (&archetype_id, archetype_cache) in systems
-            .values_mut()
-            .flat_map(|system_cache| system_cache.archetypes.iter_mut())
-        {
-            let Some(storage) = archetypes.get_archetype_info(archetype_id) else {
-                unreachable!("{archetype_id} should exist")
-            };
-            let storage_slices = storage.slices();
-
-            let Some(entities) = storage_slices.entities else {
-                continue;
-            };
-            let download_entities = archetype_cache.entities_download_buffer();
-            download_entities.copy_from_buffer(device, encoder, unsafe { entities.as_slice() });
-
-            for (id, components) in storage_slices.components {
-                let Some(components) = components else {
-                    continue;
-                };
-
-                let source = unsafe { components.as_slice() };
-                let download_components = archetype_cache.component_download_buffer(id);
-                download_components.copy_from_buffer(device, encoder, source);
-            }
-        }
-    }
-
-    pub fn map_async_all<F>(&mut self, callback: F)
-    where
-        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + Clone + 'static,
-    {
-        let Self { systems } = self;
-
-        for archetype_cache in systems
-            .values_mut()
-            .flat_map(|system_cache| system_cache.archetypes.values_mut())
-        {
-            archetype_cache
-                .entities_download_buffer()
-                .map_async(callback.clone());
-
-            for (_, download_buffer) in archetype_cache.component_download_buffers() {
-                download_buffer.map_async(callback.clone());
-            }
-        }
-    }
-
-    pub fn move_into(&mut self, archetypes: &mut ArchetypeRegistry) {
-        let Self { systems } = self;
-
-        for (&archetype_id, archetype_cache) in systems
-            .values_mut()
-            .flat_map(|system_cache| system_cache.archetypes.iter_mut())
-        {
-            let storage = unsafe { archetypes.get_archetype_info_mut(archetype_id.into()) };
-            let Some(storage) = storage else {
-                unreachable!("{archetype_id} should exist")
-            };
-            let storage = storage.into_meta();
-            let (entities, bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
-
-            let mapped_entities = archetype_cache.entities_download_buffer().get_buffer();
-            let Some(mapped_entities) = mapped_entities else {
-                continue;
-            };
-            must_cast_slice_mut(entities).copy_from_slice(&mapped_entities.get_mapped_range(..));
-            mapped_entities.unmap();
-
-            for mut components in bundles {
-                let component_id = components.component_id();
-                let components = unsafe { components.as_mut_buffer() };
-
-                let component_id = unsafe { GpuComponentId::from_id(component_id) };
-                let mapped_components = archetype_cache
-                    .component_download_buffer(component_id)
-                    .get_buffer();
-                let Some(mapped_components) = mapped_components else {
-                    continue;
-                };
-
-                components.write_copy_of_slice(&mapped_components.get_mapped_range(..));
-                mapped_components.unmap();
-            }
-        }
-    }
-
     #[inline]
     pub fn len(&self) -> usize {
         let Self { systems } = self;
@@ -249,8 +150,6 @@ impl SystemCache {
 #[derive(Debug)]
 pub struct ArchetypeCache {
     bind_group: BindGroup,
-    entities_download_buffer: DownloadBuffer,
-    component_download_buffers: IndexMap<GpuComponentId, DownloadBuffer>,
 }
 
 impl ArchetypeCache {
@@ -298,11 +197,7 @@ impl ArchetypeCache {
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
 
-        let me = Self {
-            bind_group,
-            entities_download_buffer: DownloadBuffer::new(),
-            component_download_buffers: IndexMap::default(),
-        };
+        let me = Self { bind_group };
         Some(me)
     }
 
@@ -310,43 +205,6 @@ impl ArchetypeCache {
     pub fn bind_group(&self) -> &BindGroup {
         let Self { bind_group, .. } = self;
         bind_group
-    }
-
-    #[inline]
-    pub fn entities_download_buffer(&mut self) -> &mut DownloadBuffer {
-        let Self {
-            entities_download_buffer,
-            ..
-        } = self;
-        entities_download_buffer
-    }
-
-    #[inline]
-    pub fn component_download_buffer(
-        &mut self,
-        component_id: GpuComponentId,
-    ) -> &mut DownloadBuffer {
-        let Self {
-            component_download_buffers,
-            ..
-        } = self;
-
-        component_download_buffers
-            .entry(component_id)
-            .or_insert_with(DownloadBuffer::new)
-    }
-
-    #[inline]
-    pub fn component_download_buffers(
-        &mut self,
-    ) -> impl Iterator<Item = (GpuComponentId, &mut DownloadBuffer)> {
-        let Self {
-            component_download_buffers,
-            ..
-        } = self;
-        component_download_buffers
-            .iter_mut()
-            .map(|(&id, buffer)| (id, buffer))
     }
 }
 
@@ -389,62 +247,4 @@ where
         };
         (component_id, entry, slice)
     })
-}
-
-#[derive(Debug)]
-pub struct DownloadBuffer {
-    buffer: Option<Buffer>,
-}
-
-impl DownloadBuffer {
-    #[inline]
-    pub fn new() -> Self {
-        let buffer = None;
-        Self { buffer }
-    }
-
-    #[inline]
-    pub fn copy_from_buffer(
-        &mut self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        source: BufferSlice<'_>,
-    ) {
-        let Self { buffer } = self;
-
-        let size = source.size().get();
-        let new_buffer = || {
-            let desc = BufferDescriptor {
-                label: Some("`gpecs` cache download buffer"),
-                size,
-                usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            };
-            device.create_buffer(&desc)
-        };
-        let buffer = buffer.get_or_insert_with(new_buffer);
-
-        if buffer.size() != size {
-            *buffer = new_buffer();
-        }
-
-        encoder.copy_buffer_to_buffer(source.buffer(), source.offset(), buffer, 0, size);
-    }
-
-    #[inline]
-    pub fn map_async<F>(&self, callback: F)
-    where
-        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + 'static,
-    {
-        let Self { buffer } = self;
-        if let Some(buffer) = buffer {
-            buffer.map_async(MapMode::Read, .., callback);
-        }
-    }
-
-    #[inline]
-    pub fn get_buffer(&self) -> Option<&Buffer> {
-        let Self { buffer } = self;
-        buffer.as_ref()
-    }
 }

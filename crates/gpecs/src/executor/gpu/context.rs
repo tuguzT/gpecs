@@ -11,7 +11,10 @@ use wgpu::{CommandEncoderDescriptor, Device, Queue, SubmissionIndex};
 
 use crate::{
     context::Context,
-    executor::gpu::{archetype::registry::GpuArchetypeRegistry, cache::GpuCache},
+    executor::gpu::{
+        archetype::registry::GpuArchetypeRegistry,
+        cache::{schedule::ScheduleCache, transfer::TransferCache},
+    },
 };
 
 #[derive(Debug)]
@@ -25,11 +28,14 @@ impl<'a> MappedContext<'a> {
     pub(super) fn new(
         context: &'a mut Context,
         device: &'a Device,
-        cache: Option<&'a mut GpuCache>,
+        transfer_cache: &'a mut TransferCache,
+        schedule_cache: Option<&'a mut ScheduleCache>,
         queue: &Queue,
         archetypes: &mut GpuArchetypeRegistry,
     ) -> Self {
-        let state = cache.map(|cache| MappedContextState::new(device, cache, queue, archetypes));
+        let state = schedule_cache.map(|schedule_cache| {
+            MappedContextState::new(device, transfer_cache, schedule_cache, queue, archetypes)
+        });
         Self { context, state }
     }
 
@@ -50,7 +56,7 @@ impl<'a> MappedContext<'a> {
 #[derive(Debug)]
 struct MappedContextState<'a> {
     device: &'a Device,
-    cache: &'a mut GpuCache,
+    transfer_cache: &'a TransferCache,
     submission_index: SubmissionIndex,
     ready: bool,
     mapped: Arc<AtomicBool>,
@@ -59,7 +65,8 @@ struct MappedContextState<'a> {
 impl<'a> MappedContextState<'a> {
     fn new(
         device: &'a Device,
-        cache: &'a mut GpuCache,
+        transfer_cache: &'a mut TransferCache,
+        schedule_cache: &ScheduleCache,
         queue: &Queue,
         archetypes: &mut GpuArchetypeRegistry,
     ) -> Self {
@@ -68,7 +75,7 @@ impl<'a> MappedContextState<'a> {
         };
         let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
 
-        cache.download_from(device, &mut command_encoder, archetypes);
+        transfer_cache.download_from(device, &mut command_encoder, schedule_cache, archetypes);
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
@@ -76,11 +83,11 @@ impl<'a> MappedContextState<'a> {
 
         let mapped_clone = Arc::clone(&mapped);
         let callback = move |_| mapped_clone.store(true, Ordering::Release);
-        cache.map_async_all(callback);
+        transfer_cache.map_async_all(callback);
 
         Self {
             device,
-            cache,
+            transfer_cache,
             submission_index,
             mapped,
             ready: false,
@@ -94,7 +101,7 @@ impl<'a> MappedContextState<'a> {
     ) -> Result<(), MappedContextNotReadyError> {
         let Self {
             device,
-            cache,
+            transfer_cache,
             submission_index,
             ready,
             mapped,
@@ -115,7 +122,7 @@ impl<'a> MappedContextState<'a> {
         }
 
         let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
-        cache.move_into(archetypes);
+        transfer_cache.move_into(archetypes);
 
         *ready = true;
         Ok(())

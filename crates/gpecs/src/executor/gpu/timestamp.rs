@@ -21,7 +21,7 @@ use wgpu::{
 use crate::{
     executor::gpu::{
         archetype::registry::{GpuArchetypeId, GpuArchetypeInfo},
-        cache::{GpuCache, SystemCache},
+        cache::schedule::{ScheduleCache, SystemCache},
         system::registry::{GpuSystemId, GpuSystemInfo},
     },
     hash::{BuildHasher, IndexMap},
@@ -38,7 +38,7 @@ pub struct TimestampQueryResources {
 
 impl TimestampQueryResources {
     #[inline]
-    pub(super) fn new(gpu_device: &Device, cache: &GpuCache) -> Option<Self> {
+    pub(super) fn new(gpu_device: &Device, cache: &ScheduleCache) -> Option<Self> {
         let can_write_timestamps = gpu_device
             .features()
             .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
@@ -194,7 +194,11 @@ pub struct TimestampQueryStatistics {
 }
 
 impl TimestampQueryStatistics {
-    pub(super) fn new(raw: &TimestampQueryRawStatistics, cache: &GpuCache, queue: &Queue) -> Self {
+    pub(super) fn new(
+        raw: &TimestampQueryRawStatistics,
+        cache: &ScheduleCache,
+        queue: &Queue,
+    ) -> Self {
         let mut pairs = raw.as_slice().iter().copied().tuple_windows();
 
         let hash_builder = BuildHasher::default();

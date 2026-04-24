@@ -124,6 +124,14 @@ pub fn run(context: &mut Context) {
         };
         device.poll(poll_type).expect("device should poll");
 
+        // let mut mapped_context = executor.map_context(&queue);
+        // let _context = mapped_context
+        //     .context(PollType::wait_indefinitely())
+        //     .expect("waiting poll should be successful");
+        // let _context = mapped_context
+        //     .context(PollType::wait_indefinitely())
+        //     .expect("should be already at ready state");
+
         let elapsed = timestamp.elapsed();
 
         #[cfg(debug_assertions)]

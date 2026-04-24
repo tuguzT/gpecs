@@ -20,6 +20,7 @@ pub use crate::{
             archetype::registry::{GpuArchetypeId, GpuArchetypeInfo},
             bundle::GpuBundle,
             component::{GpuComponent, registry::GpuComponentId},
+            context::{MappedContext, PollType},
             system::registry::{
                 GpuComponentAccess, GpuSystemDescriptor, GpuSystemId, GpuSystemInfo,
             },

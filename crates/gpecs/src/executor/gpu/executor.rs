@@ -19,7 +19,7 @@ use crate::{
             GpuComponent,
             registry::{GpuComponentId, GpuComponentRegistry},
         },
-        context::MappedContext,
+        context::{self, MappedContext},
         system::{
             registry::{
                 DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
@@ -366,7 +366,9 @@ impl<'ctx> GpuExecutor<'ctx> {
     #[inline]
     pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {
         // Wait for context to be available
-        self.map_context(queue).context();
+        self.map_context(queue)
+            .context(context::PollType::wait_indefinitely())
+            .expect("waiting poll should be successful");
 
         let Self { context, .. } = self;
         context

@@ -153,7 +153,7 @@ impl GpuCache {
 
     pub fn map_async_all<F>(&mut self, callback: F)
     where
-        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + Copy + 'static,
+        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + Clone + 'static,
     {
         let Self { systems } = self;
 
@@ -163,10 +163,10 @@ impl GpuCache {
         {
             archetype_cache
                 .entities_download_buffer()
-                .map_async(callback);
+                .map_async(callback.clone());
 
             for (_, download_buffer) in archetype_cache.component_download_buffers() {
-                download_buffer.map_async(callback);
+                download_buffer.map_async(callback.clone());
             }
         }
     }

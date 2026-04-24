@@ -104,6 +104,14 @@ pub fn run(context: &mut Context) {
         };
         device.poll(poll_type).expect("device should poll");
 
+        let mut mapped_context = executor.map_context(&queue);
+        let _context = mapped_context
+            .context(PollType::wait_indefinitely())
+            .expect("waiting poll should be successful");
+        let _context = mapped_context
+            .context(PollType::wait_indefinitely())
+            .expect("should be already at ready state");
+
         // Check data inside of the download buffer
         // if let Some(position_tag_download_slice) = position_tag_download_slice {
         //     let position_tag_archetype_info = executor

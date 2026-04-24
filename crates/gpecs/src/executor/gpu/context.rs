@@ -1,4 +1,13 @@
-use wgpu::{CommandEncoderDescriptor, Device, PollType, Queue, SubmissionIndex};
+use std::{
+    fmt::{self, Display},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
+
+use wgpu::{CommandEncoderDescriptor, Device, Queue, SubmissionIndex};
 
 use crate::{
     context::Context,
@@ -25,13 +34,13 @@ impl<'a> MappedContext<'a> {
     }
 
     #[inline]
-    pub fn context(&mut self) -> &Context {
+    pub fn context(&mut self, poll_type: PollType) -> Result<&Context, MappedContextNotReadyError> {
         let Self { context, state } = self;
 
         if let Some(state) = state {
-            state.make_ready(context);
+            state.make_ready(context, poll_type)?;
         }
-        context
+        Ok(context)
     }
 
     // TODO: methods to copy data from CPU to GPU
@@ -43,6 +52,8 @@ struct MappedContextState<'a> {
     device: &'a Device,
     cache: &'a mut GpuCache,
     submission_index: SubmissionIndex,
+    ready: bool,
+    mapped: Arc<AtomicBool>,
 }
 
 impl<'a> MappedContextState<'a> {
@@ -59,37 +70,94 @@ impl<'a> MappedContextState<'a> {
 
         cache.download_from(device, &mut command_encoder, archetypes);
         let command_buffer = command_encoder.finish();
-
         let submission_index = queue.submit([command_buffer]);
-        cache.map_async_all(|_| {
-            // TODO: set atomic flag to true
-        });
+
+        let mapped = AtomicBool::new(false).into();
+
+        let mapped_clone = Arc::clone(&mapped);
+        let callback = move |_| mapped_clone.store(true, Ordering::Release);
+        cache.map_async_all(callback);
 
         Self {
             device,
             cache,
             submission_index,
+            mapped,
+            ready: false,
         }
     }
 
-    fn make_ready(&mut self, context: &mut Context) {
+    fn make_ready(
+        &mut self,
+        context: &mut Context,
+        poll_type: PollType,
+    ) -> Result<(), MappedContextNotReadyError> {
         let Self {
             device,
             cache,
             submission_index,
+            ready,
+            mapped,
         } = self;
 
-        // TODO: check for atomic flag
+        if *ready {
+            return Ok(());
+        }
 
-        let poll_type = PollType::Wait {
-            submission_index: Some(submission_index.clone()),
-            timeout: None,
-        };
+        let submission_index = Some(submission_index.clone());
+        let poll_type = poll_type.with_index(submission_index);
         device
             .poll(poll_type)
             .expect("context download should be successful");
 
+        if !mapped.load(Ordering::Acquire) {
+            return Err(MappedContextNotReadyError);
+        }
+
         let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
         cache.move_into(archetypes);
+
+        *ready = true;
+        Ok(())
+    }
+}
+
+/// The same as [`wgpu::PollType`], but without [submission index](SubmissionIndex).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PollType {
+    Wait { timeout: Option<Duration> },
+    Poll,
+}
+
+impl PollType {
+    #[inline]
+    pub const fn wait_indefinitely() -> Self {
+        Self::Wait { timeout: None }
+    }
+
+    #[inline]
+    pub const fn is_wait(&self) -> bool {
+        matches!(self, Self::Wait { .. })
+    }
+
+    #[inline]
+    pub fn with_index(self, submission_index: Option<SubmissionIndex>) -> wgpu::PollType {
+        match self {
+            Self::Wait { timeout } => wgpu::PollType::Wait {
+                submission_index,
+                timeout,
+            },
+            Self::Poll => wgpu::PollType::Poll,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct MappedContextNotReadyError;
+
+impl Display for MappedContextNotReadyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "mapped context is not ready yet")
     }
 }

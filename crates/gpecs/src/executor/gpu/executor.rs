@@ -9,7 +9,6 @@ use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     context::{ComponentInfo, Context},
     executor::gpu::{
-        TimestampQueryError, TimestampQueryResources, TimestampQueryStatistics,
         archetype::{
             registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
             storage::GpuArchetypeStorage,
@@ -28,6 +27,7 @@ use crate::{
             schedule::GpuSystemSchedule,
             shader::GpuSystemShader,
         },
+        timestamp::{TimestampQueryError, TimestampQueryResources, TimestampQueryStatistics},
     },
 };
 

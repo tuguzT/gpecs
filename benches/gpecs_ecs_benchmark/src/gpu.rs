@@ -1,8 +1,5 @@
 use std::{
-    ffi::c_void,
     fs,
-    mem::transmute,
-    ptr::null,
     time::{Duration, Instant},
 };
 
@@ -14,7 +11,6 @@ use gpecs_ecs_benchmark_types::{
     framebuffer::{Framebuffer, FramebufferDesc},
     utils::{RandomXoshiro128, TimeDelta},
 };
-use renderdoc::{RenderDoc, V141};
 use wgpu::util::DeviceExt;
 
 use crate::{
@@ -43,7 +39,6 @@ pub fn run(context: &mut Context) {
 
     log::info!(">> Initializing GPU resources...");
     let (device, queue) = init_wgpu();
-    let mut renderdoc = init_renderdoc();
 
     let mut executor = GpuExecutor::new(context, device.clone());
     executor
@@ -95,7 +90,11 @@ pub fn run(context: &mut Context) {
 
     log::info!(">> Running GPU systems...");
     for i in 0..EXEC_COUNT {
-        renderdoc_start_frame_capture(renderdoc.as_mut(), &device);
+        #[cfg(debug_assertions)]
+        unsafe {
+            device.start_graphics_debugger_capture();
+        }
+
         let timestamp = Instant::now();
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
@@ -126,7 +125,11 @@ pub fn run(context: &mut Context) {
         device.poll(poll_type).expect("device should poll");
 
         let elapsed = timestamp.elapsed();
-        renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
+
+        #[cfg(debug_assertions)]
+        unsafe {
+            device.stop_graphics_debugger_capture();
+        }
 
         if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
             let statistics = statistics.expect("timestamp query statistics should be ready");
@@ -422,10 +425,7 @@ fn setup_gpu_systems(
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
-    let instance_desc = wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    };
+    let instance_desc = wgpu::InstanceDescriptor::new_without_display_handle();
     let instance = wgpu::Instance::new(instance_desc);
 
     let adapter_options = wgpu::RequestAdapterOptions {
@@ -488,47 +488,4 @@ fn init_wgpu_command_encoder(device: &wgpu::Device) -> wgpu::CommandEncoder {
         label: Some("`gpecs` `ecs_benchmark` command encoder"),
     };
     device.create_command_encoder(&command_encoder_desc)
-}
-
-fn init_renderdoc() -> Option<RenderDoc<V141>> {
-    match RenderDoc::<V141>::new() {
-        Ok(renderdoc) => {
-            log::info!("RenderDoc version: {:?}", renderdoc.get_api_version());
-            Some(renderdoc)
-        }
-        Err(error) => {
-            log::warn!("{error}");
-            None
-        }
-    }
-}
-
-fn wgpu_raw_device_window(device: &wgpu::Device) -> (*const c_void, *const c_void) {
-    let device_raw = unsafe {
-        device
-            .as_hal::<wgpu::hal::api::Vulkan>()
-            .map_or(null(), |device| transmute(device.raw_device().handle()))
-    };
-    let window_raw = null();
-    (device_raw, window_raw)
-}
-
-fn renderdoc_start_frame_capture(renderdoc: Option<&mut RenderDoc<V141>>, device: &wgpu::Device) {
-    let Some(renderdoc) = renderdoc else {
-        return;
-    };
-
-    log::info!("Starting RenderDoc capture...");
-    let (device_raw, window_raw) = wgpu_raw_device_window(device);
-    renderdoc.start_frame_capture(device_raw, window_raw);
-}
-
-fn renderdoc_end_frame_capture(renderdoc: Option<&mut RenderDoc<V141>>, device: &wgpu::Device) {
-    let Some(renderdoc) = renderdoc else {
-        return;
-    };
-
-    log::info!("Ending RenderDoc capture...");
-    let (device_raw, window_raw) = wgpu_raw_device_window(device);
-    renderdoc.end_frame_capture(device_raw, window_raw);
 }

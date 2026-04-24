@@ -18,7 +18,6 @@ pollster = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 wgpu = { workspace = true, features = ["spirv"] }
-renderdoc = { workspace = true }
 
 [build-dependencies]
 cargo-gpu-install = { workspace = true }

@@ -1,25 +1,18 @@
 use std::{
     collections::HashMap,
-    ffi::c_void,
     fs,
-    mem::transmute,
-    ptr::null,
     time::{Duration, Instant},
 };
 
 use gpecs::prelude::*;
 use gpecs_simple_types::{Mass, Position, Tag};
-use renderdoc::{RenderDoc, V141};
 
 use crate::{ITER_COUNT, setup::setup};
 
 pub fn run(context: &mut Context) {
-    let (device, queue) = init_wgpu();
-
-    let mut renderdoc = init_renderdoc();
-
     setup(context);
 
+    let (device, queue) = init_wgpu();
     let mut executor = GpuExecutor::new(context, device.clone());
 
     executor
@@ -74,7 +67,11 @@ pub fn run(context: &mut Context) {
 
     log::info!("Starting to execute systems on GPU...");
     for i in 0..ITER_COUNT {
-        renderdoc_start_frame_capture(renderdoc.as_mut(), &device);
+        #[cfg(debug_assertions)]
+        unsafe {
+            device.start_graphics_debugger_capture();
+        }
+
         let timestamp = Instant::now();
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
@@ -144,7 +141,11 @@ pub fn run(context: &mut Context) {
         // }
 
         let elapsed = timestamp.elapsed();
-        renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
+
+        #[cfg(debug_assertions)]
+        unsafe {
+            device.stop_graphics_debugger_capture();
+        }
 
         // Check data inside of the timestamp query download buffer
         if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
@@ -171,10 +172,7 @@ pub fn run(context: &mut Context) {
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
-    let instance_desc = wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    };
+    let instance_desc = wgpu::InstanceDescriptor::new_without_display_handle();
     let instance = wgpu::Instance::new(instance_desc);
 
     let adapter_options = wgpu::RequestAdapterOptions {
@@ -325,46 +323,4 @@ fn _wgpu_copy_into_position_tag_download_buffer(
             position_tag_positions_slice.size().get(),
         );
     }
-}
-
-fn init_renderdoc() -> Option<RenderDoc<V141>> {
-    match RenderDoc::<V141>::new() {
-        Ok(renderdoc) => {
-            log::info!("RenderDoc version: {:?}", renderdoc.get_api_version());
-            Some(renderdoc)
-        }
-        Err(error) => {
-            log::warn!("{error}");
-            None
-        }
-    }
-}
-
-fn wgpu_raw_device_window(device: &wgpu::Device) -> (*const c_void, *const c_void) {
-    let device_hal = unsafe { device.as_hal::<wgpu::hal::api::Vulkan>() };
-    let device_raw = device_hal.map_or(null::<c_void>(), |device| unsafe {
-        transmute(device.raw_device().handle())
-    });
-    let window_raw = null::<c_void>();
-    (device_raw, window_raw)
-}
-
-fn renderdoc_start_frame_capture(renderdoc: Option<&mut RenderDoc<V141>>, device: &wgpu::Device) {
-    let Some(renderdoc) = renderdoc else {
-        return;
-    };
-
-    log::info!("Starting RenderDoc capture...");
-    let (device_raw, window_raw) = wgpu_raw_device_window(device);
-    renderdoc.start_frame_capture(device_raw, window_raw);
-}
-
-fn renderdoc_end_frame_capture(renderdoc: Option<&mut RenderDoc<V141>>, device: &wgpu::Device) {
-    let Some(renderdoc) = renderdoc else {
-        return;
-    };
-
-    log::info!("Ending RenderDoc capture...");
-    let (device_raw, window_raw) = wgpu_raw_device_window(device);
-    renderdoc.end_frame_capture(device_raw, window_raw);
 }

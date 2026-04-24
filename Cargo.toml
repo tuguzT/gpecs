@@ -73,7 +73,6 @@ bytemuck = { version = "1.25", default-features = false }
 const_format = { version = "0.2", default-features = false }
 log = { version = "0.4", default-features = false }
 glam = { version = "0.32", default-features = false }
-renderdoc = { version = "0.12", default-features = false }
 env_logger = { version = "0.11" }
 wgpu = { version = "29" }
 
@@ -103,3 +102,7 @@ lto = "fat"
 [profile.flamegraph]
 inherits = "bench"
 debug = true
+
+[profile.gpu_capture]
+inherits = "bench"
+debug-assertions = true

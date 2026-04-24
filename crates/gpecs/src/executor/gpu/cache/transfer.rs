@@ -46,12 +46,17 @@ impl TransferCache {
             };
 
             let source = unsafe { entities.as_slice() };
+            let label = || format!("`gpecs` {archetype_id:#} entities download buffer");
             let archetype_cache = archetypes
                 .entry(archetype_id)
-                .and_modify(|c| c.entities.copy_from_slice(device, command_encoder, source))
+                .and_modify(|cache| {
+                    cache
+                        .entities
+                        .copy_from_slice(device, command_encoder, source, label);
+                })
                 .or_insert_with(|| {
-                    let entities = DownloadBuffer::from_slice(device, command_encoder, source);
-                    ArchetypeCache::new(entities)
+                    let b = DownloadBuffer::from_slice(device, command_encoder, source, label());
+                    ArchetypeCache::new(b)
                 });
 
             for (component_id, components) in storage_slices.components {
@@ -60,11 +65,16 @@ impl TransferCache {
                 };
 
                 let source = unsafe { components.as_slice() };
+                let label = || format!("`gpecs` {archetype_id:#} {component_id:#} download buffer");
                 archetype_cache
                     .components
                     .entry(component_id)
-                    .and_modify(|b| b.copy_from_slice(device, command_encoder, source))
-                    .or_insert_with(|| DownloadBuffer::from_slice(device, command_encoder, source));
+                    .and_modify(|components| {
+                        components.copy_from_slice(device, command_encoder, source, label);
+                    })
+                    .or_insert_with(|| {
+                        DownloadBuffer::from_slice(device, command_encoder, source, label())
+                    });
             }
         }
     }
@@ -146,12 +156,13 @@ impl DownloadBuffer {
         device: &Device,
         command_encoder: &mut CommandEncoder,
         source: BufferSlice<'_>,
+        label: impl AsRef<str>,
     ) -> Self {
         let init_size = source.size();
 
         let size = init_size.get();
         let desc = BufferDescriptor {
-            label: Some("`gpecs` transfer cache download buffer"),
+            label: Some(label.as_ref()),
             size,
             usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -163,17 +174,20 @@ impl DownloadBuffer {
     }
 
     #[inline]
-    pub fn copy_from_slice(
+    pub fn copy_from_slice<L>(
         &mut self,
         device: &Device,
         command_encoder: &mut CommandEncoder,
         source: BufferSlice<'_>,
-    ) {
+        label: impl FnOnce() -> L,
+    ) where
+        L: AsRef<str>,
+    {
         let Self { buffer, init_size } = self;
 
         let size = source.size().get();
         if buffer.size() < size {
-            *self = Self::from_slice(device, command_encoder, source);
+            *self = Self::from_slice(device, command_encoder, source, label());
             return;
         }
 

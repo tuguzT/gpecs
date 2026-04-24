@@ -1,7 +1,12 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
 use bytemuck::must_cast_slice_mut;
 use wgpu::{
-    Buffer, BufferAsyncError, BufferDescriptor, BufferSize, BufferSlice, BufferUsages,
-    CommandEncoder, Device, MapMode, WasmNotSend,
+    Buffer, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, BufferView, CommandEncoder,
+    Device, MapMode,
 };
 
 use crate::{
@@ -10,6 +15,7 @@ use crate::{
         archetype::registry::{GpuArchetypeId, GpuArchetypeRegistry},
         cache::schedule::ScheduleCache,
         component::registry::GpuComponentId,
+        context::MappedArchetypeNotReadyError,
     },
     hash::{IndexMap, IndexSet},
 };
@@ -79,26 +85,10 @@ impl TransferCache {
         }
     }
 
-    pub fn map_async_all<F>(&self, callback: F)
-    where
-        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + Clone + 'static,
-    {
-        let Self { archetypes } = self;
-
-        if archetypes.is_empty() {
-            callback(Ok(()));
-            return;
-        }
-
-        for archetype_cache in archetypes.values() {
-            archetype_cache.entities.map_async(callback.clone());
-            for component_buffer in archetype_cache.components.values() {
-                component_buffer.map_async(callback.clone());
-            }
-        }
-    }
-
-    pub fn move_into(&self, cpu_archetypes: &mut ArchetypeRegistry) {
+    pub fn move_into(
+        &self,
+        cpu_archetypes: &mut ArchetypeRegistry,
+    ) -> Result<(), MappedArchetypeNotReadyError> {
         let Self { archetypes } = self;
 
         for (&archetype_id, archetype_cache) in archetypes {
@@ -110,22 +100,25 @@ impl TransferCache {
             let storage = storage.into_meta();
             let (entities, mut bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
 
-            let mapped_entities = archetype_cache.entities.as_slice();
-            must_cast_slice_mut(entities).copy_from_slice(&mapped_entities.get_mapped_range());
-            mapped_entities.buffer().unmap();
+            let Some(mapped_entities) = archetype_cache.entities.as_slice() else {
+                return Err(MappedArchetypeNotReadyError::new(archetype_id));
+            };
+            must_cast_slice_mut(entities).copy_from_slice(&mapped_entities);
 
             for (&component_id, components) in &archetype_cache.components {
-                let mapped_components = components.as_slice();
+                let Some(mapped_components) = components.as_slice() else {
+                    return Err(MappedArchetypeNotReadyError::new(archetype_id));
+                };
 
                 let Some(mut components) = bundles.get_mut(component_id.into()) else {
                     continue;
                 };
                 let components = unsafe { components.as_mut_buffer() };
 
-                components.write_copy_of_slice(&mapped_components.get_mapped_range());
-                mapped_components.buffer().unmap();
+                components.write_copy_of_slice(&mapped_components);
             }
         }
+        Ok(())
     }
 }
 
@@ -148,6 +141,7 @@ impl ArchetypeCache {
 pub struct DownloadBuffer {
     buffer: Buffer,
     init_size: BufferSize,
+    is_mapped: Arc<AtomicBool>,
 }
 
 impl DownloadBuffer {
@@ -170,7 +164,19 @@ impl DownloadBuffer {
         let buffer = device.create_buffer(&desc);
 
         command_encoder.copy_buffer_to_buffer(source.buffer(), source.offset(), &buffer, 0, size);
-        Self { buffer, init_size }
+
+        let is_mapped = AtomicBool::new(false).into();
+        {
+            let is_mapped = Arc::clone(&is_mapped);
+            let callback = move |_| is_mapped.store(true, Ordering::Release);
+            command_encoder.map_buffer_on_submit(&buffer, MapMode::Read, ..size, callback);
+        }
+
+        Self {
+            buffer,
+            init_size,
+            is_mapped,
+        }
     }
 
     #[inline]
@@ -183,7 +189,15 @@ impl DownloadBuffer {
     ) where
         L: AsRef<str>,
     {
-        let Self { buffer, init_size } = self;
+        let Self {
+            buffer,
+            init_size,
+            is_mapped,
+        } = self;
+
+        if is_mapped.swap(false, Ordering::AcqRel) {
+            buffer.unmap();
+        }
 
         let size = source.size().get();
         if buffer.size() < size {
@@ -193,19 +207,25 @@ impl DownloadBuffer {
 
         *init_size = source.size();
         command_encoder.copy_buffer_to_buffer(source.buffer(), source.offset(), buffer, 0, size);
+
+        let is_mapped = Arc::clone(is_mapped);
+        let callback = move |_| is_mapped.store(true, Ordering::Release);
+        command_encoder.map_buffer_on_submit(buffer, MapMode::Read, ..size, callback);
     }
 
     #[inline]
-    pub fn map_async<F>(&self, callback: F)
-    where
-        F: FnOnce(Result<(), BufferAsyncError>) + WasmNotSend + 'static,
-    {
-        self.as_slice().map_async(MapMode::Read, callback);
-    }
+    pub fn as_slice(&self) -> Option<BufferView> {
+        let Self {
+            buffer,
+            init_size,
+            is_mapped,
+        } = self;
 
-    #[inline]
-    pub fn as_slice(&self) -> BufferSlice<'_> {
-        let Self { buffer, init_size } = self;
-        buffer.slice(..init_size.get())
+        if !is_mapped.load(Ordering::Acquire) {
+            return None;
+        }
+
+        let view = buffer.get_mapped_range(..init_size.get());
+        Some(view)
     }
 }

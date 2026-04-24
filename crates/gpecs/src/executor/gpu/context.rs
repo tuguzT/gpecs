@@ -1,9 +1,6 @@
 use std::{
+    error::Error,
     fmt::{self, Display},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
     time::Duration,
 };
 
@@ -12,7 +9,7 @@ use wgpu::{CommandEncoderDescriptor, Device, Queue, SubmissionIndex};
 use crate::{
     context::Context,
     executor::gpu::{
-        archetype::registry::GpuArchetypeRegistry,
+        archetype::registry::{GpuArchetypeId, GpuArchetypeRegistry},
         cache::{schedule::ScheduleCache, transfer::TransferCache},
     },
 };
@@ -59,7 +56,6 @@ struct MappedContextState<'a> {
     transfer_cache: &'a TransferCache,
     submission_index: SubmissionIndex,
     ready: bool,
-    mapped: Arc<AtomicBool>,
 }
 
 impl<'a> MappedContextState<'a> {
@@ -79,17 +75,10 @@ impl<'a> MappedContextState<'a> {
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
-        let mapped = AtomicBool::new(false).into();
-
-        let mapped_clone = Arc::clone(&mapped);
-        let callback = move |_| mapped_clone.store(true, Ordering::Release);
-        transfer_cache.map_async_all(callback);
-
         Self {
             device,
             transfer_cache,
             submission_index,
-            mapped,
             ready: false,
         }
     }
@@ -104,7 +93,6 @@ impl<'a> MappedContextState<'a> {
             transfer_cache,
             submission_index,
             ready,
-            mapped,
         } = self;
 
         if *ready {
@@ -117,12 +105,10 @@ impl<'a> MappedContextState<'a> {
             .poll(poll_type)
             .expect("context download should be successful");
 
-        if !mapped.load(Ordering::Acquire) {
-            return Err(MappedContextNotReadyError);
-        }
-
         let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
-        transfer_cache.move_into(archetypes);
+        transfer_cache
+            .move_into(archetypes)
+            .map_err(|_| MappedContextNotReadyError)?;
 
         *ready = true;
         Ok(())
@@ -168,3 +154,32 @@ impl Display for MappedContextNotReadyError {
         write!(f, "mapped context is not ready yet")
     }
 }
+
+impl Error for MappedContextNotReadyError {}
+
+#[derive(Debug, Clone)]
+pub struct MappedArchetypeNotReadyError {
+    archetype_id: GpuArchetypeId,
+}
+
+impl MappedArchetypeNotReadyError {
+    #[inline]
+    pub(super) fn new(archetype_id: GpuArchetypeId) -> Self {
+        Self { archetype_id }
+    }
+
+    #[inline]
+    pub fn archetype_id(&self) -> GpuArchetypeId {
+        let Self { archetype_id } = *self;
+        archetype_id
+    }
+}
+
+impl Display for MappedArchetypeNotReadyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { archetype_id } = self;
+        write!(f, "mapped {archetype_id} is not ready yet")
+    }
+}
+
+impl Error for MappedArchetypeNotReadyError {}

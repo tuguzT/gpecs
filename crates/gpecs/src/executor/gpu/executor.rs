@@ -1,8 +1,8 @@
 use std::{any::TypeId, num::NonZeroU32};
 
 use wgpu::{
-    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, ComputePass, ComputePassDescriptor,
-    Device, Queue,
+    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, CommandEncoderDescriptor, ComputePass,
+    ComputePassDescriptor, Device, PollType, Queue,
 };
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
             GpuComponent,
             registry::{GpuComponentId, GpuComponentRegistry},
         },
-        context::{self, MappedContext},
+        context::MappedContext,
         system::{
             registry::{
                 DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
@@ -359,7 +359,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn map_context(&mut self, queue: &Queue) -> MappedContext<'_> {
+    pub fn map_context(&mut self, command_encoder: &mut CommandEncoder) -> MappedContext<'_> {
         let Self {
             context,
             device,
@@ -374,17 +374,37 @@ impl<'ctx> GpuExecutor<'ctx> {
             device,
             transfer_cache,
             schedule_cache.as_mut(),
-            queue,
+            command_encoder,
             archetypes,
         )
     }
 
     #[inline]
     pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {
-        // Wait for context to be available
-        self.map_context(queue)
-            .context(context::PollType::wait_indefinitely())
-            .expect("waiting poll should be successful");
+        let Self { ref device, .. } = self;
+        let device = device.clone();
+
+        let command_encoder_desc = CommandEncoderDescriptor {
+            label: Some("`gpecs` context download command encoder"),
+        };
+        let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
+
+        let mut mapped_context = self.map_context(&mut command_encoder);
+
+        let command_buffer = command_encoder.finish();
+        let submission_index = queue.submit([command_buffer]);
+
+        let poll_type = PollType::Wait {
+            submission_index: Some(submission_index),
+            timeout: None,
+        };
+        device
+            .poll(poll_type)
+            .expect("device should be polled successfully");
+
+        mapped_context
+            .context()
+            .expect("all the data should be mapped successfully");
 
         let Self { context, .. } = self;
         context

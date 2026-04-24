@@ -114,6 +114,8 @@ pub fn run(context: &mut Context) {
             |_| {},
         );
 
+        // let mut mapped_context = executor.map_context(&mut command_encoder);
+
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
@@ -121,14 +123,15 @@ pub fn run(context: &mut Context) {
             submission_index: Some(submission_index),
             timeout: None,
         };
-        device.poll(poll_type).expect("device should poll");
+        device
+            .poll(poll_type)
+            .expect("device should be polled successfully");
 
-        // let mut mapped_context = executor.map_context(&queue);
         // let _context = mapped_context
-        //     .context(PollType::wait_indefinitely())
+        //     .context()
         //     .expect("waiting poll should be successful");
         // let _context = mapped_context
-        //     .context(PollType::wait_indefinitely())
+        //     .context()
         //     .expect("should be already at ready state");
 
         let elapsed = timestamp.elapsed();

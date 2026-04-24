@@ -77,6 +77,8 @@ pub fn run(context: &mut Context) {
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
 
+        let mut mapped_context = executor.map_context(&mut command_encoder);
+
         // Push commands to copy data into the download buffer
         // wgpu_copy_into_position_tag_download_buffer(
         //     &executor,
@@ -98,14 +100,15 @@ pub fn run(context: &mut Context) {
             submission_index: Some(submission_index),
             timeout: None,
         };
-        device.poll(poll_type).expect("device should poll");
+        device
+            .poll(poll_type)
+            .expect("device should be polled successfully");
 
-        let mut mapped_context = executor.map_context(&queue);
         let _context = mapped_context
-            .context(PollType::wait_indefinitely())
+            .context()
             .expect("waiting poll should be successful");
         let _context = mapped_context
-            .context(PollType::wait_indefinitely())
+            .context()
             .expect("should be already at ready state");
 
         // Check data inside of the download buffer

@@ -19,8 +19,9 @@ use crate::{
     hash::IndexMap,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ScheduleCache {
+    is_valid: bool,
     systems: IndexMap<GpuSystemId, SystemCache>,
 }
 
@@ -107,22 +108,36 @@ impl ScheduleCache {
             }
         }
 
-        let systems = system_caches;
-        Self { systems }
+        Self {
+            systems: system_caches,
+            is_valid: true,
+        }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { systems } = self;
+        let Self { systems, .. } = self;
         systems.len()
     }
 
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = GpuSystemInfo<&SystemCache>> {
-        let Self { systems } = self;
+        let Self { systems, .. } = self;
         systems
             .iter()
             .map(|(&id, cache)| GpuSystemInfo::new(id, cache))
+    }
+
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        let Self { is_valid, .. } = *self;
+        is_valid
+    }
+
+    #[inline]
+    pub fn invalidate(&mut self) {
+        let Self { is_valid, .. } = self;
+        *is_valid = false;
     }
 }
 

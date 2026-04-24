@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug)]
 pub struct MappedContext<'a> {
     context: &'a mut Context,
-    state: Option<MappedContextState<'a>>,
+    transfer_cache: &'a mut TransferCache,
 }
 
 impl<'a> MappedContext<'a> {
@@ -25,63 +25,34 @@ impl<'a> MappedContext<'a> {
         context: &'a mut Context,
         device: &Device,
         transfer_cache: &'a mut TransferCache,
-        schedule_cache: Option<&mut ScheduleCache>,
-        command_encoder: &mut CommandEncoder,
-        archetypes: &mut GpuArchetypeRegistry,
-    ) -> Self {
-        let state = schedule_cache.map(|schedule_cache| {
-            MappedContextState::new(
-                device,
-                transfer_cache,
-                schedule_cache,
-                command_encoder,
-                archetypes,
-            )
-        });
-        Self { context, state }
-    }
-
-    #[inline]
-    pub fn context(&mut self) -> Result<&Context, MappedContextNotReadyError> {
-        let Self { context, state } = self;
-
-        if let Some(state) = state {
-            state.make_ready(context)?;
-        }
-        Ok(context)
-    }
-
-    // TODO: methods to copy data from CPU to GPU
-    //       do not grant mutable access to the context (yet)
-}
-
-#[derive(Debug)]
-struct MappedContextState<'a> {
-    transfer_cache: &'a mut TransferCache,
-}
-
-impl<'a> MappedContextState<'a> {
-    fn new(
-        device: &Device,
-        transfer_cache: &'a mut TransferCache,
-        schedule_cache: &ScheduleCache,
+        schedule_cache: &mut ScheduleCache,
         command_encoder: &mut CommandEncoder,
         archetypes: &mut GpuArchetypeRegistry,
     ) -> Self {
         transfer_cache.download_from(device, command_encoder, schedule_cache, archetypes);
-        Self { transfer_cache }
+        Self {
+            context,
+            transfer_cache,
+        }
     }
 
-    fn make_ready(&mut self, context: &mut Context) -> Result<(), MappedContextNotReadyError> {
-        let Self { transfer_cache } = self;
+    #[inline]
+    pub fn context(&mut self) -> Result<&Context, MappedContextNotReadyError> {
+        let Self {
+            context,
+            transfer_cache,
+        } = self;
 
         let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
         transfer_cache
             .move_into(archetypes)
             .map_err(|_| MappedContextNotReadyError)?;
 
-        Ok(())
+        Ok(context)
     }
+
+    // TODO: methods to copy data from CPU to GPU
+    //       do not grant mutable access to the context (yet)
 }
 
 #[derive(Debug, Clone)]

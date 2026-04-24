@@ -40,7 +40,7 @@ pub struct GpuExecutor<'ctx> {
     archetypes: GpuArchetypeRegistry,
     systems: GpuSystemRegistry,
     schedule: GpuSystemSchedule,
-    schedule_cache: Option<ScheduleCache>,
+    schedule_cache: ScheduleCache,
     transfer_cache: TransferCache,
     timestamp_query_resources: Option<TimestampQueryResources>,
 }
@@ -55,7 +55,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             archetypes: GpuArchetypeRegistry::new(),
             systems: GpuSystemRegistry::new(),
             schedule: GpuSystemSchedule::new(),
-            schedule_cache: None,
+            schedule_cache: ScheduleCache::default(),
             transfer_cache: TransferCache::default(),
             timestamp_query_resources: None,
         }
@@ -153,15 +153,24 @@ impl<'ctx> GpuExecutor<'ctx> {
         B: GpuBundle,
     {
         let Self {
-            ref mut context,
             ref device,
+            ref mut context,
+            ref mut schedule_cache,
             components: ref mut gpu_components,
             archetypes: ref mut gpu_archetypes,
             ..
         } = *self;
 
         let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
-        gpu_archetypes.register_archetype_of::<B>(components, archetypes, gpu_components, device)
+        let archetype_id = gpu_archetypes.register_archetype_of::<B>(
+            components,
+            archetypes,
+            gpu_components,
+            device,
+        )?;
+
+        schedule_cache.invalidate();
+        Ok(archetype_id)
     }
 
     #[inline]
@@ -222,14 +231,34 @@ impl<'ctx> GpuExecutor<'ctx> {
 
     #[inline]
     pub fn add_system(&mut self, system_id: GpuSystemId) -> bool {
-        let Self { schedule, .. } = self;
-        schedule.add_system(system_id)
+        let Self {
+            schedule,
+            schedule_cache,
+            ..
+        } = self;
+
+        let added = schedule.add_system(system_id);
+        if added {
+            schedule_cache.invalidate();
+        }
+
+        added
     }
 
     #[inline]
     pub fn remove_system(&mut self, system_id: GpuSystemId) -> bool {
-        let Self { schedule, .. } = self;
-        schedule.remove_system(system_id)
+        let Self {
+            schedule,
+            schedule_cache,
+            ..
+        } = self;
+
+        let removed = schedule.remove_system(system_id);
+        if removed {
+            schedule_cache.invalidate();
+        }
+
+        removed
     }
 
     #[inline]
@@ -248,7 +277,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             ..
         } = *self;
 
-        let new_cache = ScheduleCache::with_additional_bindings(
+        *schedule_cache = ScheduleCache::with_additional_bindings(
             context,
             device,
             archetypes,
@@ -256,7 +285,6 @@ impl<'ctx> GpuExecutor<'ctx> {
             schedule,
             additional_bindings,
         );
-        schedule_cache.replace(new_cache);
     }
 
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
@@ -273,10 +301,9 @@ impl<'ctx> GpuExecutor<'ctx> {
         } = *self;
 
         transfer_cache.invalidate();
-
-        let new_schedule_cache =
-            || ScheduleCache::new(context, device, archetypes, systems, schedule);
-        let schedule_cache = &*schedule_cache.get_or_insert_with(new_schedule_cache);
+        if !schedule_cache.is_valid() {
+            *schedule_cache = ScheduleCache::new(context, device, archetypes, systems, schedule);
+        }
 
         if timestamp_query_resources.is_none() {
             *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);
@@ -345,16 +372,13 @@ impl<'ctx> GpuExecutor<'ctx> {
             ..
         } = self;
 
-        let (cache, timestamp_query_resources) = schedule_cache
-            .as_ref()
-            .zip(timestamp_query_resources.as_ref())?;
-
+        let timestamp_query_resources = timestamp_query_resources.as_ref()?;
         let raw_statistics = match timestamp_query_resources.raw_statistics() {
             Ok(raw_statistics) => raw_statistics,
             Err(error) => return Some(Err(error)),
         };
 
-        let statistics = TimestampQueryStatistics::new(&raw_statistics, cache, queue);
+        let statistics = TimestampQueryStatistics::new(&raw_statistics, schedule_cache, queue);
         Some(Ok(statistics))
     }
 
@@ -373,7 +397,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             context,
             device,
             transfer_cache,
-            schedule_cache.as_mut(),
+            schedule_cache,
             command_encoder,
             archetypes,
         )

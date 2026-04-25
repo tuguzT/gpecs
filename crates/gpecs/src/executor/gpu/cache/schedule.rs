@@ -154,6 +154,12 @@ impl SystemCache {
     }
 
     #[inline]
+    pub fn archetype(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeCache> {
+        let Self { archetypes } = self;
+        archetypes.get(&archetype_id)
+    }
+
+    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = GpuArchetypeInfo<&ArchetypeCache>> {
         let Self { archetypes } = self;
         archetypes

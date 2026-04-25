@@ -79,7 +79,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         executor.execute(&mut command_encoder);
 
         let mut context_mapper = executor.context_mapper();
-        context_mapper.map_full(&mut command_encoder);
+        context_mapper.map_all(&mut command_encoder);
 
         // Push commands to copy data into the download buffer
         // wgpu_copy_into_position_tag_download_buffer(
@@ -107,10 +107,10 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             .expect("device should be polled successfully");
 
         let _context = context_mapper
-            .get_full()
+            .get_all()
             .expect("waiting poll should be successful");
         let _context = context_mapper
-            .get_full()
+            .get_all()
             .expect("should be already at ready state");
 
         // Check data inside of the download buffer

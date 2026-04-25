@@ -117,7 +117,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         );
 
         let mut context_mapper = executor.context_mapper();
-        context_mapper.map_full(&mut command_encoder);
+        context_mapper.map_all(&mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
@@ -131,10 +131,10 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             .expect("device should be polled successfully");
 
         let _context = context_mapper
-            .get_full()
+            .get_all()
             .expect("waiting poll should be successful");
         let _context = context_mapper
-            .get_full()
+            .get_all()
             .expect("should be already at ready state");
 
         let elapsed = timestamp.elapsed();

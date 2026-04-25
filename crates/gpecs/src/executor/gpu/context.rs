@@ -6,6 +6,7 @@ use std::{
 use wgpu::{CommandEncoder, Device};
 
 use crate::{
+    archetype::storage::ArchetypeStorage,
     context::Context,
     executor::gpu::{
         archetype::registry::{GpuArchetypeId, GpuArchetypeRegistry},
@@ -41,7 +42,11 @@ impl<'a> ContextMapper<'a> {
     }
 
     #[inline]
-    pub fn map_full(&mut self, command_encoder: &mut CommandEncoder) {
+    pub fn map_archetype(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+        command_encoder: &mut CommandEncoder,
+    ) {
         let Self {
             device,
             schedule_cache,
@@ -49,11 +54,45 @@ impl<'a> ContextMapper<'a> {
             archetypes,
             ..
         } = self;
-        transfer_cache.download_from(device, command_encoder, schedule_cache, archetypes);
+
+        transfer_cache.download_archetype_from(
+            device,
+            command_encoder,
+            archetype_id,
+            schedule_cache,
+            archetypes,
+        );
     }
 
     #[inline]
-    pub fn get_full(&mut self) -> Result<&Context, MappedContextNotReadyError> {
+    pub fn map_all(&mut self, command_encoder: &mut CommandEncoder) {
+        let Self {
+            device,
+            schedule_cache,
+            transfer_cache,
+            archetypes,
+            ..
+        } = self;
+        transfer_cache.download_all_from(device, command_encoder, schedule_cache, archetypes);
+    }
+
+    #[inline]
+    pub fn get_archetype(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+    ) -> Result<&ArchetypeStorage, MappedArchetypeNotReadyError> {
+        let Self {
+            context,
+            transfer_cache,
+            ..
+        } = self;
+
+        let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
+        transfer_cache.move_archetype_into(archetype_id, archetypes)
+    }
+
+    #[inline]
+    pub fn get_all(&mut self) -> Result<&Context, MappedContextNotReadyError> {
         let Self {
             context,
             transfer_cache,
@@ -62,7 +101,7 @@ impl<'a> ContextMapper<'a> {
 
         let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
         transfer_cache
-            .move_into(archetypes)
+            .move_all_into(archetypes)
             .map_err(|_| MappedContextNotReadyError)?;
 
         Ok(context)

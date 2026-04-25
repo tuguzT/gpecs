@@ -406,7 +406,7 @@ impl<'ctx> GpuExecutor<'ctx> {
         let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
 
         let mut context_mapper = self.context_mapper();
-        context_mapper.map_full(&mut command_encoder);
+        context_mapper.map_all(&mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
@@ -420,7 +420,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             .expect("device should be polled successfully");
 
         context_mapper
-            .get_full()
+            .get_all()
             .expect("all the data should be mapped successfully");
 
         let Self { context, .. } = self;

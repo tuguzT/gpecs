@@ -86,9 +86,10 @@ impl ScheduleCache {
                 let Some(archetype_id) = archetypes.map_archetype_id(archetype_id) else {
                     continue;
                 };
-                let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
+                let Some(archetype_storage) = archetypes.get_archetype_storage(archetype_id) else {
                     unreachable!("{archetype_id} should exist");
                 };
+                let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
 
                 let additional_bindings = additional_bindings_cache
                     .get(&system_id)

@@ -168,9 +168,8 @@ fn exchange_components() {
     let mut tag = Tag;
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let bundle = archetypes
@@ -197,9 +196,8 @@ fn exchange_components() {
         .expect("archetype of only `Mass` should contain unique component ids");
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let refs = archetypes
@@ -243,15 +241,13 @@ fn exchange_components() {
         .expect("archetype of `Mass` and `Position` should contain unique component ids");
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let refs = archetypes
@@ -275,15 +271,13 @@ fn exchange_components() {
     );
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let error = archetypes
@@ -320,15 +314,13 @@ fn exchange_components() {
     assert!(bundle.is_none(), "entity was already removed");
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let bundle = archetypes
@@ -376,9 +368,8 @@ fn exchange_components_erased() {
     let mut tag = Tag;
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let bundle = archetypes
@@ -412,9 +403,8 @@ fn exchange_components_erased() {
     archetypes.insert(&components.as_view(), entity, bundle);
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let refs = archetypes
@@ -465,15 +455,13 @@ fn exchange_components_erased() {
     archetypes.insert(&components.as_view(), entity, bundle);
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let refs = archetypes
@@ -504,15 +492,13 @@ fn exchange_components_erased() {
     );
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let error = archetypes
@@ -562,15 +548,13 @@ fn exchange_components_erased() {
     drop(bundle);
 
     let storage = archetypes
-        .get_archetype_info(archetype_subset)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype_subset)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 
     let components_to_remove = ErasedArchetype::register::<(Position, Mass), _, _>(&mut components)
@@ -630,9 +614,8 @@ fn exchange_components_empty_registry() {
         .register_archetype_from(&components.as_view(), component_ids)
         .expect("archetype of only `Tag` should contain unique component ids");
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     archetypes
@@ -645,9 +628,8 @@ fn exchange_components_empty_registry() {
     assert!(bundle.is_none(), "entity was already removed");
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 }
 
@@ -703,9 +685,8 @@ fn exchange_components_erased_empty_registry() {
         .register_archetype_from(&components.as_view(), component_ids)
         .expect("archetype of only `Tag` should contain unique component ids");
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(storage.contains(entity));
 
     let components_to_remove =
@@ -725,9 +706,8 @@ fn exchange_components_erased_empty_registry() {
     }
 
     let storage = archetypes
-        .get_archetype_info(archetype)
-        .expect("archetype should exist")
-        .into_meta();
+        .get_archetype_storage(archetype)
+        .expect("archetype should exist");
     assert!(!storage.contains(entity));
 }
 

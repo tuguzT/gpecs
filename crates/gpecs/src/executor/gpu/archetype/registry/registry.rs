@@ -12,9 +12,7 @@ use crate::{
     context::Components,
     executor::gpu::{
         archetype::{
-            registry::{
-                GpuArchetypeId, GpuArchetypeIds, GpuArchetypeInfo, id::gpu_archetype_id_trusted,
-            },
+            registry::{GpuArchetypeId, GpuArchetypeIds, id::gpu_archetype_id_trusted},
             storage::GpuArchetypeStorage,
         },
         bundle::GpuBundle,
@@ -113,14 +111,14 @@ impl GpuArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get_archetype_info(
+    pub fn get_archetype_storage(
         &self,
         archetype_id: GpuArchetypeId,
-    ) -> Option<GpuArchetypeInfo<&GpuArchetypeStorage>> {
+    ) -> Option<&GpuArchetypeStorage> {
         let Self { gpu_archetypes } = self;
         gpu_archetypes
             .get(archetype_id.into_u32())
-            .map(|storage| GpuArchetypeInfo::new(archetype_id, storage.as_inner()))
+            .map(Identity::as_inner)
     }
 
     #[inline]

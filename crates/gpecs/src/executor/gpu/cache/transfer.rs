@@ -82,7 +82,7 @@ impl TransferCache {
             return;
         }
 
-        let Some(storage) = gpu_archetypes.get_archetype_info(archetype_id) else {
+        let Some(storage) = gpu_archetypes.get_archetype_storage(archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
         let storage_slices = storage.slices();
@@ -132,11 +132,10 @@ impl TransferCache {
         let Self { archetypes } = self;
 
         for (&archetype_id, archetype_cache) in archetypes {
-            let storage = unsafe { cpu_archetypes.get_archetype_info_mut(archetype_id.into()) };
+            let storage = unsafe { cpu_archetypes.get_archetype_storage_mut(archetype_id.into()) };
             let Some(storage) = storage else {
                 unreachable!("{archetype_id} should exist")
             };
-            let storage = storage.into_meta();
 
             Self::move_archetype_into_trusted(archetype_cache, storage)
                 .ok_or_else(|| MappedArchetypeNotReadyError::new(archetype_id))?;
@@ -150,11 +149,10 @@ impl TransferCache {
         archetype_id: GpuArchetypeId,
         cpu_archetypes: &'a mut ArchetypeRegistry,
     ) -> Result<&'a ArchetypeStorage, MappedArchetypeNotReadyError> {
-        let storage = unsafe { cpu_archetypes.get_archetype_info_mut(archetype_id.into()) };
+        let storage = unsafe { cpu_archetypes.get_archetype_storage_mut(archetype_id.into()) };
         let Some(storage) = storage else {
             unreachable!("{archetype_id} should exist")
         };
-        let storage = storage.into_meta();
 
         let Self { archetypes } = self;
         let Some(archetype_cache) = archetypes.get_mut(&archetype_id) else {

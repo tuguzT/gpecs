@@ -120,24 +120,18 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get_archetype_info(&self, id: ArchetypeId) -> Option<ArchetypeInfo<&ArchetypeStorage>> {
+    pub fn get_archetype_storage(&self, id: ArchetypeId) -> Option<&ArchetypeStorage> {
         let Self { archetypes, .. } = self;
-
-        let storage = algo::get_archetype_storage(archetypes, id)?;
-        let info = ArchetypeInfo::new(id, storage);
-        Some(info)
+        algo::get_archetype_storage(archetypes, id)
     }
 
     #[inline]
-    pub unsafe fn get_archetype_info_mut(
+    pub unsafe fn get_archetype_storage_mut(
         &mut self,
         id: ArchetypeId,
-    ) -> Option<ArchetypeInfo<&mut ArchetypeStorage>> {
+    ) -> Option<&mut ArchetypeStorage> {
         let Self { archetypes, .. } = self;
-
-        let storage = algo::get_archetype_storage_mut(archetypes, id)?;
-        let info = ArchetypeInfo::new(id, storage);
-        Some(info)
+        algo::get_archetype_storage_mut(archetypes, id)
     }
 
     #[inline]

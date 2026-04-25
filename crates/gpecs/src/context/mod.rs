@@ -4,7 +4,7 @@ use crate::{
     archetype::{
         erased::error::{ArchetypeError, DuplicateComponentError},
         registry::{
-            self as archetypes, ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityLocation,
+            self as archetypes, ArchetypeId, ArchetypeRegistry, EntityLocation,
             error::{
                 GetAtError, InsertBundleAtError, InsertBundleExactAtError, RemoveBundleAtError,
                 RemoveBundleExactAtError,
@@ -241,12 +241,9 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_archetype_info(
-        &self,
-        archetype_id: ArchetypeId,
-    ) -> Option<ArchetypeInfo<&ArchetypeStorage>> {
+    pub fn get_archetype_storage(&self, archetype_id: ArchetypeId) -> Option<&ArchetypeStorage> {
         let Self { archetypes, .. } = self;
-        archetypes.get_archetype_info(archetype_id)
+        archetypes.get_archetype_storage(archetype_id)
     }
 
     #[inline]

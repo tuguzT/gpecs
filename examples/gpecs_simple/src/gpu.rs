@@ -115,12 +115,12 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
         // Check data inside of the download buffer
         // if let Some(position_tag_download_slice) = position_tag_download_slice {
-        //     let position_tag_archetype_info = executor
+        //     let position_tag_archetype_storage = executor
         //         .context()
         //         .archetypes()
-        //         .get_archetype_info(position_tag_gpu_archetype_id.into_id())
+        //         .get_archetype_storage(position_tag_gpu_archetype_id.into_id())
         //         .expect("archetype info should be present");
-        //     let position_tag_entities = position_tag_archetype_info.storage().entities();
+        //     let position_tag_entities = position_tag_archetype_storage.entities();
 
         //     let position_tag_download_slice_mapped_range =
         //         position_tag_download_slice.get_mapped_range();
@@ -260,10 +260,10 @@ fn _init_wgpu_position_tag_download_buffer(
     position_gpu_id: GpuComponentId,
     tag_gpu_id: GpuComponentId,
 ) -> Option<wgpu::Buffer> {
-    let position_tag_gpu_archetype_info = executor
-        .get_archetype_info(position_tag_gpu_archetype_id)
+    let position_tag_gpu_archetype_storage = executor
+        .get_archetype_storage(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_info.slices();
+    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_storage.slices();
     log::debug!(
         "{position_tag_gpu_archetype_id:?} buffer slices:\n{position_tag_storage_buffer_slices:#?}"
     );
@@ -302,10 +302,10 @@ fn _wgpu_copy_into_position_tag_download_buffer(
     position_gpu_id: GpuComponentId,
     tag_gpu_id: GpuComponentId,
 ) {
-    let position_tag_gpu_archetype_info = executor
-        .get_archetype_info(position_tag_gpu_archetype_id)
+    let position_tag_gpu_archetype_storage = executor
+        .get_archetype_storage(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_info.slices();
+    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_storage.slices();
 
     let position_tag_storage_buffer_component_slices: HashMap<_, _> =
         position_tag_storage_buffer_slices.components.collect();

@@ -148,7 +148,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             let statistics = statistics.expect("timestamp query statistics should be ready");
             for system_statistics in &statistics {
                 let system_id = system_statistics.system_id();
-                let Some(system_shader) = executor.systems().get_system_info(system_id) else {
+                let Some(system_shader) = executor.systems().get_system_shader(system_id) else {
                     unreachable!("{system_id} should exist")
                 };
 

@@ -65,13 +65,13 @@ impl ScheduleCache {
 
         let mut system_caches = IndexMap::default();
         for system_id in schedule {
-            let Some(system_info) = systems.get_system_info(system_id) else {
+            let Some(system_shader) = systems.get_system_shader(system_id) else {
                 unreachable!("{system_id} should exist");
             };
+            let system_info = GpuSystemInfo::new(system_id, system_shader);
 
-            let shader = system_info.into_meta();
             let components = &context.components().as_view();
-            let component_ids = shader
+            let component_ids = system_shader
                 .bind_group_layout_entries()
                 .components
                 .map(|(component_id, _)| component_id.into());

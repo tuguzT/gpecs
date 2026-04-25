@@ -11,7 +11,7 @@ use crate::{
         component::registry::GpuComponentId,
         system::{
             registry::{
-                GpuSystemId, GpuSystemIds, GpuSystemInfo,
+                GpuSystemId, GpuSystemIds,
                 id::{gpu_system_id_from_usize, gpu_system_id_into_usize},
             },
             shader::GpuSystemShader,
@@ -86,25 +86,9 @@ impl GpuSystemRegistry {
     }
 
     #[inline]
-    pub fn get_system_info(
-        &self,
-        system_id: GpuSystemId,
-    ) -> Option<GpuSystemInfo<&GpuSystemShader>> {
+    pub fn get_system_shader(&self, system_id: GpuSystemId) -> Option<&GpuSystemShader> {
         let Self { systems } = self;
-        systems
-            .get(gpu_system_id_into_usize(system_id))
-            .map(|shader| GpuSystemInfo::new(system_id, shader))
-    }
-
-    #[inline]
-    pub fn get_system_info_mut(
-        &mut self,
-        system_id: GpuSystemId,
-    ) -> Option<GpuSystemInfo<&mut GpuSystemShader>> {
-        let Self { systems } = self;
-        systems
-            .get_mut(gpu_system_id_into_usize(system_id))
-            .map(|shader| GpuSystemInfo::new(system_id, shader))
+        systems.get(gpu_system_id_into_usize(system_id))
     }
 
     #[inline]

@@ -23,7 +23,7 @@ use crate::{
         system::{
             registry::{
                 DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
-                GpuSystemInfo, GpuSystemRegistry,
+                GpuSystemRegistry,
             },
             schedule::GpuSystemSchedule,
             shader::GpuSystemShader,
@@ -224,12 +224,9 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn get_system_info(
-        &self,
-        system_id: GpuSystemId,
-    ) -> Option<GpuSystemInfo<&GpuSystemShader>> {
+    pub fn get_system_shader(&self, system_id: GpuSystemId) -> Option<&GpuSystemShader> {
         let Self { systems, .. } = self;
-        systems.get_system_info(system_id)
+        systems.get_system_shader(system_id)
     }
 
     #[inline]
@@ -323,12 +320,11 @@ impl<'ctx> GpuExecutor<'ctx> {
         let mut query_index = 0;
         for system_cache in schedule_cache.iter() {
             let system_id = system_cache.system_id();
-            let Some(system_info) = systems.get_system_info(system_id) else {
+            let Some(system_shader) = systems.get_system_shader(system_id) else {
                 unreachable!("{system_id} should exist");
             };
-            let shader = system_info.into_meta();
 
-            let compute_pass_label = match shader.label() {
+            let compute_pass_label = match system_shader.label() {
                 Some(label) => format!("`gpecs` {system_id:#} [{label}] compute pass"),
                 None => format!("`gpecs` {system_id:#} compute pass"),
             };
@@ -337,7 +333,7 @@ impl<'ctx> GpuExecutor<'ctx> {
                 timestamp_writes: None,
             };
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
-            compute_pass.set_pipeline(shader.compute_pipeline());
+            compute_pass.set_pipeline(system_shader.compute_pipeline());
 
             for archetype_cache in system_cache.iter() {
                 let archetype_id = archetype_cache.archetype_id();
@@ -350,7 +346,9 @@ impl<'ctx> GpuExecutor<'ctx> {
                 write_timestamp(&mut compute_pass, query_index);
                 query_index += 1;
 
-                let workgroup_size = shader.workgroup_size().unwrap_or(DEFAULT_WORKGROUP_SIZE);
+                let workgroup_size = system_shader
+                    .workgroup_size()
+                    .unwrap_or(DEFAULT_WORKGROUP_SIZE);
                 let workgroup_count = workgroup_count(archetype_storage, workgroup_size);
                 compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
 

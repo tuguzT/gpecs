@@ -1,12 +1,13 @@
 use std::{
-    collections::HashMap,
     fs,
     time::{Duration, Instant},
 };
 
+use glam::Vec3;
 use gpecs::prelude::*;
 use gpecs_itertools::Itertools as _;
 use gpecs_simple_types::{Mass, Position, Tag};
+use num_traits::ToPrimitive;
 
 use crate::setup;
 
@@ -19,7 +20,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     executor
         .register_archetype_of::<(Position, Mass)>()
         .expect("archetype of `Position` and `Mass` should contain unique component ids");
-    let _position_tag_gpu_archetype_id = executor
+    let position_tag_gpu_archetype_id = executor
         .register_archetype_of::<(Position, Tag)>()
         .expect("archetype of `Position` and `Tag` should contain unique component ids");
 
@@ -58,14 +59,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     executor.add_system(positions_gpu_system_id);
     executor.add_system(mass_gpu_system_id);
 
-    // Create download buffer for archetype of `Position` and `Tag`
-    // let position_tag_download_buffer = init_wgpu_position_tag_download_buffer(
-    //     &executor,
-    //     position_tag_gpu_archetype_id,
-    //     position_gpu_id,
-    //     tag_gpu_id,
-    // );
-
     log::info!("Starting to execute systems on GPU...");
     for i in (0_u128..).maybe_take(repeat_count) {
         #[cfg(debug_assertions)]
@@ -79,24 +72,10 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         executor.execute(&mut command_encoder);
 
         let mut context_mapper = executor.context_mapper();
-        context_mapper.map_all(&mut command_encoder);
-
-        // Push commands to copy data into the download buffer
-        // wgpu_copy_into_position_tag_download_buffer(
-        //     &executor,
-        //     position_tag_download_buffer.as_ref(),
-        //     &mut command_encoder,
-        //     position_tag_gpu_archetype_id,
-        //     position_gpu_id,
-        //     tag_gpu_id,
-        // );
+        context_mapper.map_archetype(position_tag_gpu_archetype_id, &mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
-
-        // Map download buffer to CPU memory
-        // let position_tag_download_slice =
-        //     wgpu_map_whole_buffer(position_tag_download_buffer.as_ref());
 
         let poll_type = wgpu::PollType::Wait {
             submission_index: Some(submission_index),
@@ -106,48 +85,25 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             .poll(poll_type)
             .expect("device should be polled successfully");
 
-        let _context = context_mapper
-            .get_all()
-            .expect("waiting poll should be successful");
-        let _context = context_mapper
-            .get_all()
-            .expect("should be already at ready state");
+        let (position_tag_archetype_storage, components) = context_mapper
+            .get_archetype_with_components(position_tag_gpu_archetype_id)
+            .expect("archetype of `Position` and `Tag` should already be mapped");
 
-        // Check data inside of the download buffer
-        // if let Some(position_tag_download_slice) = position_tag_download_slice {
-        //     let position_tag_archetype_storage = executor
-        //         .context()
-        //         .archetypes()
-        //         .get_archetype_storage(position_tag_gpu_archetype_id.into_id())
-        //         .expect("archetype info should be present");
-        //     let position_tag_entities = position_tag_archetype_storage.entities();
-
-        //     let position_tag_download_slice_mapped_range =
-        //         position_tag_download_slice.get_mapped_range();
-        //     let position_tag_positions: &[Position] = unsafe {
-        //         slice::from_raw_parts(
-        //             position_tag_download_slice_mapped_range.as_ptr().cast(),
-        //             position_tag_entities.len(),
-        //         )
-        //     };
-        //     log::debug!(
-        //         "Positions of {position_tag_gpu_archetype_id:?}:\n{position_tag_positions:#?}"
-        //     );
-
-        //     itertools::assert_equal(
-        //         position_tag_entities.iter().map(|entity| Position {
-        //             data: Vec3 {
-        //                 x: entity.index() as f32,
-        //                 y: (entity.index() as f32) / 2.0,
-        //                 z: -(entity.index() as f32) / 2.0,
-        //             },
-        //         }),
-        //         position_tag_positions.iter().copied(),
-        //     );
-        // }
-        // if let Some(position_tag_download_buffer) = position_tag_download_buffer.as_ref() {
-        //     position_tag_download_buffer.unmap();
-        // }
+        let position_tag_entities = position_tag_archetype_storage.as_entities();
+        let (position_tag_positions,) = position_tag_archetype_storage
+            .as_bundles::<(Position,), _>(&components.as_view())
+            .expect("archetype should contain `Position` components");
+        itertools::assert_equal(
+            position_tag_entities.iter().map(|entity| Position {
+                data: Vec3 {
+                    x: entity.index().to_f32().unwrap(),
+                    y: entity.index().to_f32().unwrap() / 2.0,
+                    z: -entity.index().to_f32().unwrap() / 2.0,
+                },
+                padding: Default::default(),
+            }),
+            position_tag_positions.iter().copied(),
+        );
 
         let elapsed = timestamp.elapsed();
 
@@ -252,83 +208,4 @@ fn init_wgpu_command_encoder(device: &wgpu::Device) -> wgpu::CommandEncoder {
         label: Some("`gpecs` simple example command encoder"),
     };
     device.create_command_encoder(&command_encoder_desc)
-}
-
-fn _init_wgpu_position_tag_download_buffer(
-    executor: &GpuExecutor,
-    position_tag_gpu_archetype_id: GpuArchetypeId,
-    position_gpu_id: GpuComponentId,
-    tag_gpu_id: GpuComponentId,
-) -> Option<wgpu::Buffer> {
-    let position_tag_gpu_archetype_storage = executor
-        .get_archetype_storage(position_tag_gpu_archetype_id)
-        .expect("archetype info should be present");
-    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_storage.slices();
-    log::debug!(
-        "{position_tag_gpu_archetype_id:?} buffer slices:\n{position_tag_storage_buffer_slices:#?}"
-    );
-
-    let position_tag_storage_buffer_component_slices: HashMap<_, _> =
-        position_tag_storage_buffer_slices.components.collect();
-    let position_tag_positions_binding = position_tag_storage_buffer_component_slices
-        .get(&position_gpu_id)
-        .copied()
-        .flatten()?;
-    let position_tag_tags_binding = position_tag_storage_buffer_component_slices
-        .get(&tag_gpu_id)
-        .copied()
-        .flatten();
-    assert!(position_tag_tags_binding.is_none());
-
-    let position_tag_download_buffer_label =
-        format!("`gpecs` {position_tag_gpu_archetype_id:?} download buffer");
-    let position_tag_download_buffer_desc = wgpu::BufferDescriptor {
-        label: Some(&position_tag_download_buffer_label),
-        size: position_tag_positions_binding.size().get(),
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    };
-    executor
-        .device()
-        .create_buffer(&position_tag_download_buffer_desc)
-        .into()
-}
-
-fn _wgpu_copy_into_position_tag_download_buffer(
-    executor: &GpuExecutor,
-    position_tag_download_buffer: Option<&wgpu::Buffer>,
-    command_encoder: &mut wgpu::CommandEncoder,
-    position_tag_gpu_archetype_id: GpuArchetypeId,
-    position_gpu_id: GpuComponentId,
-    tag_gpu_id: GpuComponentId,
-) {
-    let position_tag_gpu_archetype_storage = executor
-        .get_archetype_storage(position_tag_gpu_archetype_id)
-        .expect("archetype info should be present");
-    let position_tag_storage_buffer_slices = position_tag_gpu_archetype_storage.slices();
-
-    let position_tag_storage_buffer_component_slices: HashMap<_, _> =
-        position_tag_storage_buffer_slices.components.collect();
-    let position_tag_positions_binding = position_tag_storage_buffer_component_slices
-        .get(&position_gpu_id)
-        .copied()
-        .flatten();
-    let position_tag_tags_binding = position_tag_storage_buffer_component_slices
-        .get(&tag_gpu_id)
-        .copied()
-        .flatten();
-    assert!(position_tag_tags_binding.is_none());
-
-    if let Some((position_tag_download_buffer, position_tag_positions_binding)) =
-        position_tag_download_buffer.zip(position_tag_positions_binding)
-    {
-        let position_tag_positions_slice = unsafe { position_tag_positions_binding.as_slice() };
-        command_encoder.copy_buffer_to_buffer(
-            position_tag_positions_slice.buffer(),
-            position_tag_positions_slice.offset(),
-            position_tag_download_buffer,
-            0,
-            position_tag_positions_slice.size().get(),
-        );
-    }
 }

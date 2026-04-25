@@ -7,7 +7,7 @@ use wgpu::{CommandEncoder, Device};
 
 use crate::{
     archetype::storage::ArchetypeStorage,
-    context::Context,
+    context::{Components, Context},
     executor::gpu::{
         archetype::registry::{GpuArchetypeId, GpuArchetypeRegistry},
         cache::{schedule::ScheduleCache, transfer::TransferCache},
@@ -39,6 +39,12 @@ impl<'a> ContextMapper<'a> {
             transfer_cache,
             archetypes,
         }
+    }
+
+    #[inline]
+    pub fn components(&self) -> &Components {
+        let Self { context, .. } = self;
+        context.components()
     }
 
     #[inline]
@@ -77,18 +83,28 @@ impl<'a> ContextMapper<'a> {
     }
 
     #[inline]
-    pub fn get_archetype(
+    pub fn get_archetype_with_components(
         &mut self,
         archetype_id: GpuArchetypeId,
-    ) -> Result<&ArchetypeStorage, MappedArchetypeNotReadyError> {
+    ) -> Result<(&ArchetypeStorage, &Components), MappedArchetypeNotReadyError> {
         let Self {
             context,
             transfer_cache,
             ..
         } = self;
 
-        let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
-        transfer_cache.move_archetype_into(archetype_id, archetypes)
+        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
+        let storage = transfer_cache.move_archetype_into(archetype_id, archetypes)?;
+        Ok((storage, components))
+    }
+
+    #[inline]
+    pub fn get_archetype(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+    ) -> Result<&ArchetypeStorage, MappedArchetypeNotReadyError> {
+        let (storage, _) = self.get_archetype_with_components(archetype_id)?;
+        Ok(storage)
     }
 
     #[inline]

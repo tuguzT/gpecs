@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 gpecs = { workspace = true }
+gpecs_itertools = { workspace = true }
 gpecs_simple_types = { workspace = true }
 itertools = { workspace = true }
 bytemuck = { workspace = true }

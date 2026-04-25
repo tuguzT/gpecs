@@ -8,6 +8,7 @@ edition.workspace = true
 
 [dependencies]
 gpecs = { workspace = true }
+gpecs_itertools = { workspace = true }
 gpecs_ecs_benchmark_types = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 num-traits = { workspace = true }

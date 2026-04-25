@@ -5,12 +5,13 @@ use std::{
 };
 
 use gpecs::prelude::*;
+use gpecs_itertools::Itertools as _;
 use gpecs_simple_types::{Mass, Position, Tag};
 
-use crate::{ITER_COUNT, setup::setup};
+use crate::setup;
 
-pub fn run(context: &mut Context) {
-    setup(context);
+pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
+    setup::setup(context, entity_count);
 
     let (device, queue) = init_wgpu();
     let mut executor = GpuExecutor::new(context, device.clone());
@@ -66,7 +67,7 @@ pub fn run(context: &mut Context) {
     // );
 
     log::info!("Starting to execute systems on GPU...");
-    for i in 0..ITER_COUNT {
+    for i in (0_u128..).maybe_take(repeat_count) {
         #[cfg(debug_assertions)]
         unsafe {
             device.start_graphics_debugger_capture();
@@ -175,8 +176,7 @@ pub fn run(context: &mut Context) {
         log::info!("Execution of GPU systems {i} took {elapsed:?}");
     }
 
-    let context = executor.into_context(&queue);
-    context.destroy_all();
+    executor.into_context(&queue)
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

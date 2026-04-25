@@ -2,13 +2,14 @@ use std::time::Instant;
 
 use glam::Vec3;
 use gpecs::prelude::*;
+use gpecs_itertools::Itertools as _;
 use gpecs_simple_types::{Mass, Position, Tag};
 use num_traits::ToPrimitive;
 
-use crate::{ITER_COUNT, setup::setup};
+use crate::setup;
 
-pub fn run(context: &mut Context) {
-    setup(context);
+pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
+    setup::setup(context, entity_count);
 
     let mut executor = CpuExecutor::new(context);
     let check_positions_system = executor.register_system(update_positions);
@@ -21,7 +22,7 @@ pub fn run(context: &mut Context) {
     executor.add_system(check_masses_system);
 
     log::info!("Starting to execute systems on CPU...");
-    for i in 0..ITER_COUNT {
+    for i in (0_u128..).maybe_take(repeat_count) {
         let start = Instant::now();
         executor.execute();
         let duration = start.elapsed();
@@ -29,8 +30,7 @@ pub fn run(context: &mut Context) {
     }
 
     // Return context from the executor
-    let context = executor.into_context();
-    context.destroy_all();
+    executor.into_context()
 }
 
 fn update_positions(positions: BundlesMut<(Position,)>) {

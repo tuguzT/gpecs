@@ -14,6 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .to_spirv_builder(SHADER_CRATE_PATH, "spirv-unknown-vulkan1.2")
         .shader_crate_default_features(false)
         .shader_crate_features(["nightly".into()])
+        // .release(std::env::var("CARGO_CFG_DEBUG_ASSERTIONS").is_err())
         .spirv_metadata(SpirvMetadata::Full);
     let compile_result = builder.build()?;
 

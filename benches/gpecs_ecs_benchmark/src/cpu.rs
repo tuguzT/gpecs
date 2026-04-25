@@ -12,19 +12,21 @@ use gpecs_ecs_benchmark_types::{
     },
     utils::{RandomXoshiro128, TimeDelta},
 };
+use gpecs_itertools::Itertools as _;
 
 use crate::{
-    CPU_PATH, ENTITY_COUNT, EXEC_COUNT, FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH,
-    save::save_framebuffer_to_file,
+    framebuffer::{
+        FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH, save_framebuffer_to_file,
+    },
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
-pub fn run(context: &mut Context) {
+pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     log::info!("> Running on CPU...");
 
     let mut rng = RandomXoshiro128::new(DEFAULT_SEED);
-    log::info!(">> Creating {ENTITY_COUNT} entities with mixed components...");
-    let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
+    log::info!(">> Creating {entity_count} entities with mixed components...");
+    let entities = create_entities_with_mixed_components(context, entity_count);
 
     log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
@@ -45,7 +47,7 @@ pub fn run(context: &mut Context) {
     register_cpu_systems(&mut executor, time_delta.clone(), framebuffer.clone());
 
     log::info!(">> Running CPU systems...");
-    for i in 0..EXEC_COUNT {
+    for i in (0_u128..).maybe_take(repeat_count) {
         let timestamp = Instant::now();
         executor.execute();
 
@@ -57,12 +59,11 @@ pub fn run(context: &mut Context) {
 
         log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();
-        save_framebuffer_to_file(framebuffer, CPU_PATH, i);
+        save_framebuffer_to_file(framebuffer, "cpu", i);
     }
 
     // Return context from the executor
-    let context = executor.into_context();
-    context.destroy_all();
+    executor.into_context()
 }
 
 fn register_cpu_systems<B>(

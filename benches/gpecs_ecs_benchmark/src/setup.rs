@@ -10,10 +10,12 @@ use gpecs_ecs_benchmark_types::{
 };
 use num_traits::ToPrimitive;
 
-use crate::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_WIDTH, SPAWN_AREA_MARGIN};
+use crate::framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_WIDTH, SPAWN_AREA_MARGIN};
 
-pub fn create_entities_with_mixed_components(context: &mut Context, count: usize) -> Vec<Entity> {
-    let mut entities = Vec::with_capacity(count);
+pub fn create_entities_with_mixed_components(context: &mut Context, count: u32) -> Vec<Entity> {
+    let entities_capacity = count.try_into().unwrap_or_default();
+    let mut entities = Vec::with_capacity(entities_capacity);
+
     context
         .register_archetype_of::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
         .expect("all the components should be unique");

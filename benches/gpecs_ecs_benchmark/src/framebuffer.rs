@@ -6,9 +6,12 @@ use std::{
 
 use gpecs_ecs_benchmark_types::framebuffer::Framebuffer;
 
-use crate::FRAMEBUFFER_WIDTH;
+pub const FRAMEBUFFER_WIDTH: usize = 320;
+pub const FRAMEBUFFER_HEIGHT: usize = 240;
+pub const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT;
+pub const SPAWN_AREA_MARGIN: u32 = 100;
 
-pub fn save_framebuffer_to_file<B>(framebuffer: &Framebuffer<B>, path: &str, index: usize)
+pub fn save_framebuffer_to_file<B>(framebuffer: &Framebuffer<B>, path: &str, index: u128)
 where
     B: AsRef<[u32]>,
 {

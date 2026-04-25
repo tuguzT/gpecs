@@ -3,15 +3,9 @@ use gpecs::prelude::*;
 use gpecs_simple_types::{Mass, Position, Tag};
 use num_traits::ToPrimitive;
 
-pub const ENTITY_COUNT: u32 = if cfg!(debug_assertions) {
-    2_400
-} else {
-    1_200_000
-};
-
-pub fn setup(context: &mut Context) {
+pub fn setup(context: &mut Context, entity_count: u32) {
     log::info!("Filling context with data to process...");
-    for i in 0..ENTITY_COUNT {
+    for i in 0..entity_count {
         let entity = context.spawn();
 
         let position = Position {

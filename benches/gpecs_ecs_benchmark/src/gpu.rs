@@ -11,21 +11,23 @@ use gpecs_ecs_benchmark_types::{
     framebuffer::{Framebuffer, FramebufferDesc},
     utils::{RandomXoshiro128, TimeDelta},
 };
+use gpecs_itertools::Itertools as _;
 use wgpu::util::DeviceExt;
 
 use crate::{
-    ENTITY_COUNT, EXEC_COUNT, FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH, GPU_PATH,
-    save::save_framebuffer_to_file,
+    framebuffer::{
+        FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH, save_framebuffer_to_file,
+    },
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
 #[expect(clippy::too_many_lines)]
-pub fn run(context: &mut Context) {
+pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     log::info!("> Running on GPU...");
 
     let mut rng = RandomXoshiro128::new(DEFAULT_SEED);
-    log::info!(">> Creating {ENTITY_COUNT} entities with mixed components...");
-    let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
+    log::info!(">> Creating {entity_count} entities with mixed components...");
+    let entities = create_entities_with_mixed_components(context, entity_count);
 
     log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
@@ -89,7 +91,7 @@ pub fn run(context: &mut Context) {
     );
 
     log::info!(">> Running GPU systems...");
-    for i in 0..EXEC_COUNT {
+    for i in (0_u128..).maybe_take(repeat_count) {
         #[cfg(debug_assertions)]
         unsafe {
             device.start_graphics_debugger_capture();
@@ -114,8 +116,8 @@ pub fn run(context: &mut Context) {
             |_| {},
         );
 
-        // let mut context_mapper = executor.context_mapper();
-        // context_mapper.map_full(&mut command_encoder);
+        let mut context_mapper = executor.context_mapper();
+        context_mapper.map_full(&mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
@@ -128,12 +130,12 @@ pub fn run(context: &mut Context) {
             .poll(poll_type)
             .expect("device should be polled successfully");
 
-        // let _context = context_mapper
-        //     .get_full()
-        //     .expect("waiting poll should be successful");
-        // let _context = context_mapper
-        //     .get_full()
-        //     .expect("should be already at ready state");
+        let _context = context_mapper
+            .get_full()
+            .expect("waiting poll should be successful");
+        let _context = context_mapper
+            .get_full()
+            .expect("should be already at ready state");
 
         let elapsed = timestamp.elapsed();
 
@@ -176,11 +178,10 @@ pub fn run(context: &mut Context) {
         framebuffer_download_buffer.unmap();
 
         log::info!(">>> Saving framebuffer state {i} to file...");
-        save_framebuffer_to_file(&framebuffer, GPU_PATH, i);
+        save_framebuffer_to_file(&framebuffer, "gpu", i);
     }
 
-    let context = executor.into_context(&queue);
-    context.destroy_all();
+    executor.into_context(&queue)
 }
 
 #[derive(Debug, Clone, Copy)]

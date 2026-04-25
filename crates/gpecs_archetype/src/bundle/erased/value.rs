@@ -340,8 +340,8 @@ where
 {
     fn drop(&mut self) {
         let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
-        for (component_info, to_drop) in zip_eq(archetype, ptrs) {
-            unsafe { D::drop_in_place_with(to_drop, component_info.as_meta()) }
+        for (component_desc, to_drop) in zip_eq(archetype, ptrs) {
+            unsafe { D::drop_in_place_with(to_drop, component_desc.as_meta()) }
         }
     }
 }

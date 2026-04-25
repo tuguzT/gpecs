@@ -55,14 +55,14 @@ where
         M: WithErasedDrop,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let Some(component_info) = components.get_component_info_of::<C>() else {
+        let Some(component_desc) = components.get_component_descriptor_of::<C>() else {
             let source = NotRegisteredError::of::<C>().into();
             return Err(FromStorageError::new(source, (storage, component)));
         };
 
         let field = Erased::try_from_storage_value(storage, component)?;
-        let component_id = component_info.component_id();
-        let erased_drop = component_info.erased_drop();
+        let component_id = component_desc.component_id();
+        let erased_drop = component_desc.erased_drop();
 
         let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
         Ok(me)
@@ -84,14 +84,14 @@ where
         M: WithErasedDrop,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let Some(component_info) = components.get_component_info_of::<C>() else {
+        let Some(component_desc) = components.get_component_descriptor_of::<C>() else {
             let source = NotRegisteredError::of::<C>().into();
             return Err(FromComponentError::new(component, source));
         };
 
         let field = Erased::try_from(component)?;
-        let component_id = component_info.component_id();
-        let erased_drop = component_info.erased_drop();
+        let component_id = component_desc.component_id();
+        let erased_drop = component_desc.erased_drop();
 
         let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
         Ok(me)

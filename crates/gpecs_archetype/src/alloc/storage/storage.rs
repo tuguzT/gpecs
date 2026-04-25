@@ -34,7 +34,7 @@ use crate::{
         },
     },
     erased::{
-        ErasedArchetype, ErasedArchetypeView, FromComponentInfo,
+        ErasedArchetype, ErasedArchetypeView, FromComponentDescriptor,
         error::{
             ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
             IncompatibleArchetypeExactError,
@@ -725,7 +725,7 @@ where
     where
         I: IntoIterator<Item = ComponentId>,
         T: WithLayout,
-        Meta: FromComponentInfo<'a, T>,
+        Meta: FromComponentDescriptor<'a, T>,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
         let me = Self::from_archetype(archetype);
@@ -740,7 +740,7 @@ where
         B: Bundle,
         M: WithLayout,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        Meta: FromComponentInfo<'a, M>,
+        Meta: FromComponentDescriptor<'a, M>,
     {
         let archetype = ErasedArchetype::of::<B, M, T>(components)?;
         let me = Self::from_archetype(archetype);
@@ -755,7 +755,7 @@ where
         B: Bundle,
         M: PushBackArray<Item: WithLayout + FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
-        Meta: FromComponentInfo<'a, M::Item>,
+        Meta: FromComponentDescriptor<'a, M::Item>,
     {
         let archetype = ErasedArchetype::register::<B, M, T>(components)?;
         let me = Self::from_archetype(archetype);

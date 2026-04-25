@@ -8,7 +8,7 @@ use crate::{
     component::{
         Component,
         erased::{ErasedDrop, WithErasedDrop},
-        registry::{self, ComponentIdMap, ComponentRegistry, traits::FromComponentType},
+        registry::{ComponentIdMap, ComponentRegistry, traits::FromComponentType},
     },
     hash::BuildHasher,
     soa::layout::WithLayout,
@@ -16,7 +16,6 @@ use crate::{
 
 pub type ComponentTypeIdMap = ComponentIdMap<TypeId, BuildHasher>;
 pub type Components = ComponentRegistry<Vec<ComponentDescriptor>, ComponentTypeIdMap>;
-pub type ComponentInfo<'a> = registry::ComponentInfo<&'a ComponentDescriptor>;
 
 #[derive(Debug, Clone)]
 pub struct ComponentDescriptor {

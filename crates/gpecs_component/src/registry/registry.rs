@@ -90,8 +90,8 @@ where
     }
 
     #[inline]
-    pub fn get_component_info(&self, component_id: ComponentId) -> Option<ComponentInfo<&T::Item>> {
-        self.as_view().into_get_component_info(component_id)
+    pub fn get_component_descriptor(&self, component_id: ComponentId) -> Option<&T::Item> {
+        self.as_view().into_component_descriptor(component_id)
     }
 
     #[inline]
@@ -125,11 +125,11 @@ where
     }
 
     #[inline]
-    pub fn get_component_info_of<C>(&self) -> Option<ComponentInfo<&T::Item>>
+    pub fn get_component_descriptor_of<C>(&self) -> Option<ComponentInfo<&T::Item>>
     where
         C: Component,
     {
-        self.as_view().into_get_component_info_of::<C>()
+        self.as_view().into_component_descriptor_of::<C>()
     }
 }
 

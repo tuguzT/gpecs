@@ -718,7 +718,7 @@ where
         .chain(with_components.component_ids())
         .sorted_unstable_by_key(|&component_id| {
             components
-                .get_component_info(component_id)
+                .get_component_descriptor(component_id)
                 .map(|info| info.layout().align())
         })
         .unique();

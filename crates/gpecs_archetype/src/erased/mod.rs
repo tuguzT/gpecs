@@ -4,7 +4,7 @@ pub use self::{
 };
 
 #[cfg(feature = "alloc")]
-pub use crate::alloc::erased::{ErasedArchetype, FromComponentInfo, IntoIter};
+pub use crate::alloc::erased::{ErasedArchetype, FromComponentDescriptor, IntoIter};
 
 pub mod error;
 

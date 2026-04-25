@@ -46,16 +46,16 @@ where
             .map(|component| (component.component_id(), component));
         let components = ErasedArchetype::from_iter(components, iter)?;
 
-        let iter = components.iter().map(|component_info| {
-            let component_id = component_info.component_id();
-            let meta = Meta::from_erased_component(component_info.as_meta());
+        let iter = components.iter().map(|component_desc| {
+            let component_id = component_desc.component_id();
+            let meta = Meta::from_erased_component(component_desc.as_meta());
             (component_id, meta)
         });
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
         let fields = components
             .into_iter()
-            .map(|component_info| component_info.into_meta().into_field());
+            .map(|component_desc| component_desc.into_meta().into_field());
 
         let inner = ErasedSoa::try_from_fields_layouts(fields, archetype)
             .map_err(into_from_components_error)?;

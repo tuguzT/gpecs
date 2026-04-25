@@ -41,9 +41,9 @@ where
     {
         let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
 
-        let ptrs = zip_eq(ptrs, archetype).map(|(dst, component_info)| {
+        let ptrs = zip_eq(ptrs, archetype).map(|(dst, component_desc)| {
             if to_replace.archetype().contains(dst.component_id()) {
-                unsafe { D::drop_in_place_with(dst, component_info.as_meta()) };
+                unsafe { D::drop_in_place_with(dst, component_desc.as_meta()) };
                 let src = to_replace
                     .as_ptrs()
                     .get(dst.component_id())
@@ -61,9 +61,9 @@ where
         let metas_to_append = to_replace
             .archetype()
             .into_iter()
-            .filter(|component_info| !archetype.contains(component_info.component_id()));
+            .filter(|component_desc| !archetype.contains(component_desc.component_id()));
         let iter = chain(archetype, metas_to_append)
-            .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
+            .map(|component_desc| component_desc.map_meta(Clone::clone).into_parts());
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
         let result = ErasedSoa::try_from_fields_layouts(refs, archetype);

@@ -3,12 +3,9 @@ use std::alloc::Layout;
 use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 
 use crate::{
-    archetype::erased::FromComponentInfo,
+    archetype::erased::FromComponentDescriptor,
     bundle::erased::FromErasedComponent,
-    component::{
-        erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
-        registry::ComponentInfo,
-    },
+    component::erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
     soa::layout::WithLayout,
 };
 
@@ -34,15 +31,15 @@ impl WithErasedDrop for ErasedDropMeta {
     }
 }
 
-impl<Meta> FromComponentInfo<'_, Meta> for ErasedDropMeta
+impl<Meta> FromComponentDescriptor<'_, Meta> for ErasedDropMeta
 where
     Meta: WithLayout + WithErasedDrop,
 {
     #[inline]
-    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
+    fn from_component_descriptor(info: &Meta) -> Self {
         Self {
             layout: info.layout(),
-            erased_drop: FromComponentInfo::from_component_info(info),
+            erased_drop: FromComponentDescriptor::from_component_descriptor(info),
         }
     }
 }

@@ -52,7 +52,7 @@ impl<Meta> ErasedArchetype<Meta> {
     {
         let components = try_collect_opt_components(
             iter.into_iter().map(|(id, meta)| {
-                let _ = components.get_component_info(id)?;
+                let _ = components.get_component_descriptor(id)?;
                 Some((id, meta))
             }),
             |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
@@ -76,48 +76,38 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 }
 
-pub trait FromComponentInfo<'a, Meta>: Sized
+pub trait FromComponentDescriptor<'a, D>: Sized
 where
-    Meta: ?Sized,
+    D: ?Sized,
 {
-    fn from_component_info(info: ComponentInfo<&'a Meta>) -> Self;
+    fn from_component_descriptor(desc: &'a D) -> Self;
 }
 
-impl<'a, Meta> FromComponentInfo<'a, Meta> for &'a Meta
+impl<'a, D> FromComponentDescriptor<'a, D> for &'a D
 where
-    Meta: ?Sized,
+    D: ?Sized,
 {
     #[inline]
-    fn from_component_info(info: ComponentInfo<&'a Meta>) -> Self {
-        info.into_meta()
+    fn from_component_descriptor(desc: &'a D) -> Self {
+        desc
     }
 }
 
-impl<'a, T, Meta> FromComponentInfo<'a, Meta> for ComponentInfo<T>
+impl<D> FromComponentDescriptor<'_, D> for ()
 where
-    T: FromComponentInfo<'a, Meta>,
+    D: ?Sized,
 {
     #[inline]
-    fn from_component_info(info: ComponentInfo<&'a Meta>) -> Self {
-        info.map_meta(|_| T::from_component_info(info))
-    }
+    fn from_component_descriptor(_: &D) -> Self {}
 }
 
-impl<Meta> FromComponentInfo<'_, Meta> for ()
+impl<D> FromComponentDescriptor<'_, D> for Option<ErasedDrop>
 where
-    Meta: ?Sized,
+    D: WithErasedDrop + ?Sized,
 {
     #[inline]
-    fn from_component_info(_: ComponentInfo<&Meta>) -> Self {}
-}
-
-impl<Meta> FromComponentInfo<'_, Meta> for Option<ErasedDrop>
-where
-    Meta: WithErasedDrop + ?Sized,
-{
-    #[inline]
-    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
-        info.erased_drop()
+    fn from_component_descriptor(desc: &D) -> Self {
+        desc.erased_drop()
     }
 }
 
@@ -129,12 +119,12 @@ impl<Meta> ErasedArchetype<Meta> {
     ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
-        Meta: FromComponentInfo<'a, T>,
+        Meta: FromComponentDescriptor<'a, T>,
     {
         let components = try_collect_opt_components(
             component_ids.into_iter().map(|id| {
-                let info = components.get_component_info(id)?;
-                let meta = Meta::from_component_info(info);
+                let desc = components.get_component_descriptor(id)?;
+                let meta = Meta::from_component_descriptor(desc);
                 Some((id, meta))
             }),
             |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
@@ -151,14 +141,14 @@ impl<Meta> ErasedArchetype<Meta> {
     ) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
-        Meta: FromComponentInfo<'a, M>,
+        Meta: FromComponentDescriptor<'a, M>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let components = try_collect_opt_components(
             B::get_components(components).into_iter().map(|id| {
                 let id = id?;
-                let info = components.get_component_info(id)?;
-                let meta = Meta::from_component_info(info);
+                let desc = components.get_component_descriptor(id)?;
+                let meta = Meta::from_component_descriptor(desc);
                 Some((id, meta))
             }),
             |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
@@ -175,16 +165,16 @@ impl<Meta> ErasedArchetype<Meta> {
     ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
-        Meta: FromComponentInfo<'a, M::Item>,
+        Meta: FromComponentDescriptor<'a, M::Item>,
         M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components = try_collect_components(
             B::register_components(components).into_iter().map(|id| {
-                let Some(info) = components.get_component_info(id) else {
-                    unreachable!("info of {id} should be present")
+                let Some(desc) = components.get_component_descriptor(id) else {
+                    unreachable!("descriptor of {id} should be present")
                 };
-                let meta = Meta::from_component_info(info);
+                let meta = Meta::from_component_descriptor(desc);
                 (id, meta)
             }),
             |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
@@ -204,12 +194,12 @@ impl<T, U> ErasedArchetype<(T, U)> {
     ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = (ComponentId, U)>,
-        T: FromComponentInfo<'a, W>,
+        T: FromComponentDescriptor<'a, W>,
     {
         let components = try_collect_opt_components(
             with.into_iter().map(|(id, u)| {
-                let info = components.get_component_info(id)?;
-                let t = T::from_component_info(info);
+                let desc = components.get_component_descriptor(id)?;
+                let t = T::from_component_descriptor(desc);
                 Some((id, t, u))
             }),
             |map, (id, t, u)| Inner::insert(map, id.into_u32(), (t, u).into()).is_none(),

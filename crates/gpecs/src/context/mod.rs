@@ -21,7 +21,7 @@ use crate::{
     world::{id::WorldId, registry::WorldRegistry},
 };
 
-pub use self::components::{ComponentDescriptor, ComponentInfo, ComponentTypeIdMap, Components};
+pub use self::components::{ComponentDescriptor, ComponentTypeIdMap, Components};
 
 use self::error::{
     EntityHasNoDataError, IncompatibleBundleError, InsertBundleError, InsertBundleExactError,
@@ -204,9 +204,12 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_component_info(&self, component_id: ComponentId) -> Option<ComponentInfo<'_>> {
+    pub fn get_component_descriptor(
+        &self,
+        component_id: ComponentId,
+    ) -> Option<&ComponentDescriptor> {
         let Self { components, .. } = self;
-        components.get_component_info(component_id)
+        components.get_component_descriptor(component_id)
     }
 
     #[inline]

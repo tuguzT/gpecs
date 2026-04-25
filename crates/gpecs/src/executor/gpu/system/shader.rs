@@ -92,8 +92,8 @@ impl GpuSystemShader {
         let component_entries: IndexMap<_, _> = bind_components
             .into_iter()
             .enumerate()
-            .map(|(index, component_info)| {
-                let (component_id, (desc, access)) = component_info.into_parts();
+            .map(|(index, component_desc)| {
+                let (component_id, (desc, access)) = component_desc.into_parts();
                 let component_id = unsafe { GpuComponentId::from_id(component_id) };
                 (component_id, component_entry(index, desc, access))
             })

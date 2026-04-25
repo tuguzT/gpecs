@@ -152,10 +152,10 @@ where
         self,
         components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
-        let component_info = components
-            .get_component_info(self.component_id())
+        let component_desc = components
+            .get_component_descriptor(self.component_id())
             .ok_or_else(NotRegisteredError::new)?;
-        let Some(erased_drop) = component_info.erased_drop() else {
+        let Some(erased_drop) = component_desc.erased_drop() else {
             return Ok(());
         };
 

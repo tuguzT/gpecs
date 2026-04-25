@@ -1,5 +1,5 @@
 pub use self::{
-    archetype::{ErasedArchetype, FromComponentInfo},
+    archetype::{ErasedArchetype, FromComponentDescriptor},
     into_iter::IntoIter,
 };
 

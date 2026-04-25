@@ -90,11 +90,11 @@ where
         components: &ComponentRegistryView<impl WithLayout, impl ?Sized>,
         component_id: ComponentId,
     ) -> Result<Self, DanglingError> {
-        let component_info = components
-            .get_component_info(component_id)
+        let component_desc = components
+            .get_component_descriptor(component_id)
             .ok_or_else(NotRegisteredError::new)?;
 
-        let layout = component_info.layout();
+        let layout = component_desc.layout();
         let field = Field::dangling(layout)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };

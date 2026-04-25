@@ -7,7 +7,7 @@ use wgpu::{
 
 use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
-    context::{ComponentInfo, Context},
+    context::{ComponentDescriptor, Context},
     executor::gpu::{
         archetype::{
             registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
@@ -115,9 +115,12 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn get_component_info(&self, component_id: GpuComponentId) -> Option<ComponentInfo<'_>> {
+    pub fn get_component_descriptor(
+        &self,
+        component_id: GpuComponentId,
+    ) -> Option<&ComponentDescriptor> {
         let Self { context, .. } = self;
-        context.get_component_info(component_id.into())
+        context.get_component_descriptor(component_id.into())
     }
 
     #[inline]

@@ -240,7 +240,7 @@ where
             .map(ErasedComponentPtr::component_id)
             .try_for_each(|id| {
                 components
-                    .get_component_info(id)
+                    .get_component_descriptor(id)
                     .map(drop)
                     .ok_or_else(NotRegisteredError::new)
             })?;
@@ -248,9 +248,9 @@ where
         self.iter_mut().for_each(|to_drop| {
             let component_id = to_drop.component_id();
             let info = components
-                .get_component_info(component_id)
+                .get_component_descriptor(component_id)
                 .expect("component info should exist");
-            unsafe { K::drop_in_place_with(to_drop, info.as_meta()) }
+            unsafe { K::drop_in_place_with(to_drop, info) }
         });
         Ok(())
     }

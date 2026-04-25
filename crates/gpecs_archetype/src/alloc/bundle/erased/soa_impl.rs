@@ -139,8 +139,8 @@ where
     #[inline]
     unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
         let archetype = self.as_inner();
-        for (component_info, to_drop) in zip_eq(archetype, ptrs) {
-            unsafe { D::drop_in_place_with(to_drop, component_info.as_meta()) }
+        for (component_desc, to_drop) in zip_eq(archetype, ptrs) {
+            unsafe { D::drop_in_place_with(to_drop, component_desc.as_meta()) }
         }
     }
 
@@ -232,8 +232,8 @@ where
     #[inline]
     unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
         let archetype = self.as_inner();
-        for (component_info, to_drop) in zip_eq(archetype, slices) {
-            unsafe { D::drop_in_place_slice_with(to_drop, component_info.as_meta()) }
+        for (component_desc, to_drop) in zip_eq(archetype, slices) {
+            unsafe { D::drop_in_place_slice_with(to_drop, component_desc.as_meta()) }
         }
     }
 }

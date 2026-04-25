@@ -73,8 +73,8 @@ where
         let retained_iter = bundle
             .archetype()
             .into_iter()
-            .filter(|component_info| !archetype_to_remove.contains(component_info.component_id()))
-            .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
+            .filter(|component_desc| !archetype_to_remove.contains(component_desc.component_id()))
+            .map(|component_desc| component_desc.map_meta(Clone::clone).into_parts());
         let retained_archetype = unsafe { ErasedArchetype::from_iter_unchecked(retained_iter) };
         let result = ErasedSoa::try_from_fields_layouts(retained_refs, retained_archetype);
         let retained_inner = match result.map_err(into_remove_error_kind) {
@@ -127,20 +127,20 @@ where
         let mut bundle = self.check_remove(to_destroy.component_ids())?;
 
         let (refs, archetype) = bundle.as_mut_refs_with_archetype();
-        let fields = zip_eq(refs, archetype).filter_map(|(mut field, component_info)| {
-            if to_destroy.contains(component_info.component_id()) {
+        let fields = zip_eq(refs, archetype).filter_map(|(mut field, component_desc)| {
+            if to_destroy.contains(component_desc.component_id()) {
                 let to_drop = field.as_mut_component_ptr();
-                unsafe { D::drop_in_place_with(to_drop, component_info.as_meta()) };
+                unsafe { D::drop_in_place_with(to_drop, component_desc.as_meta()) };
                 return None;
             }
             Some(field)
         });
-        let iter = archetype.iter().filter_map(|component_info| {
-            if to_destroy.contains(component_info.component_id()) {
+        let iter = archetype.iter().filter_map(|component_desc| {
+            if to_destroy.contains(component_desc.component_id()) {
                 return None;
             }
-            let component_info = component_info.map_meta(Clone::clone);
-            Some(component_info.into_parts())
+            let component_desc = component_desc.map_meta(Clone::clone);
+            Some(component_desc.into_parts())
         });
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
         let result = ErasedSoa::try_from_fields_layouts(fields, archetype);

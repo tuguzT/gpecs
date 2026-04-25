@@ -21,7 +21,7 @@ use crate::{
         Bundle,
         erased::{ErasedBundle, traits::ErasedBundleDrop},
     },
-    erased::{ErasedArchetype, FromComponentInfo, error::DuplicateComponentError},
+    erased::{ErasedArchetype, FromComponentDescriptor, error::DuplicateComponentError},
 };
 
 impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
@@ -38,7 +38,7 @@ where
     ) -> Result<Self, FromBundleError<B, S::Error>>
     where
         B: Bundle,
-        Meta: FromComponentInfo<'a, M::Item>,
+        Meta: FromComponentDescriptor<'a, M::Item>,
         M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {

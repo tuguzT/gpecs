@@ -450,23 +450,30 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     log::debug!("Adapter features:\n{:#?}", adapter.features());
 
     let downlevel_capabilities = adapter.get_downlevel_capabilities();
-    if !downlevel_capabilities
-        .flags
-        .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS)
-    {
-        panic!("adapter does not support compute shaders, which are required");
-    }
+    assert!(
+        downlevel_capabilities
+            .flags
+            .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS),
+        "adapter does not support compute shaders, which are required",
+    );
 
     let features = adapter.features();
     assert!(
         features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
         "adapter does not support timestamp queries inside passes, which are required",
     );
+    assert!(
+        adapter
+            .features()
+            .contains(wgpu::Features::MAPPABLE_PRIMARY_BUFFERS),
+        "adapter does not support mappable primary buffers, whic are required",
+    );
 
     let device_desc = wgpu::DeviceDescriptor {
         label: Some("`gpecs` `ecs_benchmark` device"),
         required_features: wgpu::Features::TIMESTAMP_QUERY
-            | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
+            | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES
+            | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
         experimental_features: wgpu::ExperimentalFeatures::disabled(),
         required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,

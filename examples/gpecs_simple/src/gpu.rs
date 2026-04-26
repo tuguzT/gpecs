@@ -168,11 +168,18 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
         adapter_features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
         "adapter does not support timestamp queries inside passes, which are required",
     );
+    assert!(
+        adapter
+            .features()
+            .contains(wgpu::Features::MAPPABLE_PRIMARY_BUFFERS),
+        "adapter does not support mappable primary buffers, whic are required",
+    );
 
     let device_desc = wgpu::DeviceDescriptor {
         label: Some("`gpecs` integration test device"),
         required_features: wgpu::Features::TIMESTAMP_QUERY
-            | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
+            | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES
+            | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
         experimental_features: wgpu::ExperimentalFeatures::disabled(),
         required_limits: adapter_limits,
         memory_hints: wgpu::MemoryHints::Performance,

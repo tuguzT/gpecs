@@ -32,7 +32,7 @@ pub struct TimestampQueryResources {
     query_set: QuerySet,
     count: NonZeroU32,
     resolve_buffer: Buffer,
-    download_buffer: Buffer,
+    download_buffer: Option<Buffer>,
     is_ready: Arc<AtomicBool>,
 }
 
@@ -62,20 +62,33 @@ impl TimestampQueryResources {
         let query_set = gpu_device.create_query_set(&query_set_desc);
 
         let size = resolve_buffer_size(count);
+        let mappable_primary_buffers = gpu_device
+            .features()
+            .contains(Features::MAPPABLE_PRIMARY_BUFFERS);
+        let needs_download_buffer = !mappable_primary_buffers;
+
+        let resolve_buffer_usage = if needs_download_buffer {
+            BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC
+        } else {
+            BufferUsages::QUERY_RESOLVE | BufferUsages::MAP_READ
+        };
+
         let resolve_buffer_desc = BufferDescriptor {
             label: Some("`gpecs` executor timestamp query resolve buffer"),
             size,
-            usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
+            usage: resolve_buffer_usage,
             mapped_at_creation: false,
         };
-        let download_buffer_desc = BufferDescriptor {
-            label: Some("`gpecs` executor timestamp query download buffer"),
-            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-            ..resolve_buffer_desc
-        };
-
         let resolve_buffer = gpu_device.create_buffer(&resolve_buffer_desc);
-        let download_buffer = gpu_device.create_buffer(&download_buffer_desc);
+
+        let download_buffer = needs_download_buffer.then(|| {
+            let download_buffer_desc = BufferDescriptor {
+                label: Some("`gpecs` executor timestamp query download buffer"),
+                usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+                ..resolve_buffer_desc
+            };
+            gpu_device.create_buffer(&download_buffer_desc)
+        });
 
         let me = TimestampQueryResources {
             query_set,
@@ -107,25 +120,28 @@ impl TimestampQueryResources {
 
     #[inline]
     pub unsafe fn download_buffer(&self) -> &Buffer {
+        self.download_buffer_trusted()
+    }
+
+    #[inline]
+    fn download_buffer_trusted(&self) -> &Buffer {
         let Self {
-            download_buffer, ..
+            resolve_buffer,
+            download_buffer,
+            ..
         } = self;
-        download_buffer
+        download_buffer.as_ref().unwrap_or(resolve_buffer)
     }
 
     #[inline]
     pub fn raw_statistics(&self) -> Result<TimestampQueryRawStatistics, TimestampQueryError> {
-        let Self {
-            download_buffer,
-            is_ready,
-            ..
-        } = self;
+        let Self { is_ready, .. } = self;
 
         if !is_ready.load(Ordering::Acquire) {
             return Err(TimestampQueryError);
         }
 
-        let timestamps = download_buffer.get_mapped_range(..);
+        let timestamps = self.download_buffer_trusted().get_mapped_range(..);
         let statistics = TimestampQueryRawStatistics { timestamps };
         Ok(statistics)
     }
@@ -140,22 +156,25 @@ impl TimestampQueryResources {
             is_ready,
         } = self;
 
-        command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
-
         if is_ready.swap(false, Ordering::AcqRel) {
-            download_buffer.unmap();
+            self.download_buffer_trusted().unmap();
         }
-        command_encoder.copy_buffer_to_buffer(
-            resolve_buffer,
-            0,
-            download_buffer,
-            0,
-            resolve_buffer.size(),
-        );
 
+        command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
+        if let Some(download_buffer) = download_buffer {
+            command_encoder.copy_buffer_to_buffer(
+                resolve_buffer,
+                0,
+                download_buffer,
+                0,
+                resolve_buffer.size(),
+            );
+        }
+
+        let buffer_to_map = self.download_buffer_trusted();
         let is_ready = Arc::clone(is_ready);
         let callback = move |_| is_ready.store(true, Ordering::Release);
-        command_encoder.map_buffer_on_submit(download_buffer, MapMode::Read, .., callback);
+        command_encoder.map_buffer_on_submit(buffer_to_map, MapMode::Read, .., callback);
     }
 }
 

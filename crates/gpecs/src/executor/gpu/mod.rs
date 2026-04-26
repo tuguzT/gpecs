@@ -7,7 +7,6 @@ pub mod context;
 pub mod system;
 pub mod timestamp;
 
-mod buffer;
 mod cache;
 mod executor;
 mod shaders;

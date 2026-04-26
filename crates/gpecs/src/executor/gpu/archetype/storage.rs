@@ -252,14 +252,18 @@ impl StorageBuffer {
             .try_into()
             .ok()?;
 
-        let mut contents = contents.to_vec();
-        contents.resize(capacity_in_bytes, 0);
+        let new_contents_capacity = usize::max(contents.len(), capacity_in_bytes);
+        let mut new_contents = Vec::with_capacity(new_contents_capacity);
+
+        new_contents.extend_from_slice(contents);
+        new_contents.resize(capacity_in_bytes, 0);
+        let contents = new_contents.as_slice();
 
         let label = label();
         let desc = BufferInitDescriptor {
             label: Some(label.as_ref()),
-            contents: contents.as_slice(),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+            contents,
         };
         let buffer = device.create_buffer_init(&desc);
 

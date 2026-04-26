@@ -38,7 +38,7 @@ pub struct TimestampQueryResources {
 
 impl TimestampQueryResources {
     #[inline]
-    pub(super) fn new(gpu_device: &Device, cache: &ScheduleCache) -> Option<Self> {
+    pub(super) fn new(gpu_device: &Device, schedule_cache: &ScheduleCache) -> Option<Self> {
         let can_write_timestamps = gpu_device
             .features()
             .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
@@ -46,7 +46,7 @@ impl TimestampQueryResources {
             return None;
         }
 
-        let count = cache
+        let count = schedule_cache
             .iter()
             .map(|info| timestamp_count_for_system_cache(&info))
             .sum::<usize>()
@@ -125,8 +125,8 @@ impl TimestampQueryResources {
             return Err(TimestampQueryError);
         }
 
-        let download_buffer = download_buffer.get_mapped_range(..);
-        let statistics = TimestampQueryRawStatistics { download_buffer };
+        let timestamps = download_buffer.get_mapped_range(..);
+        let statistics = TimestampQueryRawStatistics { timestamps };
         Ok(statistics)
     }
 
@@ -160,14 +160,14 @@ impl TimestampQueryResources {
 }
 
 pub struct TimestampQueryRawStatistics {
-    download_buffer: BufferView,
+    timestamps: BufferView,
 }
 
 impl TimestampQueryRawStatistics {
     #[inline]
     pub fn as_slice(&self) -> &[u64] {
-        let Self { download_buffer } = self;
-        bytemuck::cast_slice(download_buffer)
+        let Self { timestamps } = self;
+        bytemuck::cast_slice(timestamps)
     }
 }
 

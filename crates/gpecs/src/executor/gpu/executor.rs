@@ -303,6 +303,7 @@ impl<'ctx> GpuExecutor<'ctx> {
         transfer_cache.invalidate();
         if !schedule_cache.is_valid() {
             *schedule_cache = ScheduleCache::new(context, device, archetypes, systems, schedule);
+            *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);
         }
 
         if timestamp_query_resources.is_none() {

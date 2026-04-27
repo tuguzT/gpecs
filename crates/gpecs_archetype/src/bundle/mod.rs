@@ -4,6 +4,7 @@ pub use self::traits::{
 };
 
 pub mod erased;
+pub mod error;
 
 mod impls;
 mod traits;

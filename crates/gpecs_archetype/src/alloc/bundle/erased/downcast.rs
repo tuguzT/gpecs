@@ -30,6 +30,7 @@ use crate::{
             ErasedBundleSlicePtrs, ErasedBundleSlices,
             traits::{ErasedArchetypeKind, ErasedBundleDrop},
         },
+        error::DowncastError as BundleDowncastError,
     },
     erased::error::{DuplicateComponentError, IncompatibleArchetypeError, MissingComponentError},
 };
@@ -440,6 +441,22 @@ impl From<ComponentDowncastErrorKind> for DowncastErrorKind {
         };
 
         match error {
+            ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
+            ComponentMismatch(error) => Self::ComponentMismatch(error),
+            LayoutMismatch(error) => Self::LayoutMismatch(error),
+        }
+    }
+}
+
+impl From<BundleDowncastError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: BundleDowncastError) -> Self {
+        use BundleDowncastError::{
+            ComponentMismatch, ComponentNotRegistered, DuplicateComponent, LayoutMismatch,
+        };
+
+        match error {
+            DuplicateComponent(error) => Self::DuplicateComponent(error),
             ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
             ComponentMismatch(error) => Self::ComponentMismatch(error),
             LayoutMismatch(error) => Self::LayoutMismatch(error),

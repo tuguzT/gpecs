@@ -1,9 +1,9 @@
 use std::ptr;
 
-use gpecs_archetype::bundle::Bundle;
+use gpecs_archetype::{bundle::Bundle, erased::error::DuplicateComponentError};
 use gpecs_component::erased::{
     ErasedComponentPtr,
-    error::{DowncastErrorKind, NotRegisteredError, TryFromPtrError},
+    error::{NotRegisteredError, TryFromPtrError},
 };
 
 use crate::common::{Components, Name, Position, Tag};
@@ -27,7 +27,7 @@ fn ptrs_from_erased() {
         TryFromPtrError::NotRegistered(NotRegisteredError::of::<Position>()),
     );
 
-    let _position_id = components.register_component::<Position>();
+    let position_id = components.register_component::<Position>();
     let erased_position_ptr =
         ErasedComponentPtr::<*const u8>::try_from(&components.as_view(), ptr::from_ref(&position))
             .expect("pointer of `Position` component should be created successfully");
@@ -35,10 +35,7 @@ fn ptrs_from_erased() {
     let erased_ptrs = [erased_position_ptr; 0];
     let error = <(Position,)>::ptrs_from_erased(&components.as_view(), erased_ptrs)
         .expect_err("there should not be enough pointers provided");
-    assert!(matches!(
-        error,
-        DowncastErrorKind::ComponentNotRegistered(_),
-    ));
+    assert_eq!(error, NotRegisteredError::of::<Position>().into());
 
     let erased_ptrs = [erased_position_ptr];
     let (position_ptr,) = <(Position,)>::ptrs_from_erased(&components.as_view(), erased_ptrs)
@@ -55,32 +52,21 @@ fn ptrs_from_erased() {
     assert_eq!(position_ref, &position, "positions should be equal");
 
     let erased_ptrs = [erased_position_ptr];
-    // TODO: this should return another error!
     let error = <(Position, Position)>::ptrs_from_erased(&components.as_view(), erased_ptrs)
         .expect_err("there should not be enough pointers provided");
-    assert!(matches!(
-        error,
-        DowncastErrorKind::ComponentNotRegistered(_),
-    ));
+    assert_eq!(error, DuplicateComponentError::new(position_id).into());
 
     let erased_ptrs = [erased_position_ptr; 2];
-    // TODO: this should return an error!
-    let (position_ptr, other_position_ptr) =
-        <(Position, Position)>::ptrs_from_erased(&components.as_view(), erased_ptrs).unwrap();
-    assert_eq!(position_ptr, &position, "pointers should be equal");
-    assert_eq!(position_ptr, other_position_ptr);
-    let position_ref = unsafe { position_ptr.as_ref_unchecked() };
-    assert_eq!(position_ref, &position, "positions should be equal");
+    let error = <(Position, Position)>::ptrs_from_erased(&components.as_view(), erased_ptrs)
+        .expect_err("`Position` component was duplicated");
+    assert_eq!(error, DuplicateComponentError::new(position_id).into());
 
     let tag = Tag;
 
     let erased_ptrs = [erased_position_ptr];
     let error = <(Tag,)>::ptrs_from_erased(&components.as_view(), erased_ptrs)
         .expect_err("pointer for an archetype of only `Tag` should be created successfully");
-    assert_eq!(
-        error,
-        DowncastErrorKind::ComponentNotRegistered(NotRegisteredError::of::<Tag>()),
-    );
+    assert_eq!(error, NotRegisteredError::of::<Tag>().into());
 
     let _tag_id = components.register_component::<Tag>();
     let erased_tag_ptr =
@@ -143,22 +129,16 @@ fn ptrs_from_erased() {
         "components should be equal",
     );
 
-    // TODO: this should return an error!
-    let (position_ptr, name_ptr, other_position_ptr, tag_ptr, other_tag_ptr) =
-        <(Position, Name, Position, Tag, Tag)>::ptrs_from_erased(
-            &components.as_view(),
-            [
-                erased_position_ptr,
-                erased_name_ptr,
-                erased_position_ptr,
-                erased_tag_ptr,
-                erased_tag_ptr,
-            ],
-        )
-        .expect("pointers for an archetype should be created successfully");
-    assert_eq!(position_ptr, &position, "pointers should be equal");
-    assert_eq!(position_ptr, other_position_ptr);
-    assert_eq!(name_ptr, &name, "pointers should be equal");
-    assert_eq!(tag_ptr, &tag, "pointers should be equal");
-    assert_eq!(tag_ptr, other_tag_ptr);
+    let error = <(Position, Name, Position, Tag, Tag)>::ptrs_from_erased(
+        &components.as_view(),
+        [
+            erased_position_ptr,
+            erased_name_ptr,
+            erased_position_ptr,
+            erased_tag_ptr,
+            erased_tag_ptr,
+        ],
+    )
+    .expect_err("`Position` component was duplicated");
+    assert_eq!(error, DuplicateComponentError::new(position_id).into());
 }

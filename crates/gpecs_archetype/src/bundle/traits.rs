@@ -1,8 +1,5 @@
 use gpecs_component::{
-    erased::{
-        ErasedComponentMutPtr, ErasedComponentPtr,
-        error::{DowncastErrorKind, NotRegisteredError},
-    },
+    erased::{ErasedComponentMutPtr, ErasedComponentPtr},
     registry::{
         ComponentId, ComponentRegistry, ComponentRegistryView,
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
@@ -14,6 +11,11 @@ use gpecs_soa_erased::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
         SlicesMut, SoaOwned, SoaReadOwned, SoaWrite,
     },
+};
+
+use crate::{
+    bundle::error::DowncastError,
+    erased::error::{ArchetypeError, DuplicateComponentError},
 };
 
 pub type BundlePtrs<B> = Ptrs<'static, B>;
@@ -45,15 +47,29 @@ pub unsafe trait Bundle:
     type Components: IntoIterator<Item = ComponentId>;
 
     /// Retrieves identifiers of all already registered components of this bundle.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if:
+    /// - some of the components of this bundle were not registered,
+    /// - some of the components are occuring more than once in the type itself
+    ///   (in other words, there are duplicated components).
     fn get_components<T>(
         components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<Self::Components, NotRegisteredError>
+    ) -> Result<Self::Components, ArchetypeError>
     where
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
 
     /// Registers all components of this bundle inside of provided registry
     /// and returns their identifiers.
-    fn register_components<T, M>(components: &mut ComponentRegistry<T, M>) -> Self::Components
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if some of the components
+    /// are occuring more than once in the type itself (in other words, there are duplicated components).
+    fn register_components<T, M>(
+        components: &mut ComponentRegistry<T, M>,
+    ) -> Result<Self::Components, DuplicateComponentError>
     where
         T: PushBackArray<Item: FromComponentType>,
         M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized;
@@ -72,7 +88,7 @@ pub unsafe trait Bundle:
     fn ptrs_from_erased<I, T, P>(
         components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
-    ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
+    ) -> Result<BundlePtrs<Self>, DowncastError>
     where
         I: IntoIterator<Item = ErasedComponentPtr<P>>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -92,7 +108,7 @@ pub unsafe trait Bundle:
     fn mut_ptrs_from_erased<I, T, P>(
         components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
-    ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
+    ) -> Result<BundleMutPtrs<Self>, DowncastError>
     where
         I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,

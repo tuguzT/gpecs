@@ -29,7 +29,8 @@ fn storage_tag() {
         .expect("creation of storage for tag archetype should succeed");
     assert_eq!(storage.as_entities(), []);
 
-    let component_ids = <(Tag,)>::register_components(&mut components);
+    let component_ids = <(Tag,)>::register_components(&mut components)
+        .expect("archetype of only `Tag` should have unique components");
     itertools::assert_equal(storage.archetype().component_ids(), component_ids);
 
     let storage_from_ids = ArchetypeStorage::new(&components.as_view(), component_ids)
@@ -71,7 +72,8 @@ fn storage_tag_erased() {
         .expect("creation of storage for tag archetype should succeed");
     assert_eq!(storage.as_entities(), []);
 
-    let component_ids = <(Tag,)>::register_components(&mut components);
+    let component_ids = <(Tag,)>::register_components(&mut components)
+        .expect("archetype of only `Tag` should have unique components");
     itertools::assert_equal(storage.archetype().component_ids(), component_ids);
 
     let storage_from_ids = ArchetypeStorage::new(&components.as_view(), component_ids)
@@ -128,7 +130,8 @@ fn storage_tuple() {
         .expect("creation of storage for bundle `(Position, Name)` should succeed");
     assert_eq!(storage.as_entities(), []);
 
-    let component_ids = <(Position, Name)>::register_components(&mut components);
+    let component_ids = <(Position, Name)>::register_components(&mut components)
+        .expect("archetype of `Position` & `Name` should have unique components");
     itertools::assert_equal(storage.archetype().component_ids(), component_ids);
 
     let storage_from_ids = ArchetypeStorage::new(&components.as_view(), component_ids)
@@ -356,7 +359,8 @@ fn storage_tuple_erased() {
         .expect("creation of storage for bundle `(Position, Name)` should succeed");
     assert_eq!(storage.as_entities(), []);
 
-    let component_ids = <(Position, Name)>::register_components(&mut components);
+    let component_ids = <(Position, Name)>::register_components(&mut components)
+        .expect("archetype of `Position` & `Name` should have unique components");
     itertools::assert_equal(storage.archetype().component_ids(), component_ids);
 
     let storage_from_ids = ArchetypeStorage::new(&components.as_view(), component_ids)

@@ -345,6 +345,12 @@ impl<T> DowncastError<T> {
         let Self { source, value } = self;
         DowncastError::new(f(value), source)
     }
+
+    #[inline]
+    pub fn into_source(self) -> DowncastErrorKind {
+        let Self { source, .. } = self;
+        source
+    }
 }
 
 impl<T> From<DataDowncastError<T>> for DowncastError<T> {
@@ -353,14 +359,6 @@ impl<T> From<DataDowncastError<T>> for DowncastError<T> {
         let DataDowncastError { source, value, .. } = error;
         let source = source.into();
         Self::new(value, source)
-    }
-}
-
-impl<T> From<DowncastError<T>> for DowncastErrorKind {
-    #[inline]
-    fn from(error: DowncastError<T>) -> Self {
-        let DowncastError { source, .. } = error;
-        source
     }
 }
 

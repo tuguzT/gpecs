@@ -169,8 +169,9 @@ impl<Meta> ErasedArchetype<Meta> {
         M: PushBackArray<Item: FromComponentType>,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
+        let component_ids = B::register_components(components)?;
         let components = try_collect_components(
-            B::register_components(components).into_iter().map(|id| {
+            component_ids.into_iter().map(|id| {
                 let Some(desc) = components.get_component_descriptor(id) else {
                     unreachable!("descriptor of {id} should be present")
                 };

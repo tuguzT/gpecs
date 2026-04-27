@@ -2,7 +2,7 @@ use gpecs_component::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentPtr,
-        error::{DowncastErrorKind, NotRegisteredError},
+        error::{DowncastError as ComponentDowncastError, NotRegisteredError},
     },
     registry::{
         ComponentId, ComponentRegistry, ComponentRegistryView,
@@ -17,7 +17,10 @@ use gpecs_soa_erased::{
     },
 };
 
-use crate::bundle::{Bundle, BundleMutPtrs, BundlePtrs};
+use crate::{
+    bundle::{Bundle, BundleMutPtrs, BundlePtrs, error::DowncastError},
+    erased::error::{ArchetypeError, DuplicateComponentError},
+};
 
 unsafe impl<T> Bundle for Identity<T>
 where
@@ -30,7 +33,7 @@ where
     #[inline]
     fn get_components<U>(
         components: &ComponentRegistryView<impl Sized, U>,
-    ) -> Result<Self::Components, NotRegisteredError>
+    ) -> Result<Self::Components, ArchetypeError>
     where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
@@ -42,20 +45,23 @@ where
     }
 
     #[inline]
-    fn register_components<U, M>(components: &mut ComponentRegistry<U, M>) -> Self::Components
+    fn register_components<U, M>(
+        components: &mut ComponentRegistry<U, M>,
+    ) -> Result<Self::Components, DuplicateComponentError>
     where
         U: PushBackArray<Item: FromComponentType>,
         M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.register_component::<T>();
-        [component_id]
+        let component_ids = [component_id];
+        Ok(component_ids)
     }
 
     #[inline]
     fn ptrs_from_erased<I, U, P>(
         components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
-    ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
+    ) -> Result<BundlePtrs<Self>, DowncastError>
     where
         I: IntoIterator<Item = ErasedComponentPtr<P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -69,7 +75,10 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or_else(NotRegisteredError::of::<T>)?;
 
-        let ptr = ptr.downcast::<T, U>(components)?.cast();
+        let ptr = ptr
+            .downcast::<T, U>(components)
+            .map_err(ComponentDowncastError::into_source)?
+            .cast();
         Ok(ptr)
     }
 
@@ -77,7 +86,7 @@ where
     fn mut_ptrs_from_erased<I, U, P>(
         components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
-    ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
+    ) -> Result<BundleMutPtrs<Self>, DowncastError>
     where
         I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -91,9 +100,24 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or_else(NotRegisteredError::of::<T>)?;
 
-        let ptr = ptr.downcast::<T, U>(components)?.cast();
+        let ptr = ptr
+            .downcast::<T, U>(components)
+            .map_err(ComponentDowncastError::into_source)?
+            .cast();
         Ok(ptr)
     }
+}
+
+#[inline]
+fn find_duplicate_components(component_ids: &[ComponentId]) -> Result<(), DuplicateComponentError> {
+    for i in 1..component_ids.len() {
+        let component_id = component_ids[i];
+        if component_ids[..i].contains(&component_id) {
+            let error = DuplicateComponentError::new(component_id);
+            return Err(error);
+        }
+    }
+    Ok(())
 }
 
 macro_rules! bundle_tuple_impl {
@@ -109,48 +133,53 @@ macro_rules! bundle_tuple_impl {
             #[inline]
             fn get_components<U>(
                 components: &ComponentRegistryView<impl Sized, U>,
-            ) -> Result<Self::Components, NotRegisteredError>
+            ) -> Result<Self::Components, ArchetypeError>
             where
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
-
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
+                find_duplicate_components(&component_ids)?;
+
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 Ok(component_ids)
             }
 
             #[inline]
-            fn register_components<U, M>(components: &mut ComponentRegistry<U, M>,) -> Self::Components
+            fn register_components<U, M>(
+                components: &mut ComponentRegistry<U, M>,
+            ) -> Result<Self::Components, DuplicateComponentError>
             where
                 U: PushBackArray<Item: FromComponentType>,
                 M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
             {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
-
                 let component_ids = [$(components.register_component::<$types>(),)*];
+                find_duplicate_components(&component_ids)?;
+
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
-                component_ids
+                Ok(component_ids)
             }
 
             #[inline]
             fn ptrs_from_erased<Iter, U, P>(
                 components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
-            ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
+            ) -> Result<BundlePtrs<Self>, DowncastError>
             where
                 Iter: IntoIterator<Item = ErasedComponentPtr<P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
                 P: ConstSliceItemPtr,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
+                find_duplicate_components(&component_ids)?;
 
                 let mut ptrs = ($(None::<*const $types>,)*);
                 #[expect(clippy::needless_continue)]
                 for ptr in iter {
                     $(
                         if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
-                            ptrs.$indices = Some(ptr.downcast(components)?);
+                            ptrs.$indices = Some(ptr.downcast(components).map_err(ComponentDowncastError::into_source)?);
                             continue;
                         }
                     )*
@@ -164,20 +193,21 @@ macro_rules! bundle_tuple_impl {
             fn mut_ptrs_from_erased<Iter, U, P>(
                 components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
-            ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
+            ) -> Result<BundleMutPtrs<Self>, DowncastError>
             where
                 Iter: IntoIterator<Item = ErasedComponentMutPtr<P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
                 P: MutSliceItemPtr,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
+                find_duplicate_components(&component_ids)?;
 
                 let mut ptrs = ($(None::<*mut $types>,)*);
                 #[expect(clippy::needless_continue)]
                 for ptr in iter {
                     $(
                         if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
-                            ptrs.$indices = Some(ptr.downcast(components)?);
+                            ptrs.$indices = Some(ptr.downcast(components).map_err(ComponentDowncastError::into_source)?);
                             continue;
                         }
                     )*

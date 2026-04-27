@@ -9,23 +9,32 @@ use core::{
 
 use gpecs_component::{
     erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
-    registry::traits::WithComponentId,
+    registry::{
+        ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoa, ErasedSoaIntoFields,
     error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
-    soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput},
+    soa::{
+        field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput},
+        traits::ReadSoaContext,
+    },
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 use itertools::{equal, zip_eq};
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
-        ErasedBundleRefs, ErasedBundleRefsIter,
-        error::{ShuffleError, ShuffleErrorKind},
-        traits::{ErasedArchetypeKind, ErasedBundleDrop, IntoErasedArchetypeIterator},
+    bundle::{
+        Bundle, BundleRefs, BundleRefsMut,
+        erased::{
+            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
+            ErasedBundleRefs, ErasedBundleRefsIter,
+            error::{DowncastError, ShuffleError, ShuffleErrorKind},
+            traits::{ErasedArchetypeKind, ErasedBundleDrop, IntoErasedArchetypeIterator},
+        },
     },
     erased::{ErasedArchetypeView, Iter},
 };
@@ -61,6 +70,25 @@ where
     pub fn into_inner(self) -> ErasedSoa<S, T, P> {
         let me = ManuallyDrop::new(self);
         unsafe { ptr::read(&raw const me.inner) }
+    }
+
+    #[inline]
+    pub fn downcast<B, U>(
+        self,
+        registry: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<B, DowncastError<Self>>
+    where
+        B: Bundle,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let src = match self.as_ptrs().downcast::<B, U>(registry) {
+            Ok(src) => src,
+            Err(error) => return Err(error.map_value(drop).map_value(|()| self)),
+        };
+
+        let bundle = unsafe { B::CONTEXT.read(src) };
+        let _ = self.into_inner();
+        Ok(bundle)
     }
 }
 
@@ -187,6 +215,35 @@ where
         let (ptrs, layouts) = self.as_mut_ptrs_with_archetype();
         let refs = unsafe { ptrs.as_mut_unchecked() };
         (refs, layouts)
+    }
+
+    #[inline]
+    pub fn downcast_ref<B, U>(
+        &self,
+        registry: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<BundleRefs<'_, B>, DowncastError<&Self>>
+    where
+        B: Bundle,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        self.as_refs()
+            .downcast::<B, U>(registry)
+            .map_err(|error| error.map_value(|_| self))
+    }
+
+    #[inline]
+    pub fn downcast_mut<B, U>(
+        &mut self,
+        registry: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<BundleRefsMut<'_, B>, DowncastError<&mut Self>>
+    where
+        B: Bundle,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        match unsafe { self.as_mut_ptrs().as_mut_unchecked() }.downcast::<B, U>(registry) {
+            Ok(refs) => Ok(refs),
+            Err(error) => Err(error.map_value(drop).map_value(|()| self)),
+        }
     }
 
     #[inline]

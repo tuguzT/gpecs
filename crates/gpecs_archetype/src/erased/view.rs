@@ -6,7 +6,10 @@ use core::{
     ptr,
 };
 
-use gpecs_component::registry::{ComponentId, ComponentInfo};
+use gpecs_component::registry::{
+    ComponentId, ComponentInfo, ComponentRegistryView,
+    traits::{ComponentIdFrom, FromComponentType},
+};
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     error::FromPartsError,
@@ -20,11 +23,14 @@ use gpecs_sparse::{
     view::{EpochSparseView, EpochSparseViewPtr},
 };
 
-use crate::erased::{
-    ComponentIdOrderedIter, ComponentIds, Iter,
-    error::{
-        AlreadyHasComponentError, IncompatibleArchetypeViewExactError, MissingComponentError,
-        TooFewComponentsError,
+use crate::{
+    bundle::Bundle,
+    erased::{
+        ComponentIdOrderedIter, ComponentIds, Iter,
+        error::{
+            AlreadyHasComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+            IncompatibleArchetypeViewExactError, MissingComponentError, TooFewComponentsError,
+        },
     },
 };
 
@@ -175,7 +181,16 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         &self,
         of: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), MissingComponentError> {
-        if let Some(id) = of.component_ids().find(|&id| !self.contains(id)) {
+        let of = of.component_ids();
+        self.has_components_trusted(of)
+    }
+
+    #[inline]
+    fn has_components_trusted(
+        &self,
+        of: impl IntoIterator<Item = ComponentId>,
+    ) -> Result<(), MissingComponentError> {
+        if let Some(id) = of.into_iter().find(|&id| !self.contains(id)) {
             let error = MissingComponentError::new(id);
             return Err(error);
         }
@@ -187,7 +202,16 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         &self,
         of: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), AlreadyHasComponentError> {
-        if let Some(id) = of.component_ids().find(|&id| self.contains(id)) {
+        let of = of.component_ids();
+        self.has_no_components_trusted(of)
+    }
+
+    #[inline]
+    fn has_no_components_trusted(
+        &self,
+        of: impl IntoIterator<Item = ComponentId>,
+    ) -> Result<(), AlreadyHasComponentError> {
+        if let Some(id) = of.into_iter().find(|&id| self.contains(id)) {
             let error = AlreadyHasComponentError::new(id);
             return Err(error);
         }
@@ -254,13 +278,46 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
+    pub fn check_compatibility_of<B, T>(
+        &self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<(), IncompatibleArchetypeError>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let of = B::get_components(components)?;
+        self.has_components_trusted(of)?;
+        Ok(())
+    }
+
+    #[inline]
     pub fn check_exact_compatibility(
         &self,
         other: ErasedArchetypeView<impl Sized>,
     ) -> Result<(), IncompatibleArchetypeViewExactError> {
         self.check_compatibility(other)?;
 
-        if other.len() != self.len() {
+        if self.len() != other.len() {
+            return Err(TooFewComponentsError.into());
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn check_exact_compatibility_of<B, T>(
+        &self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<(), IncompatibleArchetypeExactError>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let of = B::get_components(components)?.into_iter();
+        let len = of.len();
+        self.has_components_trusted(of)?;
+
+        if self.len() != len {
             return Err(TooFewComponentsError.into());
         }
         Ok(())

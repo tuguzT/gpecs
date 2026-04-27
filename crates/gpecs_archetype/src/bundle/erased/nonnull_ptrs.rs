@@ -6,18 +6,28 @@ use core::{
 
 use gpecs_component::{
     erased::ErasedComponentNonNullPtr,
-    registry::{ComponentId, traits::WithComponentId},
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
-    soa::field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+    soa::{
+        field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+        traits::RawSoaContext,
+    },
 };
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleMutPtrs,
-        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+    bundle::{
+        Bundle, BundleNonNullPtrs,
+        erased::{
+            ErasedBundleMutPtrs,
+            error::DowncastError,
+            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+        },
     },
     erased::ErasedArchetypeView,
 };
@@ -193,6 +203,30 @@ where
 
         let src = unsafe { src.as_inner() };
         unsafe { inner.copy_from_nonoverlapping(src, count) }
+    }
+}
+
+impl<D, P> ErasedBundleNonNullPtrs<D, P>
+where
+    D: ErasedArchetypeKind,
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    pub fn downcast<B, T>(
+        self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundleNonNullPtrs<B>, DowncastError<Self>>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let into_self = |ptrs| unsafe { Self::new_unchecked(ptrs) };
+        let ptrs = ErasedBundleMutPtrs::from(self)
+            .downcast::<B, T>(components)
+            .map_err(|error| error.map_value(into_self))?;
+
+        let ptrs = unsafe { B::CONTEXT.ptrs_to_nonnull(ptrs) };
+        Ok(ptrs)
     }
 }
 

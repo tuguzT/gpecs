@@ -5,21 +5,31 @@ use core::{
 
 use gpecs_component::{
     erased::{ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, error::NotRegisteredError},
-    registry::{ComponentId, ComponentRegistryView, traits::WithComponentId},
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
-    soa::field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+    soa::{
+        field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+        traits::RawSoaContext,
+    },
 };
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundleSlicePtrs,
-        ErasedBundleSlicePtrsIter, ErasedBundleSlices,
-        traits::{
-            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
-            IntoErasedArchetypeIterator,
+    bundle::{
+        Bundle, BundleSliceMutPtrs,
+        erased::{
+            ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundleSlicePtrs,
+            ErasedBundleSlicePtrsIter, ErasedBundleSlices,
+            error::DowncastError,
+            traits::{
+                ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+                IntoErasedArchetypeIterator,
+            },
         },
     },
     erased::ErasedArchetypeView,
@@ -181,6 +191,32 @@ where
             unsafe { K::drop_in_place_slice_with(to_drop, info) }
         });
         Ok(())
+    }
+}
+
+impl<D, P> ErasedBundleMutSlicePtrs<D, P>
+where
+    D: ErasedArchetypeKind,
+    P: MutSliceItemPtr,
+{
+    #[inline]
+    pub fn downcast<B, T>(
+        self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundleSliceMutPtrs<B>, DowncastError<Self>>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let len = self.len();
+        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
+        let ptrs = self
+            .into_ptrs()
+            .downcast::<B, T>(components)
+            .map_err(|error| error.map_value(into_self))?;
+
+        let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
+        Ok(slices)
     }
 }
 

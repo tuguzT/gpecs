@@ -1,14 +1,8 @@
-use gpecs_component::registry::{
-    ComponentId, ComponentRegistryView,
-    traits::{ComponentIdFrom, FromComponentType},
-};
+use gpecs_component::registry::{ComponentId, ComponentRegistryView};
 
-use crate::{
-    bundle::Bundle,
-    erased::{
-        ErasedArchetype, ErasedArchetypeView,
-        error::{IncompatibleArchetypeError, IncompatibleArchetypeExactError},
-    },
+use crate::erased::{
+    ErasedArchetype, ErasedArchetypeView,
+    error::{IncompatibleArchetypeError, IncompatibleArchetypeExactError},
 };
 
 impl<Meta> ErasedArchetypeView<'_, Meta> {
@@ -27,20 +21,6 @@ impl<Meta> ErasedArchetypeView<'_, Meta> {
     }
 
     #[inline]
-    pub fn check_compatibility_of<B, T>(
-        &self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<(), IncompatibleArchetypeError>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
-        self.check_compatibility(other.as_view())?;
-        Ok(())
-    }
-
-    #[inline]
     pub fn check_exact_compatibility_for<I>(
         &self,
         components: &ComponentRegistryView<impl Sized, impl ?Sized>,
@@ -50,20 +30,6 @@ impl<Meta> ErasedArchetypeView<'_, Meta> {
         I: IntoIterator<Item = ComponentId>,
     {
         let other = ErasedArchetype::<()>::new(components, component_ids)?;
-        self.check_exact_compatibility(other.as_view())?;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn check_exact_compatibility_of<B, T>(
-        &self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<(), IncompatibleArchetypeExactError>
-    where
-        B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         self.check_exact_compatibility(other.as_view())?;
         Ok(())
     }

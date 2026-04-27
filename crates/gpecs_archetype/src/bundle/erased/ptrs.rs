@@ -5,7 +5,10 @@ use core::{
 
 use gpecs_component::{
     erased::ErasedComponentPtr,
-    registry::{ComponentId, traits::WithComponentId},
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaPtrs, ErasedSoaPtrsIter,
@@ -16,11 +19,15 @@ use gpecs_soa_erased::{
 };
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundleRefs,
-        traits::{
-            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
-            IntoErasedArchetypeIterator,
+    bundle::{
+        Bundle, BundlePtrs,
+        erased::{
+            ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundleRefs,
+            error::DowncastError,
+            traits::{
+                ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+                IntoErasedArchetypeIterator,
+            },
         },
     },
     erased::ErasedArchetypeView,
@@ -131,6 +138,30 @@ where
 
         let inner = inner.iter();
         unsafe { ErasedBundlePtrsIter::from_inner(inner) }
+    }
+}
+
+impl<D, P> ErasedBundlePtrs<D, P>
+where
+    D: ErasedArchetypeKind,
+    P: ConstSliceItemPtr,
+{
+    #[inline]
+    pub fn downcast<B, T>(
+        self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundlePtrs<B>, DowncastError<Self>>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        if let Err(error) = self.archetype().check_compatibility_of::<B, T>(components) {
+            return Err(DowncastError::new(self, error.into()));
+        }
+
+        let ptrs = B::ptrs_from_erased(components, self.iter())
+            .map_err(|error| DowncastError::new(self, error.into()))?;
+        Ok(ptrs)
     }
 }
 

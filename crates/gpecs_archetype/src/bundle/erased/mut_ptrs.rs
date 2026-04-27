@@ -8,7 +8,10 @@ use gpecs_component::{
         ErasedComponentMutPtr, ErasedComponentMutSlicePtr, ErasedComponentPtr,
         error::NotRegisteredError,
     },
-    registry::{ComponentId, ComponentRegistryView, traits::WithComponentId},
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter,
@@ -19,12 +22,16 @@ use gpecs_soa_erased::{
 use itertools::equal;
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundlePtrsIter,
-        ErasedBundleRefs,
-        traits::{
-            ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
-            IntoErasedArchetypeIterator,
+    bundle::{
+        Bundle, BundleMutPtrs,
+        erased::{
+            ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs, ErasedBundlePtrsIter,
+            ErasedBundleRefs,
+            error::DowncastError,
+            traits::{
+                ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+                IntoErasedArchetypeIterator,
+            },
         },
     },
     erased::ErasedArchetypeView,
@@ -253,6 +260,29 @@ where
             unsafe { K::drop_in_place_with(to_drop, info) }
         });
         Ok(())
+    }
+}
+
+impl<D, P> ErasedBundleMutPtrs<D, P>
+where
+    D: ErasedArchetypeKind,
+    P: MutSliceItemPtr,
+{
+    #[inline]
+    pub fn downcast<B, T>(
+        mut self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundleMutPtrs<B>, DowncastError<Self>>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        if let Err(error) = self.archetype().check_compatibility_of::<B, T>(components) {
+            return Err(DowncastError::new(self, error.into()));
+        }
+        let ptrs = B::mut_ptrs_from_erased(components, self.iter_mut())
+            .map_err(|error| DowncastError::new(self, error.into()))?;
+        Ok(ptrs)
     }
 }
 

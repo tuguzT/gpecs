@@ -5,18 +5,28 @@ use core::{
 
 use gpecs_component::{
     erased::ErasedComponentSlicePtr,
-    registry::{ComponentId, traits::WithComponentId},
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
     ptr::slice::{CastMut, ConstSliceItemPtr},
-    soa::field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+    soa::{
+        field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+        traits::RawSoaContext,
+    },
 };
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleMutSlicePtrs, ErasedBundlePtrs, ErasedBundleSlices,
-        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+    bundle::{
+        Bundle, BundleSlicePtrs,
+        erased::{
+            ErasedBundleMutSlicePtrs, ErasedBundlePtrs, ErasedBundleSlices,
+            error::DowncastError,
+            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+        },
     },
     erased::ErasedArchetypeView,
 };
@@ -125,6 +135,32 @@ where
 
         let inner = inner.iter();
         unsafe { ErasedBundleSlicePtrsIter::from_inner(inner) }
+    }
+}
+
+impl<D, P> ErasedBundleSlicePtrs<D, P>
+where
+    D: ErasedArchetypeKind,
+    P: ConstSliceItemPtr,
+{
+    #[inline]
+    pub fn downcast<B, T>(
+        self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundleSlicePtrs<B>, DowncastError<Self>>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let len = self.len();
+        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
+        let ptrs = self
+            .into_ptrs()
+            .downcast::<B, T>(components)
+            .map_err(|error| error.map_value(into_self))?;
+
+        let slices = B::CONTEXT.slice_ptrs_from_raw_parts(ptrs, len);
+        Ok(slices)
     }
 }
 

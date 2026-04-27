@@ -145,17 +145,15 @@ impl<Meta> ErasedArchetype<Meta> {
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_ids = B::get_components(components)?;
-        let components = try_collect_opt_components(
-            component_ids.into_iter().map(|id| {
-                let desc = components.get_component_descriptor(id)?;
-                let meta = Meta::from_component_descriptor(desc);
-                Some((id, meta))
-            }),
-            |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
-            |&(id, _)| id,
-        )?;
+        let iter = component_ids.into_iter().map(|id| {
+            let Some(desc) = components.get_component_descriptor(id) else {
+                unreachable!("descriptor of {id} should be present")
+            };
+            let meta = Meta::from_component_descriptor(desc);
+            (id, meta)
+        });
 
-        let me = Self { components };
+        let me = unsafe { Self::from_iter_unchecked(iter) };
         Ok(me)
     }
 
@@ -170,19 +168,15 @@ impl<Meta> ErasedArchetype<Meta> {
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let component_ids = B::register_components(components)?;
-        let components = try_collect_components(
-            component_ids.into_iter().map(|id| {
-                let Some(desc) = components.get_component_descriptor(id) else {
-                    unreachable!("descriptor of {id} should be present")
-                };
-                let meta = Meta::from_component_descriptor(desc);
-                (id, meta)
-            }),
-            |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
-            |&(id, _)| id,
-        )?;
+        let iter = component_ids.into_iter().map(|id| {
+            let Some(desc) = components.get_component_descriptor(id) else {
+                unreachable!("descriptor of {id} should be present")
+            };
+            let meta = Meta::from_component_descriptor(desc);
+            (id, meta)
+        });
 
-        let me = Self { components };
+        let me = unsafe { Self::from_iter_unchecked(iter) };
         Ok(me)
     }
 }
@@ -506,27 +500,6 @@ where
     ) -> FieldLayoutsOutput<'short, Self> {
         from
     }
-}
-
-#[inline]
-fn try_collect_components<S, I>(
-    components: I,
-    mut insert_fn: impl FnMut(&mut S, I::Item) -> bool,
-    mut component_id_fn: impl FnMut(&I::Item) -> ComponentId,
-) -> Result<S, DuplicateComponentError>
-where
-    S: Default,
-    I: IntoIterator,
-{
-    let mut set = S::default();
-    components.into_iter().try_for_each(|item| {
-        let component_id = component_id_fn(&item);
-        let is_unique = insert_fn(&mut set, item);
-        is_unique
-            .then(Default::default)
-            .ok_or_else(|| DuplicateComponentError::new(component_id))
-    })?;
-    Ok(set)
 }
 
 #[inline]

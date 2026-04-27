@@ -44,7 +44,7 @@ pub unsafe trait Bundle:
     ///
     /// Order of these identifiers should be the same
     /// as the order of corresponding [layouts](gpecs_soa_erased::soa::field::FieldLayouts::Output).
-    type Components: IntoIterator<Item = ComponentId>;
+    type Components: IntoIterator<Item = ComponentId, IntoIter: ExactSizeIterator>;
 
     /// Retrieves identifiers of all already registered components of this bundle.
     ///

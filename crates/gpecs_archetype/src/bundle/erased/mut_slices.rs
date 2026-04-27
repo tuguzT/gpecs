@@ -5,18 +5,28 @@ use core::{
 
 use gpecs_component::{
     erased::{ErasedComponentMutSlice, ErasedComponentSlice},
-    registry::{ComponentId, traits::WithComponentId},
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType, WithComponentId},
+    },
 };
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaMutSlices, ErasedSoaMutSlicesIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
-    soa::field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+    soa::{
+        field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+        traits::SoaContext,
+    },
 };
 
 use crate::{
-    bundle::erased::{
-        ErasedBundleMutSlicePtrs, ErasedBundleSlices, ErasedBundleSlicesIter,
-        traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+    bundle::{
+        Bundle, BundleSlicesMut,
+        erased::{
+            ErasedBundleMutSlicePtrs, ErasedBundleSlices, ErasedBundleSlicesIter,
+            error::DowncastError,
+            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+        },
     },
     erased::ErasedArchetypeView,
 };
@@ -126,6 +136,31 @@ where
 
         let inner = inner.iter_mut();
         unsafe { ErasedBundleMutSlicesIter::from_inner(inner) }
+    }
+}
+
+impl<'a, D, P> ErasedBundleMutSlices<'a, D, P>
+where
+    D: ErasedArchetypeKind,
+    P: MutSliceItemPtr,
+{
+    #[inline]
+    pub fn downcast<B, T>(
+        self,
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<BundleSlicesMut<'a, B>, DowncastError<Self>>
+    where
+        B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
+        let slices = self
+            .into_ptrs()
+            .downcast::<B, T>(components)
+            .map_err(|error| error.map_value(into_self))?;
+
+        let slices = unsafe { B::CONTEXT.mut_slice_ptrs_to_mut_slices(slices) };
+        Ok(slices)
     }
 }
 

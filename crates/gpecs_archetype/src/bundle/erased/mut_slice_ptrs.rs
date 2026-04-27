@@ -200,19 +200,21 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn downcast<B, T>(
+    pub fn downcast<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleSliceMutPtrs<B>, DowncastError<Self>>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let len = self.len();
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
         let ptrs = self
             .into_ptrs()
-            .downcast::<B, T>(components)
+            .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
         let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);

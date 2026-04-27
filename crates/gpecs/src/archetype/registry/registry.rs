@@ -65,14 +65,15 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn register_archetype_of<B, M, T>(
+    pub fn register_archetype_of<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let archetype = ErasedArchetype::register::<B, _, _>(components)?;
         let archetype_id = self.register_archetype(&components.as_view(), archetype);
@@ -149,15 +150,17 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn archetype_id_of<B, T>(
+    pub fn archetype_id_of<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<Option<ArchetypeId>, ArchetypeError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let archetype = ErasedArchetype::<()>::of::<B, _, T>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let archetype_id = self.archetype_id(archetype.as_view());
         Ok(archetype_id)
     }
@@ -261,15 +264,17 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn compatible_archetypes_of<B, T>(
+    pub fn compatible_archetypes_of<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<CompatibleArchetypes<'_>, ArchetypeError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let archetype = ErasedArchetype::<()>::of::<B, _, T>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let archetypes = self.compatible_archetypes(archetype.as_view());
         Ok(archetypes)
     }
@@ -298,15 +303,17 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub unsafe fn compatible_archetypes_mut_of<B, T>(
+    pub unsafe fn compatible_archetypes_mut_of<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<CompatibleArchetypesMut<'_>, ArchetypeError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let archetype = ErasedArchetype::<()>::of::<B, _, T>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let archetypes = self.compatible_archetypes_mut(archetype.as_view());
         Ok(archetypes)
     }
@@ -370,37 +377,41 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get_bundle<B, T>(
+    pub fn get_bundle<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<BundleRefs<'_, B>>, DowncastErrorKind>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
-        self.get_bundle_at::<B, T>(components, entity, location)
+        self.get_bundle_at::<B>(components, entity, location)
             .map_err(GetAtError::with_valid_location)
     }
 
     #[inline]
-    pub fn get_bundle_at<B, T>(
+    pub fn get_bundle_at<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         location: EntityLocation,
     ) -> Result<Option<BundleRefs<'_, B>>, GetAtError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(bundle) = self.get_at(entity, location)? else {
             return Ok(None);
         };
 
         let bundle = bundle
-            .downcast::<B, T>(components)
+            .downcast::<B>(components)
             .map_err(DowncastError::into_source)?;
         Ok(Some(bundle))
     }
@@ -439,37 +450,41 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get_bundle_mut<B, T>(
+    pub fn get_bundle_mut<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<BundleRefsMut<'_, B>>, DowncastErrorKind>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
-        self.get_bundle_mut_at::<B, T>(components, entity, location)
+        self.get_bundle_mut_at::<B>(components, entity, location)
             .map_err(GetAtError::with_valid_location)
     }
 
     #[inline]
-    pub fn get_bundle_mut_at<B, T>(
+    pub fn get_bundle_mut_at<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         location: EntityLocation,
     ) -> Result<Option<BundleRefsMut<'_, B>>, GetAtError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(bundle) = self.get_mut_at(entity, location)? else {
             return Ok(None);
         };
 
         let bundle = bundle
-            .downcast::<B, T>(components)
+            .downcast::<B>(components)
             .map_err(DowncastError::into_source)?;
         Ok(Some(bundle))
     }
@@ -558,37 +573,39 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn insert_bundle_exact<B, M, T>(
+    pub fn insert_bundle_exact<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         value: B,
     ) -> Result<(), InsertBundleExactError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
-        self.insert_bundle_exact_at::<B, M, T>(components, entity, value, location)
+        self.insert_bundle_exact_at(components, entity, value, location)
             .map_err(InsertBundleExactAtError::with_valid_location)?;
         Ok(())
     }
 
     #[inline]
-    pub fn insert_bundle_exact_at<B, M, T>(
+    pub fn insert_bundle_exact_at<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         value: B,
         location: EntityLocation,
     ) -> Result<ArchetypeId, InsertBundleExactAtError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
-        let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
+        let components_to_insert = match ErasedArchetype::register::<B, _, _>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
                 let source = error.into();
@@ -697,37 +714,39 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn insert_bundle<B, M, T>(
+    pub fn insert_bundle<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         value: B,
     ) -> Result<(), InsertBundleError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
-        self.insert_bundle_at::<B, M, T>(components, entity, value, location)
+        self.insert_bundle_at(components, entity, value, location)
             .map_err(InsertBundleAtError::into_insert_bundle_error)?;
         Ok(())
     }
 
     #[inline]
-    pub fn insert_bundle_at<B, M, T>(
+    pub fn insert_bundle_at<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         value: B,
         location: EntityLocation,
     ) -> Result<ArchetypeId, InsertBundleAtError<B>>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
-        let components_to_insert = match ErasedArchetype::register::<B, M, T>(components) {
+        let components_to_insert = match ErasedArchetype::register::<B, _, _>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
                 let source = error.into();
@@ -851,36 +870,38 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn remove_bundle_exact<B, M, T>(
+    pub fn remove_bundle_exact<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<B>, RemoveBundleExactError>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
         let (value, _) = self
-            .remove_bundle_exact_at::<B, M, T>(components, entity, location)
+            .remove_bundle_exact_at(components, entity, location)
             .map_err(RemoveBundleExactAtError::with_valid_location)?;
         Ok(value)
     }
 
     #[inline]
-    pub fn remove_bundle_exact_at<B, M, T>(
+    pub fn remove_bundle_exact_at<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         location: EntityLocation,
     ) -> Result<(Option<B>, EntityLocation), RemoveBundleExactAtError>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
-        let components_to_remove = ErasedArchetype::register::<B, M, T>(components)?;
+        let components_to_remove = ErasedArchetype::register::<B, _, _>(components)?;
 
         let Self { archetypes, graph } = self;
         let components = &components.as_view();
@@ -922,14 +943,12 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn remove<M>(
+    pub fn remove(
         &mut self,
-        components: &ComponentRegistryView<M, impl ?Sized>,
+        components: &ComponentRegistryView<impl WithLayout + WithErasedDrop, impl ?Sized>,
         entity: Entity,
         components_to_remove: ErasedArchetypeView<impl Sized>,
-    ) where
-        M: WithLayout + WithErasedDrop,
-    {
+    ) {
         let location = self.find_location(entity);
         let Ok(_) = self
             .remove_at(components, entity, components_to_remove, location)
@@ -937,16 +956,13 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn remove_at<M>(
+    pub fn remove_at(
         &mut self,
-        components: &ComponentRegistryView<M, impl ?Sized>,
+        components: &ComponentRegistryView<impl WithLayout + WithErasedDrop, impl ?Sized>,
         entity: Entity,
         components_to_remove: ErasedArchetypeView<impl Sized>,
         location: EntityLocation,
-    ) -> Result<EntityLocation, InvalidEntityLocationError>
-    where
-        M: WithLayout + WithErasedDrop,
-    {
+    ) -> Result<EntityLocation, InvalidEntityLocationError> {
         let Self { archetypes, graph } = self;
         let remove_archetypes = algo::remove_archetypes(
             graph,
@@ -979,35 +995,37 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn remove_bundle<B, M, T>(
+    pub fn remove_bundle<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<(), DuplicateComponentError>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let location = self.find_location(entity);
-        self.remove_bundle_at::<B, M, T>(components, entity, location)
+        self.remove_bundle_at::<B>(components, entity, location)
             .map_err(RemoveBundleAtError::with_valid_location)?;
         Ok(())
     }
 
     #[inline]
-    pub fn remove_bundle_at<B, M, T>(
+    pub fn remove_bundle_at<B>(
         &mut self,
-        components: &mut ComponentRegistry<M, T>,
+        components: &mut ComponentRegistry<
+            impl PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
+            impl ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         location: EntityLocation,
     ) -> Result<EntityLocation, RemoveBundleAtError>
     where
         B: Bundle,
-        M: PushBackArray<Item: WithLayout + WithErasedDrop + FromComponentType>,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
-        let components_to_remove = ErasedArchetype::<()>::register::<B, M, T>(components)?;
+        let components_to_remove = ErasedArchetype::<()>::register::<B, _, _>(components)?;
         let components_to_remove = components_to_remove.as_view();
 
         let Self { archetypes, graph } = self;

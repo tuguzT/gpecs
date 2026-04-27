@@ -131,18 +131,20 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn downcast<B, T>(
+    pub fn downcast<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleSlices<'a, B>, DowncastError<Self>>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let slices = self
             .into_ptrs()
-            .downcast::<B, T>(components)
+            .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
         let slices = unsafe { B::CONTEXT.slice_ptrs_to_slices(slices) };

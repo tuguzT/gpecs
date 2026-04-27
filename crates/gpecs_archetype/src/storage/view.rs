@@ -205,94 +205,103 @@ where
     }
 
     #[inline]
-    pub fn as_bundles_with_archetype<B, M>(
+    pub fn as_bundles_with_archetype<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundlesWithArchetype<'_, '_, B, T>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.as_view()
-            .into_bundles_with_archetype::<B, M>(components)
+        self.as_view().into_bundles_with_archetype::<B>(components)
     }
 
     #[inline]
-    pub fn into_bundles_with_archetype<B, M>(
+    pub fn into_bundles_with_archetype<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundlesWithArchetype<'ctx, 'a, B, T>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let (entities, bundles, sparse, archetype) = self.into_parts();
-        archetype.check_compatibility_of::<B, M>(components)?;
+        archetype.check_compatibility_of::<B>(components)?;
 
         let bundles = bundles
-            .downcast::<B, M>(components)
+            .downcast::<B>(components)
             .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
         Ok((entities, bundles, sparse, archetype))
     }
 
     #[inline]
-    pub fn as_bundles<B, M>(
+    pub fn as_bundles<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<Bundles<'_, '_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.as_view().into_bundles::<B, M>(components)
+        self.as_view().into_bundles::<B>(components)
     }
 
     #[inline]
-    pub fn into_bundles<B, M>(
+    pub fn into_bundles<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<Bundles<'ctx, 'a, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (entities, bundles, sparse, _) =
-            self.into_bundles_with_archetype::<B, M>(components)?;
+        let (entities, bundles, sparse, _) = self.into_bundles_with_archetype::<B>(components)?;
         Ok((entities, bundles, sparse))
     }
 
     #[inline]
-    pub fn get_bundle<B, M>(
+    pub fn get_bundle<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.as_view().into_get_bundle::<B, M>(components, entity)
+        self.as_view().into_get_bundle::<B>(components, entity)
     }
 
     #[inline]
-    pub fn into_get_bundle<B, M>(
+    pub fn into_get_bundle<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<BundleRefs<'a, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.archetype()
-            .check_compatibility_of::<B, M>(components)?;
+        self.archetype().check_compatibility_of::<B>(components)?;
 
         let Some(bundle) = self.into_get(entity) else {
             return Ok(None);
         };
         let bundle = bundle
-            .downcast::<B, M>(components)
+            .downcast::<B>(components)
             .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
         Ok(Some(bundle))

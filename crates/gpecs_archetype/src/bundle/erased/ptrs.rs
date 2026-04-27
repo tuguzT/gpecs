@@ -147,15 +147,17 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn downcast<B, T>(
+    pub fn downcast<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundlePtrs<B>, DowncastError<Self>>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        if let Err(error) = self.archetype().check_compatibility_of::<B, T>(components) {
+        if let Err(error) = self.archetype().check_compatibility_of::<B>(components) {
             return Err(DowncastError::new(self, error.into()));
         }
 

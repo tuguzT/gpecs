@@ -503,15 +503,17 @@ pub fn insert_into_archetype<T>(
 }
 
 #[inline]
-pub fn insert_bundle_into_archetype<B, T>(
+pub fn insert_bundle_into_archetype<B>(
     archetypes: &mut Archetypes,
-    components: &ComponentRegistryView<impl Sized, T>,
+    components: &ComponentRegistryView<
+        impl Sized,
+        impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    >,
     archetype_id: ArchetypeId,
     entity: Entity,
     value: B,
 ) where
     B: Bundle,
-    T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
     let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     if let Err(error) = storage.insert_bundle(components, entity, value) {
@@ -541,16 +543,17 @@ pub fn remove_from_archetype(
 }
 
 #[inline]
-pub fn remove_bundle_from_archetype<B, M, T>(
+pub fn remove_bundle_from_archetype<B>(
     archetypes: &mut Archetypes,
-    components: &ComponentRegistryView<M, T>,
+    components: &ComponentRegistryView<
+        impl WithLayout + WithErasedDrop,
+        impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    >,
     archetype_id: ArchetypeId,
     entity: Entity,
 ) -> B
 where
     B: Bundle,
-    M: WithLayout + WithErasedDrop,
-    T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
     let storage = unwrap_archetype_storage_mut(archetypes, archetype_id);
     let bundle = match storage.remove_bundle(components, entity) {

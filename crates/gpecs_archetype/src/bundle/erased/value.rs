@@ -73,15 +73,17 @@ where
     }
 
     #[inline]
-    pub fn downcast<B, U>(
+    pub fn downcast<B>(
         self,
-        registry: &ComponentRegistryView<impl Sized, U>,
+        registry: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<B, DowncastError<Self>>
     where
         B: Bundle,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let src = match self.as_ptrs().downcast::<B, U>(registry) {
+        let src = match self.as_ptrs().downcast::<B>(registry) {
             Ok(src) => src,
             Err(error) => return Err(error.map_value(drop).map_value(|()| self)),
         };
@@ -218,29 +220,33 @@ where
     }
 
     #[inline]
-    pub fn downcast_ref<B, U>(
+    pub fn downcast_ref<B>(
         &self,
-        registry: &ComponentRegistryView<impl Sized, U>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleRefs<'_, B>, DowncastError<&Self>>
     where
         B: Bundle,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         self.as_refs()
-            .downcast::<B, U>(registry)
+            .downcast::<B>(components)
             .map_err(|error| error.map_value(|_| self))
     }
 
     #[inline]
-    pub fn downcast_mut<B, U>(
+    pub fn downcast_mut<B>(
         &mut self,
-        registry: &ComponentRegistryView<impl Sized, U>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleRefsMut<'_, B>, DowncastError<&mut Self>>
     where
         B: Bundle,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        match unsafe { self.as_mut_ptrs().as_mut_unchecked() }.downcast::<B, U>(registry) {
+        match unsafe { self.as_mut_ptrs().as_mut_unchecked() }.downcast::<B>(components) {
             Ok(refs) => Ok(refs),
             Err(error) => Err(error.map_value(drop).map_value(|()| self)),
         }

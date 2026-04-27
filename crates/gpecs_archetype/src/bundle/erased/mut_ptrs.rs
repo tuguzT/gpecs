@@ -269,15 +269,17 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn downcast<B, T>(
+    pub fn downcast<B>(
         mut self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleMutPtrs<B>, DowncastError<Self>>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        if let Err(error) = self.archetype().check_compatibility_of::<B, T>(components) {
+        if let Err(error) = self.archetype().check_compatibility_of::<B>(components) {
             return Err(DowncastError::new(self, error.into()));
         }
         let ptrs = B::mut_ptrs_from_erased(components, self.iter_mut())

@@ -449,102 +449,116 @@ where
     }
 
     #[inline]
-    pub fn as_bundles_with_archetype<B, M>(
+    pub fn as_bundles_with_archetype<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundlesWithArchetype<'_, B, T>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let (entities, bundles, _, archetype) = self
             .as_view()
-            .into_bundles_with_archetype::<B, M>(components)?;
+            .into_bundles_with_archetype::<B>(components)?;
         Ok((entities, bundles, archetype))
     }
 
     #[inline]
-    pub fn as_bundles<B, M>(
+    pub fn as_bundles<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleSlices<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (_, bundles, _) = self.as_view().into_bundles::<B, M>(components)?;
+        let (_, bundles, _) = self.as_view().into_bundles::<B>(components)?;
         Ok(bundles)
     }
 
     #[inline]
-    pub fn as_mut_bundles_with_archetype<B, M>(
+    pub fn as_mut_bundles_with_archetype<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundlesMutWithArchetype<'_, B, T>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let (entities, bundles, _, archetype) = self
             .as_mut_view()
-            .into_mut_bundles_with_archetype::<B, M>(components)?;
+            .into_mut_bundles_with_archetype::<B>(components)?;
         Ok((entities, bundles, archetype))
     }
 
     #[inline]
-    pub fn as_mut_bundles<B, M>(
+    pub fn as_mut_bundles<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleSlicesMut<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let (_, bundles, _) = self.as_mut_view().into_mut_bundles::<B, M>(components)?;
+        let (_, bundles, _) = self.as_mut_view().into_mut_bundles::<B>(components)?;
         Ok(bundles)
     }
 
     #[inline]
-    pub fn get_bundle<B, M>(
+    pub fn get_bundle<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.as_view().into_get_bundle::<B, M>(components, entity)
+        self.as_view().into_get_bundle::<B>(components, entity)
     }
 
     #[inline]
-    pub fn get_bundle_mut<B, M>(
+    pub fn get_bundle_mut<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         self.as_mut_view()
-            .into_get_bundle_mut::<B, M>(components, entity)
+            .into_get_bundle_mut::<B>(components, entity)
     }
 
     #[inline]
-    pub fn insert_bundle<B, M>(
+    pub fn insert_bundle<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         value: B,
     ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         if let Err(source) = self
             .archetype()
-            .check_exact_compatibility_of::<B, M>(components)
+            .check_exact_compatibility_of::<B>(components)
         {
             let error = IncompatibleBundleValueError { source, value };
             return Err(error);
@@ -553,14 +567,14 @@ where
         let Self { sparse_set } = self;
         let bundle = sparse_set.insert_from(entity.into(), |_, access| match access? {
             TryInsertAccess::ReadWrite(dst) => {
-                let Ok(dst) = dst.into_ptrs().downcast::<B, M>(components) else {
+                let Ok(dst) = dst.into_ptrs().downcast::<B>(components) else {
                     unreachable!("exact archetype compatibility should be already checked")
                 };
-                let value = unsafe { soa::ptr::replace::<B, _, _>(B::CONTEXT, dst, value) };
+                let value = unsafe { soa::ptr::replace::<B, B, B>(B::CONTEXT, dst, value) };
                 Some(value)
             }
             TryInsertAccess::WriteOnly(dst) => {
-                let Ok(dst) = dst.into_inner().downcast::<B, M>(components) else {
+                let Ok(dst) = dst.into_inner().downcast::<B>(components) else {
                     unreachable!("exact archetype compatibility should be already checked")
                 };
                 unsafe { B::CONTEXT.write(dst, value) };
@@ -571,21 +585,23 @@ where
     }
 
     #[inline]
-    pub fn remove_bundle<B, M>(
+    pub fn remove_bundle<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
     ) -> Result<Option<B>, IncompatibleArchetypeExactError>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         self.archetype()
-            .check_exact_compatibility_of::<B, M>(components)?;
+            .check_exact_compatibility_of::<B>(components)?;
 
         let Self { sparse_set } = self;
         let bundle = sparse_set.swap_remove_into(entity.into(), |_, src| {
-            let Ok(src) = src?.cast_const().downcast::<B, M>(components) else {
+            let Ok(src) = src?.cast_const().downcast::<B>(components) else {
                 unreachable!("exact archetype compatibility should be already checked")
             };
             let bundle = unsafe { B::CONTEXT.read(src) };
@@ -595,17 +611,19 @@ where
     }
 
     #[inline]
-    pub fn update_with_bundle<B, M>(
+    pub fn update_with_bundle<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         entity: Entity,
         value: B,
     ) -> Result<B, UpdateWithBundleError<B>>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let dest = match self.get_bundle_mut::<B, _>(components, entity) {
+        let dest = match self.get_bundle_mut::<B>(components, entity) {
             Ok(Some(bundle)) => bundle,
             Ok(None) => {
                 let source = EntityNotFoundError::new(entity).into();
@@ -622,26 +640,28 @@ where
     }
 
     #[inline]
-    pub fn move_into_with_insert_bundle<B, M>(
+    pub fn move_into_with_insert_bundle<B>(
         &mut self,
-        components: &ComponentRegistryView<impl Sized, M>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
         other: &mut ArchetypeStorage<T>,
         entity: Entity,
         value: B,
     ) -> Result<(), MoveIntoWithInsertBundleError<B>>
     where
         B: Bundle,
-        M: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         if self
             .archetype()
-            .check_compatibility_of::<B, _>(components)
+            .check_compatibility_of::<B>(components)
             .is_ok()
         {
             let source = MoveIntoWithInsertBundleErrorKind::SourceCompatible;
             return Err(MoveIntoWithInsertBundleError { source, value });
         }
-        if let Err(error) = other.archetype().check_compatibility_of::<B, _>(components) {
+        if let Err(error) = other.archetype().check_compatibility_of::<B>(components) {
             let source = error.into();
             return Err(MoveIntoWithInsertBundleError { source, value });
         }
@@ -676,7 +696,7 @@ where
                 unsafe { dst.copy_from_compatible_nonoverlapping(src, 1) }
 
                 let dst = dst
-                    .downcast::<B, _>(components)
+                    .downcast::<B>(components)
                     .map_err(DowncastError::into_source)
                     .expect("archetype compatibility should have been checked earlier");
                 let _ = unsafe { soa::ptr::replace::<B, B, B>(B::CONTEXT, dst, value) };

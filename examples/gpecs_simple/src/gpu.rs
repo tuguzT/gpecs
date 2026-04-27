@@ -91,7 +91,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
         let position_tag_entities = position_tag_archetype_storage.as_entities();
         let (position_tag_positions,) = position_tag_archetype_storage
-            .as_bundles::<(Position,), _>(&components.as_view())
+            .as_bundles::<(Position,)>(&components.as_view())
             .expect("archetype should contain `Position` components");
         itertools::assert_equal(
             position_tag_entities.iter().map(|entity| Position {

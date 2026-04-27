@@ -212,17 +212,19 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn downcast<B, T>(
+    pub fn downcast<B>(
         self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<BundleNonNullPtrs<B>, DowncastError<Self>>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let into_self = |ptrs| unsafe { Self::new_unchecked(ptrs) };
         let ptrs = ErasedBundleMutPtrs::from(self)
-            .downcast::<B, T>(components)
+            .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
         let ptrs = unsafe { B::CONTEXT.ptrs_to_nonnull(ptrs) };

@@ -237,7 +237,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.register_archetype_of::<B, _, _>(components)
+        archetypes.register_archetype_of::<B>(components)
     }
 
     #[inline]
@@ -258,7 +258,7 @@ impl Context {
         } = self;
 
         let components = &components.as_view();
-        archetypes.archetype_id_of::<B, _>(components)
+        archetypes.archetype_id_of::<B>(components)
     }
 
     #[inline]
@@ -286,7 +286,7 @@ impl Context {
         let location = archetype_id.into();
         let components = &components.as_view();
         let bundle = archetypes
-            .get_bundle_at::<B, _>(components, entity, location)
+            .get_bundle_at::<B>(components, entity, location)
             .map_err(GetAtError::with_valid_location)?
             .expect("entity should contain data");
         Ok(bundle)
@@ -317,7 +317,7 @@ impl Context {
         let location = archetype_id.into();
         let components = &components.as_view();
         let bundle = archetypes
-            .get_bundle_mut_at::<B, _>(components, entity, location)
+            .get_bundle_mut_at::<B>(components, entity, location)
             .map_err(GetAtError::with_valid_location)?
             .expect("entity should contain data");
         Ok(bundle)
@@ -375,7 +375,7 @@ impl Context {
         };
 
         let archetype_id = archetypes
-            .insert_bundle_exact_at::<B, _, _>(components, entity, value, *location)
+            .insert_bundle_exact_at(components, entity, value, *location)
             .map_err(InsertBundleExactAtError::with_valid_location)?;
 
         *location = EntityLocation::WithComponents(archetype_id);
@@ -400,7 +400,7 @@ impl Context {
         };
 
         let archetype_id = archetypes
-            .insert_bundle_at::<B, _, _>(components, entity, value, *location)
+            .insert_bundle_at(components, entity, value, *location)
             .map_err(InsertBundleAtError::into_insert_bundle_error)?;
 
         *location = EntityLocation::WithComponents(archetype_id);
@@ -424,7 +424,7 @@ impl Context {
         };
 
         let new_location = archetypes
-            .remove_bundle_at::<B, _, _>(components, entity, *location)
+            .remove_bundle_at::<B>(components, entity, *location)
             .map_err(RemoveBundleAtError::with_valid_location)?;
 
         *location = new_location;
@@ -451,7 +451,7 @@ impl Context {
         };
 
         let (value, new_location) = archetypes
-            .remove_bundle_exact_at::<B, _, _>(components, entity, archetype_id.into())
+            .remove_bundle_exact_at(components, entity, archetype_id.into())
             .map_err(RemoveBundleExactAtError::with_valid_location)?;
         let value = value.expect("entity should contain data");
 

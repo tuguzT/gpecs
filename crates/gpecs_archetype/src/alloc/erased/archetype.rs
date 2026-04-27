@@ -313,15 +313,17 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn check_compatibility_of<B, T>(
+    pub fn check_compatibility_of<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<(), IncompatibleArchetypeError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.as_view().check_compatibility_of::<B, T>(components)
+        self.as_view().check_compatibility_of::<B>(components)
     }
 
     #[inline]
@@ -346,16 +348,17 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn check_exact_compatibility_of<B, T>(
+    pub fn check_exact_compatibility_of<B>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
     ) -> Result<(), IncompatibleArchetypeExactError>
     where
         B: Bundle,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.as_view()
-            .check_exact_compatibility_of::<B, T>(components)
+        self.as_view().check_exact_compatibility_of::<B>(components)
     }
 
     #[inline]

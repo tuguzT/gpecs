@@ -149,7 +149,7 @@ where
     ) -> BundlesIntoIterInner<'a, B> {
         let (entities, bundles, _) = info
             .into_meta()
-            .as_bundles_with_archetype::<B, T>(components)
+            .as_bundles_with_archetype::<B>(components)
             .expect("archetype should be compatible with requested bundle");
 
         let entities = entities.iter().copied();

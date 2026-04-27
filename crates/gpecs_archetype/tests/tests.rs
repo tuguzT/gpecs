@@ -4,3 +4,7 @@ mod archetype {
     mod id;
     mod storage;
 }
+
+mod bundle {
+    mod component_ids;
+}

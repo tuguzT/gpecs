@@ -1,4 +1,7 @@
 use crate::{
+    archetype::erased::error::{ArchetypeError, DuplicateComponentError},
+    bundle::Bundle,
+    component::erased::error::NotRegisteredError,
     context::Components,
     executor::gpu::{
         bundle::GpuBundle,
@@ -14,28 +17,29 @@ unsafe impl<T> GpuBundle for Identity<T>
 where
     T: GpuComponent,
 {
-    type GetGpuComponents = [Option<GpuComponentId>; 1];
+    type GpuComponents = [GpuComponentId; 1];
 
     #[inline]
     fn get_gpu_components(
         components: &Components,
         gpu_components: &GpuComponentRegistry,
-    ) -> Self::GetGpuComponents {
-        let component_id = components
-            .component_id::<T>()
-            .and_then(|id| gpu_components.map_component_id(id));
-        [component_id]
+    ) -> Result<Self::GpuComponents, ArchetypeError> {
+        let [component_id] = Self::get_components(&components.as_view())?
+            .map(|id| gpu_components.map_component_id(id));
+        let component_ids = [component_id.ok_or_else(NotRegisteredError::of::<T>)?];
+        Ok(component_ids)
     }
-
-    type RegisterGpuComponents = [GpuComponentId; 1];
 
     #[inline]
     fn register_gpu_components(
         components: &mut Components,
         gpu_components: &mut GpuComponentRegistry,
-    ) -> Self::RegisterGpuComponents {
+    ) -> Result<Self::GpuComponents, DuplicateComponentError> {
+        Self::register_components(components)?;
+
         let component_id = gpu_components.register_component::<T>(components);
-        [component_id]
+        let component_ids = [component_id];
+        Ok(component_ids)
     }
 }
 
@@ -45,36 +49,31 @@ macro_rules! gpu_bundle_tuple_impl {
         where
             $($types: GpuComponent,)*
         {
-            type GetGpuComponents = [Option<GpuComponentId>; count_idents!($($types,)*)];
+            type GpuComponents = [GpuComponentId; count_idents!($($types,)*)];
 
             #[inline]
             fn get_gpu_components(
                 components: &Components,
                 gpu_components: &GpuComponentRegistry,
-            ) -> Self::GetGpuComponents {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+            ) -> Result<Self::GpuComponents, ArchetypeError> {
+                let component_ids = Self::get_components(&components.as_view())?
+                    .map(|id| gpu_components.map_component_id(id));
 
-                let component_ids = [$(
-                    components
-                        .component_id::<$types>()
-                        .and_then(|id| gpu_components.map_component_id(id)),
-                )*];
-                let component_ids = [$(component_ids[permutation[$indices]],)*];
-                component_ids
+                let component_ids = [$(component_ids[$indices].ok_or_else(NotRegisteredError::of::<$types>)?,)*];
+                Ok(component_ids)
             }
-
-            type RegisterGpuComponents = [GpuComponentId; count_idents!($($types,)*)];
 
             #[inline]
             fn register_gpu_components(
                 components: &mut Components,
                 gpu_components: &mut GpuComponentRegistry,
-            ) -> Self::RegisterGpuComponents {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+            ) -> Result<Self::GpuComponents, DuplicateComponentError> {
+                Self::register_components(components)?;
 
                 let component_ids = [$(gpu_components.register_component::<$types>(components),)*];
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
-                component_ids
+                Ok(component_ids)
             }
         }
     };

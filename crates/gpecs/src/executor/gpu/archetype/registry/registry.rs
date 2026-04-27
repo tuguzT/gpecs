@@ -46,7 +46,7 @@ impl GpuArchetypeRegistry {
     where
         B: GpuBundle,
     {
-        let _components = B::register_gpu_components(components, gpu_components);
+        let _components = B::register_gpu_components(components, gpu_components)?;
         let archetype_id = archetypes.register_archetype_of::<B, _, _>(components)?;
 
         let Self { gpu_archetypes, .. } = self;

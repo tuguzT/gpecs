@@ -146,7 +146,7 @@ impl Error for DanglingError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TryFromPtrError {
     NotRegistered(NotRegisteredError),
     NotAligned(NotAlignedError),
@@ -273,7 +273,7 @@ impl Error for TryFromSlicePtrError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DowncastErrorKind {
     ComponentNotRegistered(NotRegisteredError),
     ComponentMismatch(ComponentMismatchError),

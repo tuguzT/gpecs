@@ -7,4 +7,5 @@ mod archetype {
 
 mod bundle {
     mod component_ids;
+    mod downcast;
 }

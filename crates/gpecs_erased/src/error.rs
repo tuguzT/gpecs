@@ -5,7 +5,7 @@ use core::{
     num::NonZeroUsize,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LenMismatchError {
     expected: usize,
     actual: usize,
@@ -105,7 +105,7 @@ pub fn check_layout(layout: Layout, expected: Layout) -> Result<(), LayoutMismat
     LayoutMismatchError::new(expected, layout).map_or(Ok(()), Err)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InsufficientLenError {
     expected: usize,
     actual: usize,
@@ -157,7 +157,7 @@ pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), Insuffici
     InsufficientLenError::new(expected, len).map_or(Ok(()), Err)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InsufficientAlignError {
     expected: NonZeroUsize,
     actual: NonZeroUsize,
@@ -216,7 +216,7 @@ pub fn check_sufficient_align(
     InsufficientAlignError::new(expected, actual).map_or(Ok(()), Err)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotAlignedError {
     ptr: *const u8,
     target_align: NonZeroUsize,

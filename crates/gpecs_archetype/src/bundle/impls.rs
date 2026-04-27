@@ -1,7 +1,7 @@
 use gpecs_component::{
     Component,
     erased::{
-        ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
+        ErasedComponentMutPtr, ErasedComponentPtr,
         error::{DowncastErrorKind, NotRegisteredError},
     },
     registry::{
@@ -10,12 +10,11 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
+    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
     soa::{
         identity::Identity,
         traits::{TupleHelper, count_idents},
     },
-    storage::AlignedStorage,
 };
 
 use crate::bundle::{Bundle, BundleMutPtrs, BundlePtrs};
@@ -93,29 +92,6 @@ where
 
         let ptr = ptr.downcast::<T, U>(components)?.cast();
         Ok(ptr)
-    }
-
-    #[inline]
-    fn from_erased<I, U, S, P>(
-        components: &ComponentRegistryView<impl Sized, U>,
-        iter: I,
-    ) -> Result<Self, DowncastErrorKind>
-    where
-        I: IntoIterator<Item = ErasedComponent<S, P>>,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        S: AlignedStorage,
-        P: SliceItemPtrs<Item = S::Item>,
-    {
-        let component_id = components
-            .component_id::<T>()
-            .ok_or_else(NotRegisteredError::of::<T>)?;
-        let component = iter
-            .into_iter()
-            .find(|component| component.component_id() == component_id)
-            .ok_or_else(NotRegisteredError::of::<T>)?;
-
-        let component = component.downcast::<T, U>(components)?;
-        Ok(component.into())
     }
 }
 
@@ -210,34 +186,6 @@ macro_rules! bundle_tuple_impl {
 
                 let ptrs = ($(ptrs.$indices.ok_or_else(NotRegisteredError::of::<$types>)?,)*);
                 Ok(ptrs)
-            }
-
-            #[inline]
-            fn from_erased<Iter, U, S, P>(
-                components: &ComponentRegistryView<impl Sized, U>,
-                iter: Iter,
-            ) -> Result<Self, DowncastErrorKind>
-            where
-                Iter: IntoIterator<Item = ErasedComponent<S, P>>,
-                U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-                S: AlignedStorage,
-                P: SliceItemPtrs<Item = S::Item>,
-            {
-                let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
-
-                let mut fields = ($(None::<$types>,)*);
-                #[expect(clippy::needless_continue)]
-                for field in iter {
-                    $(
-                        if fields.$indices.is_none() && field.component_id() == component_ids[$indices] {
-                            fields.$indices = Some(field.downcast(components)?);
-                            continue;
-                        }
-                    )*
-                }
-
-                let fields = ($(fields.$indices.ok_or_else(NotRegisteredError::of::<$types>)?,)*);
-                Ok(fields)
             }
         }
     };

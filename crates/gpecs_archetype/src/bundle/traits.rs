@@ -1,19 +1,16 @@
 use gpecs_component::{
-    erased::{
-        ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
-    },
+    erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
     registry::{
         ComponentId, ComponentRegistry, ComponentRegistryView,
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
     },
 };
 use gpecs_soa_erased::{
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
+    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
     soa::traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
         SlicesMut, SoaOwned, SoaReadOwned, SoaWrite,
     },
-    storage::AlignedStorage,
 };
 
 pub type BundlePtrs<B> = Ptrs<'static, B>;
@@ -108,25 +105,4 @@ pub unsafe trait Bundle:
         I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
         P: MutSliceItemPtr;
-
-    /// Attempts to downcast input collection of erased components
-    /// into the collection of components of this bundle.
-    ///
-    /// Note that the order of input components **may not** match
-    /// with the order of components in this bundle.
-    ///
-    /// # Errors
-    ///
-    /// This function returns an error if:
-    /// - some of the components of this bundle were not registered,
-    /// - some of the input components cannot be converted to the component of this bundle.
-    fn from_erased<I, T, S, P>(
-        components: &ComponentRegistryView<impl Sized, T>,
-        iter: I,
-    ) -> Result<Self, DowncastErrorKind>
-    where
-        I: IntoIterator<Item = ErasedComponent<S, P>>,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        S: AlignedStorage,
-        P: SliceItemPtrs<Item = S::Item>;
 }

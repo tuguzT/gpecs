@@ -144,9 +144,9 @@ impl<Meta> ErasedArchetype<Meta> {
         Meta: FromComponentDescriptor<'a, M>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
+        let component_ids = B::get_components(components)?;
         let components = try_collect_opt_components(
-            B::get_components(components).into_iter().map(|id| {
-                let id = id?;
+            component_ids.into_iter().map(|id| {
                 let desc = components.get_component_descriptor(id)?;
                 let meta = Meta::from_component_descriptor(desc);
                 Some((id, meta))

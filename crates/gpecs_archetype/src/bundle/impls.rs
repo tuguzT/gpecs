@@ -25,23 +25,24 @@ where
 {
     const CONTEXT: &'static Self::Context = &();
 
-    type GetComponents = [Option<ComponentId>; 1];
+    type Components = [ComponentId; 1];
 
     #[inline]
-    fn get_components<U>(components: &ComponentRegistryView<impl Sized, U>) -> Self::GetComponents
+    fn get_components<U>(
+        components: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<Self::Components, NotRegisteredError>
     where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<T>();
-        [component_id]
+        let component_id = components
+            .component_id::<T>()
+            .ok_or_else(NotRegisteredError::of::<T>)?;
+        let component_ids = [component_id];
+        Ok(component_ids)
     }
 
-    type RegisterComponents = [ComponentId; 1];
-
     #[inline]
-    fn register_components<U, M>(
-        components: &mut ComponentRegistry<U, M>,
-    ) -> Self::RegisterComponents
+    fn register_components<U, M>(components: &mut ComponentRegistry<U, M>) -> Self::Components
     where
         U: PushBackArray<Item: FromComponentType>,
         M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
@@ -103,26 +104,24 @@ macro_rules! bundle_tuple_impl {
         {
             const CONTEXT: &'static Self::Context = &();
 
-            type GetComponents = [Option<ComponentId>; count_idents!($($types,)*)];
+            type Components = [ComponentId; count_idents!($($types,)*)];
 
             #[inline]
-            fn get_components<U>(components: &ComponentRegistryView<impl Sized, U>) -> Self::GetComponents
+            fn get_components<U>(
+                components: &ComponentRegistryView<impl Sized, U>,
+            ) -> Result<Self::Components, NotRegisteredError>
             where
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
-                let component_ids = [$(components.component_id::<$types>(),)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
-                component_ids
+                Ok(component_ids)
             }
 
-            type RegisterComponents = [ComponentId; count_idents!($($types,)*)];
-
             #[inline]
-            fn register_components<U, M>(
-                components: &mut ComponentRegistry<U, M>,
-            ) -> Self::RegisterComponents
+            fn register_components<U, M>(components: &mut ComponentRegistry<U, M>,) -> Self::Components
             where
                 U: PushBackArray<Item: FromComponentType>,
                 M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,

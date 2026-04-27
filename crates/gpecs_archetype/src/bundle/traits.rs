@@ -1,5 +1,8 @@
 use gpecs_component::{
-    erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
+    erased::{
+        ErasedComponentMutPtr, ErasedComponentPtr,
+        error::{DowncastErrorKind, NotRegisteredError},
+    },
     registry::{
         ComponentId, ComponentRegistry, ComponentRegistryView,
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
@@ -27,11 +30,6 @@ pub type BundleSlices<'a, B> = Slices<'static, 'a, B>;
 pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 
 /// Non-empty collection of [components](gpecs_component::Component).
-///
-/// # Safety
-///
-/// Order of component identifiers defined by [`GetComponents`](Bundle::GetComponents) and [`RegisterComponents`](Bundle::RegisterComponents)
-/// should be the same as the order of corresponding [layouts](gpecs_soa_erased::soa::field::FieldLayouts::Output).
 pub unsafe trait Bundle:
     SoaOwned + AllocSoa + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
 {
@@ -40,28 +38,22 @@ pub unsafe trait Bundle:
     /// This ensures that components of this bundle are known at compile time.
     const CONTEXT: &'static Self::Context;
 
-    /// Non-empty collection of all already registered components of this bundle.
+    /// Non-empty collection of identifiers for all components of this bundle.
     ///
-    /// If some component was not registered yet,
-    /// [`None`] should be returned by its iterator.
-    type GetComponents: IntoIterator<Item = Option<ComponentId>>;
+    /// Order of these identifiers should be the same
+    /// as the order of corresponding [layouts](gpecs_soa_erased::soa::field::FieldLayouts::Output).
+    type Components: IntoIterator<Item = ComponentId>;
 
     /// Retrieves identifiers of all already registered components of this bundle.
-    fn get_components<T>(components: &ComponentRegistryView<impl Sized, T>) -> Self::GetComponents
+    fn get_components<T>(
+        components: &ComponentRegistryView<impl Sized, T>,
+    ) -> Result<Self::Components, NotRegisteredError>
     where
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
 
-    /// Non-empty collection of all components of this bundle.
-    ///
-    /// If some component was not registered yet,
-    /// it should be registered by this method and its identifier should be returned by its iterator.
-    type RegisterComponents: IntoIterator<Item = ComponentId>;
-
     /// Registers all components of this bundle inside of provided registry
     /// and returns their identifiers.
-    fn register_components<T, M>(
-        components: &mut ComponentRegistry<T, M>,
-    ) -> Self::RegisterComponents
+    fn register_components<T, M>(components: &mut ComponentRegistry<T, M>) -> Self::Components
     where
         T: PushBackArray<Item: FromComponentType>,
         M: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized;

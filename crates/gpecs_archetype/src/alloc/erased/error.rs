@@ -3,38 +3,12 @@ use core::{
     fmt::{self, Display},
 };
 
-use gpecs_component::{erased::error::NotRegisteredError, registry::ComponentId};
+use gpecs_component::erased::error::NotRegisteredError;
 
 use crate::erased::error::{
-    IncompatibleArchetypeViewExactError, MissingComponentError, TooFewComponentsError,
+    DuplicateComponentError, IncompatibleArchetypeViewExactError, MissingComponentError,
+    TooFewComponentsError,
 };
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct DuplicateComponentError {
-    component_id: ComponentId,
-}
-
-impl DuplicateComponentError {
-    #[inline]
-    pub fn new(component_id: ComponentId) -> Self {
-        Self { component_id }
-    }
-
-    #[inline]
-    pub fn component_id(&self) -> ComponentId {
-        let Self { component_id } = *self;
-        component_id
-    }
-}
-
-impl Display for DuplicateComponentError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { component_id } = *self;
-        write!(f, "duplicate {component_id} were found")
-    }
-}
-
-impl Error for DuplicateComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ArchetypeError {

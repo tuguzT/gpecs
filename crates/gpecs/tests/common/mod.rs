@@ -28,10 +28,3 @@ pub struct Tag;
 
 impl Component for Tag {}
 impl GpuComponent for Tag {}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Name {
-    pub value: String,
-}
-
-impl Component for Name {}

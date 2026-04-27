@@ -1,15 +1,26 @@
-use gpecs::{
-    archetype::{
-        erased::error::{IncompatibleArchetypeError, MissingComponentError, TooFewComponentsError},
-        storage::{ArchetypeStorage, error::IncompatibleBundleValueError},
-    },
-    bundle::{Bundle, erased::ErasedBundle},
-    context::Components,
-    entity::registry::EntityRegistry,
-    world::registry::WorldRegistry,
-};
+#![cfg(feature = "alloc")]
 
-use crate::common::{Name, Position, Tag};
+use std::mem::MaybeUninit;
+
+use gpecs_archetype::{
+    bundle::{
+        Bundle,
+        erased::{self, traits::MustDrop},
+    },
+    erased::error::{IncompatibleArchetypeError, MissingComponentError, TooFewComponentsError},
+    storage::{self, error::IncompatibleBundleValueError},
+};
+use gpecs_entity::registry::EntityRegistry;
+use gpecs_soa_erased::{ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage};
+use gpecs_world::registry::WorldRegistry;
+
+use crate::common::{Components, ErasedDropMeta, Name, Position, Tag};
+
+type ArchetypeStorage = storage::ArchetypeStorage<ErasedBundle<ErasedDropMeta>>;
+type ErasedBundle<Meta> = erased::ErasedBundle<Meta, MustDrop, Storage, SlicePtrs>;
+
+type Storage = BoxedAlignedUninitStorage;
+type SlicePtrs = CoreSliceItemPtrs<MaybeUninit<u8>>;
 
 #[test]
 fn storage_tag() {

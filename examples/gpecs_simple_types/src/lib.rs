@@ -2,8 +2,8 @@
 #![cfg_attr(not(test), no_std)]
 
 use bytemuck::{Pod, Zeroable};
+use glam::Vec3;
 use gpecs_component::{Component, GpuComponent};
-use spirv_std::glam::Vec3;
 
 #[derive(Debug, PartialEq, Clone, Copy, Pod, Zeroable)]
 #[repr(C, align(16))]

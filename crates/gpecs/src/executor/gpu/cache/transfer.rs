@@ -244,10 +244,11 @@ impl TransferCache {
         Ok(())
     }
 
-    pub fn invalidate(
+    pub fn resync(
         &mut self,
         _device: &Device,
         _command_encoder: &mut CommandEncoder,
+        schedule_cache: &mut ScheduleCache,
         cpu_archetypes: &ArchetypeRegistry,
         gpu_archetypes: &mut GpuArchetypeRegistry,
     ) {
@@ -265,9 +266,8 @@ impl TransferCache {
                     unreachable!("{archetype_id} should exist")
                 };
 
-                todo!("recreate storage for {archetype_id} & invalidate schedule cache")
-                // TODO: refactor schedule cache to store additional resources for each system
-                // schedule_cache.invalidate();
+                schedule_cache.request_archetype_resync(archetype_id);
+                todo!("recreate storage for {archetype_id}")
             }
             archetype_cache.state = ArchetypeCacheState::Invalidated;
         }

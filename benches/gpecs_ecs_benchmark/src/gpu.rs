@@ -57,6 +57,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
     log::info!(">> Registering GPU systems...");
     let gpu_systems = register_gpu_systems(&mut executor);
+    setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_resources);
 
     log::info!(">> Running GPU systems...");
     for i in (0_u128..).maybe_take(repeat_count) {
@@ -66,8 +67,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         }
 
         let timestamp = Instant::now();
-
-        setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_resources);
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
@@ -431,20 +430,10 @@ fn setup_gpu_systems(
         ..time_delta_uniform_buffer_entry
     }];
     let render_sprite_system_entries = [framebuffer_data_entry, framebuffer_desc_entry];
-    executor.set_additional_bindings([
-        (
-            systems.update_position,
-            update_position_system_entries.iter().cloned(),
-        ),
-        (
-            systems.update_data,
-            update_data_system_entries.iter().cloned(),
-        ),
-        (
-            systems.render_sprite,
-            render_sprite_system_entries.iter().cloned(),
-        ),
-    ]);
+
+    executor.set_additional_entries(systems.update_position, &update_position_system_entries);
+    executor.set_additional_entries(systems.update_data, &update_data_system_entries);
+    executor.set_additional_entries(systems.render_sprite, &render_sprite_system_entries);
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

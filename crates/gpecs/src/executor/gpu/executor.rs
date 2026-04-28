@@ -172,7 +172,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             device,
         )?;
 
-        schedule_cache.invalidate();
+        schedule_cache.request_archetype_resync(archetype_id);
         Ok(archetype_id)
     }
 
@@ -239,7 +239,7 @@ impl<'ctx> GpuExecutor<'ctx> {
 
         let added = schedule.add_system(system_id);
         if added {
-            schedule_cache.invalidate();
+            schedule_cache.request_system_resync(system_id);
         }
 
         added
@@ -247,43 +247,32 @@ impl<'ctx> GpuExecutor<'ctx> {
 
     #[inline]
     pub fn remove_system(&mut self, system_id: GpuSystemId) -> bool {
-        let Self {
-            schedule,
-            schedule_cache,
-            ..
-        } = self;
-
-        let removed = schedule.remove_system(system_id);
-        if removed {
-            schedule_cache.invalidate();
-        }
-
-        removed
+        let Self { schedule, .. } = self;
+        schedule.remove_system(system_id)
     }
 
     #[inline]
-    pub fn set_additional_bindings<'a, I, B>(&mut self, additional_bindings: I)
-    where
-        I: IntoIterator<Item = (GpuSystemId, B)>,
-        B: IntoIterator<Item = BindGroupEntry<'a>>,
-    {
+    pub fn set_additional_entries(
+        &mut self,
+        system_id: GpuSystemId,
+        additional_entries: &[BindGroupEntry<'_>],
+    ) {
         let Self {
             ref context,
             ref device,
             ref archetypes,
             ref systems,
-            ref schedule,
             ref mut schedule_cache,
             ..
         } = *self;
 
-        *schedule_cache = ScheduleCache::with_additional_bindings(
+        schedule_cache.set_additional_entries(
             context,
             device,
             archetypes,
             systems,
-            schedule,
-            additional_bindings,
+            system_id,
+            additional_entries,
         );
     }
 
@@ -301,14 +290,16 @@ impl<'ctx> GpuExecutor<'ctx> {
         } = *self;
 
         let cpu_archetypes = context.archetypes();
-        transfer_cache.invalidate(device, command_encoder, cpu_archetypes, archetypes);
+        transfer_cache.resync(
+            device,
+            command_encoder,
+            schedule_cache,
+            cpu_archetypes,
+            archetypes,
+        );
 
-        if !schedule_cache.is_valid() {
-            *schedule_cache = ScheduleCache::new(context, device, archetypes, systems, schedule);
-            *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);
-        }
-
-        if timestamp_query_resources.is_none() {
+        let updated = schedule_cache.resync(context, device, archetypes, systems, schedule);
+        if updated || timestamp_query_resources.is_none() {
             *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);
         }
         let timestamp_query_resources = timestamp_query_resources.as_ref();
@@ -321,8 +312,10 @@ impl<'ctx> GpuExecutor<'ctx> {
         };
 
         let mut query_index = 0;
-        for system_cache in schedule_cache.iter() {
-            let system_id = system_cache.system_id();
+        for system_id in schedule {
+            let Some(system_cache) = schedule_cache.system(system_id) else {
+                unreachable!("{system_id} should exist")
+            };
             let Some(system_shader) = systems.get_system_shader(system_id) else {
                 unreachable!("{system_id} should exist");
             };

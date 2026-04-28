@@ -81,13 +81,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
     log::info!(">> Registering GPU systems...");
     let gpu_systems = register_gpu_systems(&mut executor);
-    setup_gpu_systems(
-        &mut executor,
-        &gpu_systems,
-        &time_delta_uniform_buffer,
-        &framebuffer_data_storage_buffer,
-        &framebuffer_desc_uniform_buffer,
-    );
 
     log::info!(">> Running GPU systems...");
     for i in (0_u128..).maybe_take(repeat_count) {
@@ -97,6 +90,14 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         }
 
         let timestamp = Instant::now();
+
+        setup_gpu_systems(
+            &mut executor,
+            &gpu_systems,
+            &time_delta_uniform_buffer,
+            &framebuffer_data_storage_buffer,
+            &framebuffer_desc_uniform_buffer,
+        );
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);

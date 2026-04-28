@@ -20,7 +20,6 @@ use crate::{
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
-#[expect(clippy::too_many_lines)]
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     log::info!("> Running on GPU...");
 
@@ -46,34 +45,11 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         .register_archetype_of::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
         .expect("all the components should be unique");
 
-    let time_delta_slice = [time_delta.0];
-    let time_delta_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
-        label: Some("`gpecs` `ecs_benchmark` time delta uniform buffer"),
-        contents: bytemuck::cast_slice(&time_delta_slice),
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    };
-    let time_delta_uniform_buffer = device.create_buffer_init(&time_delta_uniform_buffer_desc);
-
-    let framebuffer_data_storage_buffer_desc = wgpu::util::BufferInitDescriptor {
-        label: Some("`gpecs` `ecs_benchmark` framebuffer data storage buffer"),
-        contents: bytemuck::cast_slice(framebuffer.buffer()),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-    };
-    let framebuffer_data_storage_buffer =
-        device.create_buffer_init(&framebuffer_data_storage_buffer_desc);
-
-    let framebuffer_desc = [framebuffer.desc()];
-    let framebuffer_desc_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
-        label: Some("`gpecs` `ecs_benchmark` framebuffer desc uniform buffer"),
-        contents: bytemuck::cast_slice(&framebuffer_desc),
-        usage: wgpu::BufferUsages::UNIFORM,
-    };
-    let framebuffer_desc_uniform_buffer =
-        device.create_buffer_init(&framebuffer_desc_uniform_buffer_desc);
+    let gpu_system_resources = create_gpu_system_resources(&device, time_delta, &framebuffer);
 
     let framebuffer_download_buffer_desc = wgpu::BufferDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer download buffer"),
-        size: framebuffer_data_storage_buffer.size(),
+        size: gpu_system_resources.framebuffer_data_storage.size(),
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     };
@@ -91,23 +67,17 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
         let timestamp = Instant::now();
 
-        setup_gpu_systems(
-            &mut executor,
-            &gpu_systems,
-            &time_delta_uniform_buffer,
-            &framebuffer_data_storage_buffer,
-            &framebuffer_desc_uniform_buffer,
-        );
+        setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_resources);
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
 
         command_encoder.copy_buffer_to_buffer(
-            &framebuffer_data_storage_buffer,
+            &gpu_system_resources.framebuffer_data_storage,
             0,
             &framebuffer_download_buffer,
             0,
-            framebuffer_data_storage_buffer.size(),
+            framebuffer_download_buffer.size(),
         );
         command_encoder.map_buffer_on_submit(
             &framebuffer_download_buffer,
@@ -165,7 +135,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         time_delta = TimeDelta(elapsed.as_secs_f32());
         let time_delta_slice = [time_delta.0];
         queue.write_buffer(
-            &time_delta_uniform_buffer,
+            &gpu_system_resources.time_delta_uniform,
             0,
             bytemuck::cast_slice(&time_delta_slice),
         );
@@ -194,6 +164,48 @@ struct GpuSystems {
     update_damage: GpuSystemId,
     update_sprite: GpuSystemId,
     render_sprite: GpuSystemId,
+}
+
+#[derive(Debug)]
+struct GpuSystemResources {
+    time_delta_uniform: wgpu::Buffer,
+    framebuffer_desc_uniform: wgpu::Buffer,
+    framebuffer_data_storage: wgpu::Buffer,
+}
+
+fn create_gpu_system_resources(
+    device: &wgpu::Device,
+    time_delta: TimeDelta,
+    framebuffer: &Framebuffer<impl AsRef<[u32]>>,
+) -> GpuSystemResources {
+    let time_delta_slice = [time_delta.0];
+    let time_delta_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` time delta uniform buffer"),
+        contents: bytemuck::cast_slice(&time_delta_slice),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    };
+    let time_delta_uniform = device.create_buffer_init(&time_delta_uniform_buffer_desc);
+
+    let framebuffer_data_storage_buffer_desc = wgpu::util::BufferInitDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` framebuffer data storage buffer"),
+        contents: bytemuck::cast_slice(framebuffer.buffer().as_ref()),
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+    };
+    let framebuffer_data_storage = device.create_buffer_init(&framebuffer_data_storage_buffer_desc);
+
+    let framebuffer_desc = [framebuffer.desc()];
+    let framebuffer_desc_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` framebuffer desc uniform buffer"),
+        contents: bytemuck::cast_slice(&framebuffer_desc),
+        usage: wgpu::BufferUsages::UNIFORM,
+    };
+    let framebuffer_desc_uniform = device.create_buffer_init(&framebuffer_desc_uniform_buffer_desc);
+
+    GpuSystemResources {
+        time_delta_uniform,
+        framebuffer_desc_uniform,
+        framebuffer_data_storage,
+    }
 }
 
 #[expect(clippy::too_many_lines)]
@@ -386,14 +398,12 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
 fn setup_gpu_systems(
     executor: &mut GpuExecutor,
     systems: &GpuSystems,
-    time_delta_uniform_buffer: &wgpu::Buffer,
-    framebuffer_data_storage_buffer: &wgpu::Buffer,
-    framebuffer_desc_uniform_buffer: &wgpu::Buffer,
+    resources: &GpuSystemResources,
 ) {
     let time_delta_uniform_buffer_entry = wgpu::BindGroupEntry {
         binding: 2,
         resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: time_delta_uniform_buffer,
+            buffer: &resources.time_delta_uniform,
             offset: 0,
             size: None,
         }),
@@ -401,7 +411,7 @@ fn setup_gpu_systems(
     let framebuffer_data_entry = wgpu::BindGroupEntry {
         binding: 2,
         resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: framebuffer_data_storage_buffer,
+            buffer: &resources.framebuffer_data_storage,
             offset: 0,
             size: None,
         }),
@@ -409,11 +419,12 @@ fn setup_gpu_systems(
     let framebuffer_desc_entry = wgpu::BindGroupEntry {
         binding: 3,
         resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: framebuffer_desc_uniform_buffer,
+            buffer: &resources.framebuffer_desc_uniform,
             offset: 0,
             size: None,
         }),
     };
+
     let update_position_system_entries = [time_delta_uniform_buffer_entry.clone()];
     let update_data_system_entries = [wgpu::BindGroupEntry {
         binding: 1,

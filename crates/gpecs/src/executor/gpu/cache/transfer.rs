@@ -76,10 +76,11 @@ impl TransferCache {
         let Self { archetypes } = self;
 
         let archetype_cache_entry = archetypes.entry(archetype_id);
-        if let Entry::Occupied(ref entry) = archetype_cache_entry
-            && entry.get().is_downloaded
-        {
-            return;
+        if let Entry::Occupied(ref entry) = archetype_cache_entry {
+            match entry.get().state {
+                ArchetypeCacheState::Invalidated => (),
+                ArchetypeCacheState::CopiedFromGpu | ArchetypeCacheState::CopiedIntoCpu => return,
+            }
         }
 
         let Some(storage) = gpu_archetypes.get_archetype_storage(archetype_id) else {
@@ -122,7 +123,7 @@ impl TransferCache {
                 });
         }
 
-        archetype_cache.is_downloaded = true;
+        archetype_cache.state = ArchetypeCacheState::CopiedFromGpu;
     }
 
     pub fn move_all_into<'a>(
@@ -167,11 +168,10 @@ impl TransferCache {
         archetype_cache: &mut ArchetypeCache,
         storage: &'a mut ArchetypeStorage,
     ) -> Option<&'a ArchetypeStorage> {
-        if !archetype_cache.is_downloaded {
-            return None;
-        }
-        if archetype_cache.is_moved {
-            return Some(storage);
+        match archetype_cache.state {
+            ArchetypeCacheState::Invalidated => return None,
+            ArchetypeCacheState::CopiedFromGpu => (),
+            ArchetypeCacheState::CopiedIntoCpu => return Some(storage),
         }
 
         let (entities, mut bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
@@ -189,7 +189,7 @@ impl TransferCache {
             components.write_copy_of_slice(&mapped_components);
         }
 
-        archetype_cache.is_moved = true;
+        archetype_cache.state = ArchetypeCacheState::CopiedIntoCpu;
         Some(storage)
     }
 
@@ -197,16 +197,14 @@ impl TransferCache {
         let Self { archetypes } = self;
 
         for archetype_cache in archetypes.values_mut() {
-            archetype_cache.is_downloaded = false;
-            archetype_cache.is_moved = false;
+            archetype_cache.state = ArchetypeCacheState::Invalidated;
         }
     }
 }
 
 #[derive(Debug)]
 pub struct ArchetypeCache {
-    is_downloaded: bool,
-    is_moved: bool,
+    state: ArchetypeCacheState,
     entities: DownloadBuffer,
     components: IndexMap<GpuComponentId, DownloadBuffer>,
 }
@@ -214,12 +212,18 @@ pub struct ArchetypeCache {
 impl ArchetypeCache {
     pub fn new(entities: DownloadBuffer) -> Self {
         Self {
-            is_downloaded: false,
-            is_moved: false,
             entities,
             components: IndexMap::default(),
+            state: ArchetypeCacheState::Invalidated,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum ArchetypeCacheState {
+    Invalidated,
+    CopiedFromGpu,
+    CopiedIntoCpu,
 }
 
 #[derive(Debug)]

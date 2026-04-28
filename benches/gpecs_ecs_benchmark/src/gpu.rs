@@ -15,9 +15,8 @@ use gpecs_itertools::Itertools as _;
 use wgpu::util::DeviceExt;
 
 use crate::{
-    framebuffer::{
-        FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH, save_framebuffer_to_file,
-    },
+    dump::dump_framebuffer_into_file,
+    framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
@@ -178,7 +177,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         framebuffer_download_buffer.unmap();
 
         log::info!(">>> Saving framebuffer state {i} to file...");
-        save_framebuffer_to_file(&framebuffer, "gpu", i);
+        dump_framebuffer_into_file(&framebuffer, "gpu", i);
     }
 
     executor.into_context(&queue)

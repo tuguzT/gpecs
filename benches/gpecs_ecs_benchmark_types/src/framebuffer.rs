@@ -1,16 +1,16 @@
 use bytemuck::{Pod, Zeroable};
 
-#[derive(Debug)]
-pub struct Framebuffer<B> {
-    desc: FramebufferDesc,
-    buffer: B,
-}
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 #[repr(C)]
 pub struct FramebufferDesc {
     pub width: u32,
     pub height: u32,
+}
+
+#[derive(Debug)]
+pub struct Framebuffer<B> {
+    desc: FramebufferDesc,
+    buffer: B,
 }
 
 impl<B> Framebuffer<B> {

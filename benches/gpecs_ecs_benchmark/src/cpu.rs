@@ -15,9 +15,8 @@ use gpecs_ecs_benchmark_types::{
 use gpecs_itertools::Itertools as _;
 
 use crate::{
-    framebuffer::{
-        FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH, save_framebuffer_to_file,
-    },
+    dump::dump_framebuffer_into_file,
+    framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
@@ -59,7 +58,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
         log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();
-        save_framebuffer_to_file(framebuffer, "cpu", i);
+        dump_framebuffer_into_file(framebuffer, "cpu", i);
     }
 
     // Return context from the executor

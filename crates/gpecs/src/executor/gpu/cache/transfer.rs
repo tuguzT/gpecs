@@ -139,7 +139,7 @@ impl TransferCache {
             };
 
             Self::move_archetype_into_trusted(archetype_cache, storage)
-                .ok_or_else(|| MappedArchetypeNotReadyError::new(archetype_id))?;
+                .map_err(|_| MappedArchetypeNotReadyError::new(archetype_id))?;
         }
 
         Ok(cpu_archetypes)
@@ -161,17 +161,18 @@ impl TransferCache {
         };
 
         Self::move_archetype_into_trusted(archetype_cache, storage)
-            .ok_or_else(|| MappedArchetypeNotReadyError::new(archetype_id))
+            .map_err(|_| MappedArchetypeNotReadyError::new(archetype_id))?;
+        Ok(storage)
     }
 
-    fn move_archetype_into_trusted<'a>(
+    fn move_archetype_into_trusted(
         archetype_cache: &mut ArchetypeCache,
-        storage: &'a mut ArchetypeStorage,
-    ) -> Option<&'a ArchetypeStorage> {
+        storage: &mut ArchetypeStorage,
+    ) -> Result<(), DownloadBufferNotReadyError> {
         match archetype_cache.state {
-            ArchetypeCacheState::Invalidated => return None,
+            ArchetypeCacheState::Invalidated => return Err(DownloadBufferNotReadyError),
             ArchetypeCacheState::CopiedFromGpu => (),
-            ArchetypeCacheState::CopiedIntoCpu => return Some(storage),
+            ArchetypeCacheState::CopiedIntoCpu => return Ok(()),
         }
 
         let (entities, mut bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
@@ -190,7 +191,7 @@ impl TransferCache {
         }
 
         archetype_cache.state = ArchetypeCacheState::CopiedIntoCpu;
-        Some(storage)
+        Ok(())
     }
 
     pub fn invalidate(&mut self) {
@@ -203,14 +204,14 @@ impl TransferCache {
 }
 
 #[derive(Debug)]
-pub struct ArchetypeCache {
+struct ArchetypeCache {
     state: ArchetypeCacheState,
     entities: DownloadBuffer,
     components: IndexMap<GpuComponentId, DownloadBuffer>,
 }
 
 impl ArchetypeCache {
-    pub fn new(entities: DownloadBuffer) -> Self {
+    fn new(entities: DownloadBuffer) -> Self {
         Self {
             entities,
             components: IndexMap::default(),
@@ -227,7 +228,7 @@ enum ArchetypeCacheState {
 }
 
 #[derive(Debug)]
-pub struct DownloadBuffer {
+struct DownloadBuffer {
     buffer: Buffer,
     init_size: BufferSize,
     is_mapped: Arc<AtomicBool>,
@@ -235,7 +236,7 @@ pub struct DownloadBuffer {
 
 impl DownloadBuffer {
     #[inline]
-    pub fn from_slice(
+    fn from_slice(
         device: &Device,
         command_encoder: &mut CommandEncoder,
         source: BufferSlice<'_>,
@@ -269,7 +270,7 @@ impl DownloadBuffer {
     }
 
     #[inline]
-    pub fn copy_from_slice<L>(
+    fn copy_from_slice<L>(
         &mut self,
         device: &Device,
         command_encoder: &mut CommandEncoder,
@@ -303,7 +304,7 @@ impl DownloadBuffer {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> Option<BufferView> {
+    fn as_slice(&self) -> Result<BufferView, DownloadBufferNotReadyError> {
         let Self {
             buffer,
             init_size,
@@ -311,10 +312,12 @@ impl DownloadBuffer {
         } = self;
 
         if !is_mapped.load(Ordering::Acquire) {
-            return None;
+            return Err(DownloadBufferNotReadyError);
         }
 
         let view = buffer.get_mapped_range(..init_size.get());
-        Some(view)
+        Ok(view)
     }
 }
+
+struct DownloadBufferNotReadyError;

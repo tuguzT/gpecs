@@ -1,11 +1,11 @@
 use bytemuck::{Pod, Zeroable};
+use glam::Vec2;
 use gpecs_component::{Component, GpuComponent};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Pod, Zeroable)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Pod, Zeroable)]
 #[repr(C, align(8))]
 pub struct Position {
-    pub x: f32,
-    pub y: f32,
+    pub data: Vec2,
 }
 
 impl Component for Position {}

@@ -4,6 +4,5 @@ use crate::{
 };
 
 pub fn update_position(position: &mut Position, velocity: &Velocity, dt: TimeDelta) {
-    position.x += velocity.x * dt.0;
-    position.y += velocity.y * dt.0;
+    position.data += velocity.data * dt.0;
 }

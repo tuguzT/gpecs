@@ -1,4 +1,4 @@
-use num_traits::ToPrimitive;
+use glam::IVec2;
 
 use crate::{
     components::{Position, Sprite},
@@ -9,9 +9,6 @@ pub fn render_sprite<B>(position: &Position, sprite: &Sprite, framebuffer: &mut 
 where
     B: AsMut<[u32]>,
 {
-    framebuffer.draw(
-        position.x.to_i32().unwrap(),
-        position.y.to_i32().unwrap(),
-        sprite.character,
-    );
+    let IVec2 { x, y } = position.data.as_ivec2();
+    framebuffer.draw(x, y, sprite.character);
 }

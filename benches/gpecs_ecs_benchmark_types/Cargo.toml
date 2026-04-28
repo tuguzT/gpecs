@@ -11,6 +11,7 @@ rust-version.workspace = true
 gpecs_component = { workspace = true }
 num-traits = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
+glam = { workspace = true, features = ["bytemuck", "nostd-libm"] }
 
 [lints]
 workspace = true

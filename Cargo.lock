@@ -700,6 +700,7 @@ dependencies = [
  "cargo-gpu-install",
  "const_format",
  "env_logger",
+ "glam",
  "gpecs",
  "gpecs_ecs_benchmark_types",
  "gpecs_itertools",
@@ -723,6 +724,7 @@ name = "gpecs_ecs_benchmark_types"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "glam",
  "gpecs_component",
  "num-traits",
 ]

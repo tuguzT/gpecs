@@ -1,3 +1,4 @@
+use glam::Vec2;
 use gpecs::{
     bundle::erased::error::DowncastErrorKind, context::error::IncompatibleBundleError, prelude::*,
 };
@@ -200,7 +201,9 @@ fn init_components(
     let x_rng = player.rng.range(0..framebuffer_width + SPAWN_AREA_MARGIN);
     let y_rng = player.rng.range(0..framebuffer_height + SPAWN_AREA_MARGIN);
     *position = Position {
-        x: x_rng.to_f32().unwrap() - spawn_area_margin_float,
-        y: y_rng.to_f32().unwrap() - SPAWN_AREA_MARGIN.to_f32().unwrap(),
+        data: Vec2 {
+            x: x_rng.to_f32().unwrap() - spawn_area_margin_float,
+            y: y_rng.to_f32().unwrap() - SPAWN_AREA_MARGIN.to_f32().unwrap(),
+        },
     };
 }

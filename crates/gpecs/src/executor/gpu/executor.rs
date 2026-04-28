@@ -291,16 +291,18 @@ impl<'ctx> GpuExecutor<'ctx> {
         let Self {
             ref context,
             ref device,
-            ref archetypes,
             ref systems,
             ref schedule,
+            ref mut archetypes,
             ref mut schedule_cache,
             ref mut transfer_cache,
             ref mut timestamp_query_resources,
             ..
         } = *self;
 
-        transfer_cache.invalidate();
+        let cpu_archetypes = context.archetypes();
+        transfer_cache.invalidate(device, command_encoder, cpu_archetypes, archetypes);
+
         if !schedule_cache.is_valid() {
             *schedule_cache = ScheduleCache::new(context, device, archetypes, systems, schedule);
             *timestamp_query_resources = TimestampQueryResources::new(device, schedule_cache);

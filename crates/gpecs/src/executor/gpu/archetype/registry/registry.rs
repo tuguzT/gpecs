@@ -122,6 +122,17 @@ impl GpuArchetypeRegistry {
     }
 
     #[inline]
+    pub unsafe fn get_archetype_storage_mut(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+    ) -> Option<&mut GpuArchetypeStorage> {
+        let Self { gpu_archetypes } = self;
+        gpu_archetypes
+            .get_mut(archetype_id.into_u32())
+            .map(Identity::as_inner_mut)
+    }
+
+    #[inline]
     pub fn contains(&self, id: ArchetypeId) -> bool {
         let Self { gpu_archetypes } = self;
         gpu_archetypes.contains_key(id.into_u32())

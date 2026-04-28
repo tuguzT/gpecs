@@ -108,6 +108,32 @@ impl<'a> ContextMapper<'a> {
     }
 
     #[inline]
+    pub fn get_mut_archetype_with_components(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+    ) -> Result<(&mut ArchetypeStorage, &Components), MappedArchetypeNotReadyError> {
+        let Self {
+            context,
+            transfer_cache,
+            ..
+        } = self;
+
+        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
+        let storage =
+            transfer_cache.move_archetype_into_and_allow_mutation(archetype_id, archetypes)?;
+        Ok((storage, components))
+    }
+
+    #[inline]
+    pub fn get_mut_archetype(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+    ) -> Result<&mut ArchetypeStorage, MappedArchetypeNotReadyError> {
+        let (storage, _) = self.get_mut_archetype_with_components(archetype_id)?;
+        Ok(storage)
+    }
+
+    #[inline]
     pub fn get_all(&mut self) -> Result<&Context, MappedContextNotReadyError> {
         let Self {
             context,
@@ -123,8 +149,21 @@ impl<'a> ContextMapper<'a> {
         Ok(context)
     }
 
-    // TODO: methods to copy data from CPU to GPU
-    //       do not grant mutable access to the context (yet)
+    #[inline]
+    pub fn get_mut_all(&mut self) -> Result<&mut Context, MappedContextNotReadyError> {
+        let Self {
+            context,
+            transfer_cache,
+            ..
+        } = self;
+
+        let (_, _, _, archetypes) = unsafe { context.as_parts_mut() };
+        transfer_cache
+            .move_all_into_and_allow_mutation(archetypes)
+            .map_err(|_| MappedContextNotReadyError)?;
+
+        Ok(context)
+    }
 }
 
 #[derive(Debug, Clone)]

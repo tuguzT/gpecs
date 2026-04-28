@@ -79,7 +79,9 @@ impl TransferCache {
         if let Entry::Occupied(ref entry) = archetype_cache_entry {
             match entry.get().state {
                 ArchetypeCacheState::Invalidated => (),
-                ArchetypeCacheState::CopiedFromGpu | ArchetypeCacheState::CopiedIntoCpu => return,
+                ArchetypeCacheState::CopiedFromGpu
+                | ArchetypeCacheState::CopiedIntoCpu
+                | ArchetypeCacheState::ShouldCopyIntoGpu(_) => return,
             }
         }
 
@@ -145,6 +147,28 @@ impl TransferCache {
         Ok(cpu_archetypes)
     }
 
+    pub fn move_all_into_and_allow_mutation<'a>(
+        &mut self,
+        cpu_archetypes: &'a mut ArchetypeRegistry,
+    ) -> Result<&'a mut ArchetypeRegistry, MappedArchetypeNotReadyError> {
+        let Self { archetypes } = self;
+
+        for (&archetype_id, archetype_cache) in archetypes {
+            let storage = unsafe { cpu_archetypes.get_archetype_storage_mut(archetype_id.into()) };
+            let Some(storage) = storage else {
+                unreachable!("{archetype_id} should exist")
+            };
+
+            Self::move_archetype_into_trusted(archetype_cache, storage)
+                .map_err(|_| MappedArchetypeNotReadyError::new(archetype_id))?;
+
+            assert_eq!(archetype_cache.state, ArchetypeCacheState::CopiedIntoCpu);
+            archetype_cache.state = ArchetypeCacheState::ShouldCopyIntoGpu(archetype_id);
+        }
+
+        Ok(cpu_archetypes)
+    }
+
     pub fn move_archetype_into<'a>(
         &mut self,
         archetype_id: GpuArchetypeId,
@@ -165,6 +189,30 @@ impl TransferCache {
         Ok(storage)
     }
 
+    pub fn move_archetype_into_and_allow_mutation<'a>(
+        &mut self,
+        archetype_id: GpuArchetypeId,
+        cpu_archetypes: &'a mut ArchetypeRegistry,
+    ) -> Result<&'a mut ArchetypeStorage, MappedArchetypeNotReadyError> {
+        let storage = unsafe { cpu_archetypes.get_archetype_storage_mut(archetype_id.into()) };
+        let Some(storage) = storage else {
+            unreachable!("{archetype_id} should exist")
+        };
+
+        let Self { archetypes } = self;
+        let Some(archetype_cache) = archetypes.get_mut(&archetype_id) else {
+            return Ok(storage);
+        };
+
+        Self::move_archetype_into_trusted(archetype_cache, storage)
+            .map_err(|_| MappedArchetypeNotReadyError::new(archetype_id))?;
+
+        assert_eq!(archetype_cache.state, ArchetypeCacheState::CopiedIntoCpu);
+        archetype_cache.state = ArchetypeCacheState::ShouldCopyIntoGpu(archetype_id);
+
+        Ok(storage)
+    }
+
     fn move_archetype_into_trusted(
         archetype_cache: &mut ArchetypeCache,
         storage: &mut ArchetypeStorage,
@@ -172,7 +220,9 @@ impl TransferCache {
         match archetype_cache.state {
             ArchetypeCacheState::Invalidated => return Err(DownloadBufferNotReadyError),
             ArchetypeCacheState::CopiedFromGpu => (),
-            ArchetypeCacheState::CopiedIntoCpu => return Ok(()),
+            ArchetypeCacheState::CopiedIntoCpu | ArchetypeCacheState::ShouldCopyIntoGpu(_) => {
+                return Ok(());
+            }
         }
 
         let (entities, mut bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
@@ -194,10 +244,31 @@ impl TransferCache {
         Ok(())
     }
 
-    pub fn invalidate(&mut self) {
+    pub fn invalidate(
+        &mut self,
+        _device: &Device,
+        _command_encoder: &mut CommandEncoder,
+        cpu_archetypes: &ArchetypeRegistry,
+        gpu_archetypes: &mut GpuArchetypeRegistry,
+    ) {
         let Self { archetypes } = self;
 
         for archetype_cache in archetypes.values_mut() {
+            if let ArchetypeCacheState::ShouldCopyIntoGpu(archetype_id) = archetype_cache.state {
+                let cpu_storage = cpu_archetypes.get_archetype_storage(archetype_id.into());
+                let Some(_cpu_storage) = cpu_storage else {
+                    unreachable!("{archetype_id} should exist")
+                };
+
+                let gpu_storage = unsafe { gpu_archetypes.get_archetype_storage_mut(archetype_id) };
+                let Some(_gpu_storage) = gpu_storage else {
+                    unreachable!("{archetype_id} should exist")
+                };
+
+                todo!("recreate storage for {archetype_id} & invalidate schedule cache")
+                // TODO: refactor schedule cache to store additional resources for each system
+                // schedule_cache.invalidate();
+            }
             archetype_cache.state = ArchetypeCacheState::Invalidated;
         }
     }
@@ -225,6 +296,7 @@ enum ArchetypeCacheState {
     Invalidated,
     CopiedFromGpu,
     CopiedIntoCpu,
+    ShouldCopyIntoGpu(GpuArchetypeId),
 }
 
 #[derive(Debug)]

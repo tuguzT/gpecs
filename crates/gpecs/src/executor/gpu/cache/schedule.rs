@@ -56,7 +56,7 @@ impl ScheduleCache {
         for system_id in schedule {
             let system_cache = self.systems.entry(system_id).or_insert_with(|| {
                 update_count += 1;
-                SystemCache::new(context, device, archetypes, systems, system_id, [])
+                SystemCache::new(context, device, archetypes, systems, system_id, &[])
             });
 
             let updated = system_cache.resync(device, archetypes, systems, system_id);
@@ -66,18 +66,15 @@ impl ScheduleCache {
         update_count > 0
     }
 
-    pub fn set_additional_entries<'a, I>(
+    pub fn set_additional_entries(
         &mut self,
         context: &Context,
         device: &Device,
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         system_id: GpuSystemId,
-        additional_entries: I,
-    ) where
-        I: IntoIterator<Item = BindGroupEntry<'a>>,
-        I::IntoIter: Clone,
-    {
+        additional_entries: &[BindGroupEntry<'_>],
+    ) {
         let system_cache = SystemCache::new(
             context,
             device,
@@ -119,18 +116,14 @@ pub struct SystemCache {
 }
 
 impl SystemCache {
-    fn new<'a, I>(
+    fn new(
         context: &Context,
         device: &Device,
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         system_id: GpuSystemId,
-        additional_entries: I,
-    ) -> Self
-    where
-        I: IntoIterator<Item = BindGroupEntry<'a>>,
-        I::IntoIter: Clone,
-    {
+        additional_entries: &[BindGroupEntry<'_>],
+    ) -> Self {
         let Some(system_shader) = systems.get_system_shader(system_id) else {
             unreachable!("{system_id} should exist");
         };
@@ -148,7 +141,6 @@ impl SystemCache {
             unreachable!("{system_id} should have compatible archetypes");
         };
 
-        let additional_entries = additional_entries.into_iter();
         let into_archetype_cache = |archetype_info: ArchetypeInfo<&ArchetypeStorage>| {
             let archetype_id = archetype_info.archetype_id();
             let archetype_id = archetypes.map_archetype_id(archetype_id)?;
@@ -157,12 +149,8 @@ impl SystemCache {
             };
 
             let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
-            let archetype_cache = ArchetypeCache::new(
-                device,
-                system_info,
-                archetype_info,
-                additional_entries.clone(),
-            )?;
+            let archetype_cache =
+                ArchetypeCache::new(device, system_info, archetype_info, additional_entries)?;
             Some((archetype_id, archetype_cache))
         };
 
@@ -170,59 +158,6 @@ impl SystemCache {
             .filter_map(into_archetype_cache)
             .collect();
         Self { archetypes }
-    }
-
-    #[inline]
-    fn request_archetype_resync(&mut self, archetype_id: GpuArchetypeId) {
-        let Self { archetypes } = self;
-
-        if let Some(archetype_cache) = archetypes.get_mut(&archetype_id) {
-            archetype_cache.request_resync();
-        }
-    }
-
-    #[inline]
-    fn request_resync(&mut self) {
-        let Self { archetypes } = self;
-
-        for archetype_cache in archetypes.values_mut() {
-            archetype_cache.request_resync();
-        }
-    }
-
-    #[inline]
-    fn resync(
-        &mut self,
-        device: &Device,
-        gpu_archetypes: &GpuArchetypeRegistry,
-        systems: &GpuSystemRegistry,
-        system_id: GpuSystemId,
-    ) -> bool {
-        let Self { archetypes } = self;
-
-        let mut update_count = 0_usize;
-        archetypes.retain(|&archetype_id, archetype_cache| {
-            let Some(system_shader) = systems.get_system_shader(system_id) else {
-                unreachable!("{system_id} should exist");
-            };
-            let system_info = GpuSystemInfo::new(system_id, system_shader);
-
-            let Some(archetype_storage) = gpu_archetypes.get_archetype_storage(archetype_id) else {
-                unreachable!("{archetype_id} should exist");
-            };
-            let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
-
-            // TODO: provide to-be-saved additional entries
-            let resync_result = archetype_cache.resync(device, system_info, archetype_info, []);
-            let Ok(updated) = resync_result else {
-                return false;
-            };
-
-            update_count += usize::from(updated);
-            true
-        });
-
-        update_count > 0
     }
 
     #[inline]
@@ -244,6 +179,59 @@ impl SystemCache {
             .iter()
             .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
     }
+
+    #[inline]
+    pub fn request_archetype_resync(&mut self, archetype_id: GpuArchetypeId) {
+        let Self { archetypes } = self;
+
+        if let Some(archetype_cache) = archetypes.get_mut(&archetype_id) {
+            archetype_cache.request_resync();
+        }
+    }
+
+    #[inline]
+    pub fn request_resync(&mut self) {
+        let Self { archetypes } = self;
+
+        for archetype_cache in archetypes.values_mut() {
+            archetype_cache.request_resync();
+        }
+    }
+
+    #[inline]
+    pub fn resync(
+        &mut self,
+        device: &Device,
+        gpu_archetypes: &GpuArchetypeRegistry,
+        systems: &GpuSystemRegistry,
+        system_id: GpuSystemId,
+    ) -> bool {
+        let Self { archetypes } = self;
+
+        let mut update_count = 0_usize;
+        archetypes.retain(|&archetype_id, archetype_cache| {
+            let Some(system_shader) = systems.get_system_shader(system_id) else {
+                unreachable!("{system_id} should exist");
+            };
+            let system_info = GpuSystemInfo::new(system_id, system_shader);
+
+            let Some(archetype_storage) = gpu_archetypes.get_archetype_storage(archetype_id) else {
+                unreachable!("{archetype_id} should exist");
+            };
+            let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
+
+            // TODO: provide to-be-saved additional entries
+            let resync_result = archetype_cache.resync(device, system_info, archetype_info, &[]);
+            let Ok(updated) = resync_result else {
+                return false;
+            };
+
+            update_count += usize::from(updated);
+            true
+        });
+
+        update_count > 0
+    }
 }
 
 #[derive(Debug)]
@@ -253,15 +241,12 @@ pub struct ArchetypeCache {
 }
 
 impl ArchetypeCache {
-    fn new<'a, I>(
+    fn new(
         device: &Device,
         system_info: GpuSystemInfo<&GpuSystemShader>,
         archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
-        additional_entries: I,
-    ) -> Option<Self>
-    where
-        I: IntoIterator<Item = BindGroupEntry<'a>>,
-    {
+        additional_entries: &[BindGroupEntry<'_>],
+    ) -> Option<Self> {
         let archetype_id = archetype_info.archetype_id();
         let archetype_storage = archetype_info.into_meta();
         if archetype_storage.is_empty() {
@@ -279,7 +264,7 @@ impl ArchetypeCache {
             component_entries_slices(shader_entries.components, slices.components)
                 .into_iter()
                 .filter_map(|(_, entry, slice)| bind_group_entry(entry, slice));
-        let additional_entries = additional_entries.into_iter().map(upcast_bind_group_entry);
+        let additional_entries = additional_entries.iter().cloned();
 
         let bind_group_label = match shader.label() {
             Some(label) => format!("`gpecs` {system_id:#} [{label}] {archetype_id:#} bind group"),
@@ -303,49 +288,37 @@ impl ArchetypeCache {
     }
 
     #[inline]
-    fn request_resync(&mut self) {
+    pub fn bind_group(&self) -> &BindGroup {
+        let Self { bind_group, .. } = self;
+        bind_group
+    }
+
+    #[inline]
+    pub fn request_resync(&mut self) {
         let Self { should_resync, .. } = self;
         *should_resync = true;
     }
 
     #[inline]
-    fn resync<'a, I>(
+    pub fn resync(
         &mut self,
         device: &Device,
         system_info: GpuSystemInfo<&GpuSystemShader>,
         archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
-        additional_entries: I,
-    ) -> Result<bool, InvalidArchetypeCacheError>
-    where
-        I: IntoIterator<Item = BindGroupEntry<'a>>,
-    {
+        additional_entries: &[BindGroupEntry<'_>],
+    ) -> Result<bool, ()> {
         let Self { should_resync, .. } = *self;
 
         if should_resync {
             let new = Self::new(device, system_info, archetype_info, additional_entries);
             let Some(new) = new else {
-                return Err(InvalidArchetypeCacheError);
+                return Err(());
             };
             *self = new;
             return Ok(true);
         }
         Ok(false)
     }
-
-    #[inline]
-    pub fn bind_group(&self) -> &BindGroup {
-        let Self { bind_group, .. } = self;
-        bind_group
-    }
-}
-
-struct InvalidArchetypeCacheError;
-
-#[inline]
-fn upcast_bind_group_entry<'short, 'long: 'short>(
-    entry: BindGroupEntry<'long>,
-) -> BindGroupEntry<'short> {
-    entry
 }
 
 #[inline]

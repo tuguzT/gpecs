@@ -252,11 +252,11 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn set_additional_entries<'a, I>(&mut self, system_id: GpuSystemId, additional_entries: I)
-    where
-        I: IntoIterator<Item = BindGroupEntry<'a>>,
-        I::IntoIter: Clone,
-    {
+    pub fn set_additional_entries(
+        &mut self,
+        system_id: GpuSystemId,
+        additional_entries: &[BindGroupEntry<'_>],
+    ) {
         let Self {
             ref context,
             ref device,

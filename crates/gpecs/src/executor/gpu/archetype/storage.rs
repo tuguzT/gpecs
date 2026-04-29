@@ -11,8 +11,10 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::storage::ArchetypeStorage, entity::Entity,
-    executor::gpu::component::registry::GpuComponentId, hash::IndexMap,
+    archetype::storage::ArchetypeStorage,
+    entity::Entity,
+    executor::gpu::component::registry::{GpuComponentId, GpuComponentInfo},
+    hash::IndexMap,
 };
 
 use super::registry::GpuArchetypeId;
@@ -149,21 +151,21 @@ impl GpuArchetypeStorageComponentSlices<'_> {
     #[inline]
     fn map_inner_item<'a>(
         item: (&GpuComponentId, &'a Option<StorageBuffer>),
-    ) -> (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>) {
+    ) -> GpuComponentInfo<Option<GpuArchetypeStorageSlice<'a>>> {
         let (&component_id, storage_buffer) = item;
         let slice = storage_buffer.as_ref().map(StorageBuffer::as_slice);
-        (component_id, slice)
+        GpuComponentInfo::new(component_id, slice)
     }
 }
 
 impl Debug for GpuArchetypeStorageComponentSlices<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map().entries(self.clone()).finish()
+        f.debug_set().entries(self.clone()).finish()
     }
 }
 
 impl<'a> Iterator for GpuArchetypeStorageComponentSlices<'a> {
-    type Item = (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>);
+    type Item = GpuComponentInfo<Option<GpuArchetypeStorageSlice<'a>>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

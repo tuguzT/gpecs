@@ -16,7 +16,7 @@ use crate::{
     archetype::erased::{ErasedArchetype, error::ArchetypeError},
     context::{ComponentDescriptor, Components},
     entity::Entity,
-    executor::gpu::component::registry::GpuComponentId,
+    executor::gpu::component::registry::{GpuComponentId, GpuComponentInfo},
     hash::IndexMap,
 };
 
@@ -265,17 +265,19 @@ pub struct GpuSystemShaderComponentEntries<'a> {
 
 impl Debug for GpuSystemShaderComponentEntries<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map().entries(self.clone()).finish()
+        f.debug_set().entries(self.clone()).finish()
     }
 }
 
 impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
-    type Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>);
+    type Item = GpuComponentInfo<Option<&'a GpuSystemShaderEntry>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(&id, entry)| (id, entry.as_ref()))
+        inner
+            .next()
+            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
     }
 
     #[inline]
@@ -293,13 +295,17 @@ impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(&id, entry)| (id, entry.as_ref()))
+        inner
+            .nth(n)
+            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
     }
 
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().map(|(&id, entry)| (id, entry.as_ref()))
+        inner
+            .last()
+            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
     }
 
     #[inline]
@@ -308,7 +314,9 @@ impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
         B: FromIterator<Self::Item>,
     {
         let Self { inner } = self;
-        inner.map(|(&id, entry)| (id, entry.as_ref())).collect()
+        inner
+            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
+            .collect()
     }
 }
 
@@ -316,13 +324,17 @@ impl DoubleEndedIterator for GpuSystemShaderComponentEntries<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(&id, entry)| (id, entry.as_ref()))
+        inner
+            .next_back()
+            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(&id, entry)| (id, entry.as_ref()))
+        inner
+            .nth_back(n)
+            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
     }
 }
 

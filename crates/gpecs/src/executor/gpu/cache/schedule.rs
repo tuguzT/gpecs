@@ -10,7 +10,7 @@ use crate::{
             registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
             storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
         },
-        component::registry::GpuComponentId,
+        component::registry::GpuComponentInfo,
         system::{
             registry::{GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
             schedule::GpuSystemSchedule,
@@ -135,7 +135,7 @@ impl<'a> SystemCache<'a> {
         let component_ids = system_shader
             .bind_group_layout_entries()
             .components
-            .map(|(component_id, _)| component_id.into());
+            .map(|components| components.component_id().into());
         let Ok(compatible_archetypes) = context
             .archetypes()
             .compatible_archetypes_from(components, component_ids)
@@ -270,7 +270,7 @@ impl ArchetypeCache {
         let component_bindings =
             component_entries_slices(shader_entries.components, slices.components)
                 .into_iter()
-                .filter_map(|(_, entry, slice)| bind_group_entry(entry, slice));
+                .filter_map(|(entry, slice)| bind_group_entry(entry, slice));
         let additional_entries = additional_entries.iter().cloned();
 
         let bind_group_label = match shader.label() {
@@ -340,7 +340,6 @@ fn bind_group_entry<'a>(
 }
 
 type ComponentEntriesSlicesOutputItem<'a> = (
-    GpuComponentId,
     Option<&'a GpuSystemShaderEntry>,
     Option<GpuArchetypeStorageSlice<'a>>,
 );
@@ -351,14 +350,15 @@ fn component_entries_slices<'a, E, S>(
     slices: S,
 ) -> impl IntoIterator<Item = ComponentEntriesSlicesOutputItem<'a>>
 where
-    E: IntoIterator<Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>)>,
-    S: IntoIterator<Item = (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>)>,
+    E: IntoIterator<Item = GpuComponentInfo<Option<&'a GpuSystemShaderEntry>>>,
+    S: IntoIterator<Item = GpuComponentInfo<Option<GpuArchetypeStorageSlice<'a>>>>,
 {
-    let mut slices: IndexMap<_, _> = slices.into_iter().collect();
-    entries.into_iter().map(move |(component_id, entry)| {
+    let mut slices: IndexMap<_, _> = slices.into_iter().map(From::from).collect();
+    entries.into_iter().map(move |entry| {
+        let (component_id, entry) = entry.into();
         let Some(slice) = slices.swap_remove(&component_id) else {
             unreachable!("{component_id} should exist");
         };
-        (component_id, entry, slice)
+        (entry, slice)
     })
 }

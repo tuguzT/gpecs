@@ -110,8 +110,9 @@ impl TransferCache {
                 ArchetypeCache::new(buffer)
             });
 
-        for (component_id, components) in storage_slices.components {
-            let Some(components) = components else {
+        for components in storage_slices.components {
+            let component_id = components.component_id();
+            let Some(components) = components.into_meta() else {
                 continue;
             };
 
@@ -281,8 +282,12 @@ impl TransferCache {
                     unreachable!("{archetype_id} should exist")
                 };
 
-                // TODO: do not recreate if capacity is sufficient for the new data
-                *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
+                if gpu_storage.capacity() < cpu_storage.capacity() {
+                    *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
+                } else {
+                    // TODO: set new len for GPU storage, then write data into it via staging buffer
+                    *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
+                }
                 schedule_cache.request_archetype_resync(archetype_id);
             }
             archetype_cache.state = ArchetypeCacheState::Invalidated;

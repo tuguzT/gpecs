@@ -46,6 +46,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         .expect("all the components should be unique");
 
     let gpu_system_resources = create_gpu_system_resources(&device, time_delta, &framebuffer);
+    let gpu_system_additional_entries =
+        create_gpu_systems_additional_entries(&gpu_system_resources);
 
     let framebuffer_download_buffer_desc = wgpu::BufferDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer download buffer"),
@@ -57,7 +59,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
     log::info!(">> Registering GPU systems...");
     let gpu_systems = register_gpu_systems(&mut executor);
-    setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_resources);
+    setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_additional_entries);
 
     log::info!(">> Running GPU systems...");
     for i in (0_u128..).maybe_take(repeat_count) {
@@ -153,18 +155,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     executor.into_context(&queue)
 }
 
-#[derive(Debug, Clone, Copy)]
-#[expect(unused)]
-struct GpuSystems {
-    update_position: GpuSystemId,
-    update_data: GpuSystemId,
-    update_components: GpuSystemId,
-    update_health: GpuSystemId,
-    update_damage: GpuSystemId,
-    update_sprite: GpuSystemId,
-    render_sprite: GpuSystemId,
-}
-
 #[derive(Debug)]
 struct GpuSystemResources {
     time_delta_uniform: wgpu::Buffer,
@@ -205,6 +195,67 @@ fn create_gpu_system_resources(
         framebuffer_desc_uniform,
         framebuffer_data_storage,
     }
+}
+
+#[derive(Debug)]
+struct GpuSystemAdditionalEntries<'a> {
+    update_position: [wgpu::BindGroupEntry<'a>; 1],
+    update_data: [wgpu::BindGroupEntry<'a>; 1],
+    render_sprite: [wgpu::BindGroupEntry<'a>; 2],
+}
+
+fn create_gpu_systems_additional_entries(
+    resources: &GpuSystemResources,
+) -> GpuSystemAdditionalEntries<'_> {
+    let time_delta_uniform_buffer_entry = wgpu::BindGroupEntry {
+        binding: 2,
+        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+            buffer: &resources.time_delta_uniform,
+            offset: 0,
+            size: None,
+        }),
+    };
+    let framebuffer_data_entry = wgpu::BindGroupEntry {
+        binding: 2,
+        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+            buffer: &resources.framebuffer_data_storage,
+            offset: 0,
+            size: None,
+        }),
+    };
+    let framebuffer_desc_entry = wgpu::BindGroupEntry {
+        binding: 3,
+        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+            buffer: &resources.framebuffer_desc_uniform,
+            offset: 0,
+            size: None,
+        }),
+    };
+
+    let update_position = [time_delta_uniform_buffer_entry.clone()];
+    let update_data = [wgpu::BindGroupEntry {
+        binding: 1,
+        ..time_delta_uniform_buffer_entry
+    }];
+    let render_sprite = [framebuffer_data_entry, framebuffer_desc_entry];
+
+    GpuSystemAdditionalEntries {
+        update_position,
+        update_data,
+        render_sprite,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[expect(unused)]
+struct GpuSystems {
+    update_position: GpuSystemId,
+    update_data: GpuSystemId,
+    update_components: GpuSystemId,
+    update_health: GpuSystemId,
+    update_damage: GpuSystemId,
+    update_sprite: GpuSystemId,
+    render_sprite: GpuSystemId,
 }
 
 #[expect(clippy::too_many_lines)]
@@ -394,46 +445,14 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     }
 }
 
-fn setup_gpu_systems(
-    executor: &mut GpuExecutor,
+fn setup_gpu_systems<'entries>(
+    executor: &mut GpuExecutor<'_, 'entries>,
     systems: &GpuSystems,
-    resources: &GpuSystemResources,
+    additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
 ) {
-    let time_delta_uniform_buffer_entry = wgpu::BindGroupEntry {
-        binding: 2,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: &resources.time_delta_uniform,
-            offset: 0,
-            size: None,
-        }),
-    };
-    let framebuffer_data_entry = wgpu::BindGroupEntry {
-        binding: 2,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: &resources.framebuffer_data_storage,
-            offset: 0,
-            size: None,
-        }),
-    };
-    let framebuffer_desc_entry = wgpu::BindGroupEntry {
-        binding: 3,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: &resources.framebuffer_desc_uniform,
-            offset: 0,
-            size: None,
-        }),
-    };
-
-    let update_position_system_entries = [time_delta_uniform_buffer_entry.clone()];
-    let update_data_system_entries = [wgpu::BindGroupEntry {
-        binding: 1,
-        ..time_delta_uniform_buffer_entry
-    }];
-    let render_sprite_system_entries = [framebuffer_data_entry, framebuffer_desc_entry];
-
-    executor.set_additional_entries(systems.update_position, &update_position_system_entries);
-    executor.set_additional_entries(systems.update_data, &update_data_system_entries);
-    executor.set_additional_entries(systems.render_sprite, &render_sprite_system_entries);
+    executor.set_additional_entries(systems.update_position, &additional_entries.update_position);
+    executor.set_additional_entries(systems.update_data, &additional_entries.update_data);
+    executor.set_additional_entries(systems.render_sprite, &additional_entries.render_sprite);
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

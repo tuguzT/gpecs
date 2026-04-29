@@ -33,19 +33,19 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct GpuExecutor<'ctx> {
+pub struct GpuExecutor<'ctx, 'entries> {
     context: &'ctx mut Context,
     device: Device,
     components: GpuComponentRegistry,
     archetypes: GpuArchetypeRegistry,
     systems: GpuSystemRegistry,
     schedule: GpuSystemSchedule,
-    schedule_cache: ScheduleCache,
+    schedule_cache: ScheduleCache<'entries>,
     transfer_cache: TransferCache,
     timestamp_query_resources: Option<TimestampQueryResources>,
 }
 
-impl<'ctx> GpuExecutor<'ctx> {
+impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
     #[inline]
     pub fn new(context: &'ctx mut Context, device: Device) -> Self {
         Self {
@@ -255,7 +255,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     pub fn set_additional_entries(
         &mut self,
         system_id: GpuSystemId,
-        additional_entries: &[BindGroupEntry<'_>],
+        additional_entries: &'entries [BindGroupEntry<'_>],
     ) {
         let Self {
             ref context,

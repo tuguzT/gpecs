@@ -18,7 +18,7 @@ use crate::{
 pub struct ContextMapper<'a> {
     context: &'a mut Context,
     device: &'a Device,
-    schedule_cache: &'a mut ScheduleCache,
+    schedule_cache: &'a ScheduleCache<'a>,
     transfer_cache: &'a mut TransferCache,
     archetypes: &'a mut GpuArchetypeRegistry,
 }
@@ -29,7 +29,7 @@ impl<'a> ContextMapper<'a> {
         context: &'a mut Context,
         device: &'a Device,
         transfer_cache: &'a mut TransferCache,
-        schedule_cache: &'a mut ScheduleCache,
+        schedule_cache: &'a ScheduleCache<'a>,
         archetypes: &'a mut GpuArchetypeRegistry,
     ) -> Self {
         Self {

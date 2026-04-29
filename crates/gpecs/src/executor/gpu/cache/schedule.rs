@@ -21,11 +21,11 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct ScheduleCache {
-    systems: IndexMap<GpuSystemId, SystemCache>,
+pub struct ScheduleCache<'a> {
+    systems: IndexMap<GpuSystemId, SystemCache<'a>>,
 }
 
-impl ScheduleCache {
+impl<'a> ScheduleCache<'a> {
     #[inline]
     pub fn request_system_resync(&mut self, system_id: GpuSystemId) {
         let Self { systems } = self;
@@ -73,7 +73,7 @@ impl ScheduleCache {
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         system_id: GpuSystemId,
-        additional_entries: &[BindGroupEntry<'_>],
+        additional_entries: &'a [BindGroupEntry<'_>],
     ) {
         let system_cache = SystemCache::new(
             context,
@@ -95,13 +95,13 @@ impl ScheduleCache {
     }
 
     #[inline]
-    pub fn system(&self, system_id: GpuSystemId) -> Option<&SystemCache> {
+    pub fn system(&self, system_id: GpuSystemId) -> Option<&SystemCache<'a>> {
         let Self { systems } = self;
         systems.get(&system_id)
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = GpuSystemInfo<&SystemCache>> {
+    pub fn iter(&self) -> impl Iterator<Item = GpuSystemInfo<&SystemCache<'a>>> {
         let Self { systems } = self;
         systems
             .iter()
@@ -110,19 +110,19 @@ impl ScheduleCache {
 }
 
 #[derive(Debug, Default)]
-pub struct SystemCache {
-    // TODO: store additional resources & then create bindings for them on demand
+pub struct SystemCache<'a> {
+    additional_entries: &'a [BindGroupEntry<'a>],
     archetypes: IndexMap<GpuArchetypeId, ArchetypeCache>,
 }
 
-impl SystemCache {
+impl<'a> SystemCache<'a> {
     fn new(
         context: &Context,
         device: &Device,
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         system_id: GpuSystemId,
-        additional_entries: &[BindGroupEntry<'_>],
+        additional_entries: &'a [BindGroupEntry<'_>],
     ) -> Self {
         let Some(system_shader) = systems.get_system_shader(system_id) else {
             unreachable!("{system_id} should exist");
@@ -157,12 +157,15 @@ impl SystemCache {
         let archetypes = compatible_archetypes
             .filter_map(into_archetype_cache)
             .collect();
-        Self { archetypes }
+        Self {
+            additional_entries,
+            archetypes,
+        }
     }
 
     #[inline]
     fn request_archetype_resync(&mut self, archetype_id: GpuArchetypeId) {
-        let Self { archetypes } = self;
+        let Self { archetypes, .. } = self;
 
         if let Some(archetype_cache) = archetypes.get_mut(&archetype_id) {
             archetype_cache.request_resync();
@@ -171,7 +174,7 @@ impl SystemCache {
 
     #[inline]
     fn request_resync(&mut self) {
-        let Self { archetypes } = self;
+        let Self { archetypes, .. } = self;
 
         for archetype_cache in archetypes.values_mut() {
             archetype_cache.request_resync();
@@ -185,7 +188,10 @@ impl SystemCache {
         systems: &GpuSystemRegistry,
         system_id: GpuSystemId,
     ) -> bool {
-        let Self { archetypes } = self;
+        let Self {
+            ref mut archetypes,
+            additional_entries,
+        } = *self;
 
         let mut update_count = 0_usize;
         archetypes.retain(|&archetype_id, archetype_cache| {
@@ -199,8 +205,8 @@ impl SystemCache {
             };
             let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
 
-            // TODO: provide to-be-saved additional entries
-            let resync_result = archetype_cache.resync(device, system_info, archetype_info, &[]);
+            let resync_result =
+                archetype_cache.resync(device, system_info, archetype_info, additional_entries);
             let Ok(updated) = resync_result else {
                 return false;
             };
@@ -214,19 +220,19 @@ impl SystemCache {
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { archetypes } = self;
+        let Self { archetypes, .. } = self;
         archetypes.len()
     }
 
     #[inline]
     pub fn archetype(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeCache> {
-        let Self { archetypes } = self;
+        let Self { archetypes, .. } = self;
         archetypes.get(&archetype_id)
     }
 
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = GpuArchetypeInfo<&ArchetypeCache>> {
-        let Self { archetypes } = self;
+        let Self { archetypes, .. } = self;
         archetypes
             .iter()
             .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))

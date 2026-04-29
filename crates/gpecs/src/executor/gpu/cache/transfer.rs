@@ -281,6 +281,7 @@ impl TransferCache {
                     unreachable!("{archetype_id} should exist")
                 };
 
+                // TODO: do not recreate if capacity is sufficient for the new data
                 *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
                 schedule_cache.request_archetype_resync(archetype_id);
             }

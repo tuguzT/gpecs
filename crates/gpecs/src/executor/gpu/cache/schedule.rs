@@ -49,17 +49,19 @@ impl<'a> ScheduleCache<'a> {
         context: &Context,
         device: &Device,
         archetypes: &GpuArchetypeRegistry,
-        systems: &GpuSystemRegistry,
+        gpu_systems: &GpuSystemRegistry,
         schedule: &GpuSystemSchedule,
     ) -> bool {
+        let Self { systems } = self;
+
         let mut update_count = 0_usize;
         for system_id in schedule {
-            let system_cache = self.systems.entry(system_id).or_insert_with(|| {
+            let system_cache = systems.entry(system_id).or_insert_with(|| {
                 update_count += 1;
-                SystemCache::new(context, device, archetypes, systems, system_id, &[])
+                SystemCache::new(context, device, archetypes, gpu_systems, system_id, &[])
             });
 
-            let updated = system_cache.resync(device, archetypes, systems, system_id);
+            let updated = system_cache.resync(device, archetypes, gpu_systems, system_id);
             update_count += usize::from(updated);
         }
 
@@ -304,13 +306,13 @@ impl ArchetypeCache {
         system_info: GpuSystemInfo<&GpuSystemShader>,
         archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
         additional_entries: &[BindGroupEntry<'_>],
-    ) -> Result<bool, ()> {
+    ) -> Result<bool, ArchetypeCacheResyncError> {
         let Self { should_resync, .. } = *self;
 
         if should_resync {
             let new = Self::new(device, system_info, archetype_info, additional_entries);
             let Some(new) = new else {
-                return Err(());
+                return Err(ArchetypeCacheResyncError);
             };
             *self = new;
             return Ok(true);
@@ -324,6 +326,8 @@ impl ArchetypeCache {
         bind_group
     }
 }
+
+struct ArchetypeCacheResyncError;
 
 #[inline]
 fn bind_group_entry<'a>(

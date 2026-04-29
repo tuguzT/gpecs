@@ -26,7 +26,6 @@ pub struct GpuArchetypeStorage {
 }
 
 impl GpuArchetypeStorage {
-    #[inline]
     pub(in crate::executor::gpu) fn new(
         gpu_device: &Device,
         archetype_id: GpuArchetypeId,

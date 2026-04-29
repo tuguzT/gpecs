@@ -1,17 +1,20 @@
 use std::{
+    alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
 };
 
 use bytemuck::must_cast_slice;
 use indexmap::map::Iter as IndexMapIter;
 use wgpu::{
-    Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, Device,
+    Buffer, BufferAddress, BufferSlice, BufferUsages, Device,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
 use crate::{
     archetype::storage::ArchetypeStorage,
+    component::erased::ErasedComponentSlice,
     entity::Entity,
     executor::gpu::component::registry::{GpuComponentId, GpuComponentInfo},
     hash::IndexMap,
@@ -23,8 +26,8 @@ use super::registry::GpuArchetypeId;
 pub struct GpuArchetypeStorage {
     len: usize,
     capacity: usize,
-    entities_buffer: Option<StorageBuffer>,
-    component_buffers: IndexMap<GpuComponentId, Option<StorageBuffer>>,
+    entities_buffer: StorageBuffer,
+    component_buffers: IndexMap<GpuComponentId, StorageBuffer>,
 }
 
 impl GpuArchetypeStorage {
@@ -37,15 +40,9 @@ impl GpuArchetypeStorage {
         let len = archetype_storage.len();
         let capacity = archetype_storage.capacity();
 
-        let entities_contents = must_cast_slice(entities);
         let entities_label = || format!("`gpecs` {archetype_id:#} entities storage buffer");
-        let entities_capacity_in_bytes = size_of::<Entity>().strict_mul(capacity);
-        let entities_buffer = StorageBuffer::new(
-            gpu_device,
-            entities_contents,
-            entities_capacity_in_bytes,
-            entities_label,
-        );
+        let entities_buffer =
+            StorageBuffer::from_entities(gpu_device, entities, capacity, entities_label);
 
         let component_buffers = bundles
             .into_iter()
@@ -54,14 +51,10 @@ impl GpuArchetypeStorage {
                 let components_label =
                     || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
 
-                // SAFETY: GPU components implement `NoUninit`, and so all the bytes of its slice should be initialized, too
-                let components_contents = unsafe { components.as_buffer().assume_init_ref() };
-                let components_capacity_in_bytes =
-                    components.fields().layout().size().strict_mul(capacity);
-                let buffer = StorageBuffer::new(
+                let buffer = StorageBuffer::from_components(
                     gpu_device,
-                    components_contents,
-                    components_capacity_in_bytes,
+                    components,
+                    capacity,
                     components_label,
                 );
                 (component_id, buffer)
@@ -94,6 +87,25 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
+    #[expect(unused)]
+    pub(in crate::executor::gpu) unsafe fn set_len(&mut self, new_len: usize) {
+        let Self {
+            capacity,
+            ref mut len,
+            ref mut entities_buffer,
+            ref mut component_buffers,
+        } = *self;
+
+        debug_assert!(new_len <= capacity);
+        *len = new_len;
+
+        unsafe { entities_buffer.set_len(new_len) }
+        for components in component_buffers.values_mut() {
+            unsafe { components.set_len(new_len) }
+        }
+    }
+
+    #[inline]
     pub fn slices(&self) -> GpuArchetypeStorageSlices<'_> {
         let Self {
             entities_buffer,
@@ -102,7 +114,7 @@ impl GpuArchetypeStorage {
         } = self;
 
         GpuArchetypeStorageSlices {
-            entities: entities_buffer.as_ref().map(StorageBuffer::as_slice),
+            entities: entities_buffer.as_slice(),
             components: GpuArchetypeStorageComponentSlices {
                 inner: component_buffers.iter(),
             },
@@ -112,48 +124,43 @@ impl GpuArchetypeStorage {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GpuArchetypeStorageSlice<'a> {
-    slice: BufferSlice<'a>,
+    slice: Option<BufferSlice<'a>>,
+    item_layout: Layout,
 }
 
 impl<'a> GpuArchetypeStorageSlice<'a> {
     #[inline]
-    pub fn size(&self) -> BufferSize {
-        let Self { slice } = self;
-        slice.size()
-    }
-
-    #[inline]
-    pub fn offset(&self) -> BufferAddress {
-        let Self { slice } = self;
-        slice.offset()
-    }
-
-    #[inline]
-    pub unsafe fn as_slice(&self) -> BufferSlice<'a> {
-        let Self { slice } = *self;
+    pub unsafe fn as_slice(&self) -> Option<BufferSlice<'a>> {
+        let Self { slice, .. } = *self;
         slice
+    }
+
+    #[inline]
+    pub fn item_layout(&self) -> Layout {
+        let Self { item_layout, .. } = *self;
+        item_layout
     }
 }
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GpuArchetypeStorageSlices<'a> {
-    pub entities: Option<GpuArchetypeStorageSlice<'a>>,
+    pub entities: GpuArchetypeStorageSlice<'a>,
     pub components: GpuArchetypeStorageComponentSlices<'a>,
 }
 
 #[derive(Clone)]
 pub struct GpuArchetypeStorageComponentSlices<'a> {
-    inner: IndexMapIter<'a, GpuComponentId, Option<StorageBuffer>>,
+    inner: IndexMapIter<'a, GpuComponentId, StorageBuffer>,
 }
 
 impl GpuArchetypeStorageComponentSlices<'_> {
     #[inline]
     fn map_inner_item<'a>(
-        item: (&GpuComponentId, &'a Option<StorageBuffer>),
-    ) -> GpuComponentInfo<Option<GpuArchetypeStorageSlice<'a>>> {
+        item: (&GpuComponentId, &'a StorageBuffer),
+    ) -> GpuComponentInfo<GpuArchetypeStorageSlice<'a>> {
         let (&component_id, storage_buffer) = item;
-        let slice = storage_buffer.as_ref().map(StorageBuffer::as_slice);
+        let slice = storage_buffer.as_slice();
         GpuComponentInfo::new(component_id, slice)
     }
 }
@@ -165,7 +172,7 @@ impl Debug for GpuArchetypeStorageComponentSlices<'_> {
 }
 
 impl<'a> Iterator for GpuArchetypeStorageComponentSlices<'a> {
-    type Item = GpuComponentInfo<Option<GpuArchetypeStorageSlice<'a>>>;
+    type Item = GpuComponentInfo<GpuArchetypeStorageSlice<'a>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -233,43 +240,81 @@ impl FusedIterator for GpuArchetypeStorageComponentSlices<'_> {}
 
 #[derive(Debug, Clone)]
 struct StorageBuffer {
-    buffer: Buffer,
-    init_size: BufferSize,
+    buffer: Option<Buffer>,
+    init_size: BufferAddress,
+    item_layout: Layout,
 }
 
 impl StorageBuffer {
     #[inline]
-    fn new<L>(
+    fn from_entities<L>(
         device: &Device,
+        entities: &[Entity],
+        capacity: usize,
+        label: impl FnOnce() -> L,
+    ) -> Self
+    where
+        L: AsRef<str>,
+    {
+        let contents = must_cast_slice(entities);
+        let item_layout = Layout::new::<Entity>();
+        let capacity_in_bytes = item_layout.size().strict_mul(capacity);
+        unsafe { Self::from_contents(device, item_layout, contents, capacity_in_bytes, label) }
+    }
+
+    #[inline]
+    fn from_components<L>(
+        device: &Device,
+        components: ErasedComponentSlice<'_, *const MaybeUninit<u8>>,
+        capacity: usize,
+        label: impl FnOnce() -> L,
+    ) -> Self
+    where
+        L: AsRef<str>,
+    {
+        // SAFETY: GPU components implement `NoUninit`, and so all the bytes of its slice should be initialized, too
+        let contents = unsafe { components.as_buffer().assume_init_ref() };
+        let item_layout = components.fields().layout();
+        let capacity_in_bytes = item_layout.size().strict_mul(capacity);
+        unsafe { Self::from_contents(device, item_layout, contents, capacity_in_bytes, label) }
+    }
+
+    unsafe fn from_contents<L>(
+        device: &Device,
+        item_layout: Layout,
         contents: &[u8],
         capacity_in_bytes: usize,
         label: impl FnOnce() -> L,
-    ) -> Option<Self>
+    ) -> Self
     where
         L: AsRef<str>,
     {
         let init_size = BufferAddress::try_from(contents.len())
-            .expect("contents size should fit into `BufferAddress`")
-            .try_into()
-            .ok()?;
+            .expect("contents size should fit into `BufferAddress`");
 
-        let new_contents_capacity = usize::max(contents.len(), capacity_in_bytes);
-        let mut new_contents = Vec::with_capacity(new_contents_capacity);
+        let buffer = (init_size != 0).then(|| {
+            let new_contents_capacity = usize::max(contents.len(), capacity_in_bytes);
+            let mut new_contents = Vec::with_capacity(new_contents_capacity);
+            new_contents.extend_from_slice(contents);
+            new_contents.resize(capacity_in_bytes, 0);
 
-        new_contents.extend_from_slice(contents);
-        new_contents.resize(capacity_in_bytes, 0);
-        let contents = new_contents.as_slice();
+            let contents = new_contents.as_slice();
+            assert_eq!(contents.len() % item_layout.size(), 0);
 
-        let label = label();
-        let desc = BufferInitDescriptor {
-            label: Some(label.as_ref()),
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-            contents,
-        };
-        let buffer = device.create_buffer_init(&desc);
+            let label = label();
+            let desc = BufferInitDescriptor {
+                label: Some(label.as_ref()),
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+                contents,
+            };
+            device.create_buffer_init(&desc)
+        });
 
-        let me = Self { buffer, init_size };
-        Some(me)
+        Self {
+            buffer,
+            init_size,
+            item_layout,
+        }
     }
 
     #[inline]
@@ -277,10 +322,30 @@ impl StorageBuffer {
         let Self {
             ref buffer,
             init_size,
+            item_layout,
         } = *self;
 
-        let size = init_size.into();
-        let slice = buffer.slice(0..size);
-        GpuArchetypeStorageSlice { slice }
+        let slice = buffer
+            .as_ref()
+            .filter(|_| init_size != 0)
+            .map(|buffer| buffer.slice(0..init_size));
+        GpuArchetypeStorageSlice { slice, item_layout }
+    }
+
+    #[inline]
+    unsafe fn set_len(&mut self, new_len: usize) {
+        let Self {
+            ref buffer,
+            ref mut init_size,
+            item_layout,
+        } = *self;
+
+        let new_init_size = BufferAddress::try_from(item_layout.size().strict_mul(new_len))
+            .expect("contents size should fit into `BufferAddress`");
+
+        let buffer_size = buffer.as_ref().map(Buffer::size).unwrap_or_default();
+        debug_assert!(new_init_size <= buffer_size);
+
+        *init_size = new_init_size;
     }
 }

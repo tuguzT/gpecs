@@ -93,11 +93,11 @@ impl TransferCache {
         };
         let storage_slices = storage.slices();
 
-        let Some(entities) = storage_slices.entities else {
+        let entities = unsafe { storage_slices.entities.as_slice() };
+        let Some(source) = entities else {
             return;
         };
 
-        let source = unsafe { entities.as_slice() };
         let label = || format!("`gpecs` {archetype_id:#} entities download buffer");
         let archetype_cache = archetype_cache_entry
             .and_modify(|cache| {
@@ -112,11 +112,11 @@ impl TransferCache {
 
         for components in storage_slices.components {
             let component_id = components.component_id();
-            let Some(components) = components.into_meta() else {
+            let components = unsafe { components.into_meta().as_slice() };
+            let Some(source) = components else {
                 continue;
             };
 
-            let source = unsafe { components.as_slice() };
             let label = || format!("`gpecs` {archetype_id:#} {component_id:#} download buffer");
             archetype_cache
                 .components
@@ -285,7 +285,8 @@ impl TransferCache {
                 if gpu_storage.capacity() < cpu_storage.capacity() {
                     *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
                 } else {
-                    // TODO: set new len for GPU storage, then write data into it via staging buffer
+                    // unsafe { gpu_storage.set_len(cpu_storage.len()) }
+                    // todo!("move data from CPU storage into GPU storage using staging buffer")
                     *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
                 }
                 schedule_cache.request_archetype_resync(archetype_id);

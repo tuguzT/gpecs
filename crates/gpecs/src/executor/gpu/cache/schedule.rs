@@ -332,16 +332,16 @@ struct ArchetypeCacheResyncError;
 #[inline]
 fn bind_group_entry<'a>(
     entry: Option<&GpuSystemShaderEntry>,
-    slice: Option<GpuArchetypeStorageSlice<'a>>,
+    slice: GpuArchetypeStorageSlice<'a>,
 ) -> Option<BindGroupEntry<'a>> {
     let binding = entry?.binding_index;
-    let resource = unsafe { slice?.as_slice() }.into();
+    let resource = unsafe { slice.as_slice() }?.into();
     Some(BindGroupEntry { binding, resource })
 }
 
 type ComponentEntriesSlicesOutputItem<'a> = (
     Option<&'a GpuSystemShaderEntry>,
-    Option<GpuArchetypeStorageSlice<'a>>,
+    GpuArchetypeStorageSlice<'a>,
 );
 
 #[inline]
@@ -351,7 +351,7 @@ fn component_entries_slices<'a, E, S>(
 ) -> impl IntoIterator<Item = ComponentEntriesSlicesOutputItem<'a>>
 where
     E: IntoIterator<Item = GpuComponentInfo<Option<&'a GpuSystemShaderEntry>>>,
-    S: IntoIterator<Item = GpuComponentInfo<Option<GpuArchetypeStorageSlice<'a>>>>,
+    S: IntoIterator<Item = GpuComponentInfo<GpuArchetypeStorageSlice<'a>>>,
 {
     let mut slices: IndexMap<_, _> = slices.into_iter().map(From::from).collect();
     entries.into_iter().map(move |entry| {

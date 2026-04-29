@@ -424,16 +424,21 @@ fn setup_gpu_systems(
         }),
     };
 
-    let update_position_system_entries = [time_delta_uniform_buffer_entry.clone()];
-    let update_data_system_entries = [wgpu::BindGroupEntry {
-        binding: 1,
-        ..time_delta_uniform_buffer_entry
-    }];
-    let render_sprite_system_entries = [framebuffer_data_entry, framebuffer_desc_entry];
-
-    executor.set_additional_entries(systems.update_position, &update_position_system_entries);
-    executor.set_additional_entries(systems.update_data, &update_data_system_entries);
-    executor.set_additional_entries(systems.render_sprite, &render_sprite_system_entries);
+    executor.set_additional_entries(
+        systems.update_position,
+        [time_delta_uniform_buffer_entry.clone()],
+    );
+    executor.set_additional_entries(
+        systems.update_data,
+        [wgpu::BindGroupEntry {
+            binding: 1,
+            ..time_delta_uniform_buffer_entry
+        }],
+    );
+    executor.set_additional_entries(
+        systems.render_sprite,
+        [framebuffer_data_entry, framebuffer_desc_entry],
+    );
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

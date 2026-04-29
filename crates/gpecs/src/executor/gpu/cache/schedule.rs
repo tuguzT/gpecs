@@ -161,27 +161,7 @@ impl SystemCache {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { archetypes } = self;
-        archetypes.len()
-    }
-
-    #[inline]
-    pub fn archetype(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeCache> {
-        let Self { archetypes } = self;
-        archetypes.get(&archetype_id)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = GpuArchetypeInfo<&ArchetypeCache>> {
-        let Self { archetypes } = self;
-        archetypes
-            .iter()
-            .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
-    }
-
-    #[inline]
-    pub fn request_archetype_resync(&mut self, archetype_id: GpuArchetypeId) {
+    fn request_archetype_resync(&mut self, archetype_id: GpuArchetypeId) {
         let Self { archetypes } = self;
 
         if let Some(archetype_cache) = archetypes.get_mut(&archetype_id) {
@@ -190,7 +170,7 @@ impl SystemCache {
     }
 
     #[inline]
-    pub fn request_resync(&mut self) {
+    fn request_resync(&mut self) {
         let Self { archetypes } = self;
 
         for archetype_cache in archetypes.values_mut() {
@@ -198,8 +178,7 @@ impl SystemCache {
         }
     }
 
-    #[inline]
-    pub fn resync(
+    fn resync(
         &mut self,
         device: &Device,
         gpu_archetypes: &GpuArchetypeRegistry,
@@ -231,6 +210,26 @@ impl SystemCache {
         });
 
         update_count > 0
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { archetypes } = self;
+        archetypes.len()
+    }
+
+    #[inline]
+    pub fn archetype(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeCache> {
+        let Self { archetypes } = self;
+        archetypes.get(&archetype_id)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = GpuArchetypeInfo<&ArchetypeCache>> {
+        let Self { archetypes } = self;
+        archetypes
+            .iter()
+            .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
     }
 }
 
@@ -288,19 +287,12 @@ impl ArchetypeCache {
     }
 
     #[inline]
-    pub fn bind_group(&self) -> &BindGroup {
-        let Self { bind_group, .. } = self;
-        bind_group
-    }
-
-    #[inline]
-    pub fn request_resync(&mut self) {
+    fn request_resync(&mut self) {
         let Self { should_resync, .. } = self;
         *should_resync = true;
     }
 
-    #[inline]
-    pub fn resync(
+    fn resync(
         &mut self,
         device: &Device,
         system_info: GpuSystemInfo<&GpuSystemShader>,
@@ -318,6 +310,12 @@ impl ArchetypeCache {
             return Ok(true);
         }
         Ok(false)
+    }
+
+    #[inline]
+    pub fn bind_group(&self) -> &BindGroup {
+        let Self { bind_group, .. } = self;
+        bind_group
     }
 }
 

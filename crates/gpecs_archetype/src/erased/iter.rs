@@ -123,6 +123,9 @@ impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
 
 impl<Meta> FusedIterator for Iter<'_, Meta> {}
 
+unsafe impl<Meta> Send for Iter<'_, Meta> where Meta: Sync {}
+unsafe impl<Meta> Sync for Iter<'_, Meta> where Meta: Sync {}
+
 impl<'a, Meta> FieldLayouts<'a> for Iter<'_, Meta>
 where
     Meta: WithLayout + 'a,

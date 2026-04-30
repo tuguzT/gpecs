@@ -291,3 +291,6 @@ impl<'a, Meta> IntoIterator for EntityRegistryView<'a, Meta> {
         Iter::from_inner(inner)
     }
 }
+
+unsafe impl<Meta> Send for EntityRegistryView<'_, Meta> where Meta: Sync {}
+unsafe impl<Meta> Sync for EntityRegistryView<'_, Meta> where Meta: Sync {}

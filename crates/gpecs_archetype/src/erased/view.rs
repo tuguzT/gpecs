@@ -467,6 +467,9 @@ impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
     }
 }
 
+unsafe impl<Meta> Send for ErasedArchetypeView<'_, Meta> where Meta: Sync {}
+unsafe impl<Meta> Sync for ErasedArchetypeView<'_, Meta> where Meta: Sync {}
+
 impl<'a, Meta> FieldLayouts<'a> for ErasedArchetypeView<'_, Meta>
 where
     Meta: WithLayout + 'a,

@@ -157,6 +157,9 @@ impl<Meta> ExactSizeIterator for IterMut<'_, Meta> {
 
 impl<Meta> FusedIterator for IterMut<'_, Meta> {}
 
+unsafe impl<Meta> Send for IterMut<'_, Meta> where Meta: Send {}
+unsafe impl<Meta> Sync for IterMut<'_, Meta> where Meta: Sync {}
+
 #[inline]
 fn inner_item_to_item_trusted<'a, Meta>(
     (entity, meta): (*mut Entity, *mut Identity<Meta>),

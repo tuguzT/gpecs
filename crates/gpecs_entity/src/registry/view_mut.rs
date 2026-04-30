@@ -401,3 +401,6 @@ impl<'a, Meta> IntoIterator for EntityRegistryViewMut<'a, Meta> {
         IterMut::from_inner(inner)
     }
 }
+
+unsafe impl<Meta> Send for EntityRegistryViewMut<'_, Meta> where Meta: Send {}
+unsafe impl<Meta> Sync for EntityRegistryViewMut<'_, Meta> where Meta: Sync {}

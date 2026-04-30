@@ -25,7 +25,7 @@ where
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
-impl<'ctx, T> SoaSlicesMut<'ctx, '_, T>
+impl<'ctx, 'a, T> SoaSlicesMut<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -233,6 +233,77 @@ where
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.into_get_unchecked_mut_with_context(index) }
+    }
+
+    #[inline]
+    pub unsafe fn split_at_unchecked(
+        self,
+        mid: usize,
+    ) -> (SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (first, second) = unsafe { ptrs.clone().split_at_unchecked(mid) };
+        unsafe { (first.as_ref_unchecked(), second.as_ref_unchecked()) }
+    }
+
+    #[inline]
+    pub fn split_at_checked(
+        self,
+        mid: usize,
+    ) -> Option<(SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>)> {
+        if mid <= self.len() {
+            // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
+            // fulfills the requirements of `split_at_unchecked`.
+            Some(unsafe { self.split_at_unchecked(mid) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn split_at(self, mid: usize) -> (SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>) {
+        match self.split_at_checked(mid) {
+            Some(pair) => pair,
+            None => panic!("mid > len"),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn split_at_mut_unchecked(
+        self,
+        mid: usize,
+    ) -> (SoaSlicesMut<'ctx, 'a, T>, SoaSlicesMut<'ctx, 'a, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (first, second) = unsafe { ptrs.clone().split_at_mut_unchecked(mid) };
+        unsafe { (first.as_mut_unchecked(), second.as_mut_unchecked()) }
+    }
+
+    #[inline]
+    pub fn split_at_mut_checked(
+        self,
+        mid: usize,
+    ) -> Option<(SoaSlicesMut<'ctx, 'a, T>, SoaSlicesMut<'ctx, 'a, T>)> {
+        if mid <= self.len() {
+            // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
+            // fulfills the requirements of `split_at_unchecked`.
+            Some(unsafe { self.split_at_mut_unchecked(mid) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn split_at_mut(
+        self,
+        mid: usize,
+    ) -> (SoaSlicesMut<'ctx, 'a, T>, SoaSlicesMut<'ctx, 'a, T>) {
+        match self.split_at_mut_checked(mid) {
+            Some(pair) => pair,
+            None => panic!("mid > len"),
+        }
     }
 
     #[inline]

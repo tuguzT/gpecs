@@ -299,6 +299,37 @@ where
     }
 
     #[inline]
+    pub unsafe fn split_at_unchecked(
+        self,
+        mid: usize,
+    ) -> (SoaSlicePtrs<'ctx, T>, SoaSlicePtrs<'ctx, T>) {
+        let Self { ptrs, context, len } = self;
+
+        let ptrs = context.ptrs_cast_const(ptrs.into_inner());
+        let first = unsafe { SoaSlicePtrs::from_parts(context, ptrs.clone(), len) };
+        let second = unsafe {
+            SoaSlicePtrs::from_parts(context, context.ptrs_add(ptrs, mid), len.unchecked_sub(mid))
+        };
+        (first, second)
+    }
+
+    #[inline]
+    pub unsafe fn split_at_mut_unchecked(
+        self,
+        mid: usize,
+    ) -> (SoaSliceMutPtrs<'ctx, T>, SoaSliceMutPtrs<'ctx, T>) {
+        let Self { ptrs, context, len } = self;
+
+        let ptrs = ptrs.into_inner();
+        let first = unsafe { Self::from_parts(context, ptrs.clone(), len) };
+        let second = unsafe {
+            let ptrs = context.ptrs_add_mut(ptrs, mid);
+            Self::from_parts(context, ptrs, len.unchecked_sub(mid))
+        };
+        (first, second)
+    }
+
+    #[inline]
     pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
         // call `get_unchecked_mut` directly on slice pointers to avoid creating multiple mutable references
         let (context, slices) = self.as_mut_slice_ptrs_with_context();

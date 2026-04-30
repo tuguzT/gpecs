@@ -178,6 +178,21 @@ where
     }
 
     #[inline]
+    pub unsafe fn split_at_unchecked(
+        self,
+        mid: usize,
+    ) -> (SoaSlicePtrs<'ctx, T>, SoaSlicePtrs<'ctx, T>) {
+        let Self { ptrs, context, len } = self;
+
+        let ptrs = ptrs.into_inner();
+        let first = unsafe { Self::from_parts(context, ptrs.clone(), len) };
+        let second = unsafe {
+            Self::from_parts(context, context.ptrs_add(ptrs, mid), len.unchecked_sub(mid))
+        };
+        (first, second)
+    }
+
+    #[inline]
     pub fn iter(&self) -> RawIter<'_, T> {
         let (_, iter) = self.iter_with_context();
         iter

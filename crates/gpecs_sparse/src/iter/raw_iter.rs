@@ -129,8 +129,9 @@ where
 
     #[inline]
     pub fn into_raw_keys(self) -> RawKeys<'ctx, K, V> {
-        let inner = self.into_inner();
-        RawKeys::from_inner(inner)
+        let (context, slices) = self.into_inner().into_slice_ptrs_with_context();
+        let (keys, _) = slices.into();
+        RawKeys::new(context.as_inner(), keys)
     }
 
     #[inline]

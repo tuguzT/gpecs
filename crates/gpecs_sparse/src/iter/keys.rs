@@ -1,19 +1,18 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    marker::PhantomData,
+    slice,
 };
 
 use crate::{iter::RawKeys, soa::traits::RawSoa};
 
-#[repr(transparent)]
 pub struct Keys<'ctx, 'a, K, V>
 where
     K: 'a,
     V: RawSoa + ?Sized,
 {
-    inner: RawKeys<'ctx, K, V>,
-    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
+    context: &'ctx V::Context,
+    keys: slice::Iter<'a, K>,
 }
 
 impl<'ctx, 'a, K, V> Keys<'ctx, 'a, K, V>
@@ -22,22 +21,21 @@ where
 {
     #[inline]
     pub(super) unsafe fn from_inner(inner: RawKeys<'ctx, K, V>) -> Self {
-        Self {
-            inner,
-            phantom: PhantomData,
-        }
+        let (context, keys) = inner.into_slice_ptr_with_context();
+        let keys = unsafe { keys.as_ref_unchecked() }.iter();
+        Self { context, keys }
     }
 
     #[inline]
     pub fn into_raw_keys(self) -> RawKeys<'ctx, K, V> {
-        let Self { inner, .. } = self;
-        inner
+        let Self { context, keys } = self;
+        RawKeys::new(context, keys.as_slice())
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.len()
+        let Self { keys, .. } = self;
+        keys.len()
     }
 
     #[inline]
@@ -47,8 +45,8 @@ where
 
     #[inline]
     pub fn context(&self) -> &'ctx V::Context {
-        let Self { inner, .. } = self;
-        inner.context()
+        let Self { context, .. } = *self;
+        context
     }
 
     #[inline]
@@ -59,10 +57,8 @@ where
 
     #[inline]
     pub fn as_ptr_with_context(&self) -> (&'ctx V::Context, *const K) {
-        let Self { inner, .. } = self;
-
-        let (context, key) = inner.as_ptr_with_context();
-        (context, key)
+        let Self { context, keys } = self;
+        (context, keys.as_slice().as_ptr())
     }
 
     #[inline]
@@ -73,10 +69,8 @@ where
 
     #[inline]
     pub fn into_ptr_with_context(self) -> (&'ctx V::Context, *const K) {
-        let Self { inner, .. } = self;
-
-        let (context, key) = inner.into_ptr_with_context();
-        (context, key)
+        let Self { context, keys } = self;
+        (context, keys.as_slice().as_ptr())
     }
 
     #[inline]
@@ -87,10 +81,8 @@ where
 
     #[inline]
     pub fn as_slice_ptr_with_context(&self) -> (&'ctx V::Context, *const [K]) {
-        let Self { inner, .. } = self;
-
-        let (context, key) = inner.as_slice_ptr_with_context();
-        (context, key)
+        let Self { context, keys } = self;
+        (context, keys.as_slice())
     }
 
     #[inline]
@@ -101,10 +93,8 @@ where
 
     #[inline]
     pub fn into_slice_ptr_with_context(self) -> (&'ctx V::Context, *const [K]) {
-        let Self { inner, .. } = self;
-
-        let (context, key) = inner.into_slice_ptr_with_context();
-        (context, key)
+        let Self { context, keys } = self;
+        (context, keys.as_slice())
     }
 
     #[inline]
@@ -151,10 +141,10 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref inner, phantom } = *self;
+        let Self { ref keys, context } = *self;
 
-        let inner = inner.clone();
-        Self { inner, phantom }
+        let keys = keys.clone();
+        Self { context, keys }
     }
 }
 
@@ -176,14 +166,14 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner, .. } = self;
-        inner.next().map(|key| unsafe { key.as_ref_unchecked() })
+        let Self { keys, .. } = self;
+        keys.next()
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner, .. } = self;
-        inner.size_hint()
+        let Self { keys, .. } = self;
+        keys.size_hint()
     }
 }
 
@@ -193,10 +183,8 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { inner, .. } = self;
-        inner
-            .next_back()
-            .map(|key| unsafe { key.as_ref_unchecked() })
+        let Self { keys, .. } = self;
+        keys.next_back()
     }
 }
 

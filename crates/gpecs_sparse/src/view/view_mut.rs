@@ -1086,8 +1086,9 @@ where
     pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
         let Self { dense, .. } = self;
 
-        let (context, inner) = dense.raw_iter_with_context();
-        let iter = RawKeys::from_inner(inner);
+        let (context, slices) = dense.as_slice_ptrs_with_context();
+        let (keys, _) = slices.into();
+        let iter = RawKeys::new(context.as_inner(), keys);
         (context, iter)
     }
 
@@ -1101,8 +1102,9 @@ where
     pub fn into_raw_keys_with_context(self) -> (&'ctx V::Context, RawKeys<'ctx, K, V>) {
         let Self { dense, .. } = self;
 
-        let (context, inner) = dense.into_raw_iter_with_context();
-        let iter = RawKeys::from_inner(inner);
+        let (context, slices) = dense.into_slice_ptrs().into_slice_ptrs_with_context();
+        let (keys, _) = slices.into();
+        let iter = RawKeys::new(context.as_inner(), keys);
         (context, iter)
     }
 

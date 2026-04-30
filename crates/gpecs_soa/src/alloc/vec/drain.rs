@@ -133,7 +133,7 @@ where
 unsafe impl<T, R> Send for Drain<'_, T, R>
 where
     T: AllocSoa + ?Sized,
-    T::Context: Send,
+    T::Context: Sync,
     T::Fields: Send,
     R: ?Sized,
 {

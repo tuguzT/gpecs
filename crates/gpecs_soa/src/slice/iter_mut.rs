@@ -288,3 +288,19 @@ where
 }
 
 impl<'a, T> FusedIterator for IterMut<'_, 'a, T> where T: Soa<'a> + ?Sized {}
+
+unsafe impl<T> Send for IterMut<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    T::Context: Sync,
+    T::Fields: Send,
+{
+}
+
+unsafe impl<T> Sync for IterMut<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    T::Context: Sync,
+    T::Fields: Sync,
+{
+}

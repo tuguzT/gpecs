@@ -244,3 +244,19 @@ where
 }
 
 impl<'a, T> FusedIterator for Iter<'_, 'a, T> where T: Soa<'a> + ?Sized {}
+
+unsafe impl<T> Send for Iter<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    T::Context: Sync,
+    T::Fields: Sync,
+{
+}
+
+unsafe impl<T> Sync for Iter<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    T::Context: Sync,
+    T::Fields: Sync,
+{
+}

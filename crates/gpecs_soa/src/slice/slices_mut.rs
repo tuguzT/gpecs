@@ -906,3 +906,19 @@ where
         iter
     }
 }
+
+unsafe impl<T> Send for SoaSlicesMut<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    T::Context: Sync,
+    T::Fields: Send,
+{
+}
+
+unsafe impl<T> Sync for SoaSlicesMut<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    T::Context: Sync,
+    T::Fields: Sync,
+{
+}

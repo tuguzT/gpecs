@@ -575,19 +575,3 @@ where
 }
 
 impl<T> FusedIterator for RawIterMut<'_, T> where T: RawSoa + ?Sized {}
-
-unsafe impl<T> Send for RawIterMut<'_, T>
-where
-    T: RawSoa + ?Sized,
-    T::Context: Send,
-    T::Fields: Send,
-{
-}
-
-unsafe impl<T> Sync for RawIterMut<'_, T>
-where
-    T: RawSoa + ?Sized,
-    T::Context: Sync,
-    T::Fields: Sync,
-{
-}

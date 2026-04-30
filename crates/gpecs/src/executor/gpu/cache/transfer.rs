@@ -3,11 +3,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use bytemuck::must_cast_slice_mut;
+use bytemuck::{must_cast_slice, must_cast_slice_mut};
 use indexmap::map::Entry;
 use wgpu::{
-    Buffer, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, BufferView, CommandEncoder,
-    Device, MapMode,
+    Buffer, BufferAddress, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, BufferView,
+    CommandEncoder, Device, MapMode,
+    util::{BufferInitDescriptor, DeviceExt},
 };
 
 use crate::{
@@ -103,6 +104,7 @@ impl TransferCache {
             .and_modify(|cache| {
                 cache
                     .entities
+                    .download
                     .copy_from_slice(device, command_encoder, source, label);
             })
             .or_insert_with(|| {
@@ -122,10 +124,14 @@ impl TransferCache {
                 .components
                 .entry(component_id)
                 .and_modify(|components| {
-                    components.copy_from_slice(device, command_encoder, source, label);
+                    components
+                        .download
+                        .copy_from_slice(device, command_encoder, source, label);
                 })
                 .or_insert_with(|| {
-                    DownloadBuffer::from_slice(device, command_encoder, source, label())
+                    let buffer =
+                        DownloadBuffer::from_slice(device, command_encoder, source, label());
+                    ArchetypeCacheEntry::new(buffer)
                 });
         }
 
@@ -243,11 +249,11 @@ impl TransferCache {
 
         let (entities, mut bundles, _) = unsafe { storage.as_mut_view().into_mut_slices() };
 
-        let mapped_entities = archetype_cache.entities.as_slice()?;
+        let mapped_entities = archetype_cache.entities.download.as_slice()?;
         must_cast_slice_mut(entities).copy_from_slice(&mapped_entities);
 
         for (&component_id, components) in &archetype_cache.components {
-            let mapped_components = components.as_slice()?;
+            let mapped_components = components.download.as_slice()?;
             let Some(mut components) = bundles.get_mut(component_id.into()) else {
                 continue;
             };
@@ -263,7 +269,7 @@ impl TransferCache {
     pub fn resync(
         &mut self,
         device: &Device,
-        _command_encoder: &mut CommandEncoder,
+        command_encoder: &mut CommandEncoder,
         schedule_cache: &mut ScheduleCache,
         cpu_archetypes: &ArchetypeRegistry,
         gpu_archetypes: &mut GpuArchetypeRegistry,
@@ -282,16 +288,79 @@ impl TransferCache {
                     unreachable!("{archetype_id} should exist")
                 };
 
-                if gpu_storage.capacity() < cpu_storage.capacity() {
-                    *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
-                } else {
-                    // unsafe { gpu_storage.set_len(cpu_storage.len()) }
-                    // todo!("move data from CPU storage into GPU storage using staging buffer")
-                    *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
-                }
+                Self::resync_archetype(
+                    device,
+                    command_encoder,
+                    archetype_id,
+                    archetype_cache,
+                    cpu_storage,
+                    gpu_storage,
+                );
                 schedule_cache.request_archetype_resync(archetype_id);
             }
             archetype_cache.state = ArchetypeCacheState::Invalidated;
+        }
+    }
+
+    fn resync_archetype(
+        device: &Device,
+        command_encoder: &mut CommandEncoder,
+        archetype_id: GpuArchetypeId,
+        archetype_cache: &mut ArchetypeCache,
+        cpu_storage: &ArchetypeStorage,
+        gpu_storage: &mut GpuArchetypeStorage,
+    ) {
+        if gpu_storage.capacity() < cpu_storage.capacity() {
+            *gpu_storage = GpuArchetypeStorage::new(device, archetype_id, cpu_storage);
+            return;
+        }
+
+        unsafe { gpu_storage.set_len(cpu_storage.len()) }
+
+        let (cpu_entities, cpu_bundles) = cpu_storage.as_slices();
+        let gpu_slices = gpu_storage.slices();
+
+        let gpu_entities = unsafe { gpu_slices.entities.as_slice() };
+        let Some(gpu_entities) = gpu_entities else {
+            return;
+        };
+
+        let staging_entities = &mut archetype_cache.entities.staging;
+        let contents = must_cast_slice(cpu_entities);
+        let label = || format!("`gpecs` {archetype_id:#} entities staging buffer");
+        if let Some(staging_entities) = staging_entities {
+            staging_entities.copy_from_slice(device, contents, label);
+        }
+        let staging_entities = staging_entities
+            .get_or_insert_with(|| StagingBuffer::from_slice(device, contents, label()));
+
+        staging_entities.copy_into_slice(command_encoder, gpu_entities);
+
+        for gpu_components in gpu_slices.components {
+            let component_id = gpu_components.component_id();
+            let Some(cpu_components) = cpu_bundles.get(component_id.into()) else {
+                unreachable!("{component_id} should exist");
+            };
+
+            let gpu_components = unsafe { gpu_components.as_slice() };
+            let Some(gpu_components) = gpu_components else {
+                continue;
+            };
+
+            let Some(entry) = archetype_cache.components.get_mut(&component_id) else {
+                unreachable!("{component_id} should exist");
+            };
+            let staging_components = &mut entry.staging;
+
+            let contents = unsafe { cpu_components.as_buffer().assume_init_ref() };
+            let label = || format!("`gpecs` {archetype_id:#} {component_id:#} staging buffer");
+            if let Some(staging_components) = staging_components {
+                staging_components.copy_from_slice(device, contents, label);
+            }
+            let staging_components = staging_components
+                .get_or_insert_with(|| StagingBuffer::from_slice(device, contents, label()));
+
+            staging_components.copy_into_slice(command_encoder, gpu_components);
         }
     }
 }
@@ -299,14 +368,14 @@ impl TransferCache {
 #[derive(Debug)]
 struct ArchetypeCache {
     state: ArchetypeCacheState,
-    entities: DownloadBuffer,
-    components: IndexMap<GpuComponentId, DownloadBuffer>,
+    entities: ArchetypeCacheEntry,
+    components: IndexMap<GpuComponentId, ArchetypeCacheEntry>,
 }
 
 impl ArchetypeCache {
     fn new(entities: DownloadBuffer) -> Self {
         Self {
-            entities,
+            entities: ArchetypeCacheEntry::new(entities),
             components: IndexMap::default(),
             state: ArchetypeCacheState::Invalidated,
         }
@@ -319,6 +388,21 @@ enum ArchetypeCacheState {
     CopiedFromGpu,
     CopiedIntoCpu,
     ShouldCopyIntoGpu,
+}
+
+#[derive(Debug)]
+struct ArchetypeCacheEntry {
+    download: DownloadBuffer,
+    staging: Option<StagingBuffer>,
+}
+
+impl ArchetypeCacheEntry {
+    fn new(download: DownloadBuffer) -> Self {
+        Self {
+            download,
+            staging: None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -415,3 +499,61 @@ impl DownloadBuffer {
 }
 
 struct DownloadBufferNotReadyError;
+
+#[derive(Debug)]
+struct StagingBuffer {
+    buffer: Buffer,
+    init_size: BufferAddress,
+}
+
+impl StagingBuffer {
+    #[inline]
+    fn from_slice(device: &Device, contents: &[u8], label: impl AsRef<str>) -> Self {
+        let init_size = BufferAddress::try_from(contents.len())
+            .expect("staging buffer size should fit into `BufferAddress`");
+
+        let desc = BufferInitDescriptor {
+            label: Some(label.as_ref()),
+            usage: BufferUsages::MAP_WRITE | BufferUsages::COPY_SRC,
+            contents,
+        };
+        let buffer = device.create_buffer_init(&desc);
+
+        Self { buffer, init_size }
+    }
+
+    #[inline]
+    fn copy_from_slice<L>(&mut self, device: &Device, contents: &[u8], label: impl FnOnce() -> L)
+    where
+        L: AsRef<str>,
+    {
+        let Self { buffer, init_size } = self;
+
+        let new_size = BufferAddress::try_from(contents.len())
+            .expect("staging buffer size should fit into `BufferAddress`");
+        if buffer.size() < new_size {
+            *self = Self::from_slice(device, contents, label());
+            return;
+        }
+
+        *init_size = new_size;
+        buffer
+            .get_mapped_range_mut(0..*init_size)
+            .copy_from_slice(contents);
+        buffer.unmap();
+    }
+
+    #[inline]
+    fn copy_into_slice(&self, command_encoder: &mut CommandEncoder, destination: BufferSlice<'_>) {
+        let Self { buffer, .. } = self;
+
+        command_encoder.copy_buffer_to_buffer(
+            buffer,
+            0,
+            destination.buffer(),
+            destination.offset(),
+            destination.size().get(),
+        );
+        command_encoder.map_buffer_on_submit(buffer, MapMode::Write, .., |_| {});
+    }
+}

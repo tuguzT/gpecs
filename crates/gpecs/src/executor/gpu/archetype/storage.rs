@@ -87,7 +87,6 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    #[expect(unused)]
     pub(in crate::executor::gpu) unsafe fn set_len(&mut self, new_len: usize) {
         let Self {
             capacity,

@@ -86,8 +86,15 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             .expect("device should be polled successfully");
 
         let (position_tag_archetype_storage, components) = context_mapper
-            .get_archetype_with_components(position_tag_gpu_archetype_id)
+            .get_mut_archetype_with_components(position_tag_gpu_archetype_id)
             .expect("archetype of `Position` and `Tag` should already be mapped");
+
+        let elapsed = timestamp.elapsed();
+
+        #[cfg(debug_assertions)]
+        unsafe {
+            device.stop_graphics_debugger_capture();
+        }
 
         let position_tag_entities = position_tag_archetype_storage.as_entities();
         let (position_tag_positions,) = position_tag_archetype_storage
@@ -104,13 +111,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             }),
             position_tag_positions.iter().copied(),
         );
-
-        let elapsed = timestamp.elapsed();
-
-        #[cfg(debug_assertions)]
-        unsafe {
-            device.stop_graphics_debugger_capture();
-        }
 
         // Check data inside of the timestamp query download buffer
         if let Some(statistics) = executor.timestamp_query_statistics(&queue) {

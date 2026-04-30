@@ -297,6 +297,13 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
+    pub fn into_par_iter(self) -> crate::slice::ParIter<'ctx, 'a, T> {
+        let (_, iter) = self.into_par_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
     pub fn into_par_iter_with_context(
         self,
     ) -> (&'ctx T::Context, crate::slice::ParIter<'ctx, 'a, T>) {
@@ -577,8 +584,7 @@ where
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
-        let (_, iter) = self.into_par_iter_with_context();
-        iter
+        self.into_par_iter()
     }
 }
 

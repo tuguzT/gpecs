@@ -6,7 +6,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    slice::{IterMut, SoaSlicesMut},
+    slice::{IterMut, SoaSlices, SoaSlicesMut},
     traits::{RawSoa, RefsMut, Slices, Soa, SoaOwned},
 };
 
@@ -25,6 +25,36 @@ where
     #[inline]
     pub fn new(slices: SoaSlicesMut<'ctx, 'a, T>) -> Self {
         Self { slices }
+    }
+
+    #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
+        let (_, slices) = self.slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
+        let Self { slices } = self;
+        slices.slices_with_context()
+    }
+
+    #[inline]
+    pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
+        let (_, slices) = self.mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn mut_slices_with_context(&mut self) -> (&T::Context, SoaSlicesMut<'_, '_, T>) {
+        let Self { slices } = self;
+        slices.mut_slices_with_context()
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> SoaSlicesMut<'ctx, 'a, T> {
+        let Self { slices } = self;
+        slices
     }
 }
 

@@ -759,6 +759,25 @@ where
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_iter(self) -> crate::iter::ParIter<'ctx, 'a, K, V> {
+        let (_, iter) = self.into_par_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_iter_with_context(
+        self,
+    ) -> (&'ctx V::Context, crate::iter::ParIter<'ctx, 'a, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.into_par_iter_with_context();
+        let iter = crate::iter::ParIter::new(inner);
+        (context, iter)
+    }
 }
 
 impl<'a, K, V> EpochSparseView<'_, '_, K, V>
@@ -890,6 +909,23 @@ where
     pub fn iter_with_context(&'a self) -> (&'a V::Context, Iter<'a, 'a, K, V>) {
         let (context, iter) = self.raw_iter_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
+        (context, iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&'a self) -> crate::iter::ParIter<'a, 'a, K, V> {
+        let (_, iter) = self.par_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_with_context(&'a self) -> (&'a V::Context, crate::iter::ParIter<'a, 'a, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, slices) = dense.slices_with_context();
+        let iter = crate::iter::ParIter::new(slices.into_par_iter());
         (context, iter)
     }
 }
@@ -1084,5 +1120,41 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let (_, iter) = self.into_iter_with_context();
         iter
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, K, V> rayon::iter::IntoParallelIterator for &'a EpochSparseView<'_, '_, K, V>
+where
+    K: Key + Sync,
+    V: Soa<'a> + ?Sized,
+    V::Context: Sync,
+    V::Fields: Sync,
+    Refs<'a, 'a, V>: Send,
+{
+    type Item = (&'a K, Refs<'a, 'a, V>);
+    type Iter = crate::iter::ParIter<'a, 'a, K, V>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'ctx, 'a, K, V> rayon::iter::IntoParallelIterator for EpochSparseView<'ctx, 'a, K, V>
+where
+    K: Key + Sync,
+    V: Soa<'a> + ?Sized,
+    V::Context: Sync,
+    V::Fields: Sync,
+    Refs<'ctx, 'a, V>: Send,
+{
+    type Item = (&'a K, Refs<'ctx, 'a, V>);
+    type Iter = crate::iter::ParIter<'ctx, 'a, K, V>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.into_par_iter()
     }
 }

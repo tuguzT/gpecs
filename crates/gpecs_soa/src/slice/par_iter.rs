@@ -26,6 +26,24 @@ where
     pub fn new(slices: SoaSlices<'ctx, 'a, T>) -> Self {
         Self { slices }
     }
+
+    #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
+        let (_, slices) = self.slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
+        let Self { slices } = self;
+        slices.slices_with_context()
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> SoaSlices<'ctx, 'a, T> {
+        let Self { slices } = self;
+        slices
+    }
 }
 
 impl<T> Debug for ParIter<'_, '_, T>

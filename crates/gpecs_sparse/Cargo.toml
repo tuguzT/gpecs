@@ -10,10 +10,12 @@ rust-version.workspace = true
 [dependencies]
 gpecs_soa = { workspace = true }
 gpecs_itertools = { workspace = true }
+rayon = { workspace = true, optional = true }
 
 [features]
 default = ["alloc"]
 alloc = ["gpecs_soa/alloc"]
+rayon = ["dep:rayon", "gpecs_soa/rayon"]
 
 [lints]
 workspace = true

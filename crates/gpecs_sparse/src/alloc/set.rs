@@ -1491,6 +1491,42 @@ where
         let view_mut = self.as_mut_view();
         view_mut.into_iter_with_context()
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&'a self) -> crate::iter::ParIter<'a, 'a, K, V> {
+        let (_, iter) = self.par_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_with_context(&'a self) -> (&'a V::Context, crate::iter::ParIter<'a, 'a, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, slices) = dense.slices_with_context();
+        let iter = crate::iter::ParIter::new(slices.into_par_iter());
+        (context, iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut(&'a mut self) -> crate::iter::ParIterMut<'a, 'a, K, V> {
+        let (_, iter) = self.par_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut_with_context(
+        &'a mut self,
+    ) -> (&'a V::Context, crate::iter::ParIterMut<'a, 'a, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, slices) = dense.mut_slices_with_context();
+        let iter = crate::iter::ParIterMut::new(slices.into_par_iter());
+        (context, iter)
+    }
 }
 
 impl<K, V> EpochSparseSet<K, V>
@@ -1840,6 +1876,42 @@ where
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.into_items()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, K, V> rayon::iter::IntoParallelIterator for &'a EpochSparseSet<K, V>
+where
+    K: Key + Sync,
+    V: AllocSoa + Soa<'a> + ?Sized,
+    V::Context: Sync,
+    V::Fields: Sync,
+    Refs<'a, 'a, V>: Send,
+{
+    type Item = (&'a K, Refs<'a, 'a, V>);
+    type Iter = crate::iter::ParIter<'a, 'a, K, V>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, K, V> rayon::iter::IntoParallelIterator for &'a mut EpochSparseSet<K, V>
+where
+    K: Key + Send + Sync,
+    V: AllocSoa + Soa<'a> + ?Sized,
+    V::Context: Sync,
+    V::Fields: Send,
+    RefsMut<'a, 'a, V>: Send,
+{
+    type Item = (&'a K, RefsMut<'a, 'a, V>);
+    type Iter = crate::iter::ParIterMut<'a, 'a, K, V>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter_mut()
     }
 }
 

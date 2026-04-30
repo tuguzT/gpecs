@@ -227,14 +227,28 @@ where
 
     #[inline]
     pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
+        let (_, slices) = self.slice_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn slice_ptrs_with_context(&self) -> (&T::Context, SoaSlicePtrs<'_, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        SoaSlicePtrs::new(context, slices)
+        let slices = SoaSlicePtrs::new(context, slices);
+        (context, slices)
     }
 
     #[inline]
     pub fn mut_slice_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
+        let (_, slices) = self.mut_slice_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn mut_slice_ptrs_with_context(&mut self) -> (&T::Context, SoaSliceMutPtrs<'_, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        SoaSliceMutPtrs::new(context, slices)
+        let slices = SoaSliceMutPtrs::new(context, slices);
+        (context, slices)
     }
 
     #[inline]
@@ -462,12 +476,28 @@ where
 
     #[inline]
     pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        unsafe { self.slice_ptrs().as_ref_unchecked() }
+        let (_, slices) = self.slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
+        let (context, slices) = self.slice_ptrs_with_context();
+        let slices = unsafe { slices.as_ref_unchecked() };
+        (context, slices)
     }
 
     #[inline]
     pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        unsafe { self.mut_slice_ptrs().as_mut_unchecked() }
+        let (_, slices) = self.mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn mut_slices_with_context(&mut self) -> (&T::Context, SoaSlicesMut<'_, '_, T>) {
+        let (context, slices) = self.mut_slice_ptrs_with_context();
+        let slices = unsafe { slices.as_mut_unchecked() };
+        (context, slices)
     }
 
     #[inline]
@@ -1035,6 +1065,38 @@ where
         let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&'a self) -> crate::slice::ParIter<'a, 'a, T> {
+        let (_, iter) = self.par_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slice::ParIter<'a, 'a, T>) {
+        let (context, slices) = self.slices_with_context();
+        let iter = crate::slice::ParIter::new(slices);
+        (context, iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut(&'a mut self) -> crate::slice::ParIterMut<'a, 'a, T> {
+        let (_, iter) = self.par_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut_with_context(
+        &'a mut self,
+    ) -> (&'a T::Context, crate::slice::ParIterMut<'a, 'a, T>) {
+        let (context, slices) = self.mut_slices_with_context();
+        let iter = crate::slice::ParIterMut::new(slices);
+        (context, iter)
+    }
 }
 
 impl<T> SoaVec<T>
@@ -1432,6 +1494,40 @@ where
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.into_items()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, T> rayon::iter::IntoParallelIterator for &'a SoaVec<T>
+where
+    T: AllocSoa + Soa<'a> + ?Sized,
+    T::Context: Sync,
+    T::Fields: Sync,
+    Refs<'a, 'a, T>: Send,
+{
+    type Item = Refs<'a, 'a, T>;
+    type Iter = crate::slice::ParIter<'a, 'a, T>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, T> rayon::iter::IntoParallelIterator for &'a mut SoaVec<T>
+where
+    T: AllocSoa + Soa<'a> + ?Sized,
+    T::Context: Sync,
+    T::Fields: Send,
+    RefsMut<'a, 'a, T>: Send,
+{
+    type Item = RefsMut<'a, 'a, T>;
+    type Iter = crate::slice::ParIterMut<'a, 'a, T>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter_mut()
     }
 }
 

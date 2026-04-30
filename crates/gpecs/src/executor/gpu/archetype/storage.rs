@@ -240,7 +240,7 @@ impl FusedIterator for GpuArchetypeStorageComponentSlices<'_> {}
 
 #[derive(Debug, Clone)]
 struct StorageBuffer {
-    buffer: Option<Buffer>,
+    buffer: Buffer,
     init_size: BufferAddress,
     item_layout: Layout,
 }
@@ -290,25 +290,23 @@ impl StorageBuffer {
         L: AsRef<str>,
     {
         let init_size = BufferAddress::try_from(contents.len())
-            .expect("contents size should fit into `BufferAddress`");
+            .expect("storage buffer size should fit into `BufferAddress`");
 
-        let buffer = (init_size != 0).then(|| {
-            let new_contents_capacity = usize::max(contents.len(), capacity_in_bytes);
-            let mut new_contents = Vec::with_capacity(new_contents_capacity);
-            new_contents.extend_from_slice(contents);
-            new_contents.resize(capacity_in_bytes, 0);
+        let new_contents_capacity = usize::max(contents.len(), capacity_in_bytes);
+        let mut new_contents = Vec::with_capacity(new_contents_capacity);
+        new_contents.extend_from_slice(contents);
+        new_contents.resize(capacity_in_bytes, 0);
 
-            let contents = new_contents.as_slice();
-            assert_eq!(contents.len() % item_layout.size(), 0);
+        let contents = new_contents.as_slice();
+        assert!(contents.len().is_multiple_of(item_layout.size()));
 
-            let label = label();
-            let desc = BufferInitDescriptor {
-                label: Some(label.as_ref()),
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                contents,
-            };
-            device.create_buffer_init(&desc)
-        });
+        let label = label();
+        let desc = BufferInitDescriptor {
+            label: Some(label.as_ref()),
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+            contents,
+        };
+        let buffer = device.create_buffer_init(&desc);
 
         Self {
             buffer,
@@ -325,10 +323,7 @@ impl StorageBuffer {
             item_layout,
         } = *self;
 
-        let slice = buffer
-            .as_ref()
-            .filter(|_| init_size != 0)
-            .map(|buffer| buffer.slice(0..init_size));
+        let slice = (init_size != 0).then(|| buffer.slice(0..init_size));
         GpuArchetypeStorageSlice { slice, item_layout }
     }
 
@@ -341,10 +336,8 @@ impl StorageBuffer {
         } = *self;
 
         let new_init_size = BufferAddress::try_from(item_layout.size().strict_mul(new_len))
-            .expect("contents size should fit into `BufferAddress`");
-
-        let buffer_size = buffer.as_ref().map(Buffer::size).unwrap_or_default();
-        debug_assert!(new_init_size <= buffer_size);
+            .expect("storage buffer size should fit into `BufferAddress`");
+        debug_assert!(new_init_size <= buffer.size());
 
         *init_size = new_init_size;
     }

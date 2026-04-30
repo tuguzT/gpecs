@@ -11,6 +11,9 @@ pub use self::{
     slices_mut::SoaSlicesMut,
 };
 
+#[cfg(feature = "rayon")]
+pub use self::{par_iter::ParIter, par_iter_mut::ParIterMut};
+
 pub(crate) use self::index::{IndexHelper, IndexHelperMut};
 
 #[cfg(feature = "alloc")]
@@ -29,3 +32,8 @@ mod slice_mut_ptrs;
 mod slice_ptrs;
 mod slices;
 mod slices_mut;
+
+#[cfg(feature = "rayon")]
+mod par_iter;
+#[cfg(feature = "rayon")]
+mod par_iter_mut;

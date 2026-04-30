@@ -120,20 +120,34 @@ where
 
     #[inline]
     pub fn slices(&self) -> SoaSlices<'_, '_, T> {
+        let (_, slices) = self.slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
         let Self { ptrs, .. } = self;
 
         let len = ptrs.len();
         let (context, ptrs) = ptrs.as_ptrs_with_context();
-        unsafe { SoaSlices::from_parts(context, ptrs, len) }
+        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
+        (context, slices)
     }
 
     #[inline]
     pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
+        let (_, slices) = self.mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn mut_slices_with_context(&mut self) -> (&T::Context, SoaSlicesMut<'_, '_, T>) {
         let Self { ptrs, .. } = self;
 
         let len = ptrs.len();
         let (context, ptrs) = ptrs.as_mut_ptrs_with_context();
-        unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
+        let slices = unsafe { SoaSlicesMut::from_parts(context, ptrs, len) };
+        (context, slices)
     }
 
     #[inline]
@@ -547,6 +561,16 @@ where
         let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_iter_with_context(
+        self,
+    ) -> (&'ctx T::Context, crate::slice::ParIterMut<'ctx, 'a, T>) {
+        let (context, _, _) = self.ptrs.clone().into_parts();
+        let iter = crate::slice::ParIterMut::new(self);
+        (context, iter)
+    }
 }
 
 impl<'a, T> SoaSlicesMut<'_, '_, T>
@@ -685,6 +709,38 @@ where
     pub fn iter_mut_with_context(&'a mut self) -> (&'a T::Context, IterMut<'a, 'a, T>) {
         let (context, iter) = self.raw_iter_mut_with_context();
         let iter = unsafe { iter.as_mut_unchecked() };
+        (context, iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&'a self) -> crate::slice::ParIter<'a, 'a, T> {
+        let (_, iter) = self.par_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slice::ParIter<'a, 'a, T>) {
+        let (context, slices) = self.slices_with_context();
+        let iter = crate::slice::ParIter::new(slices);
+        (context, iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut(&'a mut self) -> crate::slice::ParIterMut<'a, 'a, T> {
+        let (_, iter) = self.par_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut_with_context(
+        &'a mut self,
+    ) -> (&'a T::Context, crate::slice::ParIterMut<'a, 'a, T>) {
+        let (context, slices) = self.mut_slices_with_context();
+        let iter = crate::slice::ParIterMut::new(slices);
         (context, iter)
     }
 
@@ -974,6 +1030,58 @@ where
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let (_, iter) = self.into_iter_with_context();
+        iter
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, T> rayon::iter::IntoParallelIterator for &'a SoaSlicesMut<'_, '_, T>
+where
+    T: Soa<'a> + ?Sized,
+    T::Context: Sync,
+    T::Fields: Sync,
+    Refs<'a, 'a, T>: Send,
+{
+    type Item = Refs<'a, 'a, T>;
+    type Iter = crate::slice::ParIter<'a, 'a, T>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, T> rayon::iter::IntoParallelIterator for &'a mut SoaSlicesMut<'_, '_, T>
+where
+    T: Soa<'a> + ?Sized,
+    T::Context: Sync,
+    T::Fields: Send,
+    RefsMut<'a, 'a, T>: Send,
+{
+    type Item = RefsMut<'a, 'a, T>;
+    type Iter = crate::slice::ParIterMut<'a, 'a, T>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter_mut()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'ctx, 'a, T> rayon::iter::IntoParallelIterator for SoaSlicesMut<'ctx, 'a, T>
+where
+    T: Soa<'a> + ?Sized,
+    T::Context: Sync,
+    T::Fields: Send,
+    RefsMut<'ctx, 'a, T>: Send,
+{
+    type Item = RefsMut<'ctx, 'a, T>;
+    type Iter = crate::slice::ParIterMut<'ctx, 'a, T>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        let (_, iter) = self.into_par_iter_with_context();
         iter
     }
 }

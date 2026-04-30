@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_layout = { workspace = true }
+rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
 itertools = { workspace = true }

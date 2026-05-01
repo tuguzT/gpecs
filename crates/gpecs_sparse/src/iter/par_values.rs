@@ -6,71 +6,59 @@ use rayon::iter::{
 };
 
 use crate::{
-    item::DenseItem,
-    iter::Iter,
-    soa::{
-        slice,
-        traits::{RawSoa, Refs, Slices, Soa, SoaOwned},
-    },
+    iter::{ParIter, Values},
+    soa::traits::{RawSoa, Refs, Slices, Soa, SoaOwned},
 };
 
-type Inner<'ctx, 'a, K, V> = slice::ParIter<'ctx, 'a, DenseItem<K, V>>;
-
 #[repr(transparent)]
-pub struct ParIter<'ctx, 'a, K, V>
+pub struct ParValues<'ctx, 'a, K, V>
 where
     V: RawSoa + ?Sized,
-    V::Context: 'ctx,
 {
-    inner: Inner<'ctx, 'a, K, V>,
+    inner: ParIter<'ctx, 'a, K, V>,
 }
 
-impl<'ctx, 'a, K, V> ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> ParValues<'ctx, 'a, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: Inner<'ctx, 'a, K, V>) -> Self {
+    pub(crate) fn new(inner: ParIter<'ctx, 'a, K, V>) -> Self {
         Self { inner }
     }
 }
 
-impl<'a, K, V> ParIter<'_, '_, K, V>
+impl<'a, K, V> ParValues<'_, '_, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
-        let (_, keys, values) = self.as_slices_with_context();
-        (keys, values)
+    pub fn as_slices(&'a self) -> Slices<'a, 'a, V> {
+        let (_, values) = self.as_slices_with_context();
+        values
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], Slices<'a, 'a, V>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, Slices<'a, 'a, V>) {
         let Self { inner } = self;
 
-        let (context, slices) = inner.slices().into_slices_with_context();
-        let (keys, values) = slices.into();
-        (context, keys, values)
+        let (context, _, values) = inner.as_slices_with_context();
+        (context, values)
     }
 }
 
-impl<K, V> Debug for ParIter<'_, '_, K, V>
+impl<K, V> Debug for ParValues<'_, '_, K, V>
 where
-    K: Debug,
     V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (keys, values) = &self.as_slices();
-        f.debug_struct("ParIter")
-            .field("keys", keys)
-            .field("values", values)
-            .finish()
+        let values = &self.as_slices();
+        f.debug_tuple("ParValues").field(values).finish()
     }
 }
 
-impl<K, V> Clone for ParIter<'_, '_, K, V>
+impl<K, V> Clone for ParValues<'_, '_, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -83,7 +71,7 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> ParallelIterator for ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> ParallelIterator for ParValues<'ctx, 'a, K, V>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
@@ -91,7 +79,7 @@ where
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
 {
-    type Item = (&'a K, Refs<'ctx, 'a, V>);
+    type Item = Refs<'ctx, 'a, V>;
 
     fn drive_unindexed<C>(self, consumer: C) -> C::Result
     where
@@ -105,7 +93,7 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> IndexedParallelIterator for ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> IndexedParallelIterator for ParValues<'ctx, 'a, K, V>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
@@ -115,7 +103,7 @@ where
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
-        inner.slices().len()
+        inner.len()
     }
 
     fn drive<C>(self, consumer: C) -> C::Result
@@ -133,7 +121,7 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> Producer for ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> Producer for ParValues<'ctx, 'a, K, V>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
@@ -141,14 +129,14 @@ where
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
 {
-    type Item = (&'a K, Refs<'ctx, 'a, V>);
-    type IntoIter = Iter<'ctx, 'a, K, V>;
+    type Item = Refs<'ctx, 'a, V>;
+    type IntoIter = Values<'ctx, 'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 
-        let inner = inner.into_slices().into_iter();
-        Iter::from_inner(inner)
+        let inner = inner.into_iter();
+        unsafe { Values::from_inner(inner) }
     }
 
     fn split_at(self, index: usize) -> (Self, Self) {

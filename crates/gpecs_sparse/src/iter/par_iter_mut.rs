@@ -10,7 +10,7 @@ use crate::{
     iter::IterMut,
     soa::{
         slice,
-        traits::{RawSoa, RefsMut, Slices, Soa, SoaOwned},
+        traits::{RawSoa, RefsMut, Slices, SlicesMut, Soa, SoaOwned},
     },
 };
 
@@ -33,6 +33,43 @@ where
     }
 }
 
+impl<'a, K, V> ParIterMut<'_, '_, K, V>
+where
+    V: Soa<'a> + ?Sized,
+{
+    #[inline]
+    pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
+        let (_, keys, values) = self.as_slices_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], Slices<'a, 'a, V>) {
+        let Self { inner } = self;
+
+        let (context, slices) = inner.slices().into_slices_with_context();
+        let (keys, values) = slices.into();
+        (context, keys, values)
+    }
+
+    #[inline]
+    pub fn as_mut_slices(&'a mut self) -> (&'a [K], SlicesMut<'a, 'a, V>) {
+        let (_, keys, values) = self.as_mut_slices_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(
+        &'a mut self,
+    ) -> (&'a V::Context, &'a [K], SlicesMut<'a, 'a, V>) {
+        let Self { inner } = self;
+
+        let (context, slices) = inner.mut_slices().into_slices_with_context();
+        let (keys, values) = slices.into();
+        (context, keys, values)
+    }
+}
+
 impl<K, V> Debug for ParIterMut<'_, '_, K, V>
 where
     K: Debug,
@@ -40,12 +77,10 @@ where
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-
-        let (keys, values) = &inner.slices().into_slices().into();
+        let (keys, values) = &self.as_slices();
         f.debug_struct("ParIter")
-            .field("keys", &keys)
-            .field("values", &values)
+            .field("keys", keys)
+            .field("values", values)
             .finish()
     }
 }

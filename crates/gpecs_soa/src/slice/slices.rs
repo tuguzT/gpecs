@@ -11,6 +11,7 @@ use crate::{
     traits::{Ptrs, RawSoa, RawSoaContext, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
+#[repr(transparent)]
 pub struct SoaSlices<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,

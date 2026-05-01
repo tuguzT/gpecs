@@ -17,6 +17,7 @@ use crate::{
     },
 };
 
+#[repr(transparent)]
 pub struct SoaSlicesMut<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,

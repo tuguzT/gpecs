@@ -1542,6 +1542,40 @@ where
         let iter = crate::iter::ParIterMut::new(slices.into_par_iter());
         (context, iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_values(&'a self) -> crate::iter::ParValues<'a, 'a, K, V> {
+        let (_, iter) = self.par_values_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_values_with_context(
+        &'a self,
+    ) -> (&'a V::Context, crate::iter::ParValues<'a, 'a, K, V>) {
+        let (context, inner) = self.par_iter_with_context();
+        let values = crate::iter::ParValues::new(inner);
+        (context, values)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_values_mut(&'a mut self) -> crate::iter::ParValuesMut<'a, 'a, K, V> {
+        let (_, iter) = self.par_values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_values_mut_with_context(
+        &'a mut self,
+    ) -> (&'a V::Context, crate::iter::ParValuesMut<'a, 'a, K, V>) {
+        let (context, inner) = self.par_iter_mut_with_context();
+        let values = crate::iter::ParValuesMut::new(inner);
+        (context, values)
+    }
 }
 
 impl<K, V> EpochSparseSet<K, V>

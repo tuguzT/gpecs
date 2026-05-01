@@ -812,6 +812,23 @@ where
         let iter = crate::iter::ParIter::new(inner);
         (context, iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_values(self) -> crate::iter::ParValues<'ctx, 'a, K, V> {
+        let (_, iter) = self.into_par_values_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_values_with_context(
+        self,
+    ) -> (&'ctx V::Context, crate::iter::ParValues<'ctx, 'a, K, V>) {
+        let (context, inner) = self.into_par_iter_with_context();
+        let values = crate::iter::ParValues::new(inner);
+        (context, values)
+    }
 }
 
 impl<'a, K, V> EpochSparseView<'_, '_, K, V>
@@ -961,6 +978,23 @@ where
         let (context, slices) = dense.slices_with_context();
         let iter = crate::iter::ParIter::new(slices.into_par_iter());
         (context, iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_values(&'a self) -> crate::iter::ParValues<'a, 'a, K, V> {
+        let (_, iter) = self.par_values_with_context();
+        iter
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_values_with_context(
+        &'a self,
+    ) -> (&'a V::Context, crate::iter::ParValues<'a, 'a, K, V>) {
+        let (context, inner) = self.par_iter_with_context();
+        let values = crate::iter::ParValues::new(inner);
+        (context, values)
     }
 }
 

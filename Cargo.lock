@@ -737,6 +737,7 @@ dependencies = [
  "gpecs_num",
  "gpecs_sparse",
  "gpecs_world",
+ "rayon",
 ]
 
 [[package]]

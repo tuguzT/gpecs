@@ -12,10 +12,12 @@ gpecs_num = { workspace = true }
 gpecs_world = { workspace = true }
 gpecs_sparse = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
+rayon = { workspace = true, optional = true }
 
 [features]
 default = ["alloc"]
 alloc = ["gpecs_sparse/alloc"]
+rayon = ["dep:rayon", "gpecs_sparse/rayon"]
 
 [lints]
 workspace = true

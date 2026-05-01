@@ -239,6 +239,20 @@ impl<Meta> EntityRegistry<Meta> {
     pub fn iter_mut(&mut self) -> IterMut<'_, Meta> {
         self.as_mut_view().into_iter()
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta> {
+        let view = self.as_view();
+        crate::registry::ParIter::new(view)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut(&mut self) -> crate::registry::ParIterMut<'_, Meta> {
+        let view = self.as_mut_view();
+        crate::registry::ParIterMut::new(view)
+    }
 }
 
 impl<Meta> Debug for EntityRegistry<Meta>
@@ -377,5 +391,33 @@ impl<'a, Meta> IntoIterator for &'a mut EntityRegistry<Meta> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a EntityRegistry<Meta>
+where
+    Meta: Sync,
+{
+    type Item = (Entity, &'a Meta);
+    type Iter = crate::registry::ParIter<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a mut EntityRegistry<Meta>
+where
+    Meta: Send,
+{
+    type Item = (Entity, &'a mut Meta);
+    type Iter = crate::registry::ParIterMut<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter_mut()
     }
 }

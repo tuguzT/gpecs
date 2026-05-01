@@ -74,6 +74,13 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
+    #[allow(unused)]
+    pub(super) fn into_inner(self) -> Inner<'a, Meta> {
+        let Self { inner } = self;
+        inner
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (&'a [Entity], &'a [Meta], &'a [SparseItem<Entity>]) {
         let Self { inner } = self;
 
@@ -179,6 +186,12 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     #[inline]
     pub fn iter(&self) -> Iter<'_, Meta> {
         (*self).into_iter()
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta> {
+        crate::registry::ParIter::new(*self)
     }
 }
 
@@ -289,6 +302,34 @@ impl<'a, Meta> IntoIterator for EntityRegistryView<'a, Meta> {
 
         let inner = inner.into_iter();
         Iter::from_inner(inner)
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a EntityRegistryView<'_, Meta>
+where
+    Meta: Sync,
+{
+    type Item = (Entity, &'a Meta);
+    type Iter = crate::registry::ParIter<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for EntityRegistryView<'a, Meta>
+where
+    Meta: Sync,
+{
+    type Item = (Entity, &'a Meta);
+    type Iter = crate::registry::ParIter<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        crate::registry::ParIter::new(self)
     }
 }
 

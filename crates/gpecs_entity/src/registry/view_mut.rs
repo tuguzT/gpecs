@@ -74,6 +74,13 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     }
 
     #[inline]
+    #[allow(unused)]
+    pub(super) fn into_inner(self) -> Inner<'a, Meta> {
+        let Self { inner } = self;
+        inner
+    }
+
+    #[inline]
     pub unsafe fn into_parts(
         self,
     ) -> (
@@ -279,6 +286,20 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let inner = inner.iter_mut();
         IterMut::from_inner(inner)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta> {
+        let view = self.as_view();
+        crate::registry::ParIter::new(view)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_iter_mut(&mut self) -> crate::registry::ParIterMut<'_, Meta> {
+        let view = self.as_mut_view();
+        crate::registry::ParIterMut::new(view)
+    }
 }
 
 impl<Meta> Debug for EntityRegistryViewMut<'_, Meta>
@@ -399,6 +420,48 @@ impl<'a, Meta> IntoIterator for EntityRegistryViewMut<'a, Meta> {
 
         let inner = inner.into_iter();
         IterMut::from_inner(inner)
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a EntityRegistryViewMut<'_, Meta>
+where
+    Meta: Sync,
+{
+    type Item = (Entity, &'a Meta);
+    type Iter = crate::registry::ParIter<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a mut EntityRegistryViewMut<'_, Meta>
+where
+    Meta: Send,
+{
+    type Item = (Entity, &'a mut Meta);
+    type Iter = crate::registry::ParIterMut<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        self.par_iter_mut()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, Meta> rayon::iter::IntoParallelIterator for EntityRegistryViewMut<'a, Meta>
+where
+    Meta: Send,
+{
+    type Item = (Entity, &'a mut Meta);
+    type Iter = crate::registry::ParIterMut<'a, Meta>;
+
+    #[inline]
+    fn into_par_iter(self) -> Self::Iter {
+        crate::registry::ParIterMut::new(self)
     }
 }
 

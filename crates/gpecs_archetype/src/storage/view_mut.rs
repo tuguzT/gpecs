@@ -32,12 +32,11 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::error::DowncastError,
     },
-    erased::ErasedArchetypeView,
-    erased::error::IncompatibleArchetypeError,
-    storage::{ArchetypeStorageView, NoEpochEntity, traits::ErasedArchetypeSoa},
+    erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
+    storage::{ArchetypeStorageView, Iter, IterMut, NoEpochEntity, traits::ErasedArchetypeSoa},
 };
 
-type Inner<'a, T> = EpochSparseViewMutPtr<'a, NoEpochEntity, T>;
+type Inner<'ctx, T> = EpochSparseViewMutPtr<'ctx, NoEpochEntity, T>;
 
 #[repr(transparent)]
 pub struct ArchetypeStorageViewMut<'ctx, 'a, T>
@@ -264,6 +263,22 @@ where
     }
 
     #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let Self { inner, .. } = self;
+
+        let inner = inner.iter();
+        Iter::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        let Self { inner, .. } = self;
+
+        let inner = inner.iter_mut();
+        IterMut::from_inner(inner)
+    }
+
+    #[inline]
     pub fn as_bundles_with_archetype<B>(
         &self,
         components: &ComponentRegistryView<
@@ -466,6 +481,48 @@ where
         f.debug_struct("ArchetypeStorageViewMut")
             .field("component_ids", component_ids)
             .finish_non_exhaustive()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a ArchetypeStorageViewMut<'_, '_, T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefs<'a, 'a, T>);
+    type IntoIter = Iter<'a, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut ArchetypeStorageViewMut<'_, '_, T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefsMut<'a, 'a, T>);
+    type IntoIter = IterMut<'a, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl<'ctx, 'a, T> IntoIterator for ArchetypeStorageViewMut<'ctx, 'a, T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefsMut<'ctx, 'a, T>);
+    type IntoIter = IterMut<'ctx, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { inner, .. } = self;
+
+        let inner = inner.into_iter();
+        IterMut::from_inner(inner)
     }
 }
 

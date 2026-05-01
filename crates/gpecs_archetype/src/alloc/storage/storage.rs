@@ -41,7 +41,8 @@ use crate::{
         },
     },
     storage::{
-        ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, NoEpochEntity,
+        ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, Iter, IterMut,
+        NoEpochEntity,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
             MoveIntoWithInsertBundleError, MoveIntoWithInsertBundleErrorKind,
@@ -256,6 +257,16 @@ where
     #[inline]
     pub fn get_mut(&mut self, entity: Entity) -> Option<ErasedBundleRefsMut<'_, '_, T>> {
         self.as_mut_view().into_get_mut(entity)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        self.as_view().into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        self.as_mut_view().into_iter()
     }
 
     #[inline]
@@ -804,5 +815,31 @@ where
         f.debug_struct("ArchetypeStorage")
             .field("component_ids", component_ids)
             .finish_non_exhaustive()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a ArchetypeStorage<T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefs<'a, 'a, T>);
+    type IntoIter = Iter<'a, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut ArchetypeStorage<T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefsMut<'a, 'a, T>);
+    type IntoIter = IterMut<'a, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }

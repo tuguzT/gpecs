@@ -27,10 +27,10 @@ use gpecs_sparse::{
 use crate::{
     bundle::{Bundle, BundleRefs, BundleSlices, erased::error::DowncastError},
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
-    storage::{NoEpochEntity, traits::ErasedArchetypeSoa},
+    storage::{Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
 };
 
-type Inner<'a, T> = EpochSparseViewPtr<'a, NoEpochEntity, T>;
+type Inner<'ctx, T> = EpochSparseViewPtr<'ctx, NoEpochEntity, T>;
 
 #[repr(transparent)]
 pub struct ArchetypeStorageView<'ctx, 'a, T>
@@ -205,6 +205,14 @@ where
     }
 
     #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let Self { inner, .. } = self;
+
+        let inner = inner.iter();
+        Iter::from_inner(inner)
+    }
+
+    #[inline]
     pub fn as_bundles_with_archetype<B>(
         &self,
         components: &ComponentRegistryView<
@@ -338,6 +346,35 @@ where
     T: ErasedArchetypeSoa + ?Sized,
     for<'a> T::Archetype<'a>: Copy,
 {
+}
+
+impl<'a, T> IntoIterator for &'a ArchetypeStorageView<'_, '_, T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefs<'a, 'a, T>);
+    type IntoIter = Iter<'a, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'ctx, 'a, T> IntoIterator for ArchetypeStorageView<'ctx, 'a, T>
+where
+    T: ErasedArchetypeSoa + ?Sized,
+{
+    type Item = (Entity, ErasedBundleRefs<'ctx, 'a, T>);
+    type IntoIter = Iter<'ctx, 'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { inner, .. } = self;
+
+        let inner = inner.into_iter();
+        Iter::from_inner(inner)
+    }
 }
 
 type SlicesWithArchetype<'ctx, 'a, T> = (

@@ -13,7 +13,7 @@ gpecs_component = { workspace = true }
 gpecs_soa_erased = { workspace = true }
 gpecs_sparse = { workspace = true }
 itertools = { workspace = true }
-bytemuck = { workspace = true, features = ["must_cast"] }
+bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 
 [dev-dependencies]
 gpecs_world = { workspace = true }

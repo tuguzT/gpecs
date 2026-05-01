@@ -104,7 +104,7 @@ where
 {
     type Item = (Entity, BundleRefs<'a, B>);
 
-    // FIXME: this actually should be just `FlatMap`,
+    // FIXME: this actually could be just `FlatMap` with closure,
     // but it cannot be returned because `impl Trait` is unstable in associated types
     type IntoIter = BundlesIntoIter<'a, 'ctx, B, M, T>;
 

@@ -2,7 +2,7 @@ use gpecs_itertools::Itertools;
 
 use crate::{
     item::{SparseItem, SparseItemKind},
-    key::{Epoch, Key},
+    key::{Epoch, Key, SparseIndex},
 };
 
 #[inline]
@@ -244,31 +244,21 @@ where
     assert_equal_key_failed()
 }
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn assert_compatible_key_failed() -> ! {
-    panic!("provided key and key from dense should have the same sparse index")
-}
-
 #[inline]
 #[track_caller]
 pub fn assert_compatible_key<K>(key: K, dense_key: K)
 where
     K: Key,
 {
+    assert_equal_sparse_index(key.sparse_index(), dense_key.sparse_index());
     assert_equal_epoch(key.epoch(), dense_key.epoch());
-    if key.sparse_index() == dense_key.sparse_index() {
-        return;
-    }
-    assert_compatible_key_failed()
 }
 
 #[cold]
 #[track_caller]
 #[inline(never)]
 const fn assert_equal_epoch_failed() -> ! {
-    panic!("epoch provided by key does not match an actual epoch")
+    panic!("provided epoch does not match an actual epoch")
 }
 
 #[inline]
@@ -281,4 +271,23 @@ where
         return;
     }
     assert_equal_epoch_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn assert_equal_sparse_index_failed() -> ! {
+    panic!("provided sparse index does not match an actual sparse index")
+}
+
+#[inline]
+#[track_caller]
+pub fn assert_equal_sparse_index<I>(first: I, second: I)
+where
+    I: SparseIndex,
+{
+    if first == second {
+        return;
+    }
+    assert_equal_sparse_index_failed()
 }

@@ -79,7 +79,7 @@ where
 }
 
 #[inline]
-fn sparse_item_by_index<K>(
+pub fn sparse_item_by_index<K>(
     sparse: &[SparseItem<K>],
     sparse_index: K::SparseIndex,
 ) -> Option<&SparseItem<K>>
@@ -88,6 +88,18 @@ where
 {
     let sparse_index = sparse_index.try_into().ok()?;
     sparse_item(sparse, sparse_index)
+}
+
+#[inline]
+pub fn sparse_item_mut_by_index<K>(
+    sparse: &mut [SparseItem<K>],
+    sparse_index: K::SparseIndex,
+) -> Option<&mut SparseItem<K>>
+where
+    K: Key,
+{
+    let sparse_index = sparse_index.try_into().ok()?;
+    sparse_item_mut(sparse, sparse_index)
 }
 
 #[inline]

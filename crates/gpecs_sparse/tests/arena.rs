@@ -874,6 +874,33 @@ fn two_items_invalidate_epoch() {
 }
 
 #[test]
+fn two_items_replace_epoch() {
+    let mut sparse_set = EpochSparseArena::<_, Identity<i32>>::new();
+
+    let first_key = Key::new(5, 1);
+    sparse_set.insert(first_key, Identity(42));
+
+    let second_key = Key::new(2, 0);
+    sparse_set.insert(second_key, Identity(69));
+
+    let new_first_key = unsafe { sparse_set.replace_epoch(first_key.sparse_index, 0) }
+        .expect("first key should be present");
+    assert_eq!(new_first_key.sparse_index(), first_key.sparse_index());
+    assert_eq!(new_first_key.epoch(), &0);
+    assert_eq!(new_first_key, Key::new(5, 0));
+    assert_eq!(sparse_set.get(first_key), None);
+    assert_eq!(sparse_set.get(new_first_key), Some(&42.into()));
+
+    let new_second_key = unsafe { sparse_set.replace_epoch(second_key.sparse_index, 4) }
+        .expect("second key should be present");
+    assert_eq!(new_second_key.sparse_index(), second_key.sparse_index());
+    assert_eq!(new_second_key.epoch(), &4);
+    assert_eq!(new_second_key, Key::new(2, 4));
+    assert_eq!(sparse_set.get(second_key), None);
+    assert_eq!(sparse_set.get(new_second_key), Some(&69.into()));
+}
+
+#[test]
 fn three_items_insert_remove_middle() {
     let mut sparse_arena = SparseArena::<Identity<i32>>::new();
     sparse_arena.insert(2, Identity(34));

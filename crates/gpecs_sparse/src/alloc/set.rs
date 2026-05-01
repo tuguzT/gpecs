@@ -711,6 +711,16 @@ where
     }
 
     #[inline]
+    pub unsafe fn replace_epoch(
+        &mut self,
+        sparse_index: K::SparseIndex,
+        epoch: K::Epoch,
+    ) -> Option<K> {
+        let mut view_mut = self.as_mut_view();
+        unsafe { view_mut.replace_epoch(sparse_index, epoch) }
+    }
+
+    #[inline]
     pub fn replace_key(&mut self, key: K) -> Option<K> {
         let mut view_mut = self.as_mut_view();
         view_mut.replace_key(key)

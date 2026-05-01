@@ -8,9 +8,11 @@ use gpecs::prelude::*;
 use gpecs_itertools::Itertools as _;
 use gpecs_simple_types::{Mass, Position, Tag};
 use num_traits::ToPrimitive;
+use rayon::prelude::*;
 
 use crate::setup;
 
+#[expect(clippy::too_many_lines)]
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     setup::setup(context, entity_count);
 
@@ -96,21 +98,27 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        let position_tag_entities = position_tag_archetype_storage.as_entities();
-        let (position_tag_positions,) = position_tag_archetype_storage
-            .as_bundles::<(Position,)>(&components.as_view())
+        let (position_tag_entities, (position_tag_positions,), _) = position_tag_archetype_storage
+            .as_bundles_with_archetype::<(Position,)>(&components.as_view())
             .expect("archetype should contain `Position` components");
-        itertools::assert_equal(
-            position_tag_entities.iter().map(|entity| Position {
-                data: Vec3 {
-                    x: entity.index().to_f32().unwrap(),
-                    y: entity.index().to_f32().unwrap() / 2.0,
-                    z: -entity.index().to_f32().unwrap() / 2.0,
-                },
-                padding: Default::default(),
-            }),
-            position_tag_positions.iter().copied(),
-        );
+        position_tag_entities
+            .par_iter()
+            .zip_eq(position_tag_positions)
+            .enumerate()
+            .for_each(|(index, (entity, position))| {
+                let expected_position = Position {
+                    data: Vec3 {
+                        x: entity.index().to_f32().unwrap(),
+                        y: entity.index().to_f32().unwrap() / 2.0,
+                        z: -entity.index().to_f32().unwrap() / 2.0,
+                    },
+                    padding: Default::default(),
+                };
+                assert_eq!(
+                    position, &expected_position,
+                    "position does not match expected at {index}",
+                );
+            });
 
         // Check data inside of the timestamp query download buffer
         if let Some(statistics) = executor.timestamp_query_statistics(&queue) {

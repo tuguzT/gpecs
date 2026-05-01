@@ -1,8 +1,8 @@
 use std::{
     fmt::{self, Debug},
-    iter::{self, FusedIterator},
+    iter::FusedIterator,
     marker::PhantomData,
-    slice,
+    ptr,
 };
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
         traits::{ComponentIdFrom, FromComponentType},
     },
     entity::Entity,
-    soa::slice::{IterMut as SoaIterMut, SoaSlicesMut},
+    soa::traits::{Slices, SoaContext},
 };
 
 use super::algo;
@@ -110,8 +110,7 @@ where
     }
 }
 
-type BundlesMutIntoIterInner<'a, B> =
-    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'static, 'a, B>>;
+type Inner<'a, B> = gpecs_sparse::iter::IterMut<'static, 'a, Entity, B>;
 
 pub struct BundlesMutIntoIter<'a, 'ctx, B, M, T>
 where
@@ -120,7 +119,7 @@ where
 {
     archetypes: CompatibleArchetypesMut<'a>,
     components: ComponentRegistryView<'ctx, M, T>,
-    inner_front: Option<BundlesMutIntoIterInner<'a, B>>,
+    inner_front: Option<Inner<'a, B>>,
 }
 
 impl<'a, 'ctx, B, M, T> BundlesMutIntoIter<'a, 'ctx, B, M, T>
@@ -132,23 +131,23 @@ where
     fn new_inner(
         info: ArchetypeInfo<&'a mut ArchetypeStorage>,
         components: &ComponentRegistryView<'ctx, M, T>,
-    ) -> BundlesMutIntoIterInner<'a, B> {
+    ) -> Inner<'a, B> {
         let (entities, bundles, _) = info
             .into_meta()
             .as_mut_bundles_with_archetype::<B>(components)
             .expect("archetype should be compatible with requested bundle");
 
-        let entities = entities.iter().copied();
-        let bundles = SoaSlicesMut::new(B::CONTEXT, bundles);
-        entities.zip(bundles)
+        let keys = ptr::from_ref(entities).cast_mut();
+        let bundles = B::CONTEXT.mut_slices_as_mut_slice_ptrs(bundles);
+        unsafe { Inner::from_parts(B::CONTEXT, keys, bundles) }
     }
 }
 
-impl<'a, B, M, T> Debug for BundlesMutIntoIter<'a, '_, B, M, T>
+impl<B, M, T> Debug for BundlesMutIntoIter<'_, '_, B, M, T>
 where
     B: Bundle,
     T: ComponentIdFrom<Key: FromComponentType>,
-    BundlesMutIntoIterInner<'a, B>: Debug,
+    for<'ctx, 'a> Slices<'ctx, 'a, B>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -181,7 +180,7 @@ where
 
         loop {
             if let item @ Some(_) = algo::and_then_or_clear(inner_front, Iterator::next) {
-                return item;
+                return item.map(|(&entity, bundle)| (entity, bundle));
             }
             match archetypes.next() {
                 None => return None,

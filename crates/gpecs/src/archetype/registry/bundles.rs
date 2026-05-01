@@ -1,8 +1,7 @@
 use std::{
     fmt::{self, Debug},
-    iter::{self, FusedIterator},
+    iter::FusedIterator,
     marker::PhantomData,
-    slice,
 };
 
 use crate::{
@@ -17,7 +16,7 @@ use crate::{
         traits::{ComponentIdFrom, FromComponentType},
     },
     entity::Entity,
-    soa::slice::{Iter as SoaIter, SoaSlices},
+    soa::traits::Slices,
 };
 
 use super::algo;
@@ -124,8 +123,7 @@ where
     }
 }
 
-type BundlesIntoIterInner<'a, B> =
-    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'static, 'a, B>>;
+type Inner<'a, B> = gpecs_sparse::iter::Iter<'static, 'a, Entity, B>;
 
 pub struct BundlesIntoIter<'a, 'ctx, B, M, T>
 where
@@ -134,7 +132,7 @@ where
 {
     archetypes: CompatibleArchetypes<'a>,
     components: ComponentRegistryView<'ctx, M, T>,
-    inner_front: Option<BundlesIntoIterInner<'a, B>>,
+    inner_front: Option<Inner<'a, B>>,
 }
 
 impl<'a, 'ctx, B, M, T> BundlesIntoIter<'a, 'ctx, B, M, T>
@@ -146,23 +144,20 @@ where
     fn new_inner(
         info: ArchetypeInfo<&'a ArchetypeStorage>,
         components: &ComponentRegistryView<'ctx, M, T>,
-    ) -> BundlesIntoIterInner<'a, B> {
+    ) -> Inner<'a, B> {
         let (entities, bundles, _) = info
             .into_meta()
             .as_bundles_with_archetype::<B>(components)
             .expect("archetype should be compatible with requested bundle");
-
-        let entities = entities.iter().copied();
-        let bundles = SoaSlices::new(B::CONTEXT, bundles);
-        entities.zip(bundles)
+        Inner::new(B::CONTEXT, entities, bundles)
     }
 }
 
-impl<'a, B, M, T> Debug for BundlesIntoIter<'a, '_, B, M, T>
+impl<B, M, T> Debug for BundlesIntoIter<'_, '_, B, M, T>
 where
     B: Bundle,
     T: ComponentIdFrom<Key: FromComponentType>,
-    BundlesIntoIterInner<'a, B>: Debug,
+    for<'ctx, 'a> Slices<'ctx, 'a, B>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -215,7 +210,7 @@ where
 
         loop {
             if let item @ Some(_) = algo::and_then_or_clear(inner_front, Iterator::next) {
-                return item;
+                return item.map(|(&entity, bundle)| (entity, bundle));
             }
             match archetypes.next() {
                 None => return None,

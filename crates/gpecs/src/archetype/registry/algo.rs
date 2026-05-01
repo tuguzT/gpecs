@@ -333,7 +333,7 @@ pub fn check_location(
 ) -> Result<(), InvalidEntityLocationError> {
     let EntityLocation::WithComponents(archetype_id) = location else {
         // FIXME: this check is too expensive, especially if done for every entity
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, test))]
         if let Some(archetype_id) = find_location(archetypes, entity).archetype_id() {
             let kind = InvalidEntityLocationErrorKind::EntityHasComponents;
             let error = InvalidEntityLocationError::new(entity, archetype_id, kind);

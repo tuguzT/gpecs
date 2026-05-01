@@ -8,7 +8,6 @@ use crate::{iter::RawKeys, soa::traits::RawSoa};
 
 pub struct Keys<'ctx, 'a, K, V>
 where
-    K: 'a,
     V: RawSoa + ?Sized,
 {
     context: &'ctx V::Context,
@@ -20,10 +19,16 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
+    pub(super) fn new(context: &'ctx V::Context, keys: &'a [K]) -> Self {
+        let keys = keys.iter();
+        Self { context, keys }
+    }
+
+    #[inline]
     pub(super) unsafe fn from_inner(inner: RawKeys<'ctx, K, V>) -> Self {
         let (context, keys) = inner.into_slice_ptr_with_context();
-        let keys = unsafe { keys.as_ref_unchecked() }.iter();
-        Self { context, keys }
+        let keys = unsafe { keys.as_ref_unchecked() };
+        Self::new(context, keys)
     }
 
     #[inline]

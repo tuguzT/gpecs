@@ -1253,6 +1253,38 @@ where
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_keys(&self) -> crate::iter::ParKeys<'_, '_, K, V> {
+        let (_, keys) = self.par_keys_with_context();
+        keys
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_keys_with_context(&self) -> (&V::Context, crate::iter::ParKeys<'_, '_, K, V>) {
+        let (context, keys) = self.as_key_slice_with_context();
+        let keys = crate::iter::ParKeys::new(context, keys);
+        (context, keys)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_keys(self) -> crate::iter::ParKeys<'ctx, 'a, K, V> {
+        let (_, keys) = self.into_par_keys_with_context();
+        keys
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_par_keys_with_context(
+        self,
+    ) -> (&'ctx V::Context, crate::iter::ParKeys<'ctx, 'a, K, V>) {
+        let (context, keys) = self.into_key_slice_with_context();
+        let keys = crate::iter::ParKeys::new(context, keys);
+        (context, keys)
+    }
 }
 
 impl<'ctx, 'a, K, V> EpochSparseViewMut<'ctx, 'a, K, V>

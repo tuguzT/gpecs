@@ -8,7 +8,7 @@ pub use self::{
 pub use crate::alloc::iter::{Drain, IntoIter, IntoKeys, IntoValues};
 
 #[cfg(feature = "rayon")]
-pub use self::{par_iter::ParIter, par_iter_mut::ParIterMut};
+pub use self::{par_iter::ParIter, par_iter_mut::ParIterMut, par_keys::ParKeys};
 
 mod keys;
 mod raw_keys;
@@ -23,7 +23,11 @@ mod iter_mut;
 mod raw_iter;
 mod raw_iter_mut;
 
+// TODO: more parallel iterators
+
 #[cfg(feature = "rayon")]
 mod par_iter;
 #[cfg(feature = "rayon")]
 mod par_iter_mut;
+#[cfg(feature = "rayon")]
+mod par_keys;

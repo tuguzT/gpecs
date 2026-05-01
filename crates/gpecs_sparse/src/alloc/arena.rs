@@ -1386,6 +1386,21 @@ where
     }
 
     #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_keys(&self) -> crate::iter::ParKeys<'_, '_, K, V> {
+        let (_, keys) = self.par_keys_with_context();
+        keys
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn par_keys_with_context(&self) -> (&V::Context, crate::iter::ParKeys<'_, '_, K, V>) {
+        let (context, keys) = self.as_key_slice_with_context();
+        let keys = crate::iter::ParKeys::new(context, keys);
+        (context, keys)
+    }
+
+    #[inline]
     #[must_use]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense, .. } = self;

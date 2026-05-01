@@ -10,7 +10,7 @@ use core::{
 use crate::{
     algo::{
         check_parts, sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key,
-        sparse_index,
+        sparse_index, sparse_item_by_key, sparse_item_mut_by_key,
     },
     assert::{
         assert_compatible_key, assert_equal_epoch, assert_equal_key, unwrap_dense,
@@ -977,10 +977,7 @@ where
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
-        let sparse_item = sparse
-            .get_mut(sparse_index.try_into().ok()?)
-            .take_if(|item| item.epoch == key.epoch())?;
+        let sparse_item = sparse_item_mut_by_key(sparse, key)?;
         let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
 
         let (keys, _) = dense.as_mut_slice_ptrs().into_parts();
@@ -990,7 +987,7 @@ where
         assert_equal_key(key, *dense_key);
 
         sparse_item.epoch = sparse_item.epoch.next();
-        *dense_key = K::new(sparse_index, sparse_item.epoch);
+        *dense_key = K::new(key.sparse_index(), sparse_item.epoch);
 
         Some(*dense_key)
     }
@@ -998,11 +995,10 @@ where
     pub fn replace_key(&mut self, key: K) -> Option<K> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
-        let sparse_item = sparse
-            .get_mut(sparse_index.try_into().ok()?)
-            .take_if(|item| item.epoch == key.epoch())?;
-        let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
+        let dense_index = sparse_item_by_key(sparse, key)
+            .and_then(SparseItem::dense_index)
+            .copied()?;
+        let dense_index = unwrap_into_usize(dense_index);
 
         let (keys, _) = dense.as_mut_slice_ptrs().into_parts();
         let keys = unsafe { keys.as_mut_unchecked() };

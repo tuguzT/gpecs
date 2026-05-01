@@ -27,6 +27,87 @@ where
     unsafe { sparse.cast::<SparseItem<K>>().add(sparse_index) }
 }
 
+#[inline]
+fn sparse_item<K>(sparse: &[SparseItem<K>], sparse_index: usize) -> Option<&SparseItem<K>>
+where
+    K: Key,
+{
+    sparse.get(sparse_index)
+}
+
+#[inline]
+fn sparse_item_mut<K>(
+    sparse: &mut [SparseItem<K>],
+    sparse_index: usize,
+) -> Option<&mut SparseItem<K>>
+where
+    K: Key,
+{
+    sparse.get_mut(sparse_index)
+}
+
+#[inline]
+fn filter_sparse_item<K>(sparse_item: &SparseItem<K>, epoch: K::Epoch) -> bool
+where
+    K: Key,
+{
+    sparse_item.epoch == epoch
+}
+
+#[inline]
+pub fn sparse_item_by_epoch<K>(
+    sparse: &[SparseItem<K>],
+    sparse_index: usize,
+    epoch: K::Epoch,
+) -> Option<&SparseItem<K>>
+where
+    K: Key,
+{
+    sparse_item(sparse, sparse_index).filter(|item| filter_sparse_item(item, epoch))
+}
+
+#[inline]
+pub fn sparse_item_mut_by_epoch<K>(
+    sparse: &mut [SparseItem<K>],
+    sparse_index: usize,
+    epoch: K::Epoch,
+) -> Option<&mut SparseItem<K>>
+where
+    K: Key,
+{
+    sparse_item_mut(sparse, sparse_index).filter(|item| filter_sparse_item(item, epoch))
+}
+
+#[inline]
+fn sparse_item_by_index<K>(
+    sparse: &[SparseItem<K>],
+    sparse_index: K::SparseIndex,
+) -> Option<&SparseItem<K>>
+where
+    K: Key,
+{
+    let sparse_index = sparse_index.try_into().ok()?;
+    sparse_item(sparse, sparse_index)
+}
+
+#[inline]
+pub fn sparse_item_by_key<K>(sparse: &[SparseItem<K>], key: K) -> Option<&SparseItem<K>>
+where
+    K: Key,
+{
+    let sparse_index = key.sparse_index().try_into().ok()?;
+    sparse_item_by_epoch(sparse, sparse_index, key.epoch())
+}
+
+#[inline]
+pub fn sparse_item_mut_by_key<K>(sparse: &mut [SparseItem<K>], key: K) -> Option<&mut SparseItem<K>>
+where
+    K: Key,
+{
+    let sparse_index = key.sparse_index().try_into().ok()?;
+    sparse_item_mut_by_epoch(sparse, sparse_index, key.epoch())
+}
+
 pub unsafe fn sparse_get_unchecked<K, T>(
     dense: impl IntoIterator<Item = T>,
     sparse: *const [SparseItem<K>],
@@ -39,18 +120,6 @@ where
     let dense_index = unsafe { sparse_item.into_dense_index().unwrap_unchecked() };
     let dense_index = unsafe { dense_index.try_into().unwrap_unchecked() };
     unsafe { dense.into_iter().nth(dense_index).unwrap_unchecked() }
-}
-
-#[inline]
-fn sparse_item_by_key<K>(sparse: &[SparseItem<K>], key: K) -> Option<&SparseItem<K>>
-where
-    K: Key,
-{
-    let sparse_index = key.sparse_index().try_into().ok()?;
-    let sparse_item = sparse
-        .get(sparse_index)
-        .take_if(|item| item.epoch == key.epoch())?;
-    Some(sparse_item)
 }
 
 pub fn sparse_get<K, T>(
@@ -97,16 +166,6 @@ where
     }
 }
 
-#[inline]
-fn sparse_item<K>(sparse: &[SparseItem<K>], sparse_index: K::SparseIndex) -> Option<&SparseItem<K>>
-where
-    K: Key,
-{
-    let sparse_index = sparse_index.try_into().ok()?;
-    let sparse_item = sparse.get(sparse_index)?;
-    Some(sparse_item)
-}
-
 pub fn sparse_get_with_key<K, T>(
     dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
     sparse: &[SparseItem<K>],
@@ -115,7 +174,7 @@ pub fn sparse_get_with_key<K, T>(
 where
     K: Key,
 {
-    let sparse_item = sparse_item(sparse, sparse_index)?;
+    let sparse_item = sparse_item_by_index(sparse, sparse_index)?;
     let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
 
     let (dense_key, value) = unwrap_dense(dense, dense_index);
@@ -133,7 +192,7 @@ pub fn sparse_get_epoch<K>(
 where
     K: Key,
 {
-    let sparse_item = sparse_item(sparse, sparse_index)?;
+    let sparse_item = sparse_item_by_index(sparse, sparse_index)?;
     let epoch = sparse_item.epoch;
 
     if let Some(dense_index) = sparse_item.dense_index() {

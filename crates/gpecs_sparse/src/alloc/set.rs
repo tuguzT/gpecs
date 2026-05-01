@@ -8,7 +8,7 @@ use core::{
 use core_alloc::vec::Vec;
 
 use crate::{
-    algo::{check_parts, dense_keys},
+    algo::{check_parts, dense_keys, sparse_item_by_epoch},
     assert::{
         assert_dense_index_bounds, assert_equal_key, assert_key_bounds, unwrap_dense,
         unwrap_dense_index_mut, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item_mut,
@@ -778,9 +778,7 @@ where
             return f(dense.context(), None);
         };
 
-        let dense_index = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
+        let dense_index = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
             .and_then(SparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
@@ -832,9 +830,7 @@ where
             return f(dense.context(), None);
         };
 
-        let dense_index = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
+        let dense_index = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
             .and_then(SparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
@@ -1111,16 +1107,15 @@ where
             .sparse_index()
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
-        let Some(dense_index) = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
+        let Some(dense_index) = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
             .and_then(SparseItem::dense_index)
+            .copied()
         else {
             let entry = VacantEntry::new(key, self);
             return Ok(Entry::Vacant(entry));
         };
 
-        let dense_index = unwrap_into_usize(*dense_index);
+        let dense_index = unwrap_into_usize(dense_index);
         assert_dense_index_bounds(dense_index, dense.len());
         let entry = OccupiedEntry::new(key, dense_index, self);
         Ok(Entry::Occupied(entry))

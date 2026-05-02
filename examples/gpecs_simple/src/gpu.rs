@@ -98,9 +98,11 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        let (position_tag_entities, (position_tag_positions,), _) = position_tag_archetype_storage
-            .as_bundles_with_archetype::<(Position,)>(&components.as_view())
-            .expect("archetype should contain `Position` components");
+        let (position_tag_entities, (position_tag_positions,)) = position_tag_archetype_storage
+            .as_bundles::<(Position,)>(&components.as_view())
+            .expect("archetype should contain `Position` components")
+            .into_iter()
+            .into_slices();
         position_tag_entities
             .par_iter()
             .zip_eq(position_tag_positions)

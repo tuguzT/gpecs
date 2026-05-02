@@ -26,7 +26,7 @@ use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet}
 
 use crate::{
     bundle::{
-        Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
+        Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBundle, ErasedBundleKind,
             error::DowncastError,
@@ -41,8 +41,8 @@ use crate::{
         },
     },
     storage::{
-        ArchetypeStorageView, ArchetypeStorageViewMut, BundleIter, BundleIterMut,
-        ErasedArchetypeSoa, Iter, IterMut, NoEpochEntity,
+        ArchetypeStorageView, ArchetypeStorageViewMut, BundleIter, BundleIterMut, Bundles,
+        BundlesMut, ErasedArchetypeSoa, Iter, IterMut, NoEpochEntity,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
             MoveIntoWithInsertBundleError, MoveIntoWithInsertBundleErrorKind,
@@ -466,14 +466,11 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundlesWithArchetype<'_, B, T>, IncompatibleArchetypeError>
+    ) -> Result<(Bundles<'_, B>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        let (entities, bundles, _, archetype) = self
-            .as_view()
-            .into_bundles_with_archetype::<B>(components)?;
-        Ok((entities, bundles, archetype))
+        self.as_view().into_bundles_with_archetype::<B>(components)
     }
 
     #[inline]
@@ -483,12 +480,11 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundleSlices<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Bundles<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        let (_, bundles, _) = self.as_view().into_bundles::<B>(components)?;
-        Ok(bundles)
+        self.as_view().into_bundles::<B>(components)
     }
 
     #[inline]
@@ -498,14 +494,12 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundlesMutWithArchetype<'_, B, T>, IncompatibleArchetypeError>
+    ) -> Result<(BundlesMut<'_, B>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        let (entities, bundles, _, archetype) = self
-            .as_mut_view()
-            .into_mut_bundles_with_archetype::<B>(components)?;
-        Ok((entities, bundles, archetype))
+        self.as_mut_view()
+            .into_mut_bundles_with_archetype::<B>(components)
     }
 
     #[inline]
@@ -515,12 +509,11 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundleSlicesMut<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<BundlesMut<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        let (_, bundles, _) = self.as_mut_view().into_mut_bundles::<B>(components)?;
-        Ok(bundles)
+        self.as_mut_view().into_mut_bundles::<B>(components)
     }
 
     #[inline]
@@ -784,18 +777,6 @@ type SlicesWithArchetype<'a, T> = (
 type SlicesMutWithArchetype<'a, T> = (
     &'a [Entity],
     ErasedBundlesMut<'a, 'a, T>,
-    ErasedArchetypeView<'a, <T as ErasedArchetypeSoa>::Meta>,
-);
-
-type BundlesWithArchetype<'a, B, T> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
-    ErasedArchetypeView<'a, <T as ErasedArchetypeSoa>::Meta>,
-);
-
-type BundlesMutWithArchetype<'a, B, T> = (
-    &'a [Entity],
-    BundleSlicesMut<'a, B>,
     ErasedArchetypeView<'a, <T as ErasedArchetypeSoa>::Meta>,
 );
 

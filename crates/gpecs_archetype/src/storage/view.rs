@@ -25,9 +25,9 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    bundle::{Bundle, BundleRefs, BundleSlices, erased::error::DowncastError},
+    bundle::{Bundle, BundleRefs, erased::error::DowncastError},
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
-    storage::{BundleIter, Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
+    storage::{BundleIter, Bundles, Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
 };
 
 type Inner<'ctx, T> = EpochSparseViewPtr<'ctx, NoEpochEntity, T>;
@@ -219,7 +219,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundlesWithArchetype<'_, '_, B, T>, IncompatibleArchetypeError>
+    ) -> Result<(Bundles<'_, B>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -233,7 +233,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundlesWithArchetype<'ctx, 'a, B, T>, IncompatibleArchetypeError>
+    ) -> Result<(Bundles<'a, B>, ErasedArchetypeView<'ctx, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -244,7 +244,9 @@ where
             .downcast::<B>(components)
             .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
-        Ok((entities, bundles, sparse, archetype))
+        let bundles = unsafe { Bundles::from_parts(entities, bundles, sparse) };
+
+        Ok((bundles, archetype))
     }
 
     #[inline]
@@ -254,7 +256,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<Bundles<'_, '_, B>, IncompatibleArchetypeError>
+    ) -> Result<Bundles<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -268,12 +270,12 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<Bundles<'ctx, 'a, B>, IncompatibleArchetypeError>
+    ) -> Result<Bundles<'a, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        let (entities, bundles, sparse, _) = self.into_bundles_with_archetype::<B>(components)?;
-        Ok((entities, bundles, sparse))
+        let (bundles, _) = self.into_bundles_with_archetype::<B>(components)?;
+        Ok(bundles)
     }
 
     #[inline]
@@ -340,8 +342,8 @@ where
     where
         B: Bundle,
     {
-        let (entities, bundles, _) = self.into_bundles::<B>(components)?;
-        let iter = BundleIter::new(entities, bundles);
+        let bundles = self.into_bundles::<B>(components)?;
+        let iter = bundles.into_iter();
         Ok(iter)
     }
 
@@ -372,14 +374,8 @@ where
     where
         B: Bundle,
     {
-        let (entities, bundles, sparse) = self.into_bundles::<B>(components)?;
-
-        let slices = DenseSlices::new(B::CONTEXT, must_cast_slice(entities), bundles);
-        let dense = SoaSlices::new(Identity::from_inner_ref(B::CONTEXT), slices);
-        let bundle_view = unsafe { EpochSparseView::from_parts(dense, sparse) };
-
-        let inner = bundle_view.into_par_iter();
-        let iter = crate::storage::BundleParIter::new(inner);
+        let bundles = self.into_bundles::<B>(components)?;
+        let iter = bundles.into_par_iter();
         Ok(iter)
     }
 }
@@ -454,17 +450,5 @@ type SlicesWithArchetype<'ctx, 'a, T> = (
 type Slices<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [SparseItem<NoEpochEntity>],
-);
-
-type BundlesWithArchetype<'ctx, 'a, B, T> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
-    &'a [SparseItem<NoEpochEntity>],
-    ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
-);
-type Bundles<'ctx, 'a, B> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
     &'a [SparseItem<NoEpochEntity>],
 );

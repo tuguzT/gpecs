@@ -133,8 +133,7 @@ where
     T: ComponentIdFrom<Key: FromComponentType>,
 {
     type Item = (Entity, BundleRefs<'a, B>);
-    type Iter =
-        rayon::iter::Flatten<rayon::vec::IntoIter<crate::archetype::storage::BundleParIter<'a, B>>>;
+    type Iter = rayon::iter::FlattenIter<rayon::vec::IntoIter<BundleIter<'a, B>>>;
 
     fn into_par_iter(self) -> Self::Iter {
         use itertools::Itertools;
@@ -147,14 +146,10 @@ where
         } = self;
 
         archetypes
-            .map(|info| {
-                info.into_meta()
-                    .bundle_par_iter::<B>(components)
-                    .expect("archetype should be compatible with requested bundle")
-            })
+            .map(|info| make_inner(info, components))
             .collect_vec()
             .into_par_iter()
-            .flatten()
+            .flatten_iter()
     }
 }
 
@@ -166,22 +161,6 @@ where
     archetypes: CompatibleArchetypes<'a>,
     components: ComponentRegistryView<'ctx, M, T>,
     inner_front: Option<BundleIter<'a, B>>,
-}
-
-impl<'a, 'ctx, B, M, T> BundlesIntoIter<'a, 'ctx, B, M, T>
-where
-    B: Bundle,
-    T: ComponentIdFrom<Key: FromComponentType>,
-{
-    #[inline]
-    fn new_inner(
-        info: ArchetypeInfo<&'a ArchetypeStorage>,
-        components: &ComponentRegistryView<'ctx, M, T>,
-    ) -> BundleIter<'a, B> {
-        info.into_meta()
-            .bundle_iter(components)
-            .expect("archetype should be compatible with requested bundle")
-    }
 }
 
 impl<B, M, T> Debug for BundlesIntoIter<'_, '_, B, M, T>
@@ -245,7 +224,7 @@ where
             }
             match archetypes.next() {
                 None => return None,
-                Some(info) => *inner_front = Self::new_inner(info, components).into(),
+                Some(info) => *inner_front = make_inner(info, components).into(),
             }
         }
     }
@@ -275,4 +254,20 @@ where
     B: Bundle,
     T: ComponentIdFrom<Key: FromComponentType>,
 {
+}
+
+#[inline]
+fn make_inner<'a, B>(
+    info: ArchetypeInfo<&'a ArchetypeStorage>,
+    components: &ComponentRegistryView<
+        impl Sized,
+        impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    >,
+) -> BundleIter<'a, B>
+where
+    B: Bundle,
+{
+    info.into_meta()
+        .bundle_iter(components)
+        .expect("archetype should be compatible with requested bundle")
 }

@@ -8,7 +8,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-gpecs = { workspace = true }
+gpecs = { workspace = true, features = ["rayon"] }
 gpecs_itertools = { workspace = true }
 gpecs_simple_types = { workspace = true }
 bytemuck = { workspace = true }

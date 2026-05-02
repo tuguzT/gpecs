@@ -123,6 +123,41 @@ where
     }
 }
 
+#[cfg(feature = "rayon")]
+impl<'a, B, M, T> rayon::iter::IntoParallelIterator for Bundles<'a, '_, B, M, T>
+where
+    B: Bundle,
+    B::Context: Sync,
+    B::Fields: Sync,
+    BundleRefs<'a, B>: Send,
+    T: ComponentIdFrom<Key: FromComponentType>,
+{
+    type Item = (Entity, BundleRefs<'a, B>);
+    type Iter =
+        rayon::iter::Flatten<rayon::vec::IntoIter<crate::archetype::storage::BundleParIter<'a, B>>>;
+
+    fn into_par_iter(self) -> Self::Iter {
+        use itertools::Itertools;
+        use rayon::prelude::*;
+
+        let Self {
+            archetypes,
+            ref components,
+            ..
+        } = self;
+
+        archetypes
+            .map(|info| {
+                info.into_meta()
+                    .bundle_par_iter::<B>(components)
+                    .expect("archetype should be compatible with requested bundle")
+            })
+            .collect_vec()
+            .into_par_iter()
+            .flatten()
+    }
+}
+
 pub struct BundlesIntoIter<'a, 'ctx, B, M, T>
 where
     B: Bundle,

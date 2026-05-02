@@ -665,6 +665,7 @@ dependencies = [
  "num-traits",
  "petgraph",
  "pollster",
+ "rayon",
  "rustc-hash 2.1.2",
  "wgpu",
 ]

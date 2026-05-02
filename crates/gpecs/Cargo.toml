@@ -21,6 +21,7 @@ rustc-hash = { workspace = true }
 petgraph = { workspace = true }
 itertools = { workspace = true, features = ["use_std"] }
 wgpu = { workspace = true, features = ["spirv"] }
+rayon = { workspace = true, optional = true }
 
 [build-dependencies]
 cargo-gpu-install = { workspace = true }
@@ -29,6 +30,14 @@ const_format = { workspace = true }
 [dev-dependencies]
 pollster = { workspace = true }
 num-traits = { workspace = true }
+
+[features]
+rayon = [
+    "dep:rayon",
+    "gpecs_sparse/rayon",
+    "gpecs_entity/rayon",
+    "gpecs_archetype/rayon",
+]
 
 [lints]
 workspace = true

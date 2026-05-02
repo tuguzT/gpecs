@@ -109,6 +109,42 @@ where
     }
 }
 
+#[cfg(feature = "rayon")]
+impl<'a, B, M, T> rayon::iter::IntoParallelIterator for BundlesMut<'a, '_, B, M, T>
+where
+    B: Bundle,
+    B::Context: Sync,
+    B::Fields: Send,
+    BundleRefsMut<'a, B>: Send,
+    T: ComponentIdFrom<Key: FromComponentType>,
+{
+    type Item = (Entity, BundleRefsMut<'a, B>);
+    type Iter = rayon::iter::Flatten<
+        rayon::vec::IntoIter<crate::archetype::storage::BundleParIterMut<'a, B>>,
+    >;
+
+    fn into_par_iter(self) -> Self::Iter {
+        use itertools::Itertools;
+        use rayon::prelude::*;
+
+        let Self {
+            archetypes,
+            ref components,
+            ..
+        } = self;
+
+        archetypes
+            .map(|info| {
+                info.into_meta()
+                    .bundle_par_iter_mut::<B>(components)
+                    .expect("archetype should be compatible with requested bundle")
+            })
+            .collect_vec()
+            .into_par_iter()
+            .flatten()
+    }
+}
+
 pub struct BundlesMutIntoIter<'a, 'ctx, B, M, T>
 where
     B: Bundle,

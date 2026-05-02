@@ -500,25 +500,11 @@ where
     where
         B: Bundle,
     {
-        self.as_mut_view().into_bundle_iter_mut::<B>(components)
+        self.as_mut_view().into_bundle_iter::<B>(components)
     }
 
     #[inline]
     pub fn into_bundle_iter<B>(
-        self,
-        components: &ComponentRegistryView<
-            impl Sized,
-            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        >,
-    ) -> Result<BundleIter<'a, B>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-    {
-        ArchetypeStorageView::from(self).into_bundle_iter(components)
-    }
-
-    #[inline]
-    pub fn into_bundle_iter_mut<B>(
         self,
         components: &ComponentRegistryView<
             impl Sized,
@@ -533,6 +519,61 @@ where
         let bundles = B::CONTEXT.mut_slices_as_mut_slice_ptrs(bundles);
 
         let iter = unsafe { BundleIterMut::from_parts(entities, bundles) };
+        Ok(iter)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn bundle_par_iter<B>(
+        &self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIter<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_view().into_bundle_par_iter(components)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn bundle_par_iter_mut<B>(
+        &mut self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIterMut<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_mut_view().into_bundle_par_iter(components)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_bundle_par_iter<B>(
+        self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIterMut<'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        let (entities, bundles, sparse) = self.into_mut_bundles::<B>(components)?;
+        let entities = unsafe { ptr::from_ref(entities).cast_mut().as_mut_unchecked() };
+        let sparse = unsafe { ptr::from_ref(sparse).cast_mut().as_mut_unchecked() };
+
+        let slices = DenseSlicesMut::new(B::CONTEXT, must_cast_slice_mut(entities), bundles);
+        let dense = SoaSlicesMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
+        let bundle_view = unsafe { EpochSparseViewMut::from_parts(dense, sparse) };
+
+        let inner = bundle_view.into_par_iter();
+        let iter = crate::storage::BundleParIterMut::new(inner);
         Ok(iter)
     }
 }

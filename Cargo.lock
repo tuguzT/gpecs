@@ -680,6 +680,7 @@ dependencies = [
  "gpecs_sparse",
  "gpecs_world",
  "itertools 0.14.0",
+ "rayon",
 ]
 
 [[package]]

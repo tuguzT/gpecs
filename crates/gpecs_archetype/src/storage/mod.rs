@@ -7,6 +7,9 @@ pub use self::{
 #[cfg(feature = "alloc")]
 pub use crate::alloc::storage::ArchetypeStorage;
 
+#[cfg(feature = "rayon")]
+pub use self::{bundle_par_iter::BundleParIter, bundle_par_iter_mut::BundleParIterMut};
+
 pub mod error;
 
 mod bundle_iter;
@@ -17,3 +20,8 @@ mod iter_mut;
 mod traits;
 mod view;
 mod view_mut;
+
+#[cfg(feature = "rayon")]
+mod bundle_par_iter;
+#[cfg(feature = "rayon")]
+mod bundle_par_iter_mut;

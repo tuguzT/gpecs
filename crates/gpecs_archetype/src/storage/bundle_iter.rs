@@ -30,13 +30,18 @@ where
     pub unsafe fn from_parts(entities: *const [Entity], bundles: BundleSlicePtrs<B>) -> Self {
         let keys = entities as *const [_];
         let inner = unsafe { Inner::from_parts(B::CONTEXT, keys, bundles) };
-        Self { inner }
+        Self::from_inner(inner)
     }
 
     #[inline]
     pub fn new(entities: &'a [Entity], bundles: BundleSlices<'a, B>) -> Self {
         let keys = must_cast_slice(entities);
         let inner = Inner::new(B::CONTEXT, keys, bundles);
+        Self::from_inner(inner)
+    }
+
+    #[inline]
+    pub(super) fn from_inner(inner: Inner<'a, B>) -> Self {
         Self { inner }
     }
 

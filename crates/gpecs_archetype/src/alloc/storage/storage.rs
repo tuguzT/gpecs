@@ -741,7 +741,37 @@ where
     where
         B: Bundle,
     {
-        self.as_mut_view().into_bundle_iter_mut::<B>(components)
+        self.as_mut_view().into_bundle_iter::<B>(components)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn bundle_par_iter<B>(
+        &self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIter<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_view().into_bundle_par_iter(components)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn bundle_par_iter_mut<B>(
+        &mut self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIterMut<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_mut_view().into_bundle_par_iter(components)
     }
 }
 

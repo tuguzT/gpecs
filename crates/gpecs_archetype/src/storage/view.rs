@@ -344,6 +344,44 @@ where
         let iter = BundleIter::new(entities, bundles);
         Ok(iter)
     }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn bundle_par_iter<B>(
+        &self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIter<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_view().into_bundle_par_iter(components)
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    pub fn into_bundle_par_iter<B>(
+        self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<crate::storage::BundleParIter<'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        let (entities, bundles, sparse) = self.into_bundles::<B>(components)?;
+
+        let slices = DenseSlices::new(B::CONTEXT, must_cast_slice(entities), bundles);
+        let dense = SoaSlices::new(Identity::from_inner_ref(B::CONTEXT), slices);
+        let bundle_view = unsafe { EpochSparseView::from_parts(dense, sparse) };
+
+        let inner = bundle_view.into_par_iter();
+        let iter = crate::storage::BundleParIter::new(inner);
+        Ok(iter)
+    }
 }
 
 impl<T> Debug for ArchetypeStorageView<'_, '_, T>

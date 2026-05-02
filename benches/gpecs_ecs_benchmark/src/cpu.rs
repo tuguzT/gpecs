@@ -101,7 +101,7 @@ fn register_cpu_systems<B>(
         bundles
             .into_par_iter()
             .for_each(|(_, (position, velocity, data))| {
-                update_components(position, velocity, data)
+                update_components(position, velocity, data);
             });
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_components` system took {elapsed:?}");

@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem,
 };
 
 use bytemuck::{must_cast_slice, must_cast_slice_mut};
@@ -10,7 +11,7 @@ use gpecs_sparse::{iter::IterMut, soa::traits::Slices};
 use crate::{
     bundle::{
         Bundle, BundleMutPtrs, BundlePtrs, BundleRefsMut, BundleSliceMutPtrs, BundleSlicePtrs,
-        BundleSlicesMut,
+        BundleSlices, BundleSlicesMut,
     },
     storage::NoEpochEntity,
 };
@@ -132,11 +133,12 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], Slices<'_, '_, B>) {
+    pub fn as_slices(&self) -> (&[Entity], BundleSlices<'_, B>) {
         let Self { inner } = self;
 
         let (entities, bundles) = inner.as_slices();
         let entities = must_cast_slice(entities);
+        let bundles = unsafe { mem::transmute::<Slices<'_, '_, B>, BundleSlices<'_, B>>(bundles) };
         (entities, bundles)
     }
 

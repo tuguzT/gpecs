@@ -1,4 +1,7 @@
-use core::fmt::{self, Debug};
+use core::{
+    fmt::{self, Debug},
+    mem,
+};
 
 use bytemuck::must_cast_slice;
 use gpecs_entity::Entity;
@@ -12,7 +15,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    bundle::{Bundle, BundleRefsMut},
+    bundle::{Bundle, BundleRefsMut, BundleSlices, BundleSlicesMut},
     storage::{BundleIterMut, NoEpochEntity},
 };
 
@@ -36,20 +39,23 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], Slices<'_, '_, B>) {
+    pub fn as_slices(&self) -> (&[Entity], BundleSlices<'_, B>) {
         let Self { inner } = self;
 
         let (entities, bundles) = inner.as_slices();
         let entities = must_cast_slice(entities);
+        let bundles = unsafe { mem::transmute::<Slices<'_, '_, B>, BundleSlices<'_, B>>(bundles) };
         (entities, bundles)
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&[Entity], SlicesMut<'_, '_, B>) {
+    pub fn as_mut_slices(&mut self) -> (&[Entity], BundleSlicesMut<'_, B>) {
         let Self { inner } = self;
 
         let (entities, bundles) = inner.as_mut_slices();
         let entities = must_cast_slice(entities);
+        let bundles =
+            unsafe { mem::transmute::<SlicesMut<'_, '_, B>, BundleSlicesMut<'_, B>>(bundles) };
         (entities, bundles)
     }
 }

@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    ptr,
 };
 
 use bytemuck::must_cast_slice_mut;
@@ -17,7 +18,7 @@ use gpecs_soa_erased::{
         slice::SoaSlicesMut,
         traits::{
             Refs as ErasedBundleRefs, RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles,
-            SlicesMut as ErasedBundlesMut,
+            SlicesMut as ErasedBundlesMut, SoaContext,
         },
     },
 };
@@ -33,7 +34,10 @@ use crate::{
         erased::error::DowncastError,
     },
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
-    storage::{ArchetypeStorageView, Iter, IterMut, NoEpochEntity, traits::ErasedArchetypeSoa},
+    storage::{
+        ArchetypeStorageView, BundleIter, BundleIterMut, Iter, IterMut, NoEpochEntity,
+        traits::ErasedArchetypeSoa,
+    },
 };
 
 type Inner<'ctx, T> = EpochSparseViewMutPtr<'ctx, NoEpochEntity, T>;
@@ -469,6 +473,67 @@ where
             .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
         Ok(Some(bundle))
+    }
+
+    #[inline]
+    pub fn bundle_iter<B>(
+        &self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIter<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_view().into_bundle_iter::<B>(components)
+    }
+
+    #[inline]
+    pub fn bundle_iter_mut<B>(
+        &mut self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIterMut<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_mut_view().into_bundle_iter_mut::<B>(components)
+    }
+
+    #[inline]
+    pub fn into_bundle_iter<B>(
+        self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIter<'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        ArchetypeStorageView::from(self).into_bundle_iter(components)
+    }
+
+    #[inline]
+    pub fn into_bundle_iter_mut<B>(
+        self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIterMut<'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        let (entities, bundles, _) = self.into_mut_bundles::<B>(components)?;
+        let entities = ptr::from_ref(entities).cast_mut();
+        let bundles = B::CONTEXT.mut_slices_as_mut_slice_ptrs(bundles);
+
+        let iter = unsafe { BundleIterMut::from_parts(entities, bundles) };
+        Ok(iter)
     }
 }
 

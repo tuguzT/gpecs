@@ -41,8 +41,8 @@ use crate::{
         },
     },
     storage::{
-        ArchetypeStorageView, ArchetypeStorageViewMut, ErasedArchetypeSoa, Iter, IterMut,
-        NoEpochEntity,
+        ArchetypeStorageView, ArchetypeStorageViewMut, BundleIter, BundleIterMut,
+        ErasedArchetypeSoa, Iter, IterMut, NoEpochEntity,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
             MoveIntoWithInsertBundleError, MoveIntoWithInsertBundleErrorKind,
@@ -714,6 +714,34 @@ where
             });
         });
         Ok(())
+    }
+
+    #[inline]
+    pub fn bundle_iter<B>(
+        &self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIter<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_view().into_bundle_iter::<B>(components)
+    }
+
+    #[inline]
+    pub fn bundle_iter_mut<B>(
+        &mut self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIterMut<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_mut_view().into_bundle_iter_mut::<B>(components)
     }
 }
 

@@ -27,7 +27,7 @@ use gpecs_sparse::{
 use crate::{
     bundle::{Bundle, BundleRefs, BundleSlices, erased::error::DowncastError},
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
-    storage::{Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
+    storage::{BundleIter, Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
 };
 
 type Inner<'ctx, T> = EpochSparseViewPtr<'ctx, NoEpochEntity, T>;
@@ -313,6 +313,36 @@ where
             .map_err(DowncastError::into_source)
             .expect("archetype compatibility should have been already checked");
         Ok(Some(bundle))
+    }
+
+    #[inline]
+    pub fn bundle_iter<B>(
+        &self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIter<'_, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        self.as_view().into_bundle_iter::<B>(components)
+    }
+
+    #[inline]
+    pub fn into_bundle_iter<B>(
+        self,
+        components: &ComponentRegistryView<
+            impl Sized,
+            impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        >,
+    ) -> Result<BundleIter<'a, B>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        let (entities, bundles, _) = self.into_bundles::<B>(components)?;
+        let iter = BundleIter::new(entities, bundles);
+        Ok(iter)
     }
 }
 

@@ -8,7 +8,7 @@ use crate::{
     archetype::{
         erased::{ErasedArchetype, error::ArchetypeError},
         registry::{ArchetypeInfo, CompatibleArchetypes},
-        storage::ArchetypeStorage,
+        storage::{ArchetypeStorage, BundleIter},
     },
     bundle::{Bundle, BundleRefs},
     component::registry::{
@@ -123,8 +123,6 @@ where
     }
 }
 
-type Inner<'a, B> = gpecs_sparse::iter::Iter<'static, 'a, Entity, B>;
-
 pub struct BundlesIntoIter<'a, 'ctx, B, M, T>
 where
     B: Bundle,
@@ -132,7 +130,7 @@ where
 {
     archetypes: CompatibleArchetypes<'a>,
     components: ComponentRegistryView<'ctx, M, T>,
-    inner_front: Option<Inner<'a, B>>,
+    inner_front: Option<BundleIter<'a, B>>,
 }
 
 impl<'a, 'ctx, B, M, T> BundlesIntoIter<'a, 'ctx, B, M, T>
@@ -144,12 +142,10 @@ where
     fn new_inner(
         info: ArchetypeInfo<&'a ArchetypeStorage>,
         components: &ComponentRegistryView<'ctx, M, T>,
-    ) -> Inner<'a, B> {
-        let (entities, bundles, _) = info
-            .into_meta()
-            .as_bundles_with_archetype::<B>(components)
-            .expect("archetype should be compatible with requested bundle");
-        Inner::new(B::CONTEXT, entities, bundles)
+    ) -> BundleIter<'a, B> {
+        info.into_meta()
+            .bundle_iter(components)
+            .expect("archetype should be compatible with requested bundle")
     }
 }
 
@@ -210,7 +206,7 @@ where
 
         loop {
             if let item @ Some(_) = algo::and_then_or_clear(inner_front, Iterator::next) {
-                return item.map(|(&entity, bundle)| (entity, bundle));
+                return item;
             }
             match archetypes.next() {
                 None => return None,

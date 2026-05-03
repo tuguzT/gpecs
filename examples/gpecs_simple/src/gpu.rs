@@ -98,16 +98,14 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        let (position_tag_entities, (position_tag_positions,)) = position_tag_archetype_storage
+        let position_tag_bundles = position_tag_archetype_storage
             .as_bundles::<(Position,)>(&components.as_view())
-            .expect("archetype should contain `Position` components")
-            .into_iter()
-            .into_slices();
-        position_tag_entities
-            .par_iter()
-            .zip_eq(position_tag_positions)
+            .expect("archetype should contain `Position` components");
+        position_tag_bundles
+            .into_par_iter()
             .enumerate()
-            .for_each(|(index, (entity, position))| {
+            .for_each(|(index, item)| {
+                let (entity, (position,)) = item;
                 let expected_position = Position {
                     data: Vec3 {
                         x: entity.index().to_f32().unwrap(),

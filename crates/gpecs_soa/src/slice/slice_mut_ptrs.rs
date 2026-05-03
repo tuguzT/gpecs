@@ -306,27 +306,24 @@ where
         let Self { ptrs, context, len } = self;
 
         let ptrs = context.ptrs_cast_const(ptrs.into_inner());
-        let first = unsafe { SoaSlicePtrs::from_parts(context, ptrs.clone(), len) };
-        let second = unsafe {
+        let left = unsafe { SoaSlicePtrs::from_parts(context, ptrs.clone(), mid) };
+        let right = unsafe {
             SoaSlicePtrs::from_parts(context, context.ptrs_add(ptrs, mid), len.unchecked_sub(mid))
         };
-        (first, second)
+        (left, right)
     }
 
     #[inline]
-    pub unsafe fn split_at_mut_unchecked(
-        self,
-        mid: usize,
-    ) -> (SoaSliceMutPtrs<'ctx, T>, SoaSliceMutPtrs<'ctx, T>) {
+    pub unsafe fn split_at_mut_unchecked(self, mid: usize) -> (Self, Self) {
         let Self { ptrs, context, len } = self;
 
         let ptrs = ptrs.into_inner();
-        let first = unsafe { Self::from_parts(context, ptrs.clone(), len) };
-        let second = unsafe {
+        let left = unsafe { Self::from_parts(context, ptrs.clone(), mid) };
+        let right = unsafe {
             let ptrs = context.ptrs_add_mut(ptrs, mid);
             Self::from_parts(context, ptrs, len.unchecked_sub(mid))
         };
-        (first, second)
+        (left, right)
     }
 
     #[inline]

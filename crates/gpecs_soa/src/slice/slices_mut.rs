@@ -257,8 +257,8 @@ where
     ) -> (SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>) {
         let Self { ptrs, .. } = self;
 
-        let (first, second) = unsafe { ptrs.split_at_unchecked(mid) };
-        unsafe { (first.as_ref_unchecked(), second.as_ref_unchecked()) }
+        let (left, right) = unsafe { ptrs.split_at_unchecked(mid) };
+        unsafe { (left.as_ref_unchecked(), right.as_ref_unchecked()) }
     }
 
     #[inline]
@@ -285,21 +285,15 @@ where
     }
 
     #[inline]
-    pub unsafe fn split_at_mut_unchecked(
-        self,
-        mid: usize,
-    ) -> (SoaSlicesMut<'ctx, 'a, T>, SoaSlicesMut<'ctx, 'a, T>) {
+    pub unsafe fn split_at_mut_unchecked(self, mid: usize) -> (Self, Self) {
         let Self { ptrs, .. } = self;
 
-        let (first, second) = unsafe { ptrs.clone().split_at_mut_unchecked(mid) };
-        unsafe { (first.as_mut_unchecked(), second.as_mut_unchecked()) }
+        let (left, right) = unsafe { ptrs.clone().split_at_mut_unchecked(mid) };
+        unsafe { (left.as_mut_unchecked(), right.as_mut_unchecked()) }
     }
 
     #[inline]
-    pub fn split_at_mut_checked(
-        self,
-        mid: usize,
-    ) -> Option<(SoaSlicesMut<'ctx, 'a, T>, SoaSlicesMut<'ctx, 'a, T>)> {
+    pub fn split_at_mut_checked(self, mid: usize) -> Option<(Self, Self)> {
         if mid <= self.len() {
             // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
             // fulfills the requirements of `split_at_unchecked`.
@@ -311,10 +305,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn split_at_mut(
-        self,
-        mid: usize,
-    ) -> (SoaSlicesMut<'ctx, 'a, T>, SoaSlicesMut<'ctx, 'a, T>) {
+    pub fn split_at_mut(self, mid: usize) -> (Self, Self) {
         match self.split_at_mut_checked(mid) {
             Some(pair) => pair,
             None => panic!("mid > len"),

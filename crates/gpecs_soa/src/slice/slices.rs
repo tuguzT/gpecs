@@ -165,21 +165,15 @@ where
     }
 
     #[inline]
-    pub unsafe fn split_at_unchecked(
-        self,
-        mid: usize,
-    ) -> (SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>) {
+    pub unsafe fn split_at_unchecked(self, mid: usize) -> (Self, Self) {
         let Self { ptrs, .. } = self;
 
-        let (first, second) = unsafe { ptrs.split_at_unchecked(mid) };
-        unsafe { (first.as_ref_unchecked(), second.as_ref_unchecked()) }
+        let (left, right) = unsafe { ptrs.split_at_unchecked(mid) };
+        unsafe { (left.as_ref_unchecked(), right.as_ref_unchecked()) }
     }
 
     #[inline]
-    pub fn split_at_checked(
-        self,
-        mid: usize,
-    ) -> Option<(SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>)> {
+    pub fn split_at_checked(self, mid: usize) -> Option<(Self, Self)> {
         if mid <= self.len() {
             // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
             // fulfills the requirements of `split_at_unchecked`.
@@ -191,7 +185,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn split_at(self, mid: usize) -> (SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>) {
+    pub fn split_at(self, mid: usize) -> (Self, Self) {
         match self.split_at_checked(mid) {
             Some(pair) => pair,
             None => panic!("mid > len"),

@@ -171,7 +171,7 @@ where
     ) -> (SoaSlices<'ctx, 'a, T>, SoaSlices<'ctx, 'a, T>) {
         let Self { ptrs, .. } = self;
 
-        let (first, second) = unsafe { ptrs.clone().split_at_unchecked(mid) };
+        let (first, second) = unsafe { ptrs.split_at_unchecked(mid) };
         unsafe { (first.as_ref_unchecked(), second.as_ref_unchecked()) }
     }
 

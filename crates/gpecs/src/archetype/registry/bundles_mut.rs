@@ -119,7 +119,9 @@ where
     T: ComponentIdFrom<Key: FromComponentType>,
 {
     type Item = (Entity, BundleRefsMut<'a, B>);
-    type Iter = rayon::iter::FlattenIter<rayon::vec::IntoIter<BundleIterMut<'a, B>>>;
+    type Iter = rayon::iter::Flatten<
+        rayon::vec::IntoIter<crate::archetype::storage::BundleParIterMut<'a, B>>,
+    >;
 
     fn into_par_iter(self) -> Self::Iter {
         use itertools::Itertools;
@@ -132,10 +134,10 @@ where
         } = self;
 
         archetypes
-            .map(|info| make_inner(info, components))
+            .map(|info| make_par_inner(info, components))
             .collect_vec()
             .into_par_iter()
-            .flatten_iter()
+            .flatten()
     }
 }
 
@@ -235,5 +237,22 @@ where
 {
     info.into_meta()
         .bundle_iter_mut(components)
+        .expect("archetype should be compatible with requested bundle")
+}
+
+#[inline]
+#[cfg(feature = "rayon")]
+fn make_par_inner<'a, B>(
+    info: ArchetypeInfo<&'a mut ArchetypeStorage>,
+    components: &ComponentRegistryView<
+        impl Sized,
+        impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    >,
+) -> crate::archetype::storage::BundleParIterMut<'a, B>
+where
+    B: Bundle,
+{
+    info.into_meta()
+        .bundle_par_iter_mut(components)
         .expect("archetype should be compatible with requested bundle")
 }

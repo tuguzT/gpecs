@@ -20,7 +20,7 @@ where
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
-impl<'ctx, 'a, T> SoaSlices<'ctx, 'a, T>
+impl<'ctx, T> SoaSlices<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
 {

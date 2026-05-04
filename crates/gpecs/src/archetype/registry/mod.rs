@@ -1,20 +1,9 @@
 pub use self::{
-    after::ArchetypesAfter,
-    after_mut::ArchetypesAfterMut,
-    before::ArchetypesBefore,
-    before_mut::ArchetypesBeforeMut,
-    bundles::{Bundles, BundlesIntoIter},
-    bundles_mut::{BundlesMut, BundlesMutIntoIter},
-    compatible::CompatibleArchetypes,
-    compatible_mut::CompatibleArchetypesMut,
-    cow::ErasedArchetypeCow,
-    id::ArchetypeId,
-    ids::ArchetypeIds,
-    info::ArchetypeInfo,
-    iter::Iter,
-    iter_mut::IterMut,
-    location::EntityLocation,
-    registry::ArchetypeRegistry,
+    after::ArchetypesAfter, after_mut::ArchetypesAfterMut, before::ArchetypesBefore,
+    before_mut::ArchetypesBeforeMut, bundles::Bundles, bundles_mut::BundlesMut,
+    compatible::CompatibleArchetypes, compatible_mut::CompatibleArchetypesMut,
+    cow::ErasedArchetypeCow, id::ArchetypeId, ids::ArchetypeIds, info::ArchetypeInfo, iter::Iter,
+    iter_mut::IterMut, location::EntityLocation, registry::ArchetypeRegistry,
 };
 
 pub mod error;

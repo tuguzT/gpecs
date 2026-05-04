@@ -223,18 +223,6 @@ where
 }
 
 #[inline]
-pub fn and_then_or_clear<T, U, F>(opt: &mut Option<T>, f: F) -> Option<U>
-where
-    F: FnOnce(&mut T) -> Option<U>,
-{
-    let x = f(opt.as_mut()?);
-    if x.is_none() {
-        *opt = None;
-    }
-    x
-}
-
-#[inline]
 pub fn find_archetype(
     archetypes: &Archetypes,
     archetype: ErasedArchetypeView<impl Sized>,

@@ -791,6 +791,7 @@ dependencies = [
  "gpecs",
  "gpecs_itertools",
  "gpecs_simple_types",
+ "itertools 0.14.0",
  "log",
  "num-traits",
  "pollster",

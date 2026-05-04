@@ -13,6 +13,7 @@ use gpecs_ecs_benchmark_types::{
     utils::{RandomXoshiro128, TimeDelta},
 };
 use gpecs_itertools::Itertools as _;
+use itertools::Itertools as _;
 use rayon::prelude::*;
 
 use crate::{
@@ -77,9 +78,16 @@ fn register_cpu_systems<B>(
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Velocity)>| {
         let time_delta = *time_delta_clone.borrow();
         let timestamp = Instant::now();
-        bundles
+
+        let bundles = bundles
+            .map(ArchetypeInfo::into_meta)
+            .collect_vec()
             .into_par_iter()
-            .for_each(|(_, (position, velocity))| update_position(position, velocity, time_delta));
+            .flatten();
+        bundles.for_each(|(_, (position, velocity))| {
+            update_position(position, velocity, time_delta);
+        });
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_position` system took {elapsed:?}");
     });
@@ -88,9 +96,16 @@ fn register_cpu_systems<B>(
     let system = executor.register_system(move |bundles: BundlesMut<(Data,)>| {
         let time_delta = *time_delta.borrow();
         let timestamp = Instant::now();
-        bundles
+
+        let bundles = bundles
+            .map(ArchetypeInfo::into_meta)
+            .collect_vec()
             .into_par_iter()
-            .for_each(|(_, (data,))| update_data(data, time_delta));
+            .flatten();
+        bundles.for_each(|(_, (data,))| {
+            update_data(data, time_delta);
+        });
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_data` system took {elapsed:?}");
     });
@@ -98,11 +113,16 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Position, Velocity, Data)>| {
         let timestamp = Instant::now();
-        bundles
+
+        let bundles = bundles
+            .map(ArchetypeInfo::into_meta)
+            .collect_vec()
             .into_par_iter()
-            .for_each(|(_, (position, velocity, data))| {
-                update_components(position, velocity, data);
-            });
+            .flatten();
+        bundles.for_each(|(_, (position, velocity, data))| {
+            update_components(position, velocity, data);
+        });
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_components` system took {elapsed:?}");
     });
@@ -110,9 +130,16 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Health,)>| {
         let timestamp = Instant::now();
-        bundles
+
+        let bundles = bundles
+            .map(ArchetypeInfo::into_meta)
+            .collect_vec()
             .into_par_iter()
-            .for_each(|(_, (health,))| update_health(health));
+            .flatten();
+        bundles.for_each(|(_, (health,))| {
+            update_health(health);
+        });
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_health` system took {elapsed:?}");
     });
@@ -120,9 +147,16 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Health, Damage)>| {
         let timestamp = Instant::now();
-        bundles
+
+        let bundles = bundles
+            .map(ArchetypeInfo::into_meta)
+            .collect_vec()
             .into_par_iter()
-            .for_each(|(_, (health, damage))| update_damage(health, damage));
+            .flatten();
+        bundles.for_each(|(_, (health, damage))| {
+            update_damage(health, damage);
+        });
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_damage` system took {elapsed:?}");
     });
@@ -130,9 +164,16 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Sprite, Player, Health)>| {
         let timestamp = Instant::now();
-        bundles
+
+        let bundles = bundles
+            .map(ArchetypeInfo::into_meta)
+            .collect_vec()
             .into_par_iter()
-            .for_each(|(_, (sprite, player, health))| update_sprite(sprite, player, health));
+            .flatten();
+        bundles.for_each(|(_, (sprite, player, health))| {
+            update_sprite(sprite, player, health);
+        });
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `update_sprite` system took {elapsed:?}");
     });
@@ -141,9 +182,11 @@ fn register_cpu_systems<B>(
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Sprite)>| {
         let framebuffer = &mut *framebuffer.borrow_mut();
         let timestamp = Instant::now();
-        for (_, (position, sprite)) in bundles {
+
+        for (_, (position, sprite)) in bundles.flat_map(ArchetypeInfo::into_meta) {
             render_sprite(position, sprite, framebuffer);
         }
+
         let elapsed = timestamp.elapsed();
         log::info!(">>>> `render_sprite` system took {elapsed:?}");
     });

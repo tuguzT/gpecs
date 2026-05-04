@@ -5,7 +5,7 @@ use gpecs::{
             error::{AlreadyHasComponentError, MissingComponentError},
         },
         registry::{
-            ArchetypeRegistry,
+            ArchetypeInfo, ArchetypeRegistry,
             error::{InsertBundleExactError, InsertExactError},
         },
     },
@@ -745,7 +745,7 @@ fn components() {
     let positions = archetypes
         .bundles_mut::<(Position,), _, _>(components.as_view())
         .expect("archetype of just `Position` should exist & contain unique component ids");
-    for (entity, (position,)) in positions {
+    for (entity, (position,)) in positions.flat_map(ArchetypeInfo::into_meta) {
         assert_eq!(entity, entity1);
         position.x -= 1.0;
         position.y -= 2.0;
@@ -763,7 +763,7 @@ fn components() {
     let masses = archetypes
         .bundles::<(Mass,), _, _>(components.as_view())
         .expect("archetype of just `Mass` should exist & contain unique component ids");
-    for (entity, (mass,)) in masses {
+    for (entity, (mass,)) in masses.flat_map(ArchetypeInfo::into_meta) {
         assert_eq!(entity, entity2);
         assert_eq!(mass.value, 42);
     }
@@ -771,7 +771,7 @@ fn components() {
     let tags = archetypes
         .bundles::<(Tag,), _, _>(components.as_view())
         .expect("archetype of just `Tag` should exist & contain unique component ids");
-    for (entity, (&tag,)) in tags.clone() {
+    for (entity, (&tag,)) in tags.flat_map(ArchetypeInfo::into_meta) {
         assert!(entity == entity1 || entity == entity2);
         assert_eq!(tag, Tag);
     }
@@ -808,7 +808,7 @@ fn components_erased() {
     let positions = archetypes
         .bundles_mut::<(Position,), _, _>(components.as_view())
         .expect("archetype of just `Position` should exist & contain unique component ids");
-    for (entity, (position,)) in positions {
+    for (entity, (position,)) in positions.flat_map(ArchetypeInfo::into_meta) {
         assert_eq!(entity, entity1);
         position.x -= 1.0;
         position.y -= 2.0;
@@ -826,7 +826,7 @@ fn components_erased() {
     let masses = archetypes
         .bundles::<(Mass,), _, _>(components.as_view())
         .expect("archetype of just `Mass` should exist & contain unique component ids");
-    for (entity, (mass,)) in masses {
+    for (entity, (mass,)) in masses.flat_map(ArchetypeInfo::into_meta) {
         assert_eq!(entity, entity2);
         assert_eq!(mass.value, 42);
     }
@@ -834,7 +834,7 @@ fn components_erased() {
     let tags = archetypes
         .bundles::<(Tag,), _, _>(components.as_view())
         .expect("archetype of just `Tag` should exist & contain unique component ids");
-    for (entity, (&tag,)) in tags.clone() {
+    for (entity, (&tag,)) in tags.flat_map(ArchetypeInfo::into_meta) {
         assert!(entity == entity1 || entity == entity2);
         assert_eq!(tag, Tag);
     }

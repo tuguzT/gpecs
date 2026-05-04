@@ -4,6 +4,7 @@ use glam::Vec3;
 use gpecs::prelude::*;
 use gpecs_itertools::Itertools as _;
 use gpecs_simple_types::{Mass, Position, Tag};
+use itertools::Itertools as _;
 use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
@@ -39,7 +40,13 @@ fn update_positions(positions: BundlesMut<(Position,)>) {
 
     // let mut positions_count = 0;
     let start = Instant::now();
-    positions.into_par_iter().for_each(|(entity, (position,))| {
+
+    let positions = positions
+        .map(ArchetypeInfo::into_meta)
+        .collect_vec()
+        .into_par_iter()
+        .flatten();
+    positions.for_each(|(entity, (position,))| {
         assert!(matches!(entity.index() % 3, 0 | 2));
         // assert_eq!(position.data.x, entity.index() as f32);
         // assert_eq!(position.data.y, -(entity.index() as f32));
@@ -55,6 +62,7 @@ fn update_positions(positions: BundlesMut<(Position,)>) {
 
         // positions_count += 1;
     });
+
     // assert_eq!(positions_count, ENTITY_COUNT / 3 * 2);
     let duration = start.elapsed();
     log::info!("CPU system working with positions took {duration:?}");
@@ -65,10 +73,16 @@ fn update_masses(context: &mut Context) {
 
     // let mut masses_count = 0;
     let start = Instant::now();
+
     let masses = context
         .bundles_mut::<(Mass,)>()
         .expect("archetype of `Mass` should exist");
-    masses.into_par_iter().for_each(|(entity, (mass,))| {
+    let masses = masses
+        .map(ArchetypeInfo::into_meta)
+        .collect_vec()
+        .into_par_iter()
+        .flatten();
+    masses.for_each(|(entity, (mass,))| {
         assert!(matches!(entity.index() % 3, 1 | 2));
         // assert_eq!(mass.value, entity.index());
 
@@ -78,6 +92,7 @@ fn update_masses(context: &mut Context) {
 
         // masses_count += 1;
     });
+
     // assert_eq!(masses_count, ENTITY_COUNT / 3 * 2);
     let duration = start.elapsed();
     log::info!("CPU system working with masses took {duration:?}");
@@ -88,13 +103,20 @@ fn _check_tags(tags: Bundles<(Tag,)>) {
 
     // let mut tags_count = 0;
     let start = Instant::now();
-    for (entity, (tag,)) in tags {
+
+    let tags = tags
+        .map(ArchetypeInfo::into_meta)
+        .collect_vec()
+        .into_par_iter()
+        .flatten();
+    tags.for_each(|(entity, (tag,))| {
         assert!(matches!(entity.index() % 3, 0 | 1));
         // assert_eq!(tag, &Tag);
 
         log::debug!("{entity} has {tag:?}");
         // tags_count += 1;
-    }
+    });
+
     // assert_eq!(tags_count, ENTITY_COUNT / 3 * 2);
     let duration = start.elapsed();
     log::info!("CPU system working with tags took {duration:?}");

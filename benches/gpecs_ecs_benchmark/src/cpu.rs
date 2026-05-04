@@ -53,7 +53,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         executor.execute();
 
         let elapsed = timestamp.elapsed();
-        log::info!(">>! Execution of CPU systems {i} took {elapsed:?}");
+        log::info!(">>! Execution of all the CPU systems {i} took {elapsed:?}");
 
         let time_delta = &mut *time_delta.borrow_mut();
         *time_delta = TimeDelta(elapsed.as_secs_f32());
@@ -77,118 +77,144 @@ fn register_cpu_systems<B>(
     let time_delta_clone = Rc::clone(&time_delta);
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Velocity)>| {
         let time_delta = *time_delta_clone.borrow();
-        let timestamp = Instant::now();
 
         let bundles = bundles
-            .map(ArchetypeInfo::into_meta)
+            .filter(|bundles| !bundles.is_empty())
             .collect_vec()
-            .into_par_iter()
-            .flatten();
-        bundles.for_each(|(_, (position, velocity))| {
-            update_position(position, velocity, time_delta);
-        });
+            .into_par_iter();
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_position` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (position, velocity))| {
+                update_position(position, velocity, time_delta);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `update_position` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 
     let system = executor.register_system(move |bundles: BundlesMut<(Data,)>| {
         let time_delta = *time_delta.borrow();
-        let timestamp = Instant::now();
 
         let bundles = bundles
-            .map(ArchetypeInfo::into_meta)
+            .filter(|bundles| !bundles.is_empty())
             .collect_vec()
-            .into_par_iter()
-            .flatten();
-        bundles.for_each(|(_, (data,))| {
-            update_data(data, time_delta);
-        });
+            .into_par_iter();
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_data` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (data,))| {
+                update_data(data, time_delta);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `update_data` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Position, Velocity, Data)>| {
-        let timestamp = Instant::now();
-
         let bundles = bundles
-            .map(ArchetypeInfo::into_meta)
+            .filter(|bundles| !bundles.is_empty())
             .collect_vec()
-            .into_par_iter()
-            .flatten();
-        bundles.for_each(|(_, (position, velocity, data))| {
-            update_components(position, velocity, data);
-        });
+            .into_par_iter();
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_components` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (position, velocity, data))| {
+                update_components(position, velocity, data);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `update_components` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Health,)>| {
-        let timestamp = Instant::now();
-
         let bundles = bundles
-            .map(ArchetypeInfo::into_meta)
+            .filter(|bundles| !bundles.is_empty())
             .collect_vec()
-            .into_par_iter()
-            .flatten();
-        bundles.for_each(|(_, (health,))| {
-            update_health(health);
-        });
+            .into_par_iter();
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_health` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (health,))| {
+                update_health(health);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `update_health` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Health, Damage)>| {
-        let timestamp = Instant::now();
-
         let bundles = bundles
-            .map(ArchetypeInfo::into_meta)
+            .filter(|bundles| !bundles.is_empty())
             .collect_vec()
-            .into_par_iter()
-            .flatten();
-        bundles.for_each(|(_, (health, damage))| {
-            update_damage(health, damage);
-        });
+            .into_par_iter();
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_damage` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (health, damage))| {
+                update_damage(health, damage);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `update_damage` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Sprite, Player, Health)>| {
-        let timestamp = Instant::now();
-
         let bundles = bundles
-            .map(ArchetypeInfo::into_meta)
+            .filter(|bundles| !bundles.is_empty())
             .collect_vec()
-            .into_par_iter()
-            .flatten();
-        bundles.for_each(|(_, (sprite, player, health))| {
-            update_sprite(sprite, player, health);
-        });
+            .into_par_iter();
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `update_sprite` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (sprite, player, health))| {
+                update_sprite(sprite, player, health);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `update_sprite` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Sprite)>| {
         let framebuffer = &mut *framebuffer.borrow_mut();
-        let timestamp = Instant::now();
 
-        for (_, (position, sprite)) in bundles.flat_map(ArchetypeInfo::into_meta) {
-            render_sprite(position, sprite, framebuffer);
-        }
+        let bundles = bundles.filter(|bundles| !bundles.is_empty());
+        bundles.for_each(|bundles| {
+            let archetype_id = bundles.archetype_id();
+            let timestamp = Instant::now();
 
-        let elapsed = timestamp.elapsed();
-        log::info!(">>>> `render_sprite` system took {elapsed:?}");
+            let bundles = bundles.into_meta().into_iter();
+            bundles.for_each(|(_, (position, sprite))| {
+                render_sprite(position, sprite, framebuffer);
+            });
+
+            let elapsed = timestamp.elapsed();
+            log::info!(">>>> `render_sprite` system with {archetype_id} took {elapsed:?}");
+        });
     });
     executor.add_system(system);
 }

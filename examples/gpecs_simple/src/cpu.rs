@@ -44,7 +44,7 @@ fn update_positions(positions: BundlesMut<(Position,)>) {
         let archetype_id = positions.archetype_id();
         let start = Instant::now();
 
-        let positions = positions.into_meta().into_par_iter();
+        let positions = positions.into_meta().into_iter();
         positions.for_each(|(entity, (position,))| {
             assert!(matches!(entity.index() % 3, 0 | 2));
             // assert_eq!(position.data.x, entity.index() as f32);
@@ -77,7 +77,7 @@ fn update_masses(context: &mut Context) {
         let archetype_id = masses.archetype_id();
         let start = Instant::now();
 
-        let masses = masses.into_meta().into_par_iter();
+        let masses = masses.into_meta().into_iter();
         masses.for_each(|(entity, (mass,))| {
             assert!(matches!(entity.index() % 3, 1 | 2));
             // assert_eq!(mass.value, entity.index());
@@ -100,7 +100,7 @@ fn _check_tags(tags: Bundles<(Tag,)>) {
         let archetype_id = tags.archetype_id();
         let start = Instant::now();
 
-        let tags = tags.into_meta().into_par_iter();
+        let tags = tags.into_meta().into_iter();
         tags.for_each(|(entity, (tag,))| {
             assert!(matches!(entity.index() % 3, 0 | 1));
             assert_eq!(tag, &Tag);

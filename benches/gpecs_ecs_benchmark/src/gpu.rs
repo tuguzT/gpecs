@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    time::{Duration, Instant},
-};
+use std::{fs, time::Instant};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
@@ -123,22 +120,22 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
                     unreachable!("{system_id} should exist")
                 };
 
-                let total_duration: Duration = system_statistics
-                    .iter()
-                    .map(|archetype_stats| archetype_stats.duration)
-                    .sum();
-                let name = system_shader.label().unwrap_or("<unknown>");
-                log::info!(">>>> `{name}` system took {total_duration:?}");
+                let label = system_shader.label().expect("GPU system should be labeled");
+                for archetype_statistics in system_statistics.into_meta() {
+                    let archetype_id = archetype_statistics.archetype_id();
+                    let duration = archetype_statistics.duration;
+                    log::info!(">>>> `{label}` system with {archetype_id:#} took {duration:?}");
+                }
             }
         }
-        log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
+        log::info!(">>! Execution of all the GPU systems {i} took {elapsed:?}");
 
         time_delta = TimeDelta(elapsed.as_secs_f32());
         let time_delta_slice = [time_delta.0];
         queue.write_buffer(
             &gpu_system_resources.time_delta_uniform,
             0,
-            bytemuck::cast_slice(&time_delta_slice),
+            bytemuck::must_cast_slice(&time_delta_slice),
         );
 
         let framebuffer_view = framebuffer_download_buffer.get_mapped_range(..);
@@ -170,14 +167,14 @@ fn create_gpu_system_resources(
     let time_delta_slice = [time_delta.0];
     let time_delta_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` time delta uniform buffer"),
-        contents: bytemuck::cast_slice(&time_delta_slice),
+        contents: bytemuck::must_cast_slice(&time_delta_slice),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     };
     let time_delta_uniform = device.create_buffer_init(&time_delta_uniform_buffer_desc);
 
     let framebuffer_data_storage_buffer_desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer data storage buffer"),
-        contents: bytemuck::cast_slice(framebuffer.buffer().as_ref()),
+        contents: bytemuck::must_cast_slice(framebuffer.buffer().as_ref()),
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
     };
     let framebuffer_data_storage = device.create_buffer_init(&framebuffer_data_storage_buffer_desc);
@@ -185,7 +182,7 @@ fn create_gpu_system_resources(
     let framebuffer_desc = [framebuffer.desc()];
     let framebuffer_desc_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer desc uniform buffer"),
-        contents: bytemuck::cast_slice(&framebuffer_desc),
+        contents: bytemuck::must_cast_slice(&framebuffer_desc),
         usage: wgpu::BufferUsages::UNIFORM,
     };
     let framebuffer_desc_uniform = device.create_buffer_init(&framebuffer_desc_uniform_buffer_desc);

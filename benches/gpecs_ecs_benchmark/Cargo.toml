@@ -10,7 +10,7 @@ edition.workspace = true
 gpecs = { workspace = true, features = ["rayon"] }
 gpecs_itertools = { workspace = true }
 gpecs_ecs_benchmark_types = { workspace = true }
-bytemuck = { workspace = true, features = ["derive"] }
+bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 num-traits = { workspace = true }
 glam = { workspace = true }
 log = { workspace = true }

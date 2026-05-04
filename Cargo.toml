@@ -72,7 +72,7 @@ pollster = { version = "0.4", default-features = false }
 bytemuck = { version = "1.25", default-features = false }
 const_format = { version = "0.2", default-features = false }
 log = { version = "0.4", default-features = false }
-glam = { version = "0.32", default-features = false }
+glam = { version = "0.32", default-features = false, features = ["nostd-libm"] }
 rayon = { version = "1.12" }
 env_logger = { version = "0.11" }
 wgpu = { version = "29" }

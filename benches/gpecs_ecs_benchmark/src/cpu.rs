@@ -67,6 +67,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     executor.into_context()
 }
 
+#[expect(clippy::too_many_lines)]
 fn register_cpu_systems<B>(
     executor: &mut CpuExecutor,
     time_delta: Rc<RefCell<TimeDelta>>,

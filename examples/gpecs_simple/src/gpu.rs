@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    time::{Duration, Instant},
-};
+use std::{fs, time::Instant};
 
 use glam::Vec3;
 use gpecs::prelude::*;
@@ -19,9 +16,11 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     let (device, queue) = init_wgpu();
     let mut executor = GpuExecutor::new(context, device.clone());
 
+    // Move all the archetypes to GPU-accessible memory
     executor
-        .register_archetype_of::<(Position, Mass)>()
-        .expect("archetype of `Position` and `Mass` should contain unique component ids");
+        .register_archetype_of::<(Position, Mass, Tag)>()
+        .expect("archetype of `Position`, `Mass` & `Tag` should contain unique component ids");
+
     let position_tag_gpu_archetype_id = executor
         .register_archetype_of::<(Position, Tag)>()
         .expect("archetype of `Position` and `Tag` should contain unique component ids");
@@ -129,15 +128,15 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
                     unreachable!("{system_id} should exist")
                 };
 
-                let total_duration: Duration = system_statistics
-                    .iter()
-                    .map(|archetype_stats| archetype_stats.duration)
-                    .sum();
-                let name = system_shader.label().unwrap_or("<unknown>");
-                log::info!(">>>> `{name}` system took {total_duration:?}");
+                let label = system_shader.label().expect("GPU system should be labeled");
+                for archetype_statistics in system_statistics.into_meta() {
+                    let archetype_id = archetype_statistics.archetype_id();
+                    let duration = archetype_statistics.duration;
+                    log::info!("GPU system `{label}` with {archetype_id} took {duration:?}");
+                }
             }
         }
-        log::info!("Execution of GPU systems {i} took {elapsed:?}");
+        log::info!("Execution of all the GPU systems {i} took {elapsed:?}");
     }
 
     executor.into_context(&queue)

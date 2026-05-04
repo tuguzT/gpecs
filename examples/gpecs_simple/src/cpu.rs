@@ -27,8 +27,9 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     for i in (0_u128..).maybe_take(repeat_count) {
         let start = Instant::now();
         executor.execute();
+
         let duration = start.elapsed();
-        log::info!("CPU system execution {i} took {duration:?}");
+        log::info!("Execution of all the CPU systems {i} took {duration:?}");
     }
 
     // Return context from the executor
@@ -38,86 +39,77 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 fn update_positions(positions: BundlesMut<(Position,)>) {
     // log::info!("Hello from the CPU system working with positions!");
 
-    // let mut positions_count = 0;
-    let start = Instant::now();
+    let positions = positions.collect_vec().into_par_iter();
+    positions.for_each(|positions| {
+        let archetype_id = positions.archetype_id();
+        let start = Instant::now();
 
-    let positions = positions
-        .map(ArchetypeInfo::into_meta)
-        .collect_vec()
-        .into_par_iter()
-        .flatten();
-    positions.for_each(|(entity, (position,))| {
-        assert!(matches!(entity.index() % 3, 0 | 2));
-        // assert_eq!(position.data.x, entity.index() as f32);
-        // assert_eq!(position.data.y, -(entity.index() as f32));
-        // assert_eq!(position.data.z, 0.0);
+        let positions = positions.into_meta().into_par_iter();
+        positions.for_each(|(entity, (position,))| {
+            assert!(matches!(entity.index() % 3, 0 | 2));
+            // assert_eq!(position.data.x, entity.index() as f32);
+            // assert_eq!(position.data.y, -(entity.index() as f32));
+            // assert_eq!(position.data.z, 0.0);
 
-        // log::debug!("{entity} has position of {}", position.data);
-        position.data = Vec3 {
-            x: entity.index().to_f32().unwrap(),
-            y: entity.index().to_f32().unwrap() / 2.0,
-            z: -entity.index().to_f32().unwrap() / 2.0,
-        };
-        log::debug!("{entity} position have been updated to {}", position.data);
+            // log::debug!("{entity} has position of {}", position.data);
+            position.data = Vec3 {
+                x: entity.index().to_f32().unwrap(),
+                y: entity.index().to_f32().unwrap() / 2.0,
+                z: -entity.index().to_f32().unwrap() / 2.0,
+            };
+            log::debug!("{entity} position have been updated to {}", position.data);
+        });
 
-        // positions_count += 1;
+        let duration = start.elapsed();
+        log::info!("CPU system `update_positions` with {archetype_id} took {duration:?}");
     });
-
-    // assert_eq!(positions_count, ENTITY_COUNT / 3 * 2);
-    let duration = start.elapsed();
-    log::info!("CPU system working with positions took {duration:?}");
 }
 
 fn update_masses(context: &mut Context) {
     // log::info!("Hello from the CPU system working with masses!");
 
-    // let mut masses_count = 0;
-    let start = Instant::now();
-
     let masses = context
         .bundles_mut::<(Mass,)>()
-        .expect("archetype of `Mass` should exist");
-    let masses = masses
-        .map(ArchetypeInfo::into_meta)
+        .expect("archetype of `Mass` should exist")
         .collect_vec()
-        .into_par_iter()
-        .flatten();
-    masses.for_each(|(entity, (mass,))| {
-        assert!(matches!(entity.index() % 3, 1 | 2));
-        // assert_eq!(mass.value, entity.index());
+        .into_par_iter();
+    masses.for_each(|masses| {
+        let archetype_id = masses.archetype_id();
+        let start = Instant::now();
 
-        // log::debug!("{entity} has mass of {}", mass.value);
-        mass.value = entity.index();
-        log::debug!("{entity} mass have been updated to {}", mass.value);
+        let masses = masses.into_meta().into_par_iter();
+        masses.for_each(|(entity, (mass,))| {
+            assert!(matches!(entity.index() % 3, 1 | 2));
+            // assert_eq!(mass.value, entity.index());
 
-        // masses_count += 1;
+            // log::debug!("{entity} has mass of {}", mass.value);
+            mass.value = entity.index();
+            log::debug!("{entity} mass have been updated to {}", mass.value);
+        });
+
+        let duration = start.elapsed();
+        log::info!("CPU system `update_masses` with {archetype_id} took {duration:?}");
     });
-
-    // assert_eq!(masses_count, ENTITY_COUNT / 3 * 2);
-    let duration = start.elapsed();
-    log::info!("CPU system working with masses took {duration:?}");
 }
 
 fn _check_tags(tags: Bundles<(Tag,)>) {
     // log::info!("Hello from the CPU system working with tags!");
 
-    // let mut tags_count = 0;
-    let start = Instant::now();
+    let tags = tags.collect_vec().into_par_iter();
+    tags.for_each(|tags| {
+        let archetype_id = tags.archetype_id();
+        let start = Instant::now();
 
-    let tags = tags
-        .map(ArchetypeInfo::into_meta)
-        .collect_vec()
-        .into_par_iter()
-        .flatten();
-    tags.for_each(|(entity, (tag,))| {
-        assert!(matches!(entity.index() % 3, 0 | 1));
-        // assert_eq!(tag, &Tag);
+        let tags = tags.into_meta().into_par_iter();
+        tags.for_each(|(entity, (tag,))| {
+            assert!(matches!(entity.index() % 3, 0 | 1));
+            assert_eq!(tag, &Tag);
 
-        log::debug!("{entity} has {tag:?}");
-        // tags_count += 1;
+            log::debug!("{entity} has {tag:?}");
+            // tags_count += 1;
+        });
+
+        let duration = start.elapsed();
+        log::info!("CPU system `check_tags` with {archetype_id} took {duration:?}");
     });
-
-    // assert_eq!(tags_count, ENTITY_COUNT / 3 * 2);
-    let duration = start.elapsed();
-    log::info!("CPU system working with tags took {duration:?}");
 }

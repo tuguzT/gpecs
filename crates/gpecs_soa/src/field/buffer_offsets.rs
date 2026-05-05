@@ -4,7 +4,7 @@ use core::{
     num::NonZeroUsize,
 };
 
-use crate::layout::{WithLayout, repeat_packed};
+use crate::layout::WithLayout;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BufferOffset<T> {
@@ -209,7 +209,7 @@ impl RawBufferOffsets {
         } = *self;
 
         let layout = layout.pad_to_align();
-        let layout = match repeat_packed(layout, capacity) {
+        let layout = match layout.repeat_packed(capacity) {
             Ok(layout) => layout,
             Err(error) => return Err(error),
         };

@@ -6,7 +6,7 @@ use crate::{
         error::{DataError, DowncastError, TryFromSlicePtrError, check_downcast},
     },
     error::{check_len, check_ptr_align, check_sufficient_align},
-    layout::{self, bytes_to_items},
+    layout::bytes_to_items,
     ptr::slice::{CastConst, MutSliceItemPtr},
 };
 
@@ -66,7 +66,7 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
-        let (expected_layout, _) = layout::repeat(layout, len)?;
+        let expected_layout = layout.pad_to_align().repeat_packed(len)?;
         check_len(buffer_layout.size(), expected_layout.size())?;
 
         let ptr = unsafe { T::from_slice(buffer, 0) };

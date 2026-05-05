@@ -294,7 +294,7 @@ pub unsafe trait RawSoa {
     ///
     /// Most of the time, this should be just `Self`.
     /// This is true for such implementations which store all the fields of self.
-    type Fields;
+    type Fields: ?Sized;
 }
 
 /// An extension of [SoA context](RawSoaContext) type which allows to perform copy-assignment of each stored field.
@@ -449,12 +449,13 @@ where
 
 /// An extension of [SoA](RawSoa) type which allows to
 /// declare properties needed for buffer allocation & buffer memory manipulation.
-pub unsafe trait AllocSoa: RawSoa<Context: AllocSoaContext<Self>> {}
+pub unsafe trait AllocSoa: RawSoa<Context: AllocSoaContext<Self>, Fields: Sized> {}
 
 unsafe impl<T> AllocSoa for T
 where
     T: RawSoa + ?Sized,
     T::Context: AllocSoaContext<T>,
+    T::Fields: Sized,
 {
 }
 

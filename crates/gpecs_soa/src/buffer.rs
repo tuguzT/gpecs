@@ -14,8 +14,7 @@ use crate::{
 /// [`Fields`](crate::traits::RawSoa::Fields) and [`Context`](crate::traits::RawSoa::Context) associated types.
 pub union BufferData<T>
 where
-    T: RawSoa + ?Sized,
-    T::Context: Sized,
+    T: AllocSoa + ?Sized,
 {
     _align: ManuallyDrop<BufferAlign<T>>,
     _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
@@ -25,8 +24,7 @@ where
 #[repr(C)]
 pub struct BufferPrefix<T>
 where
-    T: RawSoa + ?Sized,
-    T::Context: Sized,
+    T: AllocSoa + ?Sized,
 {
     _align: BufferAlign<T>,
     pub context: T::Context,
@@ -136,8 +134,7 @@ where
 #[repr(C)]
 struct BufferAlign<T>
 where
-    T: RawSoa + ?Sized,
-    T::Context: Sized,
+    T: AllocSoa + ?Sized,
 {
     _fields: [T::Fields; 0],
     _context: [T::Context; 0],
@@ -149,8 +146,7 @@ const _: () = {
     #[cfg_attr(coverage_nightly, coverage(off))]
     const fn assert_safety_preconditions<T>()
     where
-        T: RawSoa + ?Sized,
-        T::Context: Sized,
+        T: AllocSoa + ?Sized,
     {
         assert!(
             size_of::<BufferAlign<T>>() == 0,

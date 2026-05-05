@@ -3,7 +3,8 @@ pub use self::{
     ids::GpuSystemIds,
     info::GpuSystemInfo,
     registry::{
-        DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemRegistry,
+        DEFAULT_WORKGROUP_SIZE, DispatchStrategy, GpuComponentAccess, GpuSystemDescriptor,
+        GpuSystemRegistry,
     },
 };
 

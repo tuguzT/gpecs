@@ -286,7 +286,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("update position"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_position"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [
             (position_id, GpuComponentAccess::ReadWrite),
@@ -307,7 +307,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("update data"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_data"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [(data_id, GpuComponentAccess::ReadWrite)],
         additional_bindings: [time_delta_uniform_buffer_entry],
@@ -321,7 +321,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("update components"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_components"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [
             (position_id, GpuComponentAccess::ReadOnly),
@@ -339,7 +339,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("update health"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_health"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [(health_id, GpuComponentAccess::ReadWrite)],
         additional_bindings: [],
@@ -353,7 +353,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("update damage"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_damage"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [
             (health_id, GpuComponentAccess::ReadWrite),
@@ -370,7 +370,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("update sprite"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_sprite"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [
             (sprite_id, GpuComponentAccess::ReadWrite),
@@ -418,7 +418,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         label: Some("render sprite"),
         shader_module,
         entry_point: Some("render_sprite"),
-        workgroup_size: 64.try_into().ok(),
+        dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
         bind_components: [
             (position_id, GpuComponentAccess::ReadOnly),

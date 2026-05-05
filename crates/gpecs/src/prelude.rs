@@ -21,7 +21,8 @@ pub use crate::{
             bundle::GpuBundle,
             component::{GpuComponent, registry::GpuComponentId},
             system::registry::{
-                GpuComponentAccess, GpuSystemDescriptor, GpuSystemId, GpuSystemInfo,
+                DispatchStrategy, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
+                GpuSystemInfo,
             },
         },
     },

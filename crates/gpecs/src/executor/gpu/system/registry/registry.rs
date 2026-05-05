@@ -2,7 +2,7 @@
 
 use std::num::NonZeroU32;
 
-use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule};
+use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule, util::DispatchIndirectArgs};
 
 use crate::{
     archetype::erased::error::ArchetypeError,
@@ -22,6 +22,34 @@ use crate::{
 pub const DEFAULT_WORKGROUP_SIZE: NonZeroU32 =
     NonZeroU32::new(64).expect("default workgroup size cannot be zero");
 
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum DispatchStrategy {
+    Linear { workgroup_size: NonZeroU32 },
+    // TODO: add custom strategy using boxed dyn trait object
+}
+
+impl DispatchStrategy {
+    #[inline]
+    pub fn workgroup_count(&self, len: u32) -> DispatchIndirectArgs {
+        match self {
+            Self::Linear { workgroup_size } => {
+                let x = len.div_ceil(workgroup_size.get());
+                DispatchIndirectArgs { x, y: 1, z: 1 }
+            }
+        }
+    }
+}
+
+impl Default for DispatchStrategy {
+    #[inline]
+    fn default() -> Self {
+        Self::Linear {
+            workgroup_size: DEFAULT_WORKGROUP_SIZE,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum GpuComponentAccess {
@@ -32,8 +60,8 @@ pub enum GpuComponentAccess {
 pub struct GpuSystemDescriptor<'a, Components, Bindings> {
     pub label: Label<'a>,
     pub shader_module: ShaderModule,
-    pub workgroup_size: Option<NonZeroU32>,
     pub entry_point: Option<&'a str>,
+    pub dispatch_strategy: DispatchStrategy,
     pub bind_entities: bool,
     pub bind_components: Components,
     pub additional_bindings: Bindings,

@@ -1,8 +1,8 @@
-use std::{any::TypeId, num::NonZeroU32};
+use std::any::TypeId;
 
 use wgpu::{
     BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, CommandEncoderDescriptor, ComputePass,
-    ComputePassDescriptor, Device, PollType, Queue,
+    ComputePassDescriptor, Device, PollType, Queue, util::DispatchIndirectArgs,
 };
 
 use crate::{
@@ -21,10 +21,7 @@ use crate::{
         },
         context::ContextMapper,
         system::{
-            registry::{
-                DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
-                GpuSystemRegistry,
-            },
+            registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId, GpuSystemRegistry},
             schedule::GpuSystemSchedule,
             shader::GpuSystemShader,
         },
@@ -342,11 +339,13 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
                 write_timestamp(&mut compute_pass, query_index);
                 query_index += 1;
 
-                let workgroup_size = system_shader
-                    .workgroup_size()
-                    .unwrap_or(DEFAULT_WORKGROUP_SIZE);
-                let workgroup_count = workgroup_count(archetype_storage, workgroup_size);
-                compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+                let len = archetype_storage
+                    .len()
+                    .try_into()
+                    .expect("archetype storage len should fit into `u32`");
+                let DispatchIndirectArgs { x, y, z } =
+                    system_shader.dispatch_strategy().workgroup_count(len);
+                compute_pass.dispatch_workgroups(x, y, z);
 
                 write_timestamp(&mut compute_pass, query_index);
             }
@@ -423,17 +422,4 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
         let Self { context, .. } = self;
         context
     }
-}
-
-#[inline]
-fn workgroup_count(archetype_storage: &GpuArchetypeStorage, workgroup_size: NonZeroU32) -> u32 {
-    let storage_len = archetype_storage.len();
-    let workgroup_size = workgroup_size
-        .get()
-        .try_into()
-        .expect("workgroup size should fit into `usize`");
-    storage_len
-        .div_ceil(workgroup_size)
-        .try_into()
-        .expect("workgroup count should fit into `u32`")
 }

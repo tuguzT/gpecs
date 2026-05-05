@@ -1,7 +1,6 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    num::NonZeroU32,
 };
 
 use indexmap::map::Iter as IndexMapIter;
@@ -16,7 +15,10 @@ use crate::{
     archetype::erased::{ErasedArchetype, error::ArchetypeError},
     context::{ComponentDescriptor, Components},
     entity::Entity,
-    executor::gpu::component::registry::{GpuComponentId, GpuComponentInfo},
+    executor::gpu::{
+        component::registry::{GpuComponentId, GpuComponentInfo},
+        system::registry::DispatchStrategy,
+    },
     hash::IndexMap,
 };
 
@@ -29,7 +31,7 @@ pub struct GpuSystemShader {
     component_entries: IndexMap<GpuComponentId, Option<GpuSystemShaderEntry>>,
     additional_entries: Box<[BindGroupLayoutEntry]>,
     shader_module: ShaderModule,
-    workgroup_size: Option<NonZeroU32>,
+    dispatch_strategy: DispatchStrategy,
     bind_group_layout: BindGroupLayout,
     pipeline_layout: PipelineLayout,
     compute_pipeline: ComputePipeline,
@@ -54,7 +56,7 @@ impl GpuSystemShader {
             label,
             shader_module,
             entry_point,
-            workgroup_size,
+            dispatch_strategy,
             bind_entities,
             bind_components,
             additional_bindings,
@@ -148,7 +150,7 @@ impl GpuSystemShader {
             component_entries,
             additional_entries,
             shader_module,
-            workgroup_size,
+            dispatch_strategy,
             bind_group_layout,
             pipeline_layout,
             compute_pipeline,
@@ -168,9 +170,11 @@ impl GpuSystemShader {
     }
 
     #[inline]
-    pub fn workgroup_size(&self) -> Option<NonZeroU32> {
-        let Self { workgroup_size, .. } = *self;
-        workgroup_size
+    pub fn dispatch_strategy(&self) -> &DispatchStrategy {
+        let Self {
+            dispatch_strategy, ..
+        } = self;
+        dispatch_strategy
     }
 
     #[inline]

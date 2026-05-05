@@ -91,19 +91,13 @@ impl<'a> ScheduleCache<'a> {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { systems } = self;
-        systems.len()
-    }
-
-    #[inline]
     pub fn system(&self, system_id: GpuSystemId) -> Option<&SystemCache<'a>> {
         let Self { systems } = self;
         systems.get(&system_id)
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = GpuSystemInfo<&SystemCache<'a>>> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = GpuSystemInfo<&SystemCache<'a>>> {
         let Self { systems } = self;
         systems
             .iter()

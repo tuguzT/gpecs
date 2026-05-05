@@ -22,7 +22,10 @@ use crate::{
     executor::gpu::{
         archetype::registry::{GpuArchetypeId, GpuArchetypeInfo},
         cache::schedule::{ScheduleCache, SystemCache},
-        system::registry::{GpuSystemId, GpuSystemInfo},
+        system::{
+            registry::{GpuSystemId, GpuSystemInfo},
+            schedule::GpuSystemSchedule,
+        },
     },
     hash::{BuildHasher, IndexMap},
 };
@@ -206,21 +209,26 @@ pub struct TimestampQueryStatistics {
 impl TimestampQueryStatistics {
     pub(super) fn new(
         raw: &TimestampQueryRawStatistics,
+        schedule: &GpuSystemSchedule,
         cache: &ScheduleCache,
         queue: &Queue,
     ) -> Self {
         let mut pairs = raw.as_slice().iter().copied().tuple_windows();
 
+        let capacity = schedule.iter().len();
         let hash_builder = BuildHasher::default();
-        let mut stats = IndexMap::with_capacity_and_hasher(cache.len(), hash_builder);
+        let mut stats = IndexMap::with_capacity_and_hasher(capacity, hash_builder);
 
-        for system_cache in cache.iter() {
-            let system_id = system_cache.system_id();
+        for system_id in schedule {
+            let Some(system_cache) = cache.system(system_id) else {
+                unreachable!("{system_id} should exist in schedule cache")
+            };
+            let system_cache = GpuSystemInfo::new(system_id, system_cache);
             let system_stats =
                 TimestampQuerySystemStatistics::new(system_cache, queue, pairs.by_ref());
 
             if stats.insert(system_id, system_stats).is_some() {
-                unreachable!("{system_id} should be unique in cache")
+                unreachable!("{system_id} should be unique in schedule")
             }
             pairs.next();
         }

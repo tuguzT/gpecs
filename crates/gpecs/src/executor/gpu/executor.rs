@@ -363,18 +363,19 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
         queue: &Queue,
     ) -> Option<Result<TimestampQueryStatistics, TimestampQueryError>> {
         let Self {
+            schedule,
             schedule_cache,
             timestamp_query_resources,
             ..
         } = self;
 
         let timestamp_query_resources = timestamp_query_resources.as_ref()?;
-        let raw_statistics = match timestamp_query_resources.raw_statistics() {
-            Ok(raw_statistics) => raw_statistics,
+        let raw = match timestamp_query_resources.raw_statistics() {
+            Ok(raw) => raw,
             Err(error) => return Some(Err(error)),
         };
 
-        let statistics = TimestampQueryStatistics::new(&raw_statistics, schedule_cache, queue);
+        let statistics = TimestampQueryStatistics::new(&raw, schedule, schedule_cache, queue);
         Some(Ok(statistics))
     }
 

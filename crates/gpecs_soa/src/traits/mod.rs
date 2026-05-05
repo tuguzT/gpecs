@@ -408,7 +408,9 @@ where
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
         let packed_size = packed_size_of_fields(self.field_layouts());
         let buffer_size = buffer_layout.size();
-        let max_capacity = buffer_size.checked_div(packed_size).unwrap_or(0);
+        let Some(max_capacity) = buffer_size.checked_div(packed_size) else {
+            return usize::MAX;
+        };
 
         let mut capacity = max_capacity;
         while {

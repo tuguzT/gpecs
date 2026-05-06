@@ -15,8 +15,8 @@ use crate::{
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{
-            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput,
-            FieldLayoutsOwned, RawBufferOffsets, buffer_offsets,
+            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter,
+            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         layout::WithLayout,
         traits::{AllocSoa, AllocSoaContext, NonNullPtrs, RawSoaContext},
@@ -177,12 +177,6 @@ where
         let Self { layouts, .. } = self;
         layouts
     }
-
-    #[inline]
-    fn raw_buffer_offsets(&self) -> RawBufferOffsets {
-        let Self { capacity, .. } = *self;
-        RawBufferOffsets::new(capacity, NonZeroUsize::MIN)
-    }
 }
 
 impl<'a, D, P> ErasedSoaNonNullPtrs<D, P>
@@ -229,7 +223,7 @@ where
     #[inline]
     pub(super) unsafe fn nth_field_ptr(
         &'a self,
-        state: &mut RawBufferOffsets,
+        buffer_layout: &mut BufferLayout,
         i: usize,
     ) -> ErasedNonNullPtr<P> {
         let Self {
@@ -243,7 +237,7 @@ where
         let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
 
         let buffer_offset = BufferOffset {
-            offset: unsafe { state.next_unchecked(desc.layout()) },
+            offset: unsafe { buffer_layout.extend_unchecked(desc.layout()) },
             desc,
         };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
@@ -257,11 +251,11 @@ where
     {
         let n = assert_layouts(self.field_layouts(), with.field_layouts());
 
-        let this_state = &mut self.raw_buffer_offsets();
-        let with_state = &mut with.raw_buffer_offsets();
+        let this_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
+        let with_layout = &mut BufferLayout::new(with.capacity(), NonZeroUsize::MIN);
         for i in 0..n {
-            let this = unsafe { self.nth_field_ptr(this_state, i) };
-            let with = unsafe { with.nth_field_ptr(with_state, i) };
+            let this = unsafe { self.nth_field_ptr(this_layout, i) };
+            let with = unsafe { with.nth_field_ptr(with_layout, i) };
             unsafe { this.swap(with) }
         }
     }
@@ -277,11 +271,11 @@ where
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_state = &mut self.raw_buffer_offsets();
-        let src_state = &mut src.raw_buffer_offsets();
+        let dst_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
+        let src_layout = &mut BufferLayout::new(src.capacity(), NonZeroUsize::MIN);
         for i in 0..n {
-            let dst = unsafe { self.nth_field_ptr(dst_state, i) };
-            let src = unsafe { src.nth_field_ptr(src_state, i) };
+            let dst = unsafe { self.nth_field_ptr(dst_layout, i) };
+            let src = unsafe { src.nth_field_ptr(src_layout, i) };
             unsafe { dst.copy_from(src, count) }
         }
     }
@@ -298,9 +292,9 @@ where
         #[inline]
         fn rec<'dst, 'src, D, E, P>(
             dst_ptrs: &'dst ErasedSoaNonNullPtrs<D, P>,
-            dst_state: &mut RawBufferOffsets,
+            dst_layout: &mut BufferLayout,
             src_ptrs: &'src ErasedSoaNonNullPtrs<E, P>,
-            src_state: &mut RawBufferOffsets,
+            src_layout: &mut BufferLayout,
             i: usize,
             n: usize,
             count: usize,
@@ -313,19 +307,19 @@ where
                 return;
             }
 
-            let dst = unsafe { dst_ptrs.nth_field_ptr(dst_state, i) };
-            let src = unsafe { src_ptrs.nth_field_ptr(src_state, i) };
+            let dst = unsafe { dst_ptrs.nth_field_ptr(dst_layout, i) };
+            let src = unsafe { src_ptrs.nth_field_ptr(src_layout, i) };
 
-            rec(dst_ptrs, dst_state, src_ptrs, src_state, i + 1, n, count);
+            rec(dst_ptrs, dst_layout, src_ptrs, src_layout, i + 1, n, count);
 
             unsafe { dst.copy_from(src, count) }
         }
 
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_state = &mut self.raw_buffer_offsets();
-        let src_state = &mut src.raw_buffer_offsets();
-        rec(self, dst_state, src, src_state, 0, n, count);
+        let dst_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
+        let src_layout = &mut BufferLayout::new(src.capacity(), NonZeroUsize::MIN);
+        rec(self, dst_layout, src, src_layout, 0, n, count);
     }
 
     #[inline]
@@ -339,11 +333,11 @@ where
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_state = &mut self.raw_buffer_offsets();
-        let src_state = &mut src.raw_buffer_offsets();
+        let dst_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
+        let src_layout = &mut BufferLayout::new(src.capacity(), NonZeroUsize::MIN);
         for i in 0..n {
-            let dst = unsafe { self.nth_field_ptr(dst_state, i) };
-            let src = unsafe { src.nth_field_ptr(src_state, i) };
+            let dst = unsafe { self.nth_field_ptr(dst_layout, i) };
+            let src = unsafe { src.nth_field_ptr(src_layout, i) };
             unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
     }
@@ -562,10 +556,10 @@ where
             offset,
         } = *self;
 
-        let state = inner.state();
+        let buffer_layout = inner.buffer();
         let fields = inner.as_inner().field_layouts().into_iter();
 
-        let inner = unsafe { BufferOffsets::from_parts(state, fields) };
+        let inner = unsafe { BufferOffsets::from_parts(buffer_layout, fields) };
         unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(inner, buffer, offset) }
     }
 }

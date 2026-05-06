@@ -2,7 +2,7 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::{
     buffer::packed_size_of_fields,
-    field::{FieldLayouts, FieldLayoutsOwned, buffer_layout},
+    field::{BufferLayout, FieldLayouts, FieldLayoutsOwned, buffer_layout},
 };
 
 pub use self::tuple::*;
@@ -401,7 +401,7 @@ where
     /// This layout should not include self, as it is handled by the crate itself.
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         let fields = self.field_layouts();
-        self::buffer_layout(fields, capacity)
+        self::buffer_layout(fields, capacity).map(BufferLayout::layout)
     }
 
     /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.

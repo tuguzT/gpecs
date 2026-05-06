@@ -2,7 +2,6 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
-    num::NonZeroUsize,
     ptr,
 };
 
@@ -19,8 +18,8 @@ use crate::{
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
-            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput,
-            FieldLayoutsOwned, RawBufferOffsets, buffer_offsets,
+            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter,
+            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         layout::WithLayout,
         traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
@@ -134,7 +133,7 @@ where
                 .map_err(PtrsError::from)
         })?;
 
-        let layout = offsets.into_buffer_layout();
+        let layout = offsets.into_buffer().layout();
         check_ptr_align(buffer.cast(), layout)?;
 
         let buffer_layout = Layout::array::<P::Item>(buffer.len())?;
@@ -210,12 +209,6 @@ where
         let Self { layouts, .. } = self;
         layouts
     }
-
-    #[inline]
-    pub(super) fn raw_buffer_offsets(&self) -> RawBufferOffsets {
-        let Self { capacity, .. } = *self;
-        RawBufferOffsets::new(capacity, NonZeroUsize::MIN)
-    }
 }
 
 impl<'a, D, P> ErasedSoaPtrs<D, P>
@@ -262,7 +255,7 @@ where
     #[inline]
     pub(super) unsafe fn nth_field_ptr(
         &'a self,
-        state: &mut RawBufferOffsets,
+        buffer_layout: &mut BufferLayout,
         i: usize,
     ) -> ErasedPtr<P> {
         let Self {
@@ -276,7 +269,7 @@ where
         let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
 
         let buffer_offset = BufferOffset {
-            offset: unsafe { state.next_unchecked(desc.layout()) },
+            offset: unsafe { buffer_layout.extend_unchecked(desc.layout()) },
             desc,
         };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
@@ -502,10 +495,10 @@ where
             offset,
         } = *self;
 
-        let state = inner.state();
+        let buffer_layout = inner.buffer();
         let fields = inner.as_inner().field_layouts().into_iter();
 
-        let inner = unsafe { BufferOffsets::from_parts(state, fields) };
+        let inner = unsafe { BufferOffsets::from_parts(buffer_layout, fields) };
         unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
     }
 }

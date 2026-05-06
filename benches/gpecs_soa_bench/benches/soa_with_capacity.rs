@@ -25,7 +25,7 @@ where
         )
         .expect("layouts should be valid");
         let fields = context.field_layouts();
-        let buffer_layout = buffer_layout(fields, capacity).unwrap();
+        let buffer_layout = buffer_layout(fields, capacity).unwrap().layout();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
@@ -40,7 +40,9 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = T::Context::default();
-        let buffer_layout = buffer_layout(context.field_layouts(), capacity).unwrap();
+        let buffer_layout = buffer_layout(context.field_layouts(), capacity)
+            .unwrap()
+            .layout();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))

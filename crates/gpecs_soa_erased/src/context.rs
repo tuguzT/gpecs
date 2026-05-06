@@ -14,7 +14,8 @@ use crate::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_layout,
+            BufferLayout, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
+            buffer_layout,
         },
         layout::WithLayout,
         traits::AllocSoa,
@@ -125,7 +126,7 @@ where
     #[inline]
     pub fn buffer_layout(&'a self, capacity: usize) -> Result<Layout, LayoutError> {
         let fields = self.field_layouts();
-        buffer_layout(fields, capacity)
+        buffer_layout(fields, capacity).map(BufferLayout::layout)
     }
 
     #[inline]

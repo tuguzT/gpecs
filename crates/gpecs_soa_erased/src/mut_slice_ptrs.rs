@@ -115,7 +115,7 @@ where
                 .map_err(SlicePtrsError::from)
         })?;
 
-        let layout = offsets.into_buffer_layout();
+        let layout = offsets.into_buffer().layout();
         check_ptr_align(buffer.cast(), layout)?;
 
         let buffer_layout = Layout::array::<P::Item>(buffer.len())?;

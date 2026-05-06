@@ -57,6 +57,10 @@ where
         let expected = expected?.desc.layout();
         check_layout(actual, expected)?;
     }
-    check_layout(actual.into_buffer_layout(), expected.into_buffer_layout())?;
+
+    check_layout(
+        actual.into_buffer().layout(),
+        expected.into_buffer().layout(),
+    )?;
     Ok(())
 }

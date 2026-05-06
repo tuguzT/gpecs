@@ -19,17 +19,17 @@ fn unit() {
     let capacity = 5;
     let from_layouts = buffer_layout(layouts, capacity).unwrap();
     let from_context = AllocSoaContext::<()>::buffer_layout(&context, capacity).unwrap();
-    assert_eq!(from_layouts, from_context);
+    assert_eq!(from_layouts.layout(), from_context);
 
     let mut offsets = buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<()>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<()>());
     assert_eq!(offsets.capacity(), capacity);
 
     let offset = offsets.next();
     assert!(offset.is_none());
 
-    let from_offsets = offsets.into_buffer_layout();
+    let from_offsets = offsets.into_buffer();
     assert_eq!(from_layouts, from_offsets);
 }
 
@@ -45,25 +45,25 @@ fn identity() {
     let from_layouts = buffer_layout(layouts, capacity).unwrap();
     let from_context =
         AllocSoaContext::<Identity<u128>>::buffer_layout(&context, capacity).unwrap();
-    assert_eq!(from_layouts, from_context);
+    assert_eq!(from_layouts.layout(), from_context);
 
     let mut offsets = buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<()>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<()>());
     assert_eq!(offsets.capacity(), capacity);
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc, Layout::new::<u128>());
     assert_eq!(
-        offsets.buffer_layout(),
+        offsets.buffer().layout(),
         Layout::array::<u128>(capacity).unwrap(),
     );
 
     let offset = offsets.next();
     assert!(offset.is_none());
 
-    let from_offsets = offsets.into_buffer_layout();
+    let from_offsets = offsets.into_buffer();
     assert_eq!(from_layouts, from_offsets);
 }
 
@@ -84,18 +84,18 @@ fn tuple() {
     let from_layouts = buffer_layout(layouts, capacity).unwrap();
     let from_context =
         AllocSoaContext::<(u32, u128, u8, ())>::buffer_layout(&context, capacity).unwrap();
-    assert_eq!(from_layouts, from_context);
+    assert_eq!(from_layouts.layout(), from_context);
 
     let mut offsets = buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<()>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<()>());
     assert_eq!(offsets.capacity(), capacity);
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc, Layout::new::<u8>());
     assert_eq!(
-        offsets.buffer_layout(),
+        offsets.buffer().layout(),
         Layout::from_size_align(5, 1).unwrap(),
     );
 
@@ -103,7 +103,7 @@ fn tuple() {
     assert_eq!(offset.offset, 5);
     assert_eq!(offset.desc, Layout::new::<()>());
     assert_eq!(
-        offsets.buffer_layout(),
+        offsets.buffer().layout(),
         Layout::from_size_align(5, 1).unwrap(),
     );
 
@@ -111,7 +111,7 @@ fn tuple() {
     assert_eq!(offset.offset, 8);
     assert_eq!(offset.desc, Layout::new::<u32>());
     assert_eq!(
-        offsets.buffer_layout(),
+        offsets.buffer().layout(),
         Layout::from_size_align(28, 4).unwrap(),
     );
 
@@ -119,14 +119,14 @@ fn tuple() {
     assert_eq!(offset.offset, 32);
     assert_eq!(offset.desc, Layout::new::<u128>());
     assert_eq!(
-        offsets.buffer_layout(),
+        offsets.buffer().layout(),
         Layout::from_size_align(112, 16).unwrap(),
     );
 
     let offset = offsets.next();
     assert!(offset.is_none());
 
-    let from_offsets = offsets.into_buffer_layout();
+    let from_offsets = offsets.into_buffer();
     assert_eq!(from_layouts, from_offsets);
 }
 
@@ -146,31 +146,31 @@ fn zst_tuple() {
     let from_layouts = buffer_layout(layouts, capacity).unwrap();
     let from_context =
         AllocSoaContext::<(ZST1, ZST2, ZST3)>::buffer_layout(&context, capacity).unwrap();
-    assert_eq!(from_layouts, from_context);
+    assert_eq!(from_layouts.layout(), from_context);
 
     let mut offsets = buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<()>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<()>());
     assert_eq!(offsets.capacity(), capacity);
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc, Layout::new::<ZST2>());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<ZST2>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<ZST2>());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc, Layout::new::<ZST3>());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<ZST3>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<ZST3>());
 
     let offset = offsets.next().unwrap().unwrap();
     assert_eq!(offset.offset, 0);
     assert_eq!(offset.desc, Layout::new::<ZST1>());
-    assert_eq!(offsets.buffer_layout(), Layout::new::<ZST1>());
+    assert_eq!(offsets.buffer().layout(), Layout::new::<ZST1>());
 
     let offset = offsets.next();
     assert!(offset.is_none());
 
-    let from_offsets = offsets.into_buffer_layout();
+    let from_offsets = offsets.into_buffer();
     assert_eq!(from_layouts, from_offsets);
 }

@@ -26,8 +26,8 @@ use crate::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
-            FieldLayoutsOutput, FieldLayoutsOwned, RawBufferOffsets, buffer_offsets,
+            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem,
+            FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         layout::WithLayout,
         traits::{
@@ -139,7 +139,7 @@ where
         })?;
 
         let layout = storage.layout();
-        let expected_layout = offsets.into_buffer_layout();
+        let expected_layout = offsets.into_buffer().layout();
         check_layout(layout, expected_layout)?;
 
         write_clone_of_fields(storage.as_mut_slice(), fields, layouts.field_layouts())?;
@@ -339,7 +339,7 @@ where
                 .map_err(FromFieldsLayoutsError::from)
         })?;
 
-        let layout = offsets.into_buffer_layout();
+        let layout = offsets.into_buffer().layout();
         let mut storage = T::from_layout(layout).map_err(FromFieldsLayoutsError::FromLayout)?;
 
         write_clone_of_fields(storage.as_mut_slice(), fields, layouts.field_layouts())?;
@@ -436,7 +436,7 @@ where
                 check_sufficient_align(actual, Layout::new::<T::Item>())?;
             }
 
-            let layout = offsets.into_buffer_layout();
+            let layout = offsets.into_buffer().layout();
             let expected_layout = context.buffer_layout(1)?;
             check_layout(layout, expected_layout)?;
 
@@ -877,12 +877,10 @@ where
             let layout = item.layout();
             check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-            let mut state = RawBufferOffsets::from_parts(storage.layout(), 1, NonZeroUsize::MIN);
-            let offset = state.next(layout)?;
+            let mut state = BufferLayout::from_parts(storage.layout(), 1, NonZeroUsize::MIN);
+            let offset = state.extend(layout)?;
 
-            storage
-                .set_layout(state.buffer_layout())
-                .map_err(FromLayout)?;
+            storage.set_layout(state.layout()).map_err(FromLayout)?;
 
             let offset = bytes_to_items::<T::Item>(offset);
             let len = bytes_to_items::<T::Item>(layout.size());

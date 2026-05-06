@@ -9,14 +9,14 @@ use crate::{
     CovariantFieldLayouts, ErasedSoaMutPtrs,
     assert::{assert_layouts, check_downcast},
     data::ErasedNonNullPtr,
-    error::DowncastError,
-    error::InsufficientAlignError,
+    error::{DowncastError, InsufficientAlignError},
     layout::bytes_to_items,
+    offsets::FieldOffsets,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{
-            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter,
-            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
+            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem,
+            FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         layout::WithLayout,
         traits::{AllocSoa, AllocSoaContext, NonNullPtrs, RawSoaContext},
@@ -221,11 +221,14 @@ where
     }
 
     #[inline]
-    pub(super) unsafe fn nth_field_ptr(
+    pub(super) unsafe fn nth_field_ptr<F>(
         &'a self,
-        buffer_layout: &mut BufferLayout,
+        offsets: &mut F,
         i: usize,
-    ) -> ErasedNonNullPtr<P> {
+    ) -> ErasedNonNullPtr<P>
+    where
+        F: for<'b> FieldOffsets<&'b FieldLayoutsItem<'a, D>>,
+    {
         let Self {
             ref layouts,
             buffer,
@@ -236,10 +239,8 @@ where
         let mut layouts = layouts.field_layouts().into_iter();
         let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
 
-        let buffer_offset = BufferOffset {
-            offset: unsafe { buffer_layout.extend_unchecked(desc.layout()) },
-            desc,
-        };
+        let buffer_offset = unsafe { offsets.next(&desc) };
+        let buffer_offset = BufferOffset::new(desc, buffer_offset);
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 

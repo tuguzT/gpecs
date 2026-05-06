@@ -17,6 +17,7 @@ pub use self::{
     mut_slice_ptrs::{ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter},
     mut_slices::{ErasedSoaMutSlices, ErasedSoaMutSlicesIter},
     nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
+    offsets::FieldOffsets,
     ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},
     refs::{ErasedSoaRefs, ErasedSoaRefsIter},
     slice_ptrs::{ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter},
@@ -39,6 +40,7 @@ mod mut_refs;
 mod mut_slice_ptrs;
 mod mut_slices;
 mod nonnull_ptrs;
+mod offsets;
 mod ptrs;
 mod refs;
 mod slice_ptrs;

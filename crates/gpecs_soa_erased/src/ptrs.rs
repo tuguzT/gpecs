@@ -15,10 +15,11 @@ use crate::{
         check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
+    offsets::FieldOffsets,
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
-            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsIter,
+            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
             FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         layout::WithLayout,
@@ -253,11 +254,10 @@ where
     }
 
     #[inline]
-    pub(super) unsafe fn nth_field_ptr(
-        &'a self,
-        buffer_layout: &mut BufferLayout,
-        i: usize,
-    ) -> ErasedPtr<P> {
+    pub(super) unsafe fn nth_field_ptr<F>(&'a self, offsets: &mut F, i: usize) -> ErasedPtr<P>
+    where
+        F: for<'b> FieldOffsets<&'b FieldLayoutsItem<'a, D>>,
+    {
         let Self {
             ref layouts,
             buffer,
@@ -268,10 +268,8 @@ where
         let mut layouts = layouts.field_layouts().into_iter();
         let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
 
-        let buffer_offset = BufferOffset {
-            offset: unsafe { buffer_layout.extend_unchecked(desc.layout()) },
-            desc,
-        };
+        let buffer_offset = unsafe { offsets.next(&desc) };
+        let buffer_offset = BufferOffset::new(desc, buffer_offset);
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 }

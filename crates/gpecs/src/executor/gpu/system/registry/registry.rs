@@ -1,8 +1,6 @@
 #![expect(clippy::module_inception)]
 
-use std::num::NonZeroU32;
-
-use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule, util::DispatchIndirectArgs};
+use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule};
 
 use crate::{
     archetype::erased::error::ArchetypeError,
@@ -14,41 +12,10 @@ use crate::{
                 GpuSystemId, GpuSystemIds,
                 id::{gpu_system_id_from_usize, gpu_system_id_into_usize},
             },
-            shader::GpuSystemShader,
+            shader::{DispatchStrategy, GpuSystemShader},
         },
     },
 };
-
-pub const DEFAULT_WORKGROUP_SIZE: NonZeroU32 =
-    NonZeroU32::new(64).expect("default workgroup size cannot be zero");
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum DispatchStrategy {
-    Linear { workgroup_size: NonZeroU32 },
-    // TODO: add custom strategy using boxed dyn trait object
-}
-
-impl DispatchStrategy {
-    #[inline]
-    pub fn workgroup_count(&self, len: u32) -> DispatchIndirectArgs {
-        match self {
-            Self::Linear { workgroup_size } => {
-                let x = len.div_ceil(workgroup_size.get());
-                DispatchIndirectArgs { x, y: 1, z: 1 }
-            }
-        }
-    }
-}
-
-impl Default for DispatchStrategy {
-    #[inline]
-    fn default() -> Self {
-        Self::Linear {
-            workgroup_size: DEFAULT_WORKGROUP_SIZE,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]

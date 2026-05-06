@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    num::NonZeroU32,
 };
 
 use indexmap::map::Iter as IndexMapIter;
@@ -8,7 +9,7 @@ use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, BufferSize, ComputePipeline, ComputePipelineDescriptor, Device, Label,
     PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, ShaderModule,
-    ShaderStages,
+    ShaderStages, util::DispatchIndirectArgs,
 };
 
 use crate::{
@@ -17,12 +18,66 @@ use crate::{
     entity::Entity,
     executor::gpu::{
         component::registry::{GpuComponentId, GpuComponentInfo},
-        system::registry::DispatchStrategy,
+        system::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
     },
     hash::IndexMap,
 };
 
-use super::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId};
+pub const DEFAULT_WORKGROUP_SIZE: NonZeroU32 =
+    NonZeroU32::new(64).expect("default workgroup size cannot be zero");
+
+#[non_exhaustive]
+pub enum DispatchStrategy {
+    Linear { workgroup_size: NonZeroU32 },
+    Custom(Box<dyn CustomDispatchStrategy>),
+}
+
+impl DispatchStrategy {
+    #[inline]
+    pub const fn linear(workgroup_size: NonZeroU32) -> Self {
+        Self::Linear { workgroup_size }
+    }
+
+    #[inline]
+    pub fn custom(custom: impl CustomDispatchStrategy + 'static) -> Self {
+        let custom = Box::new(custom);
+        Self::Custom(custom)
+    }
+
+    #[inline]
+    pub fn workgroup_count(&self, len: u32) -> DispatchIndirectArgs {
+        match self {
+            Self::Linear { workgroup_size } => {
+                let x = len.div_ceil(workgroup_size.get());
+                DispatchIndirectArgs { x, y: 1, z: 1 }
+            }
+            Self::Custom(custom) => custom.workgroup_count(len),
+        }
+    }
+}
+
+impl Debug for DispatchStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Linear { workgroup_size } => f
+                .debug_struct("Linear")
+                .field("workgroup_size", workgroup_size)
+                .finish(),
+            Self::Custom(_) => f.debug_tuple("Custom").finish_non_exhaustive(),
+        }
+    }
+}
+
+impl Default for DispatchStrategy {
+    #[inline]
+    fn default() -> Self {
+        Self::linear(DEFAULT_WORKGROUP_SIZE)
+    }
+}
+
+pub trait CustomDispatchStrategy {
+    fn workgroup_count(&self, len: u32) -> DispatchIndirectArgs;
+}
 
 #[derive(Debug)]
 pub struct GpuSystemShader {

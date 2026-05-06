@@ -20,9 +20,9 @@ pub use crate::{
             archetype::registry::{GpuArchetypeId, GpuArchetypeInfo},
             bundle::GpuBundle,
             component::{GpuComponent, registry::GpuComponentId},
-            system::registry::{
-                DispatchStrategy, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
-                GpuSystemInfo,
+            system::{
+                registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId, GpuSystemInfo},
+                shader::DispatchStrategy,
             },
         },
     },

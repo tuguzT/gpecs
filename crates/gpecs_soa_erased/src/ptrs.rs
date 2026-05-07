@@ -15,7 +15,7 @@ use crate::{
         check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
-    offsets::FieldOffsets,
+    offsets::BufferOffsetsFrom,
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
@@ -256,20 +256,19 @@ where
     #[inline]
     pub(super) unsafe fn nth_field_ptr<F>(&'a self, offsets: &mut F, i: usize) -> ErasedPtr<P>
     where
-        F: for<'b> FieldOffsets<&'b FieldLayoutsItem<'a, D>>,
+        F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>>,
     {
         let Self {
             ref layouts,
             buffer,
+            capacity,
             offset,
-            ..
         } = *self;
 
         let mut layouts = layouts.field_layouts().into_iter();
         let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
 
-        let buffer_offset = unsafe { offsets.next(&desc) };
-        let buffer_offset = BufferOffset::new(desc, buffer_offset);
+        let buffer_offset = unsafe { offsets.next(capacity, desc) };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 }

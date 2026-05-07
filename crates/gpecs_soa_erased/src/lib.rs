@@ -17,7 +17,7 @@ pub use self::{
     mut_slice_ptrs::{ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter},
     mut_slices::{ErasedSoaMutSlices, ErasedSoaMutSlicesIter},
     nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
-    offsets::FieldOffsets,
+    offsets::{BufferOffsetsFrom, BufferOffsetsFromLayout},
     ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},
     refs::{ErasedSoaRefs, ErasedSoaRefsIter},
     slice_ptrs::{ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter},

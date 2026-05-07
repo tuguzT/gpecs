@@ -1,26 +1,49 @@
-use crate::soa::{field::BufferLayout, layout::WithLayout};
+use core::{alloc::Layout, num::NonZeroUsize};
 
-pub unsafe trait FieldOffsets<T> {
-    unsafe fn next(&mut self, desc: T) -> usize;
+use crate::soa::{
+    field::{BufferLayout, BufferOffset},
+    layout::WithLayout,
+};
+
+pub unsafe trait BufferOffsetsFrom<T> {
+    unsafe fn next(&mut self, capacity: usize, desc: T) -> BufferOffset<T>;
 }
 
-unsafe impl<T, U> FieldOffsets<T> for &mut U
+unsafe impl<T, U> BufferOffsetsFrom<T> for &mut U
 where
-    U: FieldOffsets<T> + ?Sized,
+    U: BufferOffsetsFrom<T> + ?Sized,
 {
     #[inline]
-    unsafe fn next(&mut self, desc: T) -> usize {
-        unsafe { (**self).next(desc) }
+    unsafe fn next(&mut self, capacity: usize, desc: T) -> BufferOffset<T> {
+        unsafe { (**self).next(capacity, desc) }
     }
 }
 
-unsafe impl<T> FieldOffsets<T> for BufferLayout
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BufferOffsetsFromLayout {
+    total_layout: Layout,
+}
+
+impl Default for BufferOffsetsFromLayout {
+    #[inline]
+    fn default() -> Self {
+        let total_layout = Layout::new::<()>();
+        Self { total_layout }
+    }
+}
+
+unsafe impl<T> BufferOffsetsFrom<T> for BufferOffsetsFromLayout
 where
     T: WithLayout,
 {
     #[inline]
-    unsafe fn next(&mut self, desc: T) -> usize {
-        let layout = desc.layout();
-        unsafe { self.extend_unchecked(layout) }
+    unsafe fn next(&mut self, capacity: usize, desc: T) -> BufferOffset<T> {
+        let Self { total_layout } = self;
+
+        let mut buffer = BufferLayout::from_parts(*total_layout, capacity, NonZeroUsize::MIN);
+        let offset = unsafe { buffer.extend_unchecked(desc.layout()) };
+        *total_layout = buffer.layout();
+
+        BufferOffset::new(desc, offset)
     }
 }

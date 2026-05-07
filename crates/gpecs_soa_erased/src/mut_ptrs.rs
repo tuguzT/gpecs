@@ -2,13 +2,12 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
-    num::NonZeroUsize,
     ptr,
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutRefs, ErasedSoaPtrs, ErasedSoaPtrsIter,
-    ErasedSoaRefs,
+    BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoa, ErasedSoaMutRefs, ErasedSoaPtrs,
+    ErasedSoaPtrsIter, ErasedSoaRefs,
     assert::{assert_layouts, check_downcast},
     dangling::{Dangling, dangling},
     data::{ErasedMutPtr, ErasedPtr},
@@ -17,12 +16,12 @@ use crate::{
         check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
-    offsets::FieldOffsets,
+    offsets::BufferOffsetsFrom,
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
         field::{
-            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem,
-            FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
+            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
+            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         layout::WithLayout,
         traits::{AllocSoa, AllocSoaContext, MutPtrs, RawSoaContext},
@@ -283,20 +282,19 @@ where
     #[inline]
     pub(super) unsafe fn nth_field_ptr<F>(&'a self, offsets: &mut F, i: usize) -> ErasedMutPtr<P>
     where
-        F: for<'b> FieldOffsets<&'b FieldLayoutsItem<'a, D>>,
+        F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>>,
     {
         let Self {
             ref layouts,
             buffer,
+            capacity,
             offset,
-            ..
         } = *self;
 
         let mut layouts = layouts.field_layouts().into_iter();
         let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
 
-        let buffer_offset = unsafe { offsets.next(&desc) };
-        let buffer_offset = BufferOffset::new(desc, buffer_offset);
+        let buffer_offset = unsafe { offsets.next(capacity, desc) };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 
@@ -308,11 +306,13 @@ where
     {
         let n = assert_layouts(self.field_layouts(), with.field_layouts());
 
-        let this_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
-        let with_layout = &mut BufferLayout::new(with.capacity(), NonZeroUsize::MIN);
+        // TODO: add trait bound for some generic parameter to create an instance of `impl BufferOffsetsFrom`
+        //       this instance then could be used instead of `BufferOffsets` struct to implement `ErasedSoaMutPtrsIter`
+        let this_offsets = &mut BufferOffsetsFromLayout::default();
+        let with_offsets = &mut BufferOffsetsFromLayout::default();
         for i in 0..n {
-            let this = unsafe { self.nth_field_ptr(this_layout, i) };
-            let with = unsafe { with.nth_field_ptr(with_layout, i) };
+            let this = unsafe { self.nth_field_ptr(this_offsets, i) };
+            let with = unsafe { with.nth_field_ptr(with_offsets, i) };
             unsafe { this.swap(with) }
         }
     }
@@ -328,11 +328,11 @@ where
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
-        let src_layout = &mut BufferLayout::new(src.capacity(), NonZeroUsize::MIN);
+        let dst_offsets = &mut BufferOffsetsFromLayout::default();
+        let src_offsets = &mut BufferOffsetsFromLayout::default();
         for i in 0..n {
-            let dst = unsafe { self.nth_field_ptr(dst_layout, i) };
-            let src = unsafe { src.nth_field_ptr(src_layout, i) };
+            let dst = unsafe { self.nth_field_ptr(dst_offsets, i) };
+            let src = unsafe { src.nth_field_ptr(src_offsets, i) };
             unsafe { dst.copy_from(src, count) }
         }
     }
@@ -349,9 +349,9 @@ where
         #[inline]
         fn rec<'dst, 'src, D, E, P>(
             dst_ptrs: &'dst ErasedSoaMutPtrs<D, P>,
-            dst_layout: &mut BufferLayout,
+            dst_offsets: &mut BufferOffsetsFromLayout,
             src_ptrs: &'src ErasedSoaPtrs<E, CastConst<P>>,
-            src_layout: &mut BufferLayout,
+            src_offsets: &mut BufferOffsetsFromLayout,
             i: usize,
             n: usize,
             count: usize,
@@ -364,19 +364,20 @@ where
                 return;
             }
 
-            let dst = unsafe { dst_ptrs.nth_field_ptr(dst_layout, i) };
-            let src = unsafe { src_ptrs.nth_field_ptr(src_layout, i) };
+            let dst = unsafe { dst_ptrs.nth_field_ptr(dst_offsets, i) };
+            let src = unsafe { src_ptrs.nth_field_ptr(src_offsets, i) };
 
-            rec(dst_ptrs, dst_layout, src_ptrs, src_layout, i + 1, n, count);
+            let i = i + 1;
+            rec(dst_ptrs, dst_offsets, src_ptrs, src_offsets, i, n, count);
 
             unsafe { dst.copy_from(src, count) }
         }
 
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
-        let src_layout = &mut BufferLayout::new(src.capacity(), NonZeroUsize::MIN);
-        rec(self, dst_layout, src, src_layout, 0, n, count);
+        let dst_offsets = &mut BufferOffsetsFromLayout::default();
+        let src_offsets = &mut BufferOffsetsFromLayout::default();
+        rec(self, dst_offsets, src, src_offsets, 0, n, count);
     }
 
     #[inline]
@@ -390,11 +391,11 @@ where
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_layout = &mut BufferLayout::new(self.capacity(), NonZeroUsize::MIN);
-        let src_layout = &mut BufferLayout::new(src.capacity(), NonZeroUsize::MIN);
+        let dst_offsets = &mut BufferOffsetsFromLayout::default();
+        let src_offsets = &mut BufferOffsetsFromLayout::default();
         for i in 0..n {
-            let dst = unsafe { self.nth_field_ptr(dst_layout, i) };
-            let src = unsafe { src.nth_field_ptr(src_layout, i) };
+            let dst = unsafe { self.nth_field_ptr(dst_offsets, i) };
+            let src = unsafe { src.nth_field_ptr(src_offsets, i) };
             unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
     }
@@ -403,7 +404,7 @@ where
 impl<'a, D, P> ErasedSoaMutPtrs<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: MutSliceItemPtr<Item: >,
+    P: MutSliceItemPtr,
 {
     #[inline]
     #[track_caller]

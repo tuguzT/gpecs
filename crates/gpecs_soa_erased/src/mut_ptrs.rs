@@ -6,8 +6,8 @@ use core::{
 };
 
 use crate::{
-    BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoa, ErasedSoaMutRefs, ErasedSoaPtrs,
-    ErasedSoaPtrsIter, ErasedSoaRefs,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutRefs, ErasedSoaPtrs, ErasedSoaPtrsIter,
+    ErasedSoaRefs,
     assert::{assert_layouts, check_downcast},
     dangling::{Dangling, dangling},
     data::{ErasedMutPtr, ErasedPtr},
@@ -15,15 +15,14 @@ use crate::{
         DowncastError, InsufficientAlignError, PtrsError, check_offset, check_ptr_align,
         check_sufficient_align, check_sufficient_len,
     },
-    layout::bytes_to_items,
-    offsets::BufferOffsetsFrom,
+    layout::{WithLayout, bytes_to_items},
+    offsets::{BufferOffsetsFrom, BufferOffsetsFromLayout},
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
         field::{
-            BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
-            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
+            BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput,
+            FieldLayoutsOwned, buffer_offsets,
         },
-        layout::WithLayout,
         traits::{AllocSoa, AllocSoaContext, MutPtrs, RawSoaContext},
     },
     storage::AlignedStorage,
@@ -261,8 +260,8 @@ where
         } = *self;
 
         let layouts = layouts.field_layouts().into_iter();
-        let inner = buffer_offsets(layouts, capacity);
-        unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
+        let from = BufferOffsetsFromLayout::default();
+        unsafe { ErasedSoaPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 
     #[inline]
@@ -275,8 +274,8 @@ where
         } = *self;
 
         let layouts = layouts.field_layouts().into_iter();
-        let inner = buffer_offsets(layouts, capacity);
-        unsafe { ErasedSoaMutPtrsIter::new_unchecked(inner, buffer, offset) }
+        let from = BufferOffsetsFromLayout::default();
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 
     #[inline]
@@ -515,8 +514,8 @@ where
         } = self;
 
         let layouts = layouts.into_iter();
-        let inner = buffer_offsets(layouts, capacity);
-        unsafe { ErasedSoaMutPtrsIter::new_unchecked(inner, buffer, offset) }
+        let from = BufferOffsetsFromLayout::default();
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 }
 
@@ -553,8 +552,10 @@ where
     P: MutSliceItemPtr,
 {
     buffer: *mut [P::Item],
+    capacity: usize,
     offset: usize,
-    inner: BufferOffsets<D>,
+    from: BufferOffsetsFromLayout,
+    layouts: D,
 }
 
 impl<D, P> ErasedSoaMutPtrsIter<D, P>
@@ -563,14 +564,18 @@ where
 {
     #[inline]
     pub(super) unsafe fn new_unchecked(
-        inner: BufferOffsets<D>,
         buffer: *mut [P::Item],
+        capacity: usize,
         offset: usize,
+        from: BufferOffsetsFromLayout,
+        layouts: D,
     ) -> Self {
         Self {
             buffer,
+            capacity,
             offset,
-            inner,
+            from,
+            layouts,
         }
     }
 }
@@ -594,8 +599,8 @@ where
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.capacity()
+        let Self { capacity, .. } = *self;
+        capacity
     }
 
     #[inline]
@@ -606,8 +611,8 @@ where
 
     #[inline]
     pub fn layouts(&self) -> &D {
-        let Self { inner, .. } = self;
-        inner.as_inner()
+        let Self { layouts, .. } = self;
+        layouts
     }
 }
 
@@ -619,12 +624,15 @@ where
     #[inline]
     pub unsafe fn next_unchecked(&mut self) -> ErasedMutPtr<P> {
         let Self {
-            ref mut inner,
+            ref mut from,
+            ref mut layouts,
             buffer,
+            capacity,
             offset,
         } = *self;
 
-        let buffer_offset = unsafe { inner.next_unchecked() };
+        let desc = unsafe { layouts.next().unwrap_unchecked() };
+        let buffer_offset = unsafe { from.next(capacity, desc) };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 }
@@ -637,16 +645,15 @@ where
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaMutPtrsIter<FieldLayoutsIter<'a, D>, P> {
         let Self {
-            ref inner,
+            ref layouts,
             buffer,
+            capacity,
             offset,
+            from,
         } = *self;
 
-        let buffer_layout = inner.buffer();
-        let fields = inner.as_inner().field_layouts().into_iter();
-
-        let inner = unsafe { BufferOffsets::from_parts(buffer_layout, fields) };
-        unsafe { ErasedSoaMutPtrsIter::new_unchecked(inner, buffer, offset) }
+        let layouts = layouts.field_layouts().into_iter();
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 }
 
@@ -682,13 +689,15 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self {
-            ref inner,
+            ref layouts,
             buffer,
+            capacity,
             offset,
+            from,
         } = *self;
 
-        let inner = inner.clone();
-        unsafe { Self::new_unchecked(inner, buffer, offset) }
+        let layouts = layouts.clone();
+        unsafe { Self::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 }
 
@@ -702,21 +711,23 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
-            ref mut inner,
+            ref mut from,
+            ref mut layouts,
             buffer,
+            capacity,
             offset,
         } = *self;
 
-        let buffer_offset = inner.next()?;
-        let buffer_offset = unsafe { buffer_offset.unwrap_unchecked() };
+        let desc = layouts.next()?;
+        let buffer_offset = unsafe { from.next(capacity, desc) };
         let item = unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) };
         Some(item)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner, .. } = self;
-        inner.size_hint()
+        let Self { layouts, .. } = self;
+        layouts.size_hint()
     }
 }
 
@@ -727,8 +738,8 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.len()
+        let Self { layouts, .. } = self;
+        layouts.len()
     }
 }
 
@@ -748,8 +759,8 @@ where
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
-        let Self { inner, .. } = self;
-        inner.as_inner().field_layouts()
+        let Self { layouts, .. } = self;
+        layouts.field_layouts()
     }
 }
 

@@ -15,7 +15,7 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    CovariantFieldLayouts, ErasedSoa, ErasedSoaIntoFields,
+    BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoa, ErasedSoaIntoFields,
     error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
     soa::{
@@ -253,12 +253,16 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleRefsIter<'_, Iter<'_, T::Meta>, P::Const> {
+    pub fn iter(
+        &self,
+    ) -> ErasedBundleRefsIter<'_, Iter<'_, T::Meta>, P::Const, BufferOffsetsFromLayout> {
         self.as_refs().into_iter()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> ErasedBundleMutRefsIter<'_, Iter<'_, T::Meta>, P::Mut> {
+    pub fn iter_mut(
+        &mut self,
+    ) -> ErasedBundleMutRefsIter<'_, Iter<'_, T::Meta>, P::Mut, BufferOffsetsFromLayout> {
         self.as_mut_refs().into_iter()
     }
 }
@@ -417,7 +421,7 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     type Item = ErasedComponentRef<'a, P::Const>;
-    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>, P::Const>;
+    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>, P::Const, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -433,7 +437,7 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     type Item = ErasedComponentMutRef<'a, P::Mut>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>, P::Mut>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>, P::Mut, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

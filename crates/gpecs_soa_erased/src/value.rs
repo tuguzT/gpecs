@@ -22,14 +22,14 @@ use crate::{
         check_from_layouts_value, check_from_storage_value, check_from_value, check_layout,
         check_len, check_sufficient_align,
     },
-    layout::bytes_to_items,
+    layout::{WithLayout, bytes_to_items},
+    offsets::BufferOffsetsFromLayout,
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
             BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem,
             FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
-        layout::WithLayout,
         traits::{
             AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
             WriteSoaContext,
@@ -269,12 +269,16 @@ where
     }
 
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, P::Const> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, P::Const, BufferOffsetsFromLayout> {
         self.as_refs().into_iter()
     }
 
     #[inline]
-    pub fn iter_mut(&'a mut self) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P::Mut> {
+    pub fn iter_mut(
+        &'a mut self,
+    ) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P::Mut, BufferOffsetsFromLayout> {
         self.as_mut_refs().into_iter()
     }
 }
@@ -547,7 +551,8 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedRef<'a, P::Const>;
-    type IntoIter = ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, P::Const>;
+    type IntoIter =
+        ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, P::Const, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -562,7 +567,8 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedMutRef<'a, P::Mut>;
-    type IntoIter = ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P::Mut>;
+    type IntoIter =
+        ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P::Mut, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

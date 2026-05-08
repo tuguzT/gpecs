@@ -11,10 +11,13 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    CovariantFieldLayouts, ErasedSoaMutSlices, ErasedSoaMutSlicesIter,
+    BufferOffsetsFrom, BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoaMutSlices,
+    ErasedSoaMutSlicesIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
-        field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
+        field::{
+            FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned,
+        },
         traits::SoaContext,
     },
 };
@@ -123,7 +126,10 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout>
+    {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -131,7 +137,9 @@ where
     }
 
     #[inline]
-    pub fn iter_mut(&'a mut self) -> ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P> {
+    pub fn iter_mut(
+        &'a mut self,
+    ) -> ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
         let Self { inner } = self;
 
         let inner = inner.iter_mut();
@@ -208,7 +216,8 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentSlice<'a, CastConst<P>>;
-    type IntoIter = ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>>;
+    type IntoIter =
+        ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -222,7 +231,8 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentMutSlice<'a, P>;
-    type IntoIter = ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P>;
+    type IntoIter =
+        ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -236,7 +246,7 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentMutSlice<'a, P>;
-    type IntoIter = ErasedBundleMutSlicesIter<'a, D::IntoIter, P>;
+    type IntoIter = ErasedBundleMutSlicesIter<'a, D::IntoIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -286,25 +296,25 @@ where
     }
 }
 
-pub struct ErasedBundleMutSlicesIter<'a, D, P>
+pub struct ErasedBundleMutSlicesIter<'a, D, P, F>
 where
     D: ?Sized,
     P: MutSliceItemPtr,
 {
-    inner: ErasedSoaMutSlicesIter<'a, D, P>,
+    inner: ErasedSoaMutSlicesIter<'a, D, P, F>,
 }
 
-impl<'a, D, P> ErasedBundleMutSlicesIter<'a, D, P>
+impl<'a, D, P, F> ErasedBundleMutSlicesIter<'a, D, P, F>
 where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn from_inner(inner: ErasedSoaMutSlicesIter<'a, D, P>) -> Self {
+    pub(super) unsafe fn from_inner(inner: ErasedSoaMutSlicesIter<'a, D, P, F>) -> Self {
         Self { inner }
     }
 }
 
-impl<D, P> ErasedBundleMutSlicesIter<'_, D, P>
+impl<D, P, F> ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: ?Sized,
     P: MutSliceItemPtr,
@@ -346,13 +356,14 @@ where
     }
 }
 
-impl<'a, D, P> ErasedBundleMutSlicesIter<'_, D, P>
+impl<'a, D, P, F> ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P, F> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -360,13 +371,14 @@ where
     }
 }
 
-impl<'a, D, P> IntoIterator for &'a ErasedBundleMutSlicesIter<'_, D, P>
+impl<'a, D, P, F> IntoIterator for &'a ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     type Item = ErasedComponentMutSlice<'a, P>;
-    type IntoIter = ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P>;
+    type IntoIter = ErasedBundleMutSlicesIter<'a, FieldLayoutsIter<'a, D>, P, F>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -374,10 +386,11 @@ where
     }
 }
 
-impl<D, P> Debug for ErasedBundleMutSlicesIter<'_, D, P>
+impl<D, P, F> Debug for ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: FieldLayoutsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr<Item: Debug>,
+    F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -385,10 +398,11 @@ where
     }
 }
 
-impl<'a, D, P> Iterator for ErasedBundleMutSlicesIter<'a, D, P>
+impl<'a, D, P, F> Iterator for ErasedBundleMutSlicesIter<'a, D, P, F>
 where
     D: ErasedArchetypeIterator + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<D::Item>,
 {
     type Item = ErasedComponentMutSlice<'a, P>;
 
@@ -409,10 +423,11 @@ where
     }
 }
 
-impl<D, P> ExactSizeIterator for ErasedBundleMutSlicesIter<'_, D, P>
+impl<D, P, F> ExactSizeIterator for ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: ErasedArchetypeIterator + ExactSizeIterator + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<D::Item>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -421,14 +436,15 @@ where
     }
 }
 
-impl<D, P> FusedIterator for ErasedBundleMutSlicesIter<'_, D, P>
+impl<D, P, F> FusedIterator for ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: ErasedArchetypeIterator + FusedIterator + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<D::Item>,
 {
 }
 
-impl<'a, D, P> FieldLayouts<'a> for ErasedBundleMutSlicesIter<'_, D, P>
+impl<'a, D, P, F> FieldLayouts<'a> for ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
@@ -442,7 +458,7 @@ where
     }
 }
 
-impl<D, P> CovariantFieldLayouts for ErasedBundleMutSlicesIter<'_, D, P>
+impl<D, P, F> CovariantFieldLayouts for ErasedBundleMutSlicesIter<'_, D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
     P: MutSliceItemPtr,

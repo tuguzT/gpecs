@@ -205,7 +205,9 @@ where
     }
 
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaNonNullPtrsIter<FieldLayoutsIter<'a, D>, P> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedSoaNonNullPtrsIter<FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
         let Self {
             ref layouts,
             buffer,
@@ -396,7 +398,7 @@ where
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedNonNullPtr<P>;
-    type IntoIter = ErasedSoaNonNullPtrsIter<FieldLayoutsIter<'a, D>, P>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -410,7 +412,7 @@ where
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedNonNullPtr<P>;
-    type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -466,7 +468,7 @@ where
     }
 }
 
-pub struct ErasedSoaNonNullPtrsIter<D, P, F = BufferOffsetsFromLayout>
+pub struct ErasedSoaNonNullPtrsIter<D, P, F>
 where
     D: ?Sized,
     P: NonNullSliceItemPtr,

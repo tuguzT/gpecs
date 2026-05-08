@@ -239,7 +239,9 @@ where
     }
 
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldLayoutsIter<'a, D>, P> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedSoaPtrsIter<FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
         let Self {
             ref layouts,
             buffer,
@@ -344,7 +346,7 @@ where
     P: ConstSliceItemPtr,
 {
     type Item = ErasedPtr<P>;
-    type IntoIter = ErasedSoaPtrsIter<FieldLayoutsIter<'a, D>, P>;
+    type IntoIter = ErasedSoaPtrsIter<FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -358,7 +360,7 @@ where
     P: ConstSliceItemPtr,
 {
     type Item = ErasedPtr<P>;
-    type IntoIter = ErasedSoaPtrsIter<D::IntoIter, P>;
+    type IntoIter = ErasedSoaPtrsIter<D::IntoIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -402,7 +404,7 @@ where
     }
 }
 
-pub struct ErasedSoaPtrsIter<D, P, F = BufferOffsetsFromLayout>
+pub struct ErasedSoaPtrsIter<D, P, F>
 where
     D: ?Sized,
     P: ConstSliceItemPtr,

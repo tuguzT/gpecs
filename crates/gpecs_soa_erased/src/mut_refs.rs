@@ -9,10 +9,13 @@ use crate::{
     ErasedSoaRefsIter,
     data::{ErasedMutRef, ErasedRef},
     error::{DowncastError, PtrsError},
+    layout::WithLayout,
+    offsets::{BufferOffsetsFrom, BufferOffsetsFromLayout},
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
-        field::{FieldLayouts, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned},
-        layout::WithLayout,
+        field::{
+            FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned,
+        },
         traits::{AllocSoa, RefsMut, Soa, SoaContext},
     },
 };
@@ -157,7 +160,9 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -165,7 +170,9 @@ where
     }
 
     #[inline]
-    pub fn iter_mut(&'a mut self) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P> {
+    pub fn iter_mut(
+        &'a mut self,
+    ) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter_mut();
@@ -192,7 +199,8 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedRef<'a, CastConst<P>>;
-    type IntoIter = ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>>;
+    type IntoIter =
+        ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -206,7 +214,7 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedMutRef<'a, P>;
-    type IntoIter = ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -220,7 +228,7 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedMutRef<'a, P>;
-    type IntoIter = ErasedSoaMutRefsIter<'a, D::IntoIter, P>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, D::IntoIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -269,27 +277,27 @@ where
     }
 }
 
-pub struct ErasedSoaMutRefsIter<'a, D, P>
+pub struct ErasedSoaMutRefsIter<'a, D, P, F>
 where
     D: ?Sized,
     P: MutSliceItemPtr,
 {
     phantom: PhantomData<&'a mut [P::Item]>,
-    ptrs: ErasedSoaMutPtrsIter<D, P>,
+    ptrs: ErasedSoaMutPtrsIter<D, P, F>,
 }
 
-impl<D, P> ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P, F> ErasedSoaMutRefsIter<'_, D, P, F>
 where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn from_ptrs(ptrs: ErasedSoaMutPtrsIter<D, P>) -> Self {
+    pub(super) unsafe fn from_ptrs(ptrs: ErasedSoaMutPtrsIter<D, P, F>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
     }
 }
 
-impl<D, P> ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P, F> ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: ?Sized,
     P: MutSliceItemPtr,
@@ -329,13 +337,14 @@ where
     }
 }
 
-impl<'a, D, P> ErasedSoaMutRefsIter<'_, D, P>
+impl<'a, D, P, F> ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P> {
+    pub fn iter(&'a self) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, F> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -343,13 +352,14 @@ where
     }
 }
 
-impl<'a, D, P> IntoIterator for &'a ErasedSoaMutRefsIter<'_, D, P>
+impl<'a, D, P, F> IntoIterator for &'a ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     type Item = ErasedMutRef<'a, P>;
-    type IntoIter = ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, F>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -357,20 +367,22 @@ where
     }
 }
 
-impl<D, P> Debug for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P, F> Debug for ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: FieldLayoutsOwned + ?Sized,
     P: MutSliceItemPtr<Item: Debug>,
+    F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self).finish()
     }
 }
 
-impl<'a, D, P> Iterator for ErasedSoaMutRefsIter<'a, D, P>
+impl<'a, D, P, F> Iterator for ErasedSoaMutRefsIter<'a, D, P, F>
 where
     D: Iterator<Item: WithLayout> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<D::Item>,
 {
     type Item = ErasedMutRef<'a, P>;
 
@@ -389,10 +401,11 @@ where
     }
 }
 
-impl<D, P> ExactSizeIterator for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P, F> ExactSizeIterator for ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: ExactSizeIterator<Item: WithLayout> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<D::Item>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -401,14 +414,15 @@ where
     }
 }
 
-impl<D, P> FusedIterator for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P, F> FusedIterator for ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: FusedIterator<Item: WithLayout> + ?Sized,
     P: MutSliceItemPtr,
+    F: BufferOffsetsFrom<D::Item>,
 {
 }
 
-impl<'a, D, P> FieldLayouts<'a> for ErasedSoaMutRefsIter<'_, D, P>
+impl<'a, D, P, F> FieldLayouts<'a> for ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
@@ -422,7 +436,7 @@ where
     }
 }
 
-impl<D, P> CovariantFieldLayouts for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P, F> CovariantFieldLayouts for ErasedSoaMutRefsIter<'_, D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
     P: MutSliceItemPtr,

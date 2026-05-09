@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_layout = { workspace = true }
+gpecs_identity = { workspace = true }
 rayon = { workspace = true, optional = true }
 
 [dev-dependencies]

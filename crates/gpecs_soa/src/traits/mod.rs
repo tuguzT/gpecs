@@ -7,6 +7,7 @@ use crate::{
 
 pub use self::tuple::*;
 
+mod identity;
 mod tuple;
 mod unit;
 

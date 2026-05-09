@@ -751,6 +751,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpecs_identity"
+version = "0.0.0"
+
+[[package]]
 name = "gpecs_itertools"
 version = "0.0.0"
 
@@ -820,6 +824,7 @@ dependencies = [
 name = "gpecs_soa"
 version = "0.0.0"
 dependencies = [
+ "gpecs_identity",
  "gpecs_layout",
  "itertools 0.14.0",
  "rayon",

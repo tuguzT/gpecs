@@ -3,7 +3,7 @@ use core::slice;
 #[cfg(feature = "alloc")]
 use core_alloc::boxed::Box;
 
-use crate::layout::WithLayout;
+use crate::{identity::Identity, layout::WithLayout};
 
 /// Alias for the [field layouts](FieldLayouts::Output) of some type `T`.
 pub type FieldLayoutsOutput<'a, T, U = T> = <T as FieldLayouts<'a, U>>::Output;
@@ -56,6 +56,21 @@ where
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
         (**self).field_layouts()
+    }
+}
+
+impl<'a, T, U> FieldLayouts<'a, Identity<U>> for Identity<T>
+where
+    T: FieldLayouts<'a, U> + ?Sized,
+    U: ?Sized,
+{
+    type Output = T::Output;
+    type OutputIter = T::OutputIter;
+    type OutputItem = T::OutputItem;
+
+    #[inline]
+    fn field_layouts(&'a self) -> Self::Output {
+        self.as_inner().field_layouts()
     }
 }
 

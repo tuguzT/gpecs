@@ -31,8 +31,8 @@ impl<'a> Iter<'a> {
 
 impl Debug for Iter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone();
-        f.debug_set().entries(entries).finish()
+        let entries = self.clone().map(From::from);
+        f.debug_map().entries(entries).finish()
     }
 }
 

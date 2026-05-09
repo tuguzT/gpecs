@@ -36,8 +36,9 @@ impl Debug for IterMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { archetypes, ids } = self;
 
-        let entries = unsafe { Iter::from_parts(archetypes, ids.clone()) };
-        f.debug_set().entries(entries).finish()
+        let iter = unsafe { Iter::from_parts(archetypes, ids.clone()) };
+        let entries = iter.map(From::from);
+        f.debug_map().entries(entries).finish()
     }
 }
 

@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, slice};
 
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa::{
@@ -61,6 +61,8 @@ where
     T: WithLayout + 'a,
 {
     type Output = &'a [T];
+    type OutputIter = slice::Iter<'a, T>;
+    type OutputItem = &'a T;
 
     fn field_layouts(&'a self) -> Self::Output {
         self

@@ -1,5 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
+    array::IntoIter,
     borrow::{Borrow, BorrowMut},
     cmp,
     ops::{Deref, DerefMut},
@@ -321,6 +322,8 @@ where
     U: ?Sized,
 {
     type Output = T::Output;
+    type OutputIter = T::OutputIter;
+    type OutputItem = T::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -544,6 +547,8 @@ unsafe impl<T> WriteSoaContext<Identity<T>, Identity<T>> for () {
 
 impl<'a, T> FieldLayouts<'a, Identity<T>> for () {
     type Output = [Layout; 1];
+    type OutputIter = IntoIter<Layout, 1>;
+    type OutputItem = Layout;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

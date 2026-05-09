@@ -15,9 +15,7 @@ use gpecs_soa_erased::{
     ErasedSoaSlicesIter,
     ptr::slice::ConstSliceItemPtr,
     soa::{
-        field::{
-            FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned,
-        },
+        field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaContext,
     },
 };
@@ -116,13 +114,11 @@ where
 
 impl<'a, D, P> ErasedBundleSlices<'_, D, P>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn iter(
-        &'a self,
-    ) -> ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
+    pub fn iter(&'a self) -> ErasedBundleSlicesIter<'a, D::OutputIter, P, BufferOffsetsFromLayout> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -210,11 +206,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleSlices<'_, D, P>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedComponentSlice<'a, P>;
-    type IntoIter = ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleSlicesIter<'a, D::OutputIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -245,6 +241,8 @@ where
     P: ConstSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -322,12 +320,12 @@ where
 
 impl<'a, D, P, F> ErasedBundleSlicesIter<'_, D, P, F>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, P, F> {
+    pub fn iter(&'a self) -> ErasedBundleSlicesIter<'a, D::OutputIter, P, F> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -337,12 +335,12 @@ where
 
 impl<'a, D, P, F> IntoIterator for &'a ErasedBundleSlicesIter<'_, D, P, F>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedComponentSlice<'a, P>;
-    type IntoIter = ErasedBundleSlicesIter<'a, FieldLayoutsIter<'a, D>, P, F>;
+    type IntoIter = ErasedBundleSlicesIter<'a, D::OutputIter, P, F>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -352,7 +350,7 @@ where
 
 impl<D, P, F> Debug for ErasedBundleSlicesIter<'_, D, P, F>
 where
-    D: FieldLayoutsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayoutsOwned<OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: ConstSliceItemPtr<Item: Debug>,
     F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
@@ -429,6 +427,8 @@ where
     P: ConstSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

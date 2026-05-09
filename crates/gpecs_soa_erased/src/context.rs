@@ -277,6 +277,8 @@ where
     P: SliceItemPtrs,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

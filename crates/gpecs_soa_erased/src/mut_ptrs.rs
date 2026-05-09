@@ -20,8 +20,8 @@ use crate::{
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
         field::{
-            BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput,
-            FieldLayoutsOwned, buffer_offsets,
+            BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
+            buffer_offsets,
         },
         traits::{AllocSoa, AllocSoaContext, MutPtrs, RawSoaContext},
     },
@@ -253,7 +253,7 @@ where
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedSoaPtrsIter<FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout> {
+    ) -> ErasedSoaPtrsIter<D::OutputIter, CastConst<P>, BufferOffsetsFromLayout> {
         let Self {
             ref layouts,
             buffer,
@@ -269,7 +269,7 @@ where
     #[inline]
     pub fn iter_mut(
         &'a mut self,
-    ) -> ErasedSoaMutPtrsIter<FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
+    ) -> ErasedSoaMutPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout> {
         let Self {
             ref layouts,
             buffer,
@@ -285,7 +285,7 @@ where
     #[inline]
     pub(super) unsafe fn nth_field_ptr<F>(&'a self, offsets: &mut F, i: usize) -> ErasedMutPtr<P>
     where
-        F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>>,
+        F: BufferOffsetsFrom<D::OutputItem>,
     {
         let Self {
             ref layouts,
@@ -478,8 +478,7 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedPtr<CastConst<P>>;
-    type IntoIter =
-        ErasedSoaPtrsIter<FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaPtrsIter<D::OutputIter, CastConst<P>, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -493,7 +492,7 @@ where
     P: MutSliceItemPtr,
 {
     type Item = ErasedMutPtr<P>;
-    type IntoIter = ErasedSoaMutPtrsIter<FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaMutPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -530,6 +529,8 @@ where
     P: MutSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -647,10 +648,10 @@ impl<'a, D, P, F> ErasedSoaMutPtrsIter<D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaMutPtrsIter<FieldLayoutsIter<'a, D>, P, F> {
+    pub fn iter(&'a self) -> ErasedSoaMutPtrsIter<D::OutputIter, P, F> {
         let Self {
             ref offsets,
             ref layouts,
@@ -669,10 +670,10 @@ impl<'a, D, P, F> IntoIterator for &'a ErasedSoaMutPtrsIter<D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: MutSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedMutPtr<P>;
-    type IntoIter = ErasedSoaMutPtrsIter<FieldLayoutsIter<'a, D>, P, F>;
+    type IntoIter = ErasedSoaMutPtrsIter<D::OutputIter, P, F>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -771,6 +772,8 @@ where
     P: MutSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

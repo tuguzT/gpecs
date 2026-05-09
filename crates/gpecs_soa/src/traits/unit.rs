@@ -1,5 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
+    array,
     ptr::{self, NonNull},
 };
 
@@ -220,6 +221,8 @@ unsafe impl WriteSoaContext<(), ()> for () {
 
 impl<'a> FieldLayouts<'a> for () {
     type Output = [Layout; 0];
+    type OutputIter = array::IntoIter<Layout, 0>;
+    type OutputItem = Layout;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

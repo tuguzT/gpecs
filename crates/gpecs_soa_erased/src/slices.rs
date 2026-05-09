@@ -12,9 +12,7 @@ use crate::{
     offsets::{BufferOffsetsFrom, BufferOffsetsFromLayout},
     ptr::slice::ConstSliceItemPtr,
     soa::{
-        field::{
-            FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned,
-        },
+        field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::{AllocSoa, Slices, Soa, SoaContext},
     },
 };
@@ -165,9 +163,7 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn iter(
-        &'a self,
-    ) -> ErasedSoaSlicesIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
+    pub fn iter(&'a self) -> ErasedSoaSlicesIter<'a, D::OutputIter, P, BufferOffsetsFromLayout> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -215,7 +211,7 @@ where
     P: ConstSliceItemPtr,
 {
     type Item = ErasedSlice<'a, P>;
-    type IntoIter = ErasedSoaSlicesIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaSlicesIter<'a, D::OutputIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -246,6 +242,8 @@ where
     P: ConstSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -329,10 +327,10 @@ impl<'a, D, P, F> ErasedSoaSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaSlicesIter<'a, FieldLayoutsIter<'a, D>, P, F> {
+    pub fn iter(&'a self) -> ErasedSoaSlicesIter<'a, D::OutputIter, P, F> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -344,10 +342,10 @@ impl<'a, D, P, F> IntoIterator for &'a ErasedSoaSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
     P: ConstSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedSlice<'a, P>;
-    type IntoIter = ErasedSoaSlicesIter<'a, FieldLayoutsIter<'a, D>, P, F>;
+    type IntoIter = ErasedSoaSlicesIter<'a, D::OutputIter, P, F>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -431,6 +429,8 @@ where
     P: ConstSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

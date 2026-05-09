@@ -10,7 +10,7 @@ use core::{
 use gpecs_component::{
     erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
     registry::{
-        ComponentRegistryView,
+        ComponentInfo, ComponentRegistryView,
         traits::{ComponentIdFrom, FromComponentType, WithComponentId},
     },
 };
@@ -474,6 +474,8 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
+    type OutputIter = Iter<'a, T::Meta>;
+    type OutputItem = ComponentInfo<&'a T::Meta>;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

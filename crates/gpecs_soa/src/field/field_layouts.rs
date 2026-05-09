@@ -20,7 +20,9 @@ where
     T: ?Sized,
 {
     /// Collection of items which could be converted into a [layout](core::alloc::Layout).
-    type Output: IntoIterator<Item: WithLayout> + 'a;
+    type Output: IntoIterator<IntoIter = Self::OutputIter, Item = Self::OutputItem> + 'a;
+    type OutputIter: Iterator<Item = Self::OutputItem>;
+    type OutputItem: WithLayout;
 
     /// Returns [field layouts](FieldLayouts::Output) from self.
     fn field_layouts(&'a self) -> Self::Output;
@@ -32,6 +34,8 @@ where
     U: ?Sized,
 {
     type Output = T::Output;
+    type OutputIter = T::OutputIter;
+    type OutputItem = T::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -46,6 +50,8 @@ where
     U: ?Sized,
 {
     type Output = T::Output;
+    type OutputIter = T::OutputIter;
+    type OutputItem = T::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -58,6 +64,8 @@ where
     T: WithLayout + 'a,
 {
     type Output = &'a [T];
+    type OutputIter = slice::Iter<'a, T>;
+    type OutputItem = &'a T;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -70,6 +78,8 @@ where
     T: WithLayout + 'a,
 {
     type Output = &'a [T; N];
+    type OutputIter = slice::Iter<'a, T>;
+    type OutputItem = &'a T;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -82,6 +92,8 @@ where
     T: WithLayout + 'a,
 {
     type Output = slice::Iter<'a, T>;
+    type OutputIter = slice::Iter<'a, T>;
+    type OutputItem = &'a T;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

@@ -1,5 +1,6 @@
 use core::fmt::Debug;
 
+use gpecs_component::registry::ComponentInfo;
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
     ptr::slice::SliceItemPtrs,
@@ -21,7 +22,7 @@ use crate::{
         ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices,
         traits::{ErasedArchetypeKind, ErasedBundleDrop},
     },
-    erased::ErasedArchetypeView,
+    erased::{ErasedArchetypeView, Iter},
 };
 
 unsafe impl<'view, T, D, S, P> RawSoaContext<ErasedBundleKind<T, D, S, P>>
@@ -296,6 +297,8 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
+    type OutputIter = Iter<'a, T::Meta>;
+    type OutputItem = ComponentInfo<&'a T::Meta>;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

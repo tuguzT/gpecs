@@ -82,6 +82,8 @@ where
     T: AsRef<[FfiLayout]> + Clone,
 {
     type Output = GpuFieldLayouts<&'a [FfiLayout]>;
+    type OutputIter = GpuFieldLayouts<&'a [FfiLayout]>;
+    type OutputItem = FfiLayout;
 
     fn field_layouts(&'a self) -> Self::Output {
         let Self { ref layouts, next } = *self;

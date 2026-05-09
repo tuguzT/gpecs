@@ -1,4 +1,7 @@
-use core::alloc::{Layout, LayoutError};
+use core::{
+    alloc::{Layout, LayoutError},
+    iter::{Chain, Once},
+};
 
 use crate::{
     item::{
@@ -6,7 +9,7 @@ use crate::{
         DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },
     soa::{
-        field::{FieldLayouts, FieldLayoutsOutput},
+        field::{FieldLayouts, IntoFieldLayouts},
         identity::Identity,
         traits::{
             AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
@@ -250,12 +253,14 @@ where
     }
 }
 
-impl<'a, K, V> FieldLayouts<'a, DenseItem<K, V>> for Identity<V::Context>
+impl<'a, K, V, C> FieldLayouts<'a, DenseItem<K, V>> for Identity<C>
 where
-    V: RawSoa + ?Sized,
-    V::Context: FieldLayouts<'a, V>,
+    V: RawSoa<Context = C> + ?Sized,
+    C: FieldLayouts<'a, V>,
 {
-    type Output = DenseFieldLayouts<FieldLayoutsOutput<'a, V::Context, V>>;
+    type Output = DenseFieldLayouts<C::Output>;
+    type OutputIter = Chain<Once<Layout>, IntoFieldLayouts<C::OutputIter>>;
+    type OutputItem = Layout;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

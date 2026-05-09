@@ -10,7 +10,11 @@ use gpecs_soa_erased::{
 use crate::erased::{ErasedArchetypeView, Iter};
 
 pub trait ErasedArchetypeKind:
-    for<'a> FieldLayouts<'a, Output = ErasedArchetypeView<'a, Self::Meta>>
+    for<'a> FieldLayouts<
+        'a,
+        Output = ErasedArchetypeView<'a, Self::Meta>,
+        OutputIter: ErasedArchetypeIterator,
+    >
 {
     type Meta: WithLayout + 'static;
 }
@@ -37,7 +41,7 @@ where
 }
 
 pub unsafe trait ErasedArchetypeIterator:
-    Iterator<Item: WithLayout> + for<'a> FieldLayouts<'a, Output: IntoIterator<Item: WithComponentId>>
+    Iterator<Item: WithLayout> + for<'a> FieldLayouts<'a, OutputItem: WithComponentId>
 {
 }
 

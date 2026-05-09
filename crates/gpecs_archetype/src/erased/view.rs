@@ -475,6 +475,8 @@ where
     Meta: WithLayout + 'a,
 {
     type Output = ErasedArchetypeView<'a, Meta>;
+    type OutputIter = Iter<'a, Meta>;
+    type OutputItem = ComponentInfo<&'a Meta>;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

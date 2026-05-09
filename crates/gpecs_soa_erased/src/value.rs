@@ -27,8 +27,8 @@ use crate::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            BufferLayout, BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
-            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
+            BufferLayout, BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput,
+            FieldLayoutsOwned, buffer_offsets,
         },
         traits::{
             AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
@@ -271,14 +271,14 @@ where
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, P::Const, BufferOffsetsFromLayout> {
+    ) -> ErasedSoaRefsIter<'a, D::OutputIter, P::Const, BufferOffsetsFromLayout> {
         self.as_refs().into_iter()
     }
 
     #[inline]
     pub fn iter_mut(
         &'a mut self,
-    ) -> ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P::Mut, BufferOffsetsFromLayout> {
+    ) -> ErasedSoaMutRefsIter<'a, D::OutputIter, P::Mut, BufferOffsetsFromLayout> {
         self.as_mut_refs().into_iter()
     }
 }
@@ -515,9 +515,8 @@ where
 impl<T, D, P> Debug for ErasedSoa<T, D, P>
 where
     T: AlignedStorage<Item: Debug>,
-    D: FieldLayoutsOwned + ?Sized,
+    D: FieldLayoutsOwned<OutputIter: FieldLayoutsOwned> + ?Sized,
     P: SliceItemPtrs<Item = T::Item>,
-    for<'a> FieldLayoutsIter<'a, D>: FieldLayoutsOwned,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = &self.into_iter();
@@ -554,8 +553,7 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedRef<'a, P::Const>;
-    type IntoIter =
-        ErasedSoaRefsIter<'a, FieldLayoutsIter<'a, D>, P::Const, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaRefsIter<'a, D::OutputIter, P::Const, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -570,8 +568,7 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedMutRef<'a, P::Mut>;
-    type IntoIter =
-        ErasedSoaMutRefsIter<'a, FieldLayoutsIter<'a, D>, P::Mut, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, D::OutputIter, P::Mut, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -599,6 +596,8 @@ where
     D: FieldLayouts<'a> + ?Sized,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -761,6 +760,8 @@ where
     D: FieldLayouts<'a> + ?Sized,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

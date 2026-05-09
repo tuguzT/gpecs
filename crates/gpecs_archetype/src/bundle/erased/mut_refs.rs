@@ -15,9 +15,7 @@ use gpecs_soa_erased::{
     ErasedSoaMutRefsIter,
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::{
-        field::{
-            FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned,
-        },
+        field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaContext,
     },
 };
@@ -111,14 +109,13 @@ where
 
 impl<'a, D, P> ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedBundleRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout>
-    {
+    ) -> ErasedBundleRefsIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsFromLayout> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -128,7 +125,7 @@ where
     #[inline]
     pub fn iter_mut(
         &'a mut self,
-    ) -> ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout> {
+    ) -> ErasedBundleMutRefsIter<'a, D::OutputIter, P, BufferOffsetsFromLayout> {
         let Self { inner } = self;
 
         let inner = inner.iter_mut();
@@ -201,12 +198,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentRef<'a, CastConst<P>>;
-    type IntoIter =
-        ErasedBundleRefsIter<'a, FieldLayoutsIter<'a, D>, CastConst<P>, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleRefsIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -216,12 +212,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a mut ErasedBundleMutRefs<'_, D, P>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
 {
     type Item = ErasedComponentMutRef<'a, P>;
-    type IntoIter =
-        ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, D::OutputIter, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -264,6 +259,8 @@ where
     P: MutSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -341,12 +338,12 @@ where
 
 impl<'a, D, P, F> ErasedBundleMutRefsIter<'_, D, P, F>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, F> {
+    pub fn iter(&'a self) -> ErasedBundleMutRefsIter<'a, D::OutputIter, P, F> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -356,12 +353,12 @@ where
 
 impl<'a, D, P, F> IntoIterator for &'a ErasedBundleMutRefsIter<'_, D, P, F>
 where
-    D: FieldLayouts<'a, Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr,
-    F: BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
+    F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedComponentMutRef<'a, P>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, FieldLayoutsIter<'a, D>, P, F>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, D::OutputIter, P, F>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -371,7 +368,7 @@ where
 
 impl<D, P, F> Debug for ErasedBundleMutRefsIter<'_, D, P, F>
 where
-    D: FieldLayoutsOwned<Output: IntoErasedArchetypeIterator> + ?Sized,
+    D: FieldLayoutsOwned<OutputIter: ErasedArchetypeIterator> + ?Sized,
     P: MutSliceItemPtr<Item: Debug>,
     F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
@@ -433,6 +430,8 @@ where
     P: MutSliceItemPtr,
 {
     type Output = D::Output;
+    type OutputIter = D::OutputIter;
+    type OutputItem = D::OutputItem;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

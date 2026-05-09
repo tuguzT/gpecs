@@ -1,4 +1,7 @@
-use core::{alloc::Layout, iter};
+use core::{
+    alloc::Layout,
+    iter::{self, Chain, Once},
+};
 
 use crate::soa::{
     field::{FieldLayouts, IntoFieldLayouts, IntoFieldLayoutsIter},
@@ -39,7 +42,7 @@ where
     T: IntoIterator<Item: WithLayout>,
 {
     type Item = Layout;
-    type IntoIter = iter::Chain<iter::Once<Layout>, IntoFieldLayouts<T::IntoIter>>;
+    type IntoIter = Chain<Once<Layout>, IntoFieldLayouts<T::IntoIter>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -1,5 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
+    array,
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
@@ -337,6 +338,8 @@ macro_rules! soa_tuple_impl {
 
         impl<'a, $($types,)*> FieldLayouts<'a, ($($types,)*)> for () {
             type Output = [Layout; count_idents!($($types,)*)];
+            type OutputIter = array::IntoIter<Layout, { count_idents!($($types,)*) }>;
+            type OutputItem = Layout;
 
             #[inline]
             fn field_layouts(&'a self) -> Self::Output {

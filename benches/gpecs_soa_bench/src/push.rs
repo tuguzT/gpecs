@@ -1,4 +1,4 @@
-use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
+use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref, slice};
 
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
@@ -290,6 +290,8 @@ where
     T: WithLayout + 'a,
 {
     type Output = &'a [T];
+    type OutputIter = slice::Iter<'a, T>;
+    type OutputItem = &'a T;
 
     fn field_layouts(&'a self) -> Self::Output {
         self

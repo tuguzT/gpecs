@@ -20,6 +20,7 @@ macro_rules! partial_eq_impl {
     }
 }
 
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub(crate) use partial_eq_impl;
 
 partial_eq_impl! { [] SoaSlices<'_, '_, T>, Self }

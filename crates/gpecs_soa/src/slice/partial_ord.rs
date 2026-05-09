@@ -22,6 +22,7 @@ macro_rules! partial_ord_impl {
     }
 }
 
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub(crate) use partial_ord_impl;
 
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, Self }

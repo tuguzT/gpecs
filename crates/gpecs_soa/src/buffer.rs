@@ -109,6 +109,7 @@ where
 }
 
 #[inline]
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
     T: AllocSoa + ?Sized,

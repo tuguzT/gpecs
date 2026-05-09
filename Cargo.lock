@@ -861,6 +861,7 @@ dependencies = [
 name = "gpecs_world"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "gpecs_num",
 ]
 

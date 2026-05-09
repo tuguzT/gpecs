@@ -3,9 +3,9 @@ use core::{
     fmt::{self, Debug, Display},
 };
 
-use bytemuck::Contiguous;
+use bytemuck::{Contiguous, Pod, Zeroable};
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct U16InU32(u32);
 

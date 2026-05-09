@@ -3,9 +3,10 @@ use core::{
     fmt::{self, Display},
 };
 
+use bytemuck::{NoUninit, Zeroable};
 use gpecs_num::u16::{U16FromU32Error, U16InU32};
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, NoUninit, Zeroable)]
 #[repr(transparent)]
 pub struct WorldId(U16InU32);
 

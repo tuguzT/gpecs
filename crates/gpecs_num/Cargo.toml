@@ -8,7 +8,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bytemuck = { workspace = true }
+bytemuck = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

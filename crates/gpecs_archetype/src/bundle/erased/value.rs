@@ -15,7 +15,8 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoa, ErasedSoaIntoFields,
+    BufferOffsetsFrom, BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoa,
+    ErasedSoaIntoFields,
     error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
     soa::{
@@ -454,7 +455,7 @@ where
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<S, P>, S::Error>;
-    type IntoIter = ErasedBundleIntoIterKind<S, T, S, P>;
+    type IntoIter = ErasedBundleIntoIterKind<S, T, S, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -495,25 +496,26 @@ where
     }
 }
 
-pub type ErasedBorrowedViewBundleIntoIter<'a, S, Meta, F, P> =
-    ErasedBundleIntoIterKind<S, ErasedArchetypeView<'a, Meta>, F, P>;
+pub type ErasedBorrowedViewBundleIntoIter<'a, S, Meta, I, P, F> =
+    ErasedBundleIntoIterKind<S, ErasedArchetypeView<'a, Meta>, I, P, F>;
 
-pub struct ErasedBundleIntoIterKind<S, T, F, P>
+pub struct ErasedBundleIntoIterKind<S, T, I, P, F>
 where
     T: ErasedArchetypeKind + IntoIterator,
 {
-    inner: ErasedSoaIntoFields<S, T::IntoIter, F, P>,
+    inner: ErasedSoaIntoFields<S, T::IntoIter, I, P, F>,
 }
 
-impl<S, T, F, P> Iterator for ErasedBundleIntoIterKind<S, T, F, P>
+impl<S, T, I, P, F> Iterator for ErasedBundleIntoIterKind<S, T, I, P, F>
 where
     S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
-    F: AlignedStorageFromLayout<Item = S::Item>,
+    I: AlignedStorageFromLayout<Item = S::Item>,
     P: SliceItemPtrs<Item = S::Item>,
+    F: BufferOffsetsFrom<T::Item>,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
-    type Item = Result<ErasedComponent<F, P>, F::Error>;
+    type Item = Result<ErasedComponent<I, P>, I::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -549,12 +551,13 @@ where
     }
 }
 
-impl<S, T, F, P> ExactSizeIterator for ErasedBundleIntoIterKind<S, T, F, P>
+impl<S, T, I, P, F> ExactSizeIterator for ErasedBundleIntoIterKind<S, T, I, P, F>
 where
     S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
-    F: AlignedStorageFromLayout<Item = S::Item>,
+    I: AlignedStorageFromLayout<Item = S::Item>,
     P: SliceItemPtrs<Item = S::Item>,
+    F: BufferOffsetsFrom<T::Item>,
     T::IntoIter: ExactSizeIterator,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
@@ -565,12 +568,13 @@ where
     }
 }
 
-impl<S, T, F, P> FusedIterator for ErasedBundleIntoIterKind<S, T, F, P>
+impl<S, T, I, P, F> FusedIterator for ErasedBundleIntoIterKind<S, T, I, P, F>
 where
     S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
-    F: AlignedStorageFromLayout<Item = S::Item>,
+    I: AlignedStorageFromLayout<Item = S::Item>,
     P: SliceItemPtrs<Item = S::Item>,
+    F: BufferOffsetsFrom<T::Item>,
     T::IntoIter: FusedIterator,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {

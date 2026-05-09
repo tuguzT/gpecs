@@ -11,8 +11,8 @@ use core::{
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutRefs, ErasedSoaMutRefsIter, ErasedSoaPtrs,
-    ErasedSoaRefs, ErasedSoaRefsIter,
+    BufferOffsetsFrom, CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutRefs,
+    ErasedSoaMutRefsIter, ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsIter,
     assert::check_downcast,
     data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError, try_clone_from_slice},
     error::{
@@ -27,8 +27,8 @@ use crate::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            BufferLayout, BufferOffset, BufferOffsets, FieldLayouts, FieldLayoutsItem,
-            FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
+            BufferLayout, BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
+            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         traits::{
             AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
@@ -499,13 +499,16 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
-    pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, P>
+    pub fn into_fields<F>(
+        self,
+    ) -> ErasedSoaIntoFields<T, D::IntoIter, F, P, BufferOffsetsFromLayout>
     where
         F: AlignedStorageFromLayout<Item = T::Item>,
     {
         let (storage, layouts) = self.into_parts();
-        let offsets = buffer_offsets(layouts, 1);
-        ErasedSoaIntoFields::new(storage, offsets)
+        let offsets = BufferOffsetsFromLayout::default();
+        let layouts = layouts.into_iter();
+        ErasedSoaIntoFields::new(storage, offsets, layouts)
     }
 }
 
@@ -583,7 +586,7 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = Result<Erased<T, P>, FromLayoutDataError<T::Error>>;
-    type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P>;
+    type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P, BufferOffsetsFromLayout>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -616,86 +619,100 @@ where
     }
 }
 
-pub struct ErasedSoaIntoFields<T, I, F, P>
+pub struct ErasedSoaIntoFields<T, D, I, P, F>
 where
-    I: ?Sized,
+    D: ?Sized,
 {
-    phantom: PhantomData<fn() -> (F, P)>,
+    phantom: PhantomData<fn() -> (I, P)>,
     storage: T,
-    offsets: BufferOffsets<I>,
+    offsets: F,
+    layouts: D,
 }
 
-impl<T, I, F, P> ErasedSoaIntoFields<T, I, F, P> {
-    fn new(storage: T, offsets: BufferOffsets<I>) -> Self {
+impl<T, D, I, P, F> ErasedSoaIntoFields<T, D, I, P, F> {
+    fn new(storage: T, offsets: F, layouts: D) -> Self {
         Self {
             phantom: PhantomData,
             storage,
             offsets,
+            layouts,
         }
     }
 }
 
-impl<T, I, F, P> ErasedSoaIntoFields<T, I, F, P>
+impl<T, D, I, P, F> ErasedSoaIntoFields<T, D, I, P, F>
 where
-    I: ?Sized,
+    D: ?Sized,
 {
     #[inline]
-    pub fn layouts(&self) -> &I {
-        let Self { offsets, .. } = self;
-        offsets.as_inner()
+    pub fn layouts(&self) -> &D {
+        let Self { layouts, .. } = self;
+        layouts
     }
 }
 
-impl<T, I, F, P> Debug for ErasedSoaIntoFields<T, I, F, P>
+impl<T, D, I, P, F> Debug for ErasedSoaIntoFields<T, D, I, P, F>
 where
     T: Debug,
-    I: Debug + ?Sized,
+    F: Debug,
+    D: Debug + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            storage, offsets, ..
+            storage,
+            layouts,
+            offsets,
+            ..
         } = self;
 
         f.debug_struct("ErasedSoaIntoFields")
             .field("storage", storage)
-            .field("offsets", &offsets)
+            .field("layouts", &layouts)
+            .field("offsets", offsets)
             .finish()
     }
 }
 
-impl<T, I, F, P> Clone for ErasedSoaIntoFields<T, I, F, P>
+impl<T, D, I, P, F> Clone for ErasedSoaIntoFields<T, D, I, P, F>
 where
     T: Clone,
-    I: Clone,
+    D: Clone,
+    F: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
         let Self {
-            storage, offsets, ..
+            storage,
+            offsets,
+            layouts,
+            ..
         } = self;
 
-        Self::new(storage.clone(), offsets.clone())
+        Self::new(storage.clone(), offsets.clone(), layouts.clone())
     }
 }
 
-impl<T, I, F, P> Iterator for ErasedSoaIntoFields<T, I, F, P>
+impl<T, D, I, P, F> Iterator for ErasedSoaIntoFields<T, D, I, P, F>
 where
     T: AlignedStorage<Item: Clone>,
-    I: Iterator<Item: WithLayout> + ?Sized,
-    F: AlignedStorageFromLayout<Item = T::Item>,
+    D: Iterator<Item: WithLayout> + ?Sized,
+    I: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = T::Item>,
+    F: BufferOffsetsFrom<D::Item>,
 {
-    type Item = Result<Erased<F, P>, FromLayoutDataError<F::Error>>;
+    type Item = Result<Erased<I, P>, FromLayoutDataError<I::Error>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
             ref storage,
             ref mut offsets,
+            ref mut layouts,
             ..
         } = *self;
 
-        let BufferOffset { desc, offset } = unsafe { offsets.next()?.unwrap_unchecked() };
+        let desc = layouts.next()?;
+        let BufferOffset { desc, offset } = unsafe { offsets.next(1, desc) };
         let layout = desc.layout();
 
         let offset = bytes_to_items::<T::Item>(offset);
@@ -706,36 +723,44 @@ where
         let item = Erased::try_from_layout_data(layout, data);
         Some(item)
     }
-}
 
-impl<T, I, F, P> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, P>
-where
-    T: AlignedStorage<Item: Clone>,
-    I: ExactSizeIterator<Item: WithLayout> + ?Sized,
-    F: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = T::Item>,
-{
     #[inline]
-    fn len(&self) -> usize {
-        let Self { offsets, .. } = self;
-        offsets.len()
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { layouts, .. } = self;
+        layouts.size_hint()
     }
 }
 
-impl<T, I, F, P> FusedIterator for ErasedSoaIntoFields<T, I, F, P>
+impl<T, D, I, P, F> ExactSizeIterator for ErasedSoaIntoFields<T, D, I, P, F>
 where
     T: AlignedStorage<Item: Clone>,
-    I: FusedIterator<Item: WithLayout> + ?Sized,
-    F: AlignedStorageFromLayout<Item = T::Item>,
+    D: ExactSizeIterator<Item: WithLayout> + ?Sized,
+    I: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = T::Item>,
+    F: BufferOffsetsFrom<D::Item>,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { layouts, .. } = self;
+        layouts.len()
+    }
+}
+
+impl<T, D, I, P, F> FusedIterator for ErasedSoaIntoFields<T, D, I, P, F>
+where
+    T: AlignedStorage<Item: Clone>,
+    D: FusedIterator<Item: WithLayout> + ?Sized,
+    I: AlignedStorageFromLayout<Item = T::Item>,
+    P: SliceItemPtrs<Item = T::Item>,
+    F: BufferOffsetsFrom<D::Item>,
 {
 }
 
-impl<'a, T, I, F, P> FieldLayouts<'a> for ErasedSoaIntoFields<T, I, F, P>
+impl<'a, T, D, I, P, F> FieldLayouts<'a> for ErasedSoaIntoFields<T, D, I, P, F>
 where
-    I: FieldLayouts<'a> + ?Sized,
+    D: FieldLayouts<'a> + ?Sized,
 {
-    type Output = I::Output;
+    type Output = D::Output;
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -743,15 +768,15 @@ where
     }
 }
 
-impl<T, I, F, P> CovariantFieldLayouts for ErasedSoaIntoFields<T, I, F, P>
+impl<T, D, I, P, F> CovariantFieldLayouts for ErasedSoaIntoFields<T, D, I, P, F>
 where
-    I: CovariantFieldLayouts + ?Sized,
+    D: CovariantFieldLayouts + ?Sized,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
         from: FieldLayoutsOutput<'long, Self>,
     ) -> FieldLayoutsOutput<'short, Self> {
-        I::upcast_field_layouts(from)
+        D::upcast_field_layouts(from)
     }
 }
 

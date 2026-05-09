@@ -14,10 +14,10 @@ pub type ErasedBundle<Meta, D, S, P> = ErasedBundleKind<ErasedArchetype<Meta>, D
 pub type ErasedBorrowedBundle<'a, Meta, D, S, P> =
     ErasedBundleKind<&'a ErasedArchetype<Meta>, D, S, P>;
 
-pub type ErasedBundleIntoIter<S, Meta, F, P> =
-    ErasedBundleIntoIterKind<S, ErasedArchetype<Meta>, F, P>;
-pub type ErasedBorrowedBundleIntoIter<'a, S, Meta, F, P> =
-    ErasedBundleIntoIterKind<S, &'a ErasedArchetype<Meta>, F, P>;
+pub type ErasedBundleIntoIter<S, Meta, I, P, F> =
+    ErasedBundleIntoIterKind<S, ErasedArchetype<Meta>, I, P, F>;
+pub type ErasedBorrowedBundleIntoIter<'a, S, Meta, I, P, F> =
+    ErasedBundleIntoIterKind<S, &'a ErasedArchetype<Meta>, I, P, F>;
 
 impl<'a, Meta, D, S, P> From<ErasedBorrowedBundle<'a, Meta, D, S, P>>
     for ErasedBorrowedViewBundle<'a, Meta, D, S, P>

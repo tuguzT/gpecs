@@ -107,7 +107,9 @@ fn register_update_position_system(
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|(archetype, bundles)| {
+        let mut statistics = Vec::with_capacity(bundles.len());
+
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             bundles.into_iter().for_each(|(_, (position, velocity))| {
@@ -115,8 +117,14 @@ fn register_update_position_system(
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `update_position` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        map.collect_into_vec(&mut statistics);
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `update_position` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }
@@ -132,7 +140,9 @@ fn register_update_data_system(
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|(archetype, bundles)| {
+        let mut statistics = Vec::with_capacity(bundles.len());
+
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             bundles.into_iter().for_each(|(_, (data,))| {
@@ -140,8 +150,14 @@ fn register_update_data_system(
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `update_data` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        map.collect_into_vec(&mut statistics);
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `update_data` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }
@@ -152,7 +168,9 @@ fn register_update_components_system(executor: &mut CpuExecutor) -> SystemId {
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|(archetype, bundles)| {
+        let mut statistics = Vec::with_capacity(bundles.len());
+
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             let bundles = bundles.into_iter();
@@ -161,8 +179,14 @@ fn register_update_components_system(executor: &mut CpuExecutor) -> SystemId {
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `update_components` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        map.collect_into_vec(&mut statistics);
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `update_components` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }
@@ -173,7 +197,9 @@ fn register_update_health_system(executor: &mut CpuExecutor) -> SystemId {
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|(archetype, bundles)| {
+        let mut statistics = Vec::with_capacity(bundles.len());
+
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             bundles.into_iter().for_each(|(_, (health,))| {
@@ -181,8 +207,14 @@ fn register_update_health_system(executor: &mut CpuExecutor) -> SystemId {
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `update_health` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        map.collect_into_vec(&mut statistics);
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `update_health` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }
@@ -193,7 +225,9 @@ fn register_update_damage_system(executor: &mut CpuExecutor) -> SystemId {
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|(archetype, bundles)| {
+        let mut statistics = Vec::with_capacity(bundles.len());
+
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             bundles.into_iter().for_each(|(_, (health, damage))| {
@@ -201,8 +235,14 @@ fn register_update_damage_system(executor: &mut CpuExecutor) -> SystemId {
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `update_damage` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        map.collect_into_vec(&mut statistics);
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `update_damage` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }
@@ -213,7 +253,9 @@ fn register_update_sprite_system(executor: &mut CpuExecutor) -> SystemId {
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|(archetype, bundles)| {
+        let mut statistics = Vec::with_capacity(bundles.len());
+
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             let bundles = bundles.into_iter();
@@ -222,8 +264,14 @@ fn register_update_sprite_system(executor: &mut CpuExecutor) -> SystemId {
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `update_sprite` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        map.collect_into_vec(&mut statistics);
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `update_sprite` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }
@@ -239,7 +287,7 @@ where
         let framebuffer = &mut *framebuffer.borrow_mut();
 
         let bundles = bundles.filter(|(_, bundles)| !bundles.is_empty());
-        bundles.for_each(|(archetype, bundles)| {
+        let map = bundles.map(|(archetype, bundles)| {
             let timestamp = Instant::now();
 
             bundles.into_iter().for_each(|(_, (position, sprite))| {
@@ -247,8 +295,14 @@ where
             });
 
             let elapsed = timestamp.elapsed();
-            log::info!(">>>> {system} `render_sprite` with {archetype} took {elapsed:?}");
+            (archetype, elapsed)
         });
+        let mut statistics = map.collect_vec();
+        statistics.sort();
+
+        for (archetype, elapsed) in statistics {
+            log::info!(">>>> {system} `render_sprite` with {archetype} took {elapsed:?}");
+        }
     };
     executor.register_system(system)
 }

@@ -30,7 +30,17 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 }
 
 fn register_cpu_systems(executor: &mut CpuExecutor) {
-    let update_positions = |system: SystemId, positions: BundlesMut<(Position,)>| {
+    let update_positions_system = register_update_positions_system(executor);
+    let update_masses_system = register_update_masses_system(executor);
+    let _check_tags_system = register_check_tags_system(executor);
+
+    executor.add_system(update_positions_system);
+    // executor.add_system(check_tags_system);
+    executor.add_system(update_masses_system);
+}
+
+fn register_update_positions_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, positions: BundlesMut<(Position,)>| {
         // log::info!("Hello from the CPU system working with positions!");
 
         let positions = positions
@@ -59,9 +69,11 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             log::info!("CPU {system} `update_positions` with {archetype} took {duration:?}");
         });
     };
-    let update_positions_system = executor.register_system(update_positions);
+    executor.register_system(system)
+}
 
-    let update_masses = |system: SystemId, context: &mut Context| {
+fn register_update_masses_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, context: &mut Context| {
         // log::info!("Hello from the CPU system working with masses!");
 
         let masses = context
@@ -86,9 +98,11 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             log::info!("CPU {system} `update_masses` with {archetype} took {duration:?}");
         });
     };
-    let update_masses_system = executor.register_system(update_masses);
+    executor.register_system(system)
+}
 
-    let check_tags = |system: SystemId, tags: Bundles<(Tag,)>| {
+fn register_check_tags_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, tags: Bundles<(Tag,)>| {
         // log::info!("Hello from the CPU system working with tags!");
 
         let tags = tags
@@ -110,9 +124,5 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             log::info!("CPU {system} `check_tags` with {archetype} took {duration:?}");
         });
     };
-    let _check_tags_system = executor.register_system(check_tags);
-
-    executor.add_system(update_positions_system);
-    // executor.add_system(check_tags_system);
-    executor.add_system(update_masses_system);
+    executor.register_system(system)
 }

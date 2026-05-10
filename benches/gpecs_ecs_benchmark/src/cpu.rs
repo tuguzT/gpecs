@@ -67,7 +67,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     executor.into_context()
 }
 
-#[expect(clippy::too_many_lines)]
 fn register_cpu_systems<B>(
     executor: &mut CpuExecutor,
     time_delta: Rc<RefCell<TimeDelta>>,
@@ -75,9 +74,34 @@ fn register_cpu_systems<B>(
 ) where
     B: AsMut<[u32]> + 'static,
 {
-    let time_delta_clone = Rc::clone(&time_delta);
-    let update_position = move |system: SystemId, bundles: BundlesMut<(Position, Velocity)>| {
-        let time_delta = *time_delta_clone.borrow();
+    let system = register_update_position_system(executor, time_delta.clone());
+    executor.add_system(system);
+
+    let system = register_update_data_system(executor, time_delta);
+    executor.add_system(system);
+
+    let system = register_update_components_system(executor);
+    executor.add_system(system);
+
+    let system = register_update_health_system(executor);
+    executor.add_system(system);
+
+    let system = register_update_damage_system(executor);
+    executor.add_system(system);
+
+    let system = register_update_sprite_system(executor);
+    executor.add_system(system);
+
+    let system = register_render_sprite_system(executor, framebuffer);
+    executor.add_system(system);
+}
+
+fn register_update_position_system(
+    executor: &mut CpuExecutor,
+    time_delta: Rc<RefCell<TimeDelta>>,
+) -> SystemId {
+    let system = move |system: SystemId, bundles: BundlesMut<(Position, Velocity)>| {
+        let time_delta = *time_delta.borrow();
 
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
@@ -94,10 +118,14 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `update_position` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(update_position);
-    executor.add_system(system);
+    executor.register_system(system)
+}
 
-    let update_data = move |system: SystemId, bundles: BundlesMut<(Data,)>| {
+fn register_update_data_system(
+    executor: &mut CpuExecutor,
+    time_delta: Rc<RefCell<TimeDelta>>,
+) -> SystemId {
+    let system = move |system: SystemId, bundles: BundlesMut<(Data,)>| {
         let time_delta = *time_delta.borrow();
 
         let bundles = bundles
@@ -115,10 +143,11 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `update_data` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(update_data);
-    executor.add_system(system);
+    executor.register_system(system)
+}
 
-    let update_components = |system: SystemId, bundles: BundlesMut<(Position, Velocity, Data)>| {
+fn register_update_components_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, bundles: BundlesMut<(Position, Velocity, Data)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -135,10 +164,11 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `update_components` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(update_components);
-    executor.add_system(system);
+    executor.register_system(system)
+}
 
-    let update_health = |system: SystemId, bundles: BundlesMut<(Health,)>| {
+fn register_update_health_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, bundles: BundlesMut<(Health,)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -154,10 +184,11 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `update_health` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(update_health);
-    executor.add_system(system);
+    executor.register_system(system)
+}
 
-    let update_damage = |system: SystemId, bundles: BundlesMut<(Health, Damage)>| {
+fn register_update_damage_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, bundles: BundlesMut<(Health, Damage)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -173,10 +204,11 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `update_damage` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(update_damage);
-    executor.add_system(system);
+    executor.register_system(system)
+}
 
-    let update_sprite = |system: SystemId, bundles: BundlesMut<(Sprite, Player, Health)>| {
+fn register_update_sprite_system(executor: &mut CpuExecutor) -> SystemId {
+    let system = |system: SystemId, bundles: BundlesMut<(Sprite, Player, Health)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -193,10 +225,17 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `update_sprite` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(update_sprite);
-    executor.add_system(system);
+    executor.register_system(system)
+}
 
-    let render_sprite = move |system: SystemId, bundles: BundlesMut<(Position, Sprite)>| {
+fn register_render_sprite_system<B>(
+    executor: &mut CpuExecutor,
+    framebuffer: Rc<RefCell<Framebuffer<B>>>,
+) -> SystemId
+where
+    B: AsMut<[u32]> + 'static,
+{
+    let system = move |system: SystemId, bundles: BundlesMut<(Position, Sprite)>| {
         let framebuffer = &mut *framebuffer.borrow_mut();
 
         let bundles = bundles.filter(|(_, bundles)| !bundles.is_empty());
@@ -211,6 +250,5 @@ fn register_cpu_systems<B>(
             log::info!(">>>> {system} `render_sprite` with {archetype} took {elapsed:?}");
         });
     };
-    let system = executor.register_system(render_sprite);
-    executor.add_system(system);
+    executor.register_system(system)
 }

@@ -122,15 +122,15 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         // Check data inside of the timestamp query download buffer
         if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
             let statistics = statistics.expect("timestamp query statistics should be ready");
-            for (system_id, system_statistics) in &statistics {
-                let Some(system_shader) = executor.systems().get_system_shader(system_id) else {
-                    unreachable!("{system_id} should exist")
+            for (system, statistics) in &statistics {
+                let Some(system_shader) = executor.systems().get_system_shader(system) else {
+                    unreachable!("{system} should exist")
                 };
 
                 let label = system_shader.label().expect("GPU system should be labeled");
-                for (archetype_id, statistics) in system_statistics {
+                for (archetype, statistics) in statistics {
                     let duration = statistics.duration;
-                    log::info!("GPU system `{label}` with {archetype_id} took {duration:?}");
+                    log::info!("GPU {system} `{label}` with {archetype} took {duration:?}");
                 }
             }
         }

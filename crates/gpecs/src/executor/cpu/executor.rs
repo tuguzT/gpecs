@@ -74,7 +74,7 @@ impl<'ctx> CpuExecutor<'ctx> {
             let Some(system) = systems.get_mut_system(system_id) else {
                 unreachable!("{system_id} should be present");
             };
-            system.run(context);
+            system.run(system_id, context);
         });
     }
 }

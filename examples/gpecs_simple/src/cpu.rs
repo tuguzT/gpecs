@@ -30,14 +30,14 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 }
 
 fn register_cpu_systems(executor: &mut CpuExecutor) {
-    let update_positions_system = executor.register_system(|positions: BundlesMut<(Position,)>| {
+    let update_positions = |system: SystemId, positions: BundlesMut<(Position,)>| {
         // log::info!("Hello from the CPU system working with positions!");
 
         let positions = positions
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        positions.for_each(|(archetype_id, positions)| {
+        positions.for_each(|(archetype, positions)| {
             let start = Instant::now();
 
             positions.into_iter().for_each(|(entity, (position,))| {
@@ -56,11 +56,12 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             });
 
             let duration = start.elapsed();
-            log::info!("CPU system `update_positions` with {archetype_id} took {duration:?}");
+            log::info!("CPU {system} `update_positions` with {archetype} took {duration:?}");
         });
-    });
+    };
+    let update_positions_system = executor.register_system(update_positions);
 
-    let update_masses_system = executor.register_system(|context: &mut Context| {
+    let update_masses = |system: SystemId, context: &mut Context| {
         // log::info!("Hello from the CPU system working with masses!");
 
         let masses = context
@@ -69,7 +70,7 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        masses.for_each(|(archetype_id, masses)| {
+        masses.for_each(|(archetype, masses)| {
             let start = Instant::now();
 
             masses.into_iter().for_each(|(entity, (mass,))| {
@@ -82,18 +83,19 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             });
 
             let duration = start.elapsed();
-            log::info!("CPU system `update_masses` with {archetype_id} took {duration:?}");
+            log::info!("CPU {system} `update_masses` with {archetype} took {duration:?}");
         });
-    });
+    };
+    let update_masses_system = executor.register_system(update_masses);
 
-    let _check_tags_system = executor.register_system(|tags: Bundles<(Tag,)>| {
+    let check_tags = |system: SystemId, tags: Bundles<(Tag,)>| {
         // log::info!("Hello from the CPU system working with tags!");
 
         let tags = tags
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        tags.for_each(|(archetype_id, tags)| {
+        tags.for_each(|(archetype, tags)| {
             let start = Instant::now();
 
             tags.into_iter().for_each(|(entity, (tag,))| {
@@ -105,9 +107,10 @@ fn register_cpu_systems(executor: &mut CpuExecutor) {
             });
 
             let duration = start.elapsed();
-            log::info!("CPU system `check_tags` with {archetype_id} took {duration:?}");
+            log::info!("CPU {system} `check_tags` with {archetype} took {duration:?}");
         });
-    });
+    };
+    let _check_tags_system = executor.register_system(check_tags);
 
     executor.add_system(update_positions_system);
     // executor.add_system(check_tags_system);

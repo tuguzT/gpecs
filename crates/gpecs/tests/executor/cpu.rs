@@ -8,7 +8,9 @@ fn execute_simple() {
     let mut context = Context::new();
     let mut executor = CpuExecutor::new(&mut context);
 
-    let hello_system = executor.register_system(|| println!("Hello from the hello system!"));
+    let hello_system = executor.register_system(|system_id: SystemId| {
+        println!("Hello from the hello {system_id}!");
+    });
     let panic_system = executor.register_system(|| unreachable!("Hello from the panic system!"));
     let create_positions_system = executor.register_system(create_positions);
     let update_positions_system = executor.register_system(update_positions);

@@ -15,7 +15,7 @@ use crate::{
         check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     layout::{WithLayout, bytes_to_items},
-    offsets::{BufferOffsetsFrom, BufferOffsetsFromLayout},
+    offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::{
         field::{
@@ -237,9 +237,15 @@ where
         let origin_offset = origin.offset().cast_signed();
         offset.wrapping_sub(origin_offset)
     }
+}
 
+impl<'a, D, P> ErasedSoaPtrs<D, P>
+where
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+    P: ConstSliceItemPtr,
+{
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout> {
+    pub fn iter(&'a self) -> ErasedSoaPtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>> {
         let Self {
             ref layouts,
             buffer,
@@ -248,15 +254,16 @@ where
         } = *self;
 
         let layouts = layouts.field_layouts().into_iter();
-        let offsets = BufferOffsetsFromLayout::default();
+        let offsets = Default::default();
         unsafe { ErasedSoaPtrsIter::new_unchecked(buffer, capacity, offset, offsets, layouts) }
     }
 
     #[inline]
-    pub(super) unsafe fn nth_field_ptr<F>(&'a self, offsets: &mut F, i: usize) -> ErasedPtr<P>
-    where
-        F: BufferOffsetsFrom<D::OutputItem>,
-    {
+    pub(super) unsafe fn nth_field_ptr(
+        &'a self,
+        offsets: &mut BufferOffsetsOf<D::OutputItem>,
+        i: usize,
+    ) -> ErasedPtr<P> {
         let Self {
             ref layouts,
             buffer,
@@ -274,7 +281,7 @@ where
 
 impl<D, P> ErasedSoaPtrs<D, P>
 where
-    D: FieldLayoutsOwned + Clone,
+    D: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone,
     P: ConstSliceItemPtr<Item: Clone>,
 {
     #[inline]
@@ -340,11 +347,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedSoaPtrs<D, P>
 where
-    D: FieldLayouts<'a> + ?Sized,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedPtr<P>;
-    type IntoIter = ErasedSoaPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaPtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -354,11 +361,11 @@ where
 
 impl<D, P> IntoIterator for ErasedSoaPtrs<D, P>
 where
-    D: IntoIterator<Item: WithLayout>,
+    D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedPtr<P>;
-    type IntoIter = ErasedSoaPtrsIter<D::IntoIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaPtrsIter<D::IntoIter, P, BufferOffsetsOf<D::Item>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -370,7 +377,7 @@ where
         } = self;
 
         let layouts = layouts.into_iter();
-        let offsets = BufferOffsetsFromLayout::default();
+        let offsets = Default::default();
         unsafe { ErasedSoaPtrsIter::new_unchecked(buffer, capacity, offset, offsets, layouts) }
     }
 }

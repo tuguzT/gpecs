@@ -23,12 +23,12 @@ use crate::{
         check_len, check_sufficient_align,
     },
     layout::{WithLayout, bytes_to_items},
-    offsets::BufferOffsetsFromLayout,
+    offsets::{BufferOffsetsFromSelf, BufferOffsetsOf},
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            BufferLayout, BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput,
-            FieldLayoutsOwned, buffer_offsets,
+            BufferLayout, BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
+            FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         traits::{
             AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
@@ -267,18 +267,25 @@ where
         let refs = unsafe { ptrs.as_mut_unchecked() };
         (refs, layouts)
     }
+}
 
+impl<'a, T, D, P> ErasedSoa<T, D, P>
+where
+    T: AlignedStorage,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+    P: SliceItemPtrs<Item = T::Item>,
+{
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedSoaRefsIter<'a, D::OutputIter, P::Const, BufferOffsetsFromLayout> {
+    ) -> ErasedSoaRefsIter<'a, D::OutputIter, P::Const, BufferOffsetsOf<D::OutputItem>> {
         self.as_refs().into_iter()
     }
 
     #[inline]
     pub fn iter_mut(
         &'a mut self,
-    ) -> ErasedSoaMutRefsIter<'a, D::OutputIter, P::Mut, BufferOffsetsFromLayout> {
+    ) -> ErasedSoaMutRefsIter<'a, D::OutputIter, P::Mut, BufferOffsetsOf<D::OutputItem>> {
         self.as_mut_refs().into_iter()
     }
 }
@@ -495,18 +502,18 @@ where
 impl<T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage<Item: Clone>,
-    D: IntoIterator<Item: WithLayout>,
+    D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
     pub fn into_fields<F>(
         self,
-    ) -> ErasedSoaIntoFields<T, D::IntoIter, F, P, BufferOffsetsFromLayout>
+    ) -> ErasedSoaIntoFields<T, D::IntoIter, F, P, BufferOffsetsOf<D::Item>>
     where
         F: AlignedStorageFromLayout<Item = T::Item>,
     {
         let (storage, layouts) = self.into_parts();
-        let offsets = BufferOffsetsFromLayout::default();
+        let offsets = Default::default();
         let layouts = layouts.into_iter();
         ErasedSoaIntoFields::new(storage, offsets, layouts)
     }
@@ -515,11 +522,16 @@ where
 impl<T, D, P> Debug for ErasedSoa<T, D, P>
 where
     T: AlignedStorage<Item: Debug>,
-    D: FieldLayoutsOwned<OutputIter: FieldLayoutsOwned> + ?Sized,
+    D: FieldLayoutsOwned<
+            OutputIter: FieldLayoutsOwned,
+            OutputItem: for<'a, 'b> BufferOffsetsFromSelf<
+                BufferOffsets: BufferOffsetsFrom<FieldLayoutsItem<'a, FieldLayoutsIter<'b, D>>>,
+            >,
+        > + ?Sized,
     P: SliceItemPtrs<Item = T::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fields = &self.into_iter();
+        let fields = &self.iter();
         f.debug_struct("ErasedSoa").field("fields", fields).finish()
     }
 }
@@ -549,11 +561,11 @@ where
 impl<'a, T, D, P> IntoIterator for &'a ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
-    D: FieldLayouts<'a> + ?Sized,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedRef<'a, P::Const>;
-    type IntoIter = ErasedSoaRefsIter<'a, D::OutputIter, P::Const, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaRefsIter<'a, D::OutputIter, P::Const, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -564,11 +576,11 @@ where
 impl<'a, T, D, P> IntoIterator for &'a mut ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
-    D: FieldLayouts<'a> + ?Sized,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = ErasedMutRef<'a, P::Mut>;
-    type IntoIter = ErasedSoaMutRefsIter<'a, D::OutputIter, P::Mut, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, D::OutputIter, P::Mut, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -579,11 +591,11 @@ where
 impl<T, D, P> IntoIterator for ErasedSoa<T, D, P>
 where
     T: AlignedStorageFromLayout<Item: Clone>,
-    D: IntoIterator<Item: WithLayout>,
+    D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
     P: SliceItemPtrs<Item = T::Item>,
 {
     type Item = Result<Erased<T, P>, FromLayoutDataError<T::Error>>;
-    type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P, BufferOffsetsOf<D::Item>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -12,21 +12,23 @@ use gpecs_soa_erased::{
     ErasedSoa,
     error::{FromLayoutsValueError, FromLayoutsValueErrorKind, InsufficientAlignError},
     ptr::slice::SliceItemPtrs,
-    soa::layout::WithLayout,
     storage::AlignedStorageFromLayout,
 };
 
 use crate::{
     bundle::{
         Bundle,
-        erased::{ErasedBundle, traits::ErasedBundleDrop},
+        erased::{
+            ErasedBundle,
+            traits::{ErasedArchetypeMeta, ErasedBundleDrop},
+        },
     },
     erased::{ErasedArchetype, FromComponentDescriptor, error::DuplicateComponentError},
 };
 
 impl<Meta, D, S, P> ErasedBundle<Meta, D, S, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout,
     P: SliceItemPtrs<Item = S::Item>,

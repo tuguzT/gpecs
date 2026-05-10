@@ -4,6 +4,7 @@ use crate::{
     CovariantFieldLayouts, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
     ErasedSoaMutRefs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlices, ErasedSoaNonNullPtrs,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaSlicePtrs, ErasedSoaSlices,
+    offsets::BufferOffsetsFromSelf,
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput, FieldLayoutsOwned},
@@ -16,7 +17,8 @@ use crate::{
 
 unsafe impl<T, D, P> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone> + ?Sized,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>
+        + ?Sized,
     P: SliceItemPtrs,
 {
     type Ptrs<'a> = ErasedSoaPtrs<FieldLayoutsOutput<'a, D>, P::Const>;
@@ -216,7 +218,8 @@ where
 
 unsafe impl<T, D, P> RawSoa for ErasedSoa<T, D, P>
 where
-    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone> + ?Sized,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>
+        + ?Sized,
     P: SliceItemPtrs,
 {
     type Context = ErasedSoaContext<D, P>;
@@ -228,7 +231,7 @@ unsafe impl<'a, T, D, P>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
-    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone>,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>,
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
@@ -242,8 +245,8 @@ unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorage,
-    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone>,
-    N: FieldLayoutsOwned<Output: FieldLayoutsOwned>,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>,
+    N: FieldLayoutsOwned<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf>>,
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
@@ -282,7 +285,7 @@ where
 
 unsafe impl<T, D, P> AllocSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone>,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>,
     P: SliceItemPtrs,
 {
     #[inline]
@@ -298,7 +301,8 @@ where
 
 unsafe impl<'data, T, D, P> SoaContext<'data, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
-    D: CovariantFieldLayouts<Output: FieldLayoutsOwned + Clone> + ?Sized,
+    D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>
+        + ?Sized,
     P: SliceItemPtrs<Item: 'data>,
 {
     type Refs<'a> = ErasedSoaRefs<'data, FieldLayoutsOutput<'a, D>, P::Const>;

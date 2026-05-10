@@ -2,10 +2,7 @@ use core::ops::Deref;
 
 use gpecs_soa_erased::{
     ptr::slice::{ConstPtr, MutPtr, NonNullPtr, SliceItemPtrs},
-    soa::{
-        layout::WithLayout,
-        traits::{AllocSoa, SoaContext, SoaOwned},
-    },
+    soa::traits::{AllocSoa, SoaContext, SoaOwned},
     storage::AlignedStorage,
 };
 
@@ -13,8 +10,8 @@ use crate::{
     bundle::erased::{
         ErasedBorrowedViewBundle, ErasedBundleMutPtrs, ErasedBundleMutRefs,
         ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs, ErasedBundlePtrs,
-        ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices, traits::ErasedArchetypeKind,
-        traits::ErasedBundleDrop,
+        ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices,
+        traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::ErasedArchetypeView,
 };
@@ -36,7 +33,7 @@ pub trait ErasedArchetypeSoa:
         > + Deref<Target: ErasedArchetypeKind<Meta = Self::Meta>>,
     > + AllocSoa
 {
-    type Meta: WithLayout + 'static;
+    type Meta: ErasedArchetypeMeta;
     type Archetype<'a>: ErasedArchetypeKind<Meta = Self::Meta>;
     type DropKind: ErasedBundleDrop<Self::Meta>;
     type Ptrs: SliceItemPtrs;
@@ -44,7 +41,7 @@ pub trait ErasedArchetypeSoa:
 
 impl<'view, Meta, D, S, P> ErasedArchetypeSoa for ErasedBorrowedViewBundle<'view, Meta, D, S, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
     P: SliceItemPtrs<Item = S::Item>,

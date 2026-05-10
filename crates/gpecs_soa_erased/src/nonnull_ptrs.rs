@@ -10,7 +10,7 @@ use crate::{
     data::ErasedNonNullPtr,
     error::{DowncastError, InsufficientAlignError},
     layout::{WithLayout, bytes_to_items},
-    offsets::{BufferOffsetsFrom, BufferOffsetsFromLayout},
+    offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{
@@ -202,9 +202,17 @@ where
         let origin_offset = origin.offset().cast_signed();
         offset.wrapping_sub(origin_offset)
     }
+}
 
+impl<'a, D, P> ErasedSoaNonNullPtrs<D, P>
+where
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+    P: NonNullSliceItemPtr,
+{
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaNonNullPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedSoaNonNullPtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>> {
         let Self {
             ref layouts,
             buffer,
@@ -213,19 +221,16 @@ where
         } = *self;
 
         let layouts = layouts.field_layouts().into_iter();
-        let from = BufferOffsetsFromLayout::default();
+        let from = Default::default();
         unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 
     #[inline]
-    pub(super) unsafe fn nth_field_ptr<F>(
+    pub(super) unsafe fn nth_field_ptr(
         &'a self,
-        offsets: &mut F,
+        offsets: &mut BufferOffsetsOf<D::OutputItem>,
         i: usize,
-    ) -> ErasedNonNullPtr<P>
-    where
-        F: BufferOffsetsFrom<D::OutputItem>,
-    {
+    ) -> ErasedNonNullPtr<P> {
         let Self {
             ref layouts,
             buffer,
@@ -244,12 +249,12 @@ where
     #[track_caller]
     pub unsafe fn swap<'e, E>(&'a mut self, with: &'e mut ErasedSoaNonNullPtrs<E, P>)
     where
-        E: FieldLayouts<'e> + ?Sized,
+        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), with.field_layouts());
 
-        let this_offsets = &mut BufferOffsetsFromLayout::default();
-        let with_offsets = &mut BufferOffsetsFromLayout::default();
+        let this_offsets = &mut Default::default();
+        let with_offsets = &mut Default::default();
         for i in 0..n {
             let this = unsafe { self.nth_field_ptr(this_offsets, i) };
             let with = unsafe { with.nth_field_ptr(with_offsets, i) };
@@ -264,12 +269,12 @@ where
         src: &'e ErasedSoaNonNullPtrs<E, P>,
         count: usize,
     ) where
-        E: FieldLayouts<'e> + ?Sized,
+        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_offsets = &mut BufferOffsetsFromLayout::default();
-        let src_offsets = &mut BufferOffsetsFromLayout::default();
+        let dst_offsets = &mut Default::default();
+        let src_offsets = &mut Default::default();
         for i in 0..n {
             let dst = unsafe { self.nth_field_ptr(dst_offsets, i) };
             let src = unsafe { src.nth_field_ptr(src_offsets, i) };
@@ -284,20 +289,20 @@ where
         src: &'e ErasedSoaNonNullPtrs<E, P>,
         count: usize,
     ) where
-        E: FieldLayouts<'e> + ?Sized,
+        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         #[inline]
         fn rec<'dst, 'src, D, E, P>(
             dst_ptrs: &'dst ErasedSoaNonNullPtrs<D, P>,
-            dst_offsets: &mut BufferOffsetsFromLayout,
+            dst_offsets: &mut BufferOffsetsOf<D::OutputItem>,
             src_ptrs: &'src ErasedSoaNonNullPtrs<E, P>,
-            src_offsets: &mut BufferOffsetsFromLayout,
+            src_offsets: &mut BufferOffsetsOf<E::OutputItem>,
             i: usize,
             n: usize,
             count: usize,
         ) where
-            D: FieldLayouts<'dst> + ?Sized,
-            E: FieldLayouts<'src> + ?Sized,
+            D: FieldLayouts<'dst, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+            E: FieldLayouts<'src, OutputItem: BufferOffsetsFromSelf> + ?Sized,
             P: NonNullSliceItemPtr,
         {
             if i >= n {
@@ -315,8 +320,8 @@ where
 
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_offsets = &mut BufferOffsetsFromLayout::default();
-        let src_offsets = &mut BufferOffsetsFromLayout::default();
+        let dst_offsets = &mut Default::default();
+        let src_offsets = &mut Default::default();
         rec(self, dst_offsets, src, src_offsets, 0, n, count);
     }
 
@@ -327,12 +332,12 @@ where
         src: &'e ErasedSoaNonNullPtrs<E, P>,
         count: usize,
     ) where
-        E: FieldLayouts<'e> + ?Sized,
+        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
-        let dst_offsets = &mut BufferOffsetsFromLayout::default();
-        let src_offsets = &mut BufferOffsetsFromLayout::default();
+        let dst_offsets = &mut Default::default();
+        let src_offsets = &mut Default::default();
         for i in 0..n {
             let dst = unsafe { self.nth_field_ptr(dst_offsets, i) };
             let src = unsafe { src.nth_field_ptr(src_offsets, i) };
@@ -391,11 +396,11 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedSoaNonNullPtrs<D, P>
 where
-    D: FieldLayouts<'a> + ?Sized,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedNonNullPtr<P>;
-    type IntoIter = ErasedSoaNonNullPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -405,11 +410,11 @@ where
 
 impl<D, P> IntoIterator for ErasedSoaNonNullPtrs<D, P>
 where
-    D: IntoIterator<Item: WithLayout>,
+    D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedNonNullPtr<P>;
-    type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P, BufferOffsetsOf<D::Item>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -421,7 +426,7 @@ where
         } = self;
 
         let layouts = layouts.into_iter();
-        let from = BufferOffsetsFromLayout::default();
+        let from = Default::default();
         unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
     }
 }

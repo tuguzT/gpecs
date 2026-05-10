@@ -6,7 +6,6 @@ use gpecs_soa_erased::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
-        layout::WithLayout,
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
@@ -21,7 +20,7 @@ use crate::{
         ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
         ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
         ErasedBundleSlices,
-        traits::{ErasedArchetypeKind, ErasedBundleDrop},
+        traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::{ErasedArchetype, Iter},
 };
@@ -241,7 +240,7 @@ where
 
 unsafe impl<Meta, D, S, P> RawSoa for ErasedBundle<Meta, D, S, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -254,7 +253,7 @@ unsafe impl<'a, Meta, D, S, P>
     ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -269,7 +268,7 @@ unsafe impl<'a, Meta, D, S, P>
     ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + Clone + 'static,
+    Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
     P: SliceItemPtrs<Item = S::Item>,
@@ -285,7 +284,7 @@ unsafe impl<Meta, W, D, N, S, U, P>
     WriteSoaContext<ErasedBundleKind<W, N, U, P>, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + Clone + 'static,
+    Meta: ErasedArchetypeMeta + Clone,
     W: ErasedArchetypeKind,
     D: ErasedBundleDrop<Meta>,
     N: ErasedBundleDrop<W::Meta>,
@@ -302,7 +301,7 @@ where
 impl<'a, Meta, D, S, P> FieldLayouts<'a, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -320,7 +319,7 @@ where
 impl<Meta, D, S, P> CovariantFieldLayouts<ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -336,7 +335,7 @@ where
 unsafe impl<Meta, D, S, P> AllocSoaContext<ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -365,7 +364,7 @@ where
 unsafe impl<'data, Meta, D, S, P> SoaContext<'data, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'data>,
     P: SliceItemPtrs<Item = S::Item>,

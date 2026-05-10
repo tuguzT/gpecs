@@ -1,7 +1,7 @@
 use core::{alloc::Layout, iter::FusedIterator, num::NonZeroUsize};
 
 use gpecs_soa_erased::{
-    CovariantFieldLayouts,
+    BufferOffsetsFromLayout, BufferOffsetsFromSelf, CovariantFieldLayouts,
     layout::WithLayout,
     soa::field::{FieldLayouts, FieldLayoutsOutput},
 };
@@ -60,6 +60,11 @@ impl WithLayout for FfiLayout {
     fn layout(&self) -> Layout {
         Self::layout(*self)
     }
+}
+
+// TODO: add newtype which already has offsets & implement all the necessary traits
+unsafe impl BufferOffsetsFromSelf for FfiLayout {
+    type BufferOffsets = BufferOffsetsFromLayout;
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

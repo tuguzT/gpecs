@@ -1,11 +1,9 @@
-use gpecs_soa_erased::{
-    ErasedSoa, ptr::slice::SliceItemPtrs, soa::layout::WithLayout, storage::AlignedStorage,
-};
+use gpecs_soa_erased::{ErasedSoa, ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 
 use crate::{
     bundle::erased::{
         ErasedBorrowedViewBundle, ErasedBundleIntoIterKind, ErasedBundleKind,
-        traits::ErasedBundleDrop,
+        traits::{ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::ErasedArchetype,
 };
@@ -22,7 +20,7 @@ pub type ErasedBorrowedBundleIntoIter<'a, S, Meta, I, P, F> =
 impl<'a, Meta, D, S, P> From<ErasedBorrowedBundle<'a, Meta, D, S, P>>
     for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
 where
-    Meta: WithLayout + Clone + 'static,
+    Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -40,7 +38,7 @@ where
 impl<'a, Meta, D, S, P> From<ErasedBorrowedBundle<'a, Meta, D, S, P>>
     for ErasedBundle<Meta, D, S, P>
 where
-    Meta: WithLayout + Clone + 'static,
+    Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
@@ -58,7 +56,7 @@ where
 impl<'a, Meta, D, S, P> From<ErasedBorrowedViewBundle<'a, Meta, D, S, P>>
     for ErasedBundle<Meta, D, S, P>
 where
-    Meta: WithLayout + Clone + 'static,
+    Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,

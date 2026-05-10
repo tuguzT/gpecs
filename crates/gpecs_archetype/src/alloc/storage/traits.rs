@@ -1,16 +1,17 @@
-use gpecs_soa_erased::{
-    ptr::slice::SliceItemPtrs, soa::layout::WithLayout, storage::AlignedStorage,
-};
+use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
 
 use crate::{
-    bundle::erased::{ErasedBundle, traits::ErasedBundleDrop},
+    bundle::erased::{
+        ErasedBundle,
+        traits::{ErasedArchetypeMeta, ErasedBundleDrop},
+    },
     erased::ErasedArchetype,
     storage::ErasedArchetypeSoa,
 };
 
 impl<Meta, D, S, P> ErasedArchetypeSoa for ErasedBundle<Meta, D, S, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
     P: SliceItemPtrs<Item = S::Item>,

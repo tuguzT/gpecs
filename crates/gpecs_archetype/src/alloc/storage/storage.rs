@@ -30,7 +30,7 @@ use crate::{
         erased::{
             ErasedBundle, ErasedBundleKind,
             error::DowncastError,
-            traits::{ErasedArchetypeKind, ErasedBundleDrop},
+            traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
         },
     },
     erased::{
@@ -782,7 +782,7 @@ type SlicesMutWithArchetype<'a, T> = (
 
 impl<Meta, D, S, P> ArchetypeStorage<ErasedBundle<Meta, D, S, P>>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
     P: SliceItemPtrs<Item = S::Item>,

@@ -1,13 +1,13 @@
 use gpecs_sparse::soa::layout::WithLayout;
 
 use crate::{
-    bundle::erased::traits::{ErasedArchetypeIterator, ErasedArchetypeKind},
+    bundle::erased::traits::{ErasedArchetypeIterator, ErasedArchetypeKind, ErasedArchetypeMeta},
     erased::{ErasedArchetype, IntoIter},
 };
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetype<Meta>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
 {
     type Meta = Meta;
 }

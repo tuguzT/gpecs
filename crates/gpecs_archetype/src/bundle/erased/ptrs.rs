@@ -11,8 +11,8 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    BufferOffsetsFrom, BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoaPtrs,
-    ErasedSoaPtrsIter,
+    BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
+    ErasedSoaPtrs, ErasedSoaPtrsIter,
     error::FromFieldsLayoutsError,
     ptr::slice::{CastMut, ConstSliceItemPtr},
     soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
@@ -132,9 +132,18 @@ where
         let origin = unsafe { origin.as_inner() };
         unsafe { inner.offset_from(origin) }
     }
+}
 
+impl<'a, D, P> ErasedBundlePtrs<D, P>
+where
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+        + ?Sized,
+    P: ConstSliceItemPtr,
+{
     #[inline]
-    pub fn iter(&'a self) -> ErasedBundlePtrsIter<D::OutputIter, P, BufferOffsetsFromLayout> {
+    pub fn iter(
+        &'a self,
+    ) -> ErasedBundlePtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -245,11 +254,12 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundlePtrs<D, P>
 where
-    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+        + ?Sized,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedComponentPtr<P>;
-    type IntoIter = ErasedBundlePtrsIter<D::OutputIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundlePtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -259,11 +269,11 @@ where
 
 impl<D, P> IntoIterator for ErasedBundlePtrs<D, P>
 where
-    D: IntoErasedArchetypeIterator,
+    D: IntoErasedArchetypeIterator<Item: BufferOffsetsFromSelf>,
     P: ConstSliceItemPtr,
 {
     type Item = ErasedComponentPtr<P>;
-    type IntoIter = ErasedBundlePtrsIter<D::IntoIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundlePtrsIter<D::IntoIter, P, BufferOffsetsOf<D::Item>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

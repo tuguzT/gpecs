@@ -1,22 +1,41 @@
 use gpecs_component::{
     erased::{ErasedComponentMutPtr, ErasedComponentMutSlicePtr, WithErasedDrop},
-    registry::traits::WithComponentId,
+    registry::{ComponentId, traits::WithComponentId},
 };
 use gpecs_soa_erased::{
+    BufferOffsetsFrom, BufferOffsetsFromSelf,
     ptr::slice::MutSliceItemPtr,
     soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
 };
 
 use crate::erased::{ErasedArchetypeView, Iter};
 
+pub trait ErasedArchetypeMeta:
+    WithLayout
+    + for<'a> BufferOffsetsFromSelf<
+        BufferOffsets: BufferOffsetsFrom<&'a Self> + BufferOffsetsFrom<(ComponentId, &'a Self)>,
+    > + 'static
+{
+}
+
+impl<T> ErasedArchetypeMeta for T where
+    T: WithLayout
+        + for<'a> BufferOffsetsFromSelf<
+            BufferOffsets: BufferOffsetsFrom<&'a Self> + BufferOffsetsFrom<(ComponentId, &'a Self)>,
+        > + ?Sized
+        + 'static
+{
+}
+
 pub trait ErasedArchetypeKind:
     for<'a> FieldLayouts<
         'a,
         Output = ErasedArchetypeView<'a, Self::Meta>,
         OutputIter: ErasedArchetypeIterator,
+        OutputItem: BufferOffsetsFromSelf,
     >
 {
-    type Meta: WithLayout + 'static;
+    type Meta: ErasedArchetypeMeta;
 }
 
 impl<T> ErasedArchetypeKind for &T
@@ -35,7 +54,7 @@ where
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetypeView<'_, Meta>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
 {
     type Meta = Meta;
 }

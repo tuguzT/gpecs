@@ -7,7 +7,10 @@ use gpecs_component::{
     erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
     registry::{ComponentIdMap, ComponentRegistry, traits::FromComponentType},
 };
-use gpecs_soa_erased::{layout::WithLayout, ptr::slice::SliceItemPtrs, storage::AlignedStorage};
+use gpecs_soa_erased::{
+    BufferOffsetsFromLayout, BufferOffsetsFromSelf, layout::WithLayout, ptr::slice::SliceItemPtrs,
+    storage::AlignedStorage,
+};
 
 #[derive(Debug, PartialEq, Clone, Copy, Pod, Zeroable)]
 #[repr(C, align(16))]
@@ -84,6 +87,10 @@ impl WithErasedDrop for ErasedDropMeta {
         let Self { erased_drop, .. } = *self;
         erased_drop
     }
+}
+
+unsafe impl BufferOffsetsFromSelf for ErasedDropMeta {
+    type BufferOffsets = BufferOffsetsFromLayout;
 }
 
 impl<Meta> FromComponentDescriptor<'_, Meta> for ErasedDropMeta

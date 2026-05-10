@@ -1,6 +1,9 @@
 use std::alloc::Layout;
 
-use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
+use gpecs_soa_erased::{
+    BufferOffsetsFromLayout, BufferOffsetsFromSelf, ptr::slice::SliceItemPtrs,
+    storage::AlignedStorage,
+};
 
 use crate::{
     archetype::erased::FromComponentDescriptor,
@@ -29,6 +32,10 @@ impl WithErasedDrop for ErasedDropMeta {
         let Self { erased_drop, .. } = *self;
         erased_drop
     }
+}
+
+unsafe impl BufferOffsetsFromSelf for ErasedDropMeta {
+    type BufferOffsets = BufferOffsetsFromLayout;
 }
 
 impl<Meta> FromComponentDescriptor<'_, Meta> for ErasedDropMeta

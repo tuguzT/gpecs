@@ -6,7 +6,6 @@ use gpecs_soa_erased::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
-        layout::WithLayout,
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
@@ -20,7 +19,7 @@ use crate::{
         ErasedBorrowedViewBundle, ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundleMutRefs,
         ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs, ErasedBundlePtrs,
         ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices,
-        traits::{ErasedArchetypeKind, ErasedBundleDrop},
+        traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::{ErasedArchetypeView, Iter},
 };
@@ -240,7 +239,7 @@ where
 
 unsafe impl<'a, Meta, D, S, P> RawSoa for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
 where
-    Meta: WithLayout + 'static,
+    Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,

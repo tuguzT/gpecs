@@ -12,8 +12,8 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    BufferOffsetsFrom, BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoaNonNullPtrs,
-    ErasedSoaNonNullPtrsIter,
+    BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
+    ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
@@ -140,11 +140,18 @@ where
         let origin = unsafe { origin.as_inner() };
         unsafe { inner.offset_from(origin) }
     }
+}
 
+impl<'a, D, P> ErasedBundleNonNullPtrs<D, P>
+where
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+        + ?Sized,
+    P: NonNullSliceItemPtr,
+{
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedBundleNonNullPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout> {
+    ) -> ErasedBundleNonNullPtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -155,7 +162,8 @@ where
     #[track_caller]
     pub unsafe fn swap<'n, N>(&'a mut self, with: &'n mut ErasedBundleNonNullPtrs<N, P>)
     where
-        N: FieldLayouts<'n, OutputIter: ErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+            + ?Sized,
     {
         let Self { inner } = self;
 
@@ -170,7 +178,8 @@ where
         src: &'n ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputIter: ErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+            + ?Sized,
     {
         let Self { inner } = self;
 
@@ -185,7 +194,8 @@ where
         src: &'n ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputIter: ErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+            + ?Sized,
     {
         let Self { inner } = self;
 
@@ -200,7 +210,8 @@ where
         src: &'n ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputIter: ErasedArchetypeIterator> + ?Sized,
+        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+            + ?Sized,
     {
         let Self { inner } = self;
 
@@ -288,11 +299,12 @@ where
 
 impl<'a, D, P> IntoIterator for &'a ErasedBundleNonNullPtrs<D, P>
 where
-    D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
+    D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
+        + ?Sized,
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedComponentNonNullPtr<P>;
-    type IntoIter = ErasedBundleNonNullPtrsIter<D::OutputIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleNonNullPtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -302,11 +314,11 @@ where
 
 impl<D, P> IntoIterator for ErasedBundleNonNullPtrs<D, P>
 where
-    D: IntoErasedArchetypeIterator,
+    D: IntoErasedArchetypeIterator<Item: BufferOffsetsFromSelf>,
     P: NonNullSliceItemPtr,
 {
     type Item = ErasedComponentNonNullPtr<P>;
-    type IntoIter = ErasedBundleNonNullPtrsIter<D::IntoIter, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleNonNullPtrsIter<D::IntoIter, P, BufferOffsetsOf<D::Item>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -15,7 +15,7 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    BufferOffsetsFrom, BufferOffsetsFromLayout, CovariantFieldLayouts, ErasedSoa,
+    BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts, ErasedSoa,
     ErasedSoaIntoFields,
     error::FromFieldsLayoutsError,
     ptr::slice::SliceItemPtrs,
@@ -252,18 +252,36 @@ where
             Err(error) => Err(error.map_value(drop).map_value(|()| self)),
         }
     }
+}
 
+impl<T, D, S, P> ErasedBundleKind<T, D, S, P>
+where
+    T: ErasedArchetypeKind + ?Sized,
+    D: ErasedBundleDrop<T::Meta>,
+    S: AlignedStorage,
+    P: SliceItemPtrs<Item = S::Item>,
+{
     #[inline]
     pub fn iter(
         &self,
-    ) -> ErasedBundleRefsIter<'_, Iter<'_, T::Meta>, P::Const, BufferOffsetsFromLayout> {
+    ) -> ErasedBundleRefsIter<
+        '_,
+        Iter<'_, T::Meta>,
+        P::Const,
+        BufferOffsetsOf<FieldLayoutsItem<'_, T>>,
+    > {
         self.as_refs().into_iter()
     }
 
     #[inline]
     pub fn iter_mut(
         &mut self,
-    ) -> ErasedBundleMutRefsIter<'_, Iter<'_, T::Meta>, P::Mut, BufferOffsetsFromLayout> {
+    ) -> ErasedBundleMutRefsIter<
+        '_,
+        Iter<'_, T::Meta>,
+        P::Mut,
+        BufferOffsetsOf<FieldLayoutsItem<'_, T>>,
+    > {
         self.as_mut_refs().into_iter()
     }
 }
@@ -422,7 +440,12 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     type Item = ErasedComponentRef<'a, P::Const>;
-    type IntoIter = ErasedBundleRefsIter<'a, Iter<'a, T::Meta>, P::Const, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleRefsIter<
+        'a,
+        Iter<'a, T::Meta>,
+        P::Const,
+        BufferOffsetsOf<FieldLayoutsItem<'a, T>>,
+    >;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -438,7 +461,12 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     type Item = ErasedComponentMutRef<'a, P::Mut>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, Iter<'a, T::Meta>, P::Mut, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleMutRefsIter<
+        'a,
+        Iter<'a, T::Meta>,
+        P::Mut,
+        BufferOffsetsOf<FieldLayoutsItem<'a, T>>,
+    >;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -448,14 +476,14 @@ where
 
 impl<T, D, S, P> IntoIterator for ErasedBundleKind<T, D, S, P>
 where
-    T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
+    T: ErasedArchetypeKind + IntoErasedArchetypeIterator<Item: BufferOffsetsFromSelf>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
     P: SliceItemPtrs<Item = S::Item>,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<S, P>, S::Error>;
-    type IntoIter = ErasedBundleIntoIterKind<S, T, S, P, BufferOffsetsFromLayout>;
+    type IntoIter = ErasedBundleIntoIterKind<S, T, S, P, BufferOffsetsOf<T::Item>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

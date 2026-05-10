@@ -1,14 +1,15 @@
 use core::{alloc::Layout, iter::FusedIterator, num::NonZeroUsize};
 
+use bytemuck::{CheckedBitPattern, NoUninit};
 use gpecs_soa_erased::{
-    BufferOffsetsFromLayout, BufferOffsetsFromSelf, CovariantFieldLayouts,
+    BufferOffsetsFrom, BufferOffsetsFromSelf, CovariantFieldLayouts,
     layout::WithLayout,
-    soa::field::{FieldLayouts, FieldLayoutsOutput},
+    soa::field::{BufferOffset, FieldLayouts, FieldLayoutsOutput},
 };
 use spirv_std::arch::IndexUnchecked;
 
 /// FFI-compatible layout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, NoUninit, CheckedBitPattern)]
 #[repr(C)]
 pub struct FfiLayout {
     size: usize,
@@ -62,9 +63,64 @@ impl WithLayout for FfiLayout {
     }
 }
 
-// TODO: add newtype which already has offsets & implement all the necessary traits
-unsafe impl BufferOffsetsFromSelf for FfiLayout {
-    type BufferOffsets = BufferOffsetsFromLayout;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, NoUninit, CheckedBitPattern)]
+#[repr(C)]
+pub struct GpuFieldLayout {
+    layout: FfiLayout,
+    offset: usize,
+}
+
+impl GpuFieldLayout {
+    #[inline]
+    pub const unsafe fn new(layout: Layout, offset: usize) -> Self {
+        let layout = FfiLayout::new(layout);
+        Self { layout, offset }
+    }
+
+    #[inline]
+    pub const fn layout(self) -> Layout {
+        let Self { layout, .. } = self;
+        layout.layout()
+    }
+
+    #[inline]
+    pub const fn offset(self) -> usize {
+        let Self { offset, .. } = self;
+        offset
+    }
+
+    #[inline]
+    pub const fn into_parts(self) -> (Layout, usize) {
+        let Self { layout, offset } = self;
+        (layout.layout(), offset)
+    }
+}
+
+impl From<GpuFieldLayout> for (Layout, usize) {
+    #[inline]
+    fn from(layout: GpuFieldLayout) -> Self {
+        layout.into_parts()
+    }
+}
+
+impl WithLayout for GpuFieldLayout {
+    #[inline]
+    fn layout(&self) -> Layout {
+        Self::layout(*self)
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BufferOffsetsFromGpuFieldLayout;
+
+unsafe impl BufferOffsetsFrom<GpuFieldLayout> for BufferOffsetsFromGpuFieldLayout {
+    unsafe fn next(&mut self, _: usize, desc: GpuFieldLayout) -> BufferOffset<GpuFieldLayout> {
+        BufferOffset::new(desc, desc.offset)
+    }
+}
+
+unsafe impl BufferOffsetsFromSelf for GpuFieldLayout {
+    type BufferOffsets = BufferOffsetsFromGpuFieldLayout;
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -84,11 +140,11 @@ impl<T> From<T> for GpuFieldLayouts<T> {
 
 impl<'a, T> FieldLayouts<'a> for GpuFieldLayouts<T>
 where
-    T: AsRef<[FfiLayout]> + Clone,
+    T: AsRef<[GpuFieldLayout]> + Clone,
 {
-    type Output = GpuFieldLayouts<&'a [FfiLayout]>;
-    type OutputIter = GpuFieldLayouts<&'a [FfiLayout]>;
-    type OutputItem = FfiLayout;
+    type Output = GpuFieldLayouts<&'a [GpuFieldLayout]>;
+    type OutputIter = GpuFieldLayouts<&'a [GpuFieldLayout]>;
+    type OutputItem = GpuFieldLayout;
 
     fn field_layouts(&'a self) -> Self::Output {
         let Self { ref layouts, next } = *self;
@@ -96,11 +152,18 @@ where
         let layouts = layouts.as_ref();
         GpuFieldLayouts { next, layouts }
     }
+
+    unsafe fn index_field_layouts_unchecked(&self, n: usize) -> Self::OutputItem {
+        let Self { next, ref layouts } = *self;
+
+        let index = unsafe { next.unchecked_add(n) };
+        *unsafe { layouts.as_ref().index_unchecked(index) }
+    }
 }
 
 impl<T> CovariantFieldLayouts for GpuFieldLayouts<T>
 where
-    T: AsRef<[FfiLayout]> + Clone,
+    T: AsRef<[GpuFieldLayout]> + Clone,
 {
     fn upcast_field_layouts<'short, 'long: 'short>(
         from: FieldLayoutsOutput<'long, Self>,
@@ -111,9 +174,9 @@ where
 
 impl<T> Iterator for GpuFieldLayouts<T>
 where
-    T: AsRef<[FfiLayout]> + ?Sized,
+    T: AsRef<[GpuFieldLayout]> + ?Sized,
 {
-    type Item = FfiLayout;
+    type Item = GpuFieldLayout;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.nth(0)
@@ -152,7 +215,7 @@ where
 
 impl<T> ExactSizeIterator for GpuFieldLayouts<T>
 where
-    T: AsRef<[FfiLayout]> + ?Sized,
+    T: AsRef<[GpuFieldLayout]> + ?Sized,
 {
     fn len(&self) -> usize {
         let Self { ref layouts, next } = *self;
@@ -162,4 +225,4 @@ where
     }
 }
 
-impl<T> FusedIterator for GpuFieldLayouts<T> where T: AsRef<[FfiLayout]> + ?Sized {}
+impl<T> FusedIterator for GpuFieldLayouts<T> where T: AsRef<[GpuFieldLayout]> + ?Sized {}

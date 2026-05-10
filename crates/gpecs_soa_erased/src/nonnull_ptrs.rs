@@ -238,9 +238,7 @@ where
             offset,
         } = *self;
 
-        let mut layouts = layouts.field_layouts().into_iter();
-        let desc = unsafe { layouts.nth(i).unwrap_unchecked() };
-
+        let desc = unsafe { layouts.index_field_layouts_unchecked(i) };
         let buffer_offset = unsafe { offsets.next(capacity, desc) };
         unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }

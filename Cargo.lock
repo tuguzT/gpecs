@@ -777,6 +777,7 @@ version = "0.0.0"
 name = "gpecs_shaders"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "gpecs_soa_erased",
  "gpecs_sparse",
  "spirv-std",

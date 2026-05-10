@@ -26,6 +26,14 @@ where
 
     /// Returns [field layouts](FieldLayouts::Output) from self.
     fn field_layouts(&'a self) -> Self::Output;
+
+    /// Enables specialization for some extreme use cases
+    /// (for example, to bypass various issues of Rust-GPU backend).
+    #[inline]
+    #[doc(hidden)]
+    unsafe fn index_field_layouts_unchecked(&'a self, n: usize) -> Self::OutputItem {
+        unsafe { self.field_layouts().into_iter().nth(n).unwrap_unchecked() }
+    }
 }
 
 impl<'a, T, U> FieldLayouts<'a, &U> for &T

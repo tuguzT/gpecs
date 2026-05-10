@@ -9,7 +9,7 @@ use gpecs_soa_erased::{
 };
 
 pub use self::{
-    layouts::{FfiLayout, GpuFieldLayouts},
+    layouts::{FfiLayout, GpuFieldLayout, GpuFieldLayouts},
     ptrs::{GpuSliceItemPtr, GpuSliceItemPtrs},
 };
 
@@ -27,7 +27,7 @@ pub struct GpuErasedSoaDesc {
 
 pub type DescUniform = TypedBuffer<GpuErasedSoaDesc>;
 pub type DenseStorage = TypedBuffer<[u32]>;
-pub type LayoutsStorage = TypedBuffer<[FfiLayout]>;
+pub type LayoutsStorage = TypedBuffer<[GpuFieldLayout]>;
 
 #[spirv(compute(threads(64)))]
 pub fn erased_soa_work(

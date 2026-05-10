@@ -114,16 +114,14 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
         if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
             let statistics = statistics.expect("timestamp query statistics should be ready");
-            for system_statistics in &statistics {
-                let system_id = system_statistics.system_id();
+            for (system_id, system_statistics) in &statistics {
                 let Some(system_shader) = executor.systems().get_system_shader(system_id) else {
                     unreachable!("{system_id} should exist")
                 };
 
                 let label = system_shader.label().expect("GPU system should be labeled");
-                for archetype_statistics in system_statistics.into_meta() {
-                    let archetype_id = archetype_statistics.archetype_id();
-                    let duration = archetype_statistics.duration;
+                for (archetype_id, statistics) in system_statistics {
+                    let duration = statistics.duration;
                     log::info!(">>>> `{label}` system with {archetype_id:#} took {duration:?}");
                 }
             }

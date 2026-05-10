@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::archetype::{
-    registry::{ArchetypeIds, ArchetypeInfo, Iter},
+    registry::{ArchetypeId, ArchetypeIds, Iter},
     storage::ArchetypeStorage,
 };
 
@@ -36,14 +36,13 @@ impl Debug for IterMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { archetypes, ids } = self;
 
-        let iter = unsafe { Iter::from_parts(archetypes, ids.clone()) };
-        let entries = iter.map(From::from);
+        let entries = unsafe { Iter::from_parts(archetypes, ids.clone()) };
         f.debug_map().entries(entries).finish()
     }
 }
 
 impl<'a> Iterator for IterMut<'a> {
-    type Item = ArchetypeInfo<&'a mut ArchetypeStorage>;
+    type Item = (ArchetypeId, &'a mut ArchetypeStorage);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -54,8 +53,7 @@ impl<'a> Iterator for IterMut<'a> {
 
         // SAFETY: `ArchetypeIds` contains unique archetype ids
         let storage = unsafe { NonNull::from_mut(storage).as_mut() };
-        let info = ArchetypeInfo::new(archetype_id, storage);
-        Some(info)
+        Some((archetype_id, storage))
     }
 
     #[inline]
@@ -75,8 +73,7 @@ impl DoubleEndedIterator for IterMut<'_> {
 
         // SAFETY: `ArchetypeIds` contains unique archetype ids
         let storage = unsafe { NonNull::from_mut(storage).as_mut() };
-        let info = ArchetypeInfo::new(archetype_id, storage);
-        Some(info)
+        Some((archetype_id, storage))
     }
 }
 

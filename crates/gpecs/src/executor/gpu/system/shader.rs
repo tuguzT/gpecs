@@ -17,7 +17,7 @@ use crate::{
     context::{ComponentDescriptor, Components},
     entity::Entity,
     executor::gpu::{
-        component::registry::{GpuComponentId, GpuComponentInfo},
+        component::registry::GpuComponentId,
         system::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
     },
     hash::IndexMap,
@@ -149,8 +149,7 @@ impl GpuSystemShader {
         let component_entries: IndexMap<_, _> = bind_components
             .into_iter()
             .enumerate()
-            .map(|(index, component_desc)| {
-                let (component_id, (desc, access)) = component_desc.into_parts();
+            .map(|(index, (component_id, (desc, access)))| {
                 let component_id = unsafe { GpuComponentId::from_id(component_id) };
                 (component_id, component_entry(index, desc, access))
             })
@@ -324,20 +323,18 @@ pub struct GpuSystemShaderComponentEntries<'a> {
 
 impl Debug for GpuSystemShaderComponentEntries<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone().map(From::from);
+        let entries = self.clone();
         f.debug_map().entries(entries).finish()
     }
 }
 
 impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
-    type Item = GpuComponentInfo<Option<&'a GpuSystemShaderEntry>>;
+    type Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .next()
-            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
+        inner.next().map(|(&id, entry)| (id, entry.as_ref()))
     }
 
     #[inline]
@@ -355,17 +352,13 @@ impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .nth(n)
-            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
+        inner.nth(n).map(|(&id, entry)| (id, entry.as_ref()))
     }
 
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .last()
-            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
+        inner.last().map(|(&id, entry)| (id, entry.as_ref()))
     }
 
     #[inline]
@@ -374,9 +367,7 @@ impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
         B: FromIterator<Self::Item>,
     {
         let Self { inner } = self;
-        inner
-            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
-            .collect()
+        inner.map(|(&id, entry)| (id, entry.as_ref())).collect()
     }
 }
 
@@ -384,17 +375,13 @@ impl DoubleEndedIterator for GpuSystemShaderComponentEntries<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .next_back()
-            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
+        inner.next_back().map(|(&id, entry)| (id, entry.as_ref()))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .nth_back(n)
-            .map(|(&id, entry)| GpuComponentInfo::new(id, entry.as_ref()))
+        inner.nth_back(n).map(|(&id, entry)| (id, entry.as_ref()))
     }
 }
 

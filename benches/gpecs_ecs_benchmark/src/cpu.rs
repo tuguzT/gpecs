@@ -80,15 +80,13 @@ fn register_cpu_systems<B>(
         let time_delta = *time_delta_clone.borrow();
 
         let bundles = bundles
-            .filter(|bundles| !bundles.is_empty())
+            .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
-            bundles.for_each(|(_, (position, velocity))| {
+            bundles.into_iter().for_each(|(_, (position, velocity))| {
                 update_position(position, velocity, time_delta);
             });
 
@@ -102,15 +100,13 @@ fn register_cpu_systems<B>(
         let time_delta = *time_delta.borrow();
 
         let bundles = bundles
-            .filter(|bundles| !bundles.is_empty())
+            .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
-            bundles.for_each(|(_, (data,))| {
+            bundles.into_iter().for_each(|(_, (data,))| {
                 update_data(data, time_delta);
             });
 
@@ -122,14 +118,13 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Position, Velocity, Data)>| {
         let bundles = bundles
-            .filter(|bundles| !bundles.is_empty())
+            .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
+            let bundles = bundles.into_iter();
             bundles.for_each(|(_, (position, velocity, data))| {
                 update_components(position, velocity, data);
             });
@@ -142,15 +137,13 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Health,)>| {
         let bundles = bundles
-            .filter(|bundles| !bundles.is_empty())
+            .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
-            bundles.for_each(|(_, (health,))| {
+            bundles.into_iter().for_each(|(_, (health,))| {
                 update_health(health);
             });
 
@@ -162,15 +155,13 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Health, Damage)>| {
         let bundles = bundles
-            .filter(|bundles| !bundles.is_empty())
+            .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
-            bundles.for_each(|(_, (health, damage))| {
+            bundles.into_iter().for_each(|(_, (health, damage))| {
                 update_damage(health, damage);
             });
 
@@ -182,14 +173,13 @@ fn register_cpu_systems<B>(
 
     let system = executor.register_system(|bundles: BundlesMut<(Sprite, Player, Health)>| {
         let bundles = bundles
-            .filter(|bundles| !bundles.is_empty())
+            .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
+            let bundles = bundles.into_iter();
             bundles.for_each(|(_, (sprite, player, health))| {
                 update_sprite(sprite, player, health);
             });
@@ -203,13 +193,11 @@ fn register_cpu_systems<B>(
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Sprite)>| {
         let framebuffer = &mut *framebuffer.borrow_mut();
 
-        let bundles = bundles.filter(|bundles| !bundles.is_empty());
-        bundles.for_each(|bundles| {
-            let archetype_id = bundles.archetype_id();
+        let bundles = bundles.filter(|(_, bundles)| !bundles.is_empty());
+        bundles.for_each(|(archetype_id, bundles)| {
             let timestamp = Instant::now();
 
-            let bundles = bundles.into_meta().into_iter();
-            bundles.for_each(|(_, (position, sprite))| {
+            bundles.into_iter().for_each(|(_, (position, sprite))| {
                 render_sprite(position, sprite, framebuffer);
             });
 

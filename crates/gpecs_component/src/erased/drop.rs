@@ -86,6 +86,27 @@ where
     }
 }
 
+impl<T> WithErasedDrop for &mut T
+where
+    T: WithErasedDrop + ?Sized,
+{
+    #[inline]
+    fn erased_drop(&self) -> Option<ErasedDrop> {
+        (**self).erased_drop()
+    }
+}
+
+impl<K, V> WithErasedDrop for (K, V)
+where
+    V: WithErasedDrop + ?Sized,
+{
+    #[inline]
+    fn erased_drop(&self) -> Option<ErasedDrop> {
+        let (_, value) = self;
+        value.erased_drop()
+    }
+}
+
 impl WithErasedDrop for ErasedDrop {
     #[inline]
     fn erased_drop(&self) -> Option<ErasedDrop> {

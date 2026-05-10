@@ -3,7 +3,7 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_component::registry::{ComponentId, ComponentInfo};
+use gpecs_component::registry::ComponentId;
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     iter::RawIter,
@@ -36,7 +36,7 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone().map(From::from);
+        let entries = self.clone();
         f.debug_map().entries(entries).finish()
     }
 }
@@ -51,7 +51,7 @@ impl<Meta> Clone for Iter<'_, Meta> {
 }
 
 impl<'a, Meta> Iterator for Iter<'a, Meta> {
-    type Item = ComponentInfo<&'a Meta>;
+    type Item = (ComponentId, &'a Meta);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -132,7 +132,7 @@ where
 {
     type Output = Iter<'a, Meta>;
     type OutputIter = Iter<'a, Meta>;
-    type OutputItem = ComponentInfo<&'a Meta>;
+    type OutputItem = (ComponentId, &'a Meta);
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -155,8 +155,8 @@ where
 #[inline]
 fn inner_item_to_info_trusted<'a, Meta>(
     (component_id, meta): (*const u32, *const Identity<Meta>),
-) -> ComponentInfo<&'a Meta> {
+) -> (ComponentId, &'a Meta) {
     let component_id = unsafe { ComponentId::from_u32(*component_id) };
     let meta = unsafe { meta.as_ref_unchecked() }.as_inner();
-    ComponentInfo::new(component_id, meta)
+    (component_id, meta)
 }

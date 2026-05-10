@@ -1,7 +1,7 @@
 use crate::{
     Component,
     registry::{
-        ComponentId, ComponentIds, ComponentInfo,
+        ComponentId, ComponentIds,
         traits::{ComponentIdFrom, FromComponentType},
     },
 };
@@ -102,50 +102,46 @@ where
     }
 
     #[inline]
-    pub fn get_component_descriptor_of<T>(&self) -> Option<ComponentInfo<&D>>
+    pub fn get_component_descriptor_of<T>(&self) -> Option<(ComponentId, &D)>
     where
         T: Component,
     {
         let component_id = self.component_id::<T>()?;
-        let meta = self.get_component_descriptor(component_id)?;
-
-        let info = ComponentInfo::new(component_id, meta);
-        Some(info)
+        let desc = self.get_component_descriptor(component_id)?;
+        Some((component_id, desc))
     }
 }
 
-impl<'a, Meta, Mapping> ComponentRegistryView<'a, Meta, Mapping>
+impl<'a, D, M> ComponentRegistryView<'a, D, M>
 where
-    Mapping: ComponentIdFrom<Key: FromComponentType>,
+    M: ComponentIdFrom<Key: FromComponentType>,
 {
     #[inline]
-    pub fn into_component_descriptor_of<T>(self) -> Option<ComponentInfo<&'a Meta>>
+    pub fn into_component_descriptor_of<T>(self) -> Option<(ComponentId, &'a D)>
     where
         T: Component,
     {
         let component_id = self.component_id::<T>()?;
-        let meta = self.into_component_descriptor(component_id)?;
-
-        let info = ComponentInfo::new(component_id, meta);
-        Some(info)
+        let desc = self.into_component_descriptor(component_id)?;
+        Some((component_id, desc))
     }
 }
 
-impl<Meta, Mapping> Default for ComponentRegistryView<'_, Meta, Mapping>
+impl<D, M> Default for ComponentRegistryView<'_, D, M>
 where
-    Mapping: Default,
+    M: Default,
 {
     #[inline]
     fn default() -> Self {
         let descriptors = &[];
-        let mapping = Mapping::default();
+        let mapping = M::default();
         unsafe { Self::from_parts(descriptors, mapping) }
     }
 }
 
-impl<Meta, Mapping> Clone for ComponentRegistryView<'_, Meta, Mapping>
+impl<D, M> Clone for ComponentRegistryView<'_, D, M>
 where
-    Mapping: Clone,
+    M: Clone,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -158,7 +154,7 @@ where
     }
 }
 
-impl<Meta, Mapping> Copy for ComponentRegistryView<'_, Meta, Mapping> where Mapping: Copy {}
+impl<D, M> Copy for ComponentRegistryView<'_, D, M> where M: Copy {}
 
 fn get_component_descriptor<D>(descriptors: &[D], component_id: ComponentId) -> Option<&D> {
     let index: usize = component_id.into_u32().try_into().ok()?;

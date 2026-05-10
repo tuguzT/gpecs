@@ -43,7 +43,7 @@ fn one_entity() {
             .bundles::<(Position, Mass, Tag)>()
             .expect("archetype of `Position`, `Mass` and `Tag` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .map(|(entity, _)| entity),
         [entity],
     );
@@ -92,7 +92,7 @@ fn one_entity() {
             .bundles::<(Position, Mass, Tag)>()
             .expect("archetype of `Position`, `Mass` and `Tag` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .map(|(entity, _)| entity),
         [],
     );
@@ -101,7 +101,7 @@ fn one_entity() {
             .bundles::<(Tag, Mass)>()
             .expect("archetype of `Position`, `Mass` and `Tag` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .map(|(entity, _)| entity),
         [entity],
     );
@@ -114,7 +114,7 @@ fn one_entity() {
             .bundles::<(Tag, Mass)>()
             .expect("archetype of `Position`, `Mass` and `Tag` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .map(|(entity, _)| entity),
         [],
     );
@@ -161,7 +161,7 @@ fn many_entities() {
     let positions = context
         .bundles_mut::<(Position,)>()
         .expect("archetype of `Position` should exist");
-    for (entity, (position,)) in positions.flat_map(ArchetypeInfo::into_meta) {
+    for (entity, (position,)) in positions.flat_map(|(_, bundles)| bundles) {
         assert_eq!(entity.index() % 2, 0);
         assert_eq!(position.x, entity.index() as f32);
         assert_eq!(position.y, -(entity.index() as f32));
@@ -174,7 +174,7 @@ fn many_entities() {
     let masses = context
         .bundles_mut::<(Mass,)>()
         .expect("archetype of `Mass` should exist");
-    for (entity, (mass,)) in masses.flat_map(ArchetypeInfo::into_meta) {
+    for (entity, (mass,)) in masses.flat_map(|(_, bundles)| bundles) {
         assert_eq!(entity.index() % 2, 1);
         assert_eq!(mass.value, entity.index());
         masses_count += 1;
@@ -185,7 +185,7 @@ fn many_entities() {
     let tags = context
         .bundles_mut::<(Tag,)>()
         .expect("archetype of `Tag` should exist");
-    for (_, (tag,)) in tags.flat_map(ArchetypeInfo::into_meta) {
+    for (_, (tag,)) in tags.flat_map(|(_, bundles)| bundles) {
         assert_eq!(tag, &Tag);
         tags_count += 1;
     }
@@ -207,7 +207,7 @@ fn many_entities() {
             .bundles_mut::<(Position,)>()
             .expect("archetype of `Position` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .count(),
         6,
     );
@@ -216,7 +216,7 @@ fn many_entities() {
             .bundles_mut::<(Mass,)>()
             .expect("archetype of `Mass` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .count(),
         6,
     );
@@ -225,7 +225,7 @@ fn many_entities() {
             .bundles_mut::<(Tag,)>()
             .expect("archetype of `Tag` should exist")
             .into_iter()
-            .flat_map(ArchetypeInfo::into_meta)
+            .flat_map(|(_, bundles)| bundles)
             .count(),
         0,
     );

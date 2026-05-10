@@ -3,7 +3,7 @@
 use crate::executor::cpu::system::{
     IntoSystem, System,
     registry::{
-        SystemId, SystemIds, SystemInfo,
+        SystemId, SystemIds,
         id::{system_id_from_usize, system_id_into_usize},
     },
 };
@@ -49,19 +49,19 @@ impl SystemRegistry {
     }
 
     #[inline]
-    pub fn get_system(&self, system_id: SystemId) -> Option<SystemInfo<&dyn System>> {
+    pub fn get_system(&self, system_id: SystemId) -> Option<&dyn System> {
         let Self { systems } = self;
         systems
             .get(system_id_into_usize(system_id))
-            .map(|system| SystemInfo::new(system_id, system.as_ref()))
+            .map(AsRef::as_ref)
     }
 
     #[inline]
-    pub fn get_mut_system(&mut self, system_id: SystemId) -> Option<SystemInfo<&mut dyn System>> {
+    pub fn get_mut_system(&mut self, system_id: SystemId) -> Option<&mut dyn System> {
         let Self { systems } = self;
         systems
             .get_mut(system_id_into_usize(system_id))
-            .map(|system| SystemInfo::new(system_id, system.as_mut()))
+            .map(AsMut::as_mut)
     }
 
     #[inline]

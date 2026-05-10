@@ -49,7 +49,7 @@ where
 
         let refs = chain(self.as_refs(), to_insert.as_refs());
         let iter = chain(self.archetype(), to_insert.archetype())
-            .map(|component_desc| component_desc.map_meta(Clone::clone).into_parts());
+            .map(|(component_id, desc)| (component_id, desc.clone()));
         let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
         let result = ErasedSoa::try_from_fields_layouts(refs, archetype);

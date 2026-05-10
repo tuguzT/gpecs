@@ -32,7 +32,9 @@ impl<'a, Meta> ArchetypeKey<'a, Meta> {
     #[inline]
     pub fn component_ids(self) -> impl Iterator<Item = ComponentId> {
         let Self { archetype } = self;
-        archetype.into_component_id_ordered_iter().map(From::from)
+        archetype
+            .into_component_id_ordered_iter()
+            .map(|(component_id, _)| component_id)
     }
 
     #[inline]

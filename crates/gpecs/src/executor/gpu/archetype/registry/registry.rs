@@ -86,13 +86,11 @@ impl GpuArchetypeRegistry {
         let Some(archetypes_before) = archetypes.archetypes_before_inclusive(archetype_id) else {
             unreachable!("{archetype_id} should be registered prior to this call")
         };
-        archetypes_before.for_each(|info| {
-            let id = info.archetype_id();
-            let storage = info.into_meta();
-            gpu_archetypes.entry(id.into_u32()).or_insert_with(|| {
-                let id = gpu_archetype_id_trusted(id);
-                GpuArchetypeStorage::new(gpu_device, id, storage).into()
-            });
+        archetypes_before.for_each(|(id, storage)| {
+            let id = gpu_archetype_id_trusted(id);
+            gpu_archetypes
+                .entry(id.into_u32())
+                .or_insert_with(|| GpuArchetypeStorage::new(gpu_device, id, storage).into());
         });
 
         gpu_archetype_id

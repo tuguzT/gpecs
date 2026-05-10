@@ -7,7 +7,7 @@ use core::{
 use gpecs_component::{
     erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
     registry::{
-        ComponentId, ComponentInfo, ComponentRegistry, ComponentRegistryView,
+        ComponentId, ComponentRegistry, ComponentRegistryView,
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
     },
 };
@@ -459,7 +459,7 @@ where
 }
 
 impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
-    type Item = ComponentInfo<&'a Meta>;
+    type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
     #[inline]
@@ -469,7 +469,7 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
 }
 
 impl<Meta> IntoIterator for ErasedArchetype<Meta> {
-    type Item = ComponentInfo<Meta>;
+    type Item = (ComponentId, Meta);
     type IntoIter = IntoIter<Meta>;
 
     #[inline]
@@ -487,7 +487,7 @@ where
 {
     type Output = ErasedArchetypeView<'a, Meta>;
     type OutputIter = Iter<'a, Meta>;
-    type OutputItem = ComponentInfo<&'a Meta>;
+    type OutputItem = (ComponentId, &'a Meta);
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

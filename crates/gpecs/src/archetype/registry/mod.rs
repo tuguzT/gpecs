@@ -2,8 +2,8 @@ pub use self::{
     after::ArchetypesAfter, after_mut::ArchetypesAfterMut, before::ArchetypesBefore,
     before_mut::ArchetypesBeforeMut, bundles::Bundles, bundles_mut::BundlesMut,
     compatible::CompatibleArchetypes, compatible_mut::CompatibleArchetypesMut,
-    cow::ErasedArchetypeCow, id::ArchetypeId, ids::ArchetypeIds, info::ArchetypeInfo, iter::Iter,
-    iter_mut::IterMut, location::EntityLocation, registry::ArchetypeRegistry,
+    cow::ErasedArchetypeCow, id::ArchetypeId, ids::ArchetypeIds, iter::Iter, iter_mut::IterMut,
+    location::EntityLocation, registry::ArchetypeRegistry,
 };
 
 pub mod error;
@@ -20,7 +20,6 @@ mod compatible_mut;
 mod cow;
 mod id;
 mod ids;
-mod info;
 mod iter;
 mod iter_mut;
 mod key;

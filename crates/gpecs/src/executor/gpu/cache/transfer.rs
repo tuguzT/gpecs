@@ -38,10 +38,9 @@ impl TransferCache {
         schedule_cache: &ScheduleCache,
         gpu_archetypes: &GpuArchetypeRegistry,
     ) {
-        for archetype_id in schedule_cache
+        for (archetype_id, _) in schedule_cache
             .iter()
-            .flat_map(|system_cache| system_cache.iter())
-            .map(GpuArchetypeId::from)
+            .flat_map(|(_, system_cache)| system_cache.iter())
         {
             self.download_archetype_from_trusted(
                 device,
@@ -62,7 +61,7 @@ impl TransferCache {
     ) {
         let should_download = schedule_cache
             .iter()
-            .any(|system_cache| system_cache.archetype(archetype_id).is_some());
+            .any(|(_, system_cache)| system_cache.archetype(archetype_id).is_some());
         if !should_download {
             return;
         }
@@ -112,9 +111,8 @@ impl TransferCache {
                 ArchetypeCache::new(buffer)
             });
 
-        for components in storage_slices.components {
-            let component_id = components.component_id();
-            let components = unsafe { components.into_meta().as_slice() };
+        for (component_id, components) in storage_slices.components {
+            let components = unsafe { components.as_slice() };
             let Some(source) = components else {
                 continue;
             };
@@ -336,8 +334,7 @@ impl TransferCache {
 
         staging_entities.copy_into_slice(command_encoder, gpu_entities);
 
-        for gpu_components in gpu_slices.components {
-            let component_id = gpu_components.component_id();
+        for (component_id, gpu_components) in gpu_slices.components {
             let Some(cpu_components) = cpu_bundles.get(component_id.into()) else {
                 unreachable!("{component_id} should exist");
             };

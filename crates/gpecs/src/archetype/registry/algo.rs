@@ -284,7 +284,7 @@ pub fn get_archetype_storage_pair_mut(
     let b = archetype_id_into_usize(b);
     IterMut::new(archetypes)
         .get_pair(a, b)
-        .map(|(a, b)| (a.into_meta(), b.into_meta()))
+        .map(|((_, a), (_, b))| (a, b))
 }
 
 #[inline]

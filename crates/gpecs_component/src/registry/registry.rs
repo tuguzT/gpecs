@@ -3,7 +3,7 @@
 use crate::{
     Component,
     registry::{
-        ComponentId, ComponentIds, ComponentInfo, ComponentRegistryView, component_id_from_usize,
+        ComponentId, ComponentIds, ComponentRegistryView, component_id_from_usize,
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
     },
 };
@@ -125,7 +125,7 @@ where
     }
 
     #[inline]
-    pub fn get_component_descriptor_of<C>(&self) -> Option<ComponentInfo<&T::Item>>
+    pub fn get_component_descriptor_of<C>(&self) -> Option<(ComponentId, &T::Item)>
     where
         C: Component,
     {

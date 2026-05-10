@@ -74,7 +74,7 @@ fn create_positions(context: &mut Context) {
 
 fn update_positions(positions: BundlesMut<(Position,)>) {
     println!("Hello from the `update_positions` system!");
-    for (_, (position,)) in positions.flat_map(ArchetypeInfo::into_meta) {
+    for (_, (position,)) in positions.flat_map(|(_, bundles)| bundles) {
         position.x *= 2.0;
         position.y /= 2.0;
         position.z += 1.0;
@@ -83,7 +83,7 @@ fn update_positions(positions: BundlesMut<(Position,)>) {
 
 fn validate_positions(positions: Bundles<(Position,)>) {
     println!("Hello from the `validate_positions` system!");
-    for (entity, (position,)) in positions.flat_map(ArchetypeInfo::into_meta) {
+    for (entity, (position,)) in positions.flat_map(|(_, bundles)| bundles) {
         assert_eq!(position.x, entity.index().to_f32().unwrap() * 2.0);
         assert_eq!(position.y, -entity.index().to_f32().unwrap() / 2.0);
         assert_eq!(position.z, 1.0);

@@ -328,8 +328,7 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
             compute_pass.set_pipeline(system_shader.compute_pipeline());
 
-            for archetype_cache in system_cache.iter() {
-                let archetype_id = archetype_cache.archetype_id();
+            for (archetype_id, archetype_cache) in system_cache.iter() {
                 let Some(archetype_storage) = archetypes.get_archetype_storage(archetype_id) else {
                     unreachable!("{archetype_id} should exist");
                 };

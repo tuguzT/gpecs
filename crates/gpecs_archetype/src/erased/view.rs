@@ -7,7 +7,7 @@ use core::{
 };
 
 use gpecs_component::registry::{
-    ComponentId, ComponentInfo, ComponentRegistryView,
+    ComponentId, ComponentRegistryView,
     traits::{ComponentIdFrom, FromComponentType},
 };
 use gpecs_soa_erased::CovariantFieldLayouts;
@@ -445,7 +445,7 @@ impl<Meta> Index<ComponentId> for ErasedArchetypeView<'_, Meta> {
 }
 
 impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
-    type Item = ComponentInfo<&'a Meta>;
+    type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
     #[inline]
@@ -455,7 +455,7 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
 }
 
 impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
-    type Item = ComponentInfo<&'a Meta>;
+    type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
     #[inline]
@@ -476,7 +476,7 @@ where
 {
     type Output = ErasedArchetypeView<'a, Meta>;
     type OutputIter = Iter<'a, Meta>;
-    type OutputItem = ComponentInfo<&'a Meta>;
+    type OutputItem = (ComponentId, &'a Meta);
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

@@ -1,27 +1,21 @@
 pub use crate::{
-    archetype::registry::{ArchetypeId, ArchetypeInfo},
+    archetype::registry::ArchetypeId,
     bundle::Bundle,
-    component::{
-        Component,
-        registry::{ComponentId, ComponentInfo},
-    },
+    component::{Component, registry::ComponentId},
     context::{Bundles, BundlesMut, Context},
     entity::Entity,
     executor::{
         cpu::{
             CpuExecutor,
-            system::{
-                System,
-                registry::{SystemId, SystemInfo},
-            },
+            system::{System, registry::SystemId},
         },
         gpu::{
             GpuExecutor,
-            archetype::registry::{GpuArchetypeId, GpuArchetypeInfo},
+            archetype::registry::GpuArchetypeId,
             bundle::GpuBundle,
             component::{GpuComponent, registry::GpuComponentId},
             system::{
-                registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId, GpuSystemInfo},
+                registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
                 shader::DispatchStrategy,
             },
         },

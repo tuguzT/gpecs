@@ -7,7 +7,7 @@ use std::{
 use crate::{
     archetype::{
         erased::{ErasedArchetype, error::ArchetypeError},
-        registry::{ArchetypeInfo, CompatibleArchetypesMut},
+        registry::{ArchetypeId, CompatibleArchetypesMut},
         storage::{self, ArchetypeStorage},
     },
     bundle::Bundle,
@@ -86,7 +86,7 @@ where
     B: Bundle,
     T: ComponentIdFrom<Key: FromComponentType>,
 {
-    type Item = ArchetypeInfo<storage::BundlesMut<'a, B>>;
+    type Item = (ArchetypeId, storage::BundlesMut<'a, B>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -110,18 +110,18 @@ where
 }
 
 fn into_storage_bundles<'a, B>(
-    info: ArchetypeInfo<&'a mut ArchetypeStorage>,
+    item: (ArchetypeId, &'a mut ArchetypeStorage),
     components: &ComponentRegistryView<
         impl Sized,
         impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
     >,
-) -> ArchetypeInfo<storage::BundlesMut<'a, B>>
+) -> (ArchetypeId, storage::BundlesMut<'a, B>)
 where
     B: Bundle,
 {
-    info.map_meta(|storage| {
-        storage
-            .as_mut_bundles(components)
-            .expect("archetype should be compatible with requested bundle")
-    })
+    let (archetype_id, storage) = item;
+    let bundles = storage
+        .as_mut_bundles(components)
+        .expect("archetype should be compatible with requested bundle");
+    (archetype_id, bundles)
 }

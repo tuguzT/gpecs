@@ -3,10 +3,7 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::archetype::{
-    registry::{ArchetypeId, ArchetypeInfo},
-    storage::ArchetypeStorage,
-};
+use crate::archetype::{registry::ArchetypeId, storage::ArchetypeStorage};
 
 use super::algo;
 
@@ -65,7 +62,7 @@ impl Debug for ArchetypesAfterMut<'_> {
 }
 
 impl<'a> Iterator for ArchetypesAfterMut<'a> {
-    type Item = ArchetypeInfo<&'a mut ArchetypeStorage>;
+    type Item = (ArchetypeId, &'a mut ArchetypeStorage);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -76,8 +73,7 @@ impl<'a> Iterator for ArchetypesAfterMut<'a> {
 
         // SAFETY: BFS walker is non-recursive, so it must not yield the same node twice
         let storage = unsafe { NonNull::from_mut(storage).as_mut() };
-        let info = ArchetypeInfo::new(archetype_id, storage);
-        Some(info)
+        Some((archetype_id, storage))
     }
 
     #[inline]

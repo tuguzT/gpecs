@@ -10,8 +10,8 @@ use crate::{
             error::{ArchetypeError, DuplicateComponentError, MissingComponentError},
         },
         registry::{
-            ArchetypeId, ArchetypeIds, ArchetypeInfo, ArchetypesAfter, ArchetypesAfterMut,
-            ArchetypesBefore, ArchetypesBeforeMut, Bundles, BundlesMut, CompatibleArchetypes,
+            ArchetypeId, ArchetypeIds, ArchetypesAfter, ArchetypesAfterMut, ArchetypesBefore,
+            ArchetypesBeforeMut, Bundles, BundlesMut, CompatibleArchetypes,
             CompatibleArchetypesMut, EntityLocation, ErasedArchetypeCow, Iter, IterMut,
             error::{
                 GetAtError, InsertAtError, InsertBundleAtError, InsertBundleError,
@@ -1111,7 +1111,7 @@ impl Debug for ArchetypeRegistry {
 }
 
 impl<'a> IntoIterator for &'a ArchetypeRegistry {
-    type Item = ArchetypeInfo<&'a ArchetypeStorage>;
+    type Item = (ArchetypeId, &'a ArchetypeStorage);
     type IntoIter = Iter<'a>;
 
     #[inline]
@@ -1121,7 +1121,7 @@ impl<'a> IntoIterator for &'a ArchetypeRegistry {
 }
 
 impl<'a> IntoIterator for &'a mut ArchetypeRegistry {
-    type Item = ArchetypeInfo<&'a mut ArchetypeStorage>;
+    type Item = (ArchetypeId, &'a mut ArchetypeStorage);
     type IntoIter = IterMut<'a>;
 
     #[inline]

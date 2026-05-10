@@ -10,7 +10,7 @@ use core::{
 use gpecs_component::{
     erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
     registry::{
-        ComponentInfo, ComponentRegistryView,
+        ComponentId, ComponentRegistryView,
         traits::{ComponentIdFrom, FromComponentType, WithComponentId},
     },
 };
@@ -330,7 +330,7 @@ where
 
         let refs = self.as_refs();
         let fields = other.iter().map(|component| {
-            let component_id = component.into();
+            let component_id = component.component_id();
             refs.get(component_id).expect("component should be present")
         });
 
@@ -408,8 +408,8 @@ where
 {
     fn drop(&mut self) {
         let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
-        for (component_desc, to_drop) in zip_eq(archetype, ptrs) {
-            unsafe { D::drop_in_place_with(to_drop, component_desc.as_meta()) }
+        for ((_, meta), to_drop) in zip_eq(archetype, ptrs) {
+            unsafe { D::drop_in_place_with(to_drop, meta) }
         }
     }
 }
@@ -475,7 +475,7 @@ where
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
     type OutputIter = Iter<'a, T::Meta>;
-    type OutputItem = ComponentInfo<&'a T::Meta>;
+    type OutputItem = (ComponentId, &'a T::Meta);
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

@@ -1,6 +1,5 @@
-pub use self::{id::SystemId, ids::SystemIds, info::SystemInfo, registry::SystemRegistry};
+pub use self::{id::SystemId, ids::SystemIds, registry::SystemRegistry};
 
 mod id;
 mod ids;
-mod info;
 mod registry;

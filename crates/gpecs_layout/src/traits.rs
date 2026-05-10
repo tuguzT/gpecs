@@ -24,6 +24,17 @@ where
     }
 }
 
+impl<K, V> WithLayout for (K, V)
+where
+    V: WithLayout + ?Sized,
+{
+    #[inline]
+    fn layout(&self) -> Layout {
+        let (_, value) = self;
+        value.layout()
+    }
+}
+
 impl WithLayout for Layout {
     #[inline]
     fn layout(&self) -> Layout {

@@ -4,7 +4,7 @@ use core::{
     ptr,
 };
 
-use gpecs_component::registry::{ComponentId, ComponentInfo};
+use gpecs_component::registry::ComponentId;
 use gpecs_sparse::{
     iter::{IntoIter as SparseIntoIter, RawIter},
     soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
@@ -55,7 +55,7 @@ where
 }
 
 impl<'a, Meta> IntoIterator for &'a IntoIter<Meta> {
-    type Item = ComponentInfo<&'a Meta>;
+    type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
     #[inline]
@@ -65,12 +65,12 @@ impl<'a, Meta> IntoIterator for &'a IntoIter<Meta> {
 }
 
 impl<Meta> Iterator for IntoIter<Meta> {
-    type Item = ComponentInfo<Meta>;
+    type Item = (ComponentId, Meta);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(inner_item_to_info)
+        inner.next().map(map_item)
     }
 
     #[inline]
@@ -91,7 +91,7 @@ impl<Meta> Iterator for IntoIter<Meta> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(inner_item_to_info)
+        inner.nth(n).map(map_item)
     }
 
     #[inline]
@@ -100,7 +100,7 @@ impl<Meta> Iterator for IntoIter<Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(inner_item_to_info)
+        inner.last().map(map_item)
     }
 
     #[inline]
@@ -109,7 +109,7 @@ impl<Meta> Iterator for IntoIter<Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.map(inner_item_to_info).collect()
+        inner.map(map_item).collect()
     }
 }
 
@@ -117,13 +117,13 @@ impl<Meta> DoubleEndedIterator for IntoIter<Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(inner_item_to_info)
+        inner.next_back().map(map_item)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(inner_item_to_info)
+        inner.nth_back(n).map(map_item)
     }
 }
 
@@ -143,7 +143,7 @@ where
 {
     type Output = Iter<'a, Meta>;
     type OutputIter = Iter<'a, Meta>;
-    type OutputItem = ComponentInfo<&'a Meta>;
+    type OutputItem = (ComponentId, &'a Meta);
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {
@@ -152,10 +152,10 @@ where
 }
 
 #[inline]
-fn inner_item_to_info<Meta>(item: (u32, Identity<Meta>)) -> ComponentInfo<Meta> {
+fn map_item<Meta>(item: (u32, Identity<Meta>)) -> (ComponentId, Meta) {
     let (id, meta) = item;
 
     let component_id = unsafe { ComponentId::from_u32(id) };
     let meta = meta.into_inner();
-    ComponentInfo::new(component_id, meta)
+    (component_id, meta)
 }

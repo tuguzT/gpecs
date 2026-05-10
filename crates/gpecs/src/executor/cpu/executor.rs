@@ -71,7 +71,7 @@ impl<'ctx> CpuExecutor<'ctx> {
         } = *self;
 
         schedule.iter().for_each(|system_id| {
-            let Some(mut system) = systems.get_mut_system(system_id) else {
+            let Some(system) = systems.get_mut_system(system_id) else {
                 unreachable!("{system_id} should be present");
             };
             system.run(context);

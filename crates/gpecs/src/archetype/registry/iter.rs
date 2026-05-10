@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::archetype::{
-    registry::{ArchetypeIds, ArchetypeInfo},
+    registry::{ArchetypeId, ArchetypeIds},
     storage::ArchetypeStorage,
 };
 
@@ -31,13 +31,13 @@ impl<'a> Iter<'a> {
 
 impl Debug for Iter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone().map(From::from);
+        let entries = self.clone();
         f.debug_map().entries(entries).finish()
     }
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = ArchetypeInfo<&'a ArchetypeStorage>;
+    type Item = (ArchetypeId, &'a ArchetypeStorage);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -45,9 +45,7 @@ impl<'a> Iterator for Iter<'a> {
 
         let archetype_id = ids.next()?;
         let storage = algo::get_archetype_storage(archetypes, archetype_id)?;
-
-        let info = ArchetypeInfo::new(archetype_id, storage);
-        Some(info)
+        Some((archetype_id, storage))
     }
 
     #[inline]
@@ -64,9 +62,7 @@ impl DoubleEndedIterator for Iter<'_> {
 
         let archetype_id = ids.next_back()?;
         let storage = algo::get_archetype_storage(archetypes, archetype_id)?;
-
-        let info = ArchetypeInfo::new(archetype_id, storage);
-        Some(info)
+        Some((archetype_id, storage))
     }
 }
 

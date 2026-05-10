@@ -2,7 +2,7 @@ use std::iter::FusedIterator;
 
 use crate::archetype::{
     erased::ErasedArchetypeView,
-    registry::{ArchetypeInfo, ArchetypesAfter},
+    registry::{ArchetypeId, ArchetypesAfter},
     storage::ArchetypeStorage,
 };
 
@@ -27,7 +27,7 @@ impl<'a> CompatibleArchetypes<'a> {
 }
 
 impl<'a> Iterator for CompatibleArchetypes<'a> {
-    type Item = ArchetypeInfo<&'a ArchetypeStorage>;
+    type Item = (ArchetypeId, &'a ArchetypeStorage);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

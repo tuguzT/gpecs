@@ -1,7 +1,6 @@
 pub use self::{
     id::{ComponentId, GpuComponentId},
     ids::ComponentIds,
-    info::ComponentInfo,
     registry::ComponentRegistry,
     view::ComponentRegistryView,
 };
@@ -13,7 +12,6 @@ pub mod traits;
 
 mod id;
 mod ids;
-mod info;
 mod registry;
 mod view;
 

@@ -6,7 +6,7 @@ use core::{
 
 use gpecs_sparse::item::SparseItem;
 
-use gpecs_component::registry::{ComponentId, ComponentInfo};
+use gpecs_component::registry::ComponentId;
 
 pub struct ComponentIdOrderedIter<'a, Meta> {
     dense: &'a [Meta],
@@ -25,14 +25,13 @@ impl<'a, Meta> ComponentIdOrderedIter<'a, Meta> {
         dense: &'a [Meta],
         sparse_index: usize,
         dense_index: u32,
-    ) -> ComponentInfo<&'a Meta> {
+    ) -> (ComponentId, &'a Meta) {
         let id = sparse_index.try_into().expect("`ComponentId` overflow");
         let component_id = unsafe { ComponentId::from_u32(id) };
 
         let dense_index: usize = dense_index.try_into().expect("`ComponentId` overflow");
         let meta = &dense[dense_index];
-
-        ComponentInfo::new(component_id, meta)
+        (component_id, meta)
     }
 }
 
@@ -41,7 +40,7 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone().map(From::from);
+        let entries = self.clone();
         f.debug_map().entries(entries).finish()
     }
 }
@@ -55,7 +54,7 @@ impl<Meta> Clone for ComponentIdOrderedIter<'_, Meta> {
 }
 
 impl<'a, Meta> Iterator for ComponentIdOrderedIter<'a, Meta> {
-    type Item = ComponentInfo<&'a Meta>;
+    type Item = (ComponentId, &'a Meta);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

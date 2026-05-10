@@ -3,16 +3,15 @@ use std::iter::chain;
 use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, Device};
 
 use crate::{
-    archetype::{registry::ArchetypeInfo, storage::ArchetypeStorage},
     context::Context,
     executor::gpu::{
         archetype::{
-            registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
+            registry::{GpuArchetypeId, GpuArchetypeRegistry},
             storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
         },
-        component::registry::GpuComponentInfo,
+        component::registry::GpuComponentId,
         system::{
-            registry::{GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
+            registry::{GpuSystemId, GpuSystemRegistry},
             schedule::GpuSystemSchedule,
             shader::{GpuSystemShader, GpuSystemShaderEntry},
         },
@@ -97,11 +96,9 @@ impl<'a> ScheduleCache<'a> {
     }
 
     #[inline]
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = GpuSystemInfo<&SystemCache<'a>>> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (GpuSystemId, &SystemCache<'a>)> {
         let Self { systems } = self;
-        systems
-            .iter()
-            .map(|(&id, cache)| GpuSystemInfo::new(id, cache))
+        systems.iter().map(|(&id, cache)| (id, cache))
     }
 }
 
@@ -123,13 +120,12 @@ impl<'a> SystemCache<'a> {
         let Some(system_shader) = systems.get_system_shader(system_id) else {
             unreachable!("{system_id} should exist");
         };
-        let system_info = GpuSystemInfo::new(system_id, system_shader);
 
         let components = &context.components().as_view();
         let component_ids = system_shader
             .bind_group_layout_entries()
             .components
-            .map(|components| components.component_id().into());
+            .map(|(component_id, _)| component_id.into());
         let Ok(compatible_archetypes) = context
             .archetypes()
             .compatible_archetypes_from(components, component_ids)
@@ -137,16 +133,20 @@ impl<'a> SystemCache<'a> {
             unreachable!("{system_id} should have compatible archetypes");
         };
 
-        let into_archetype_cache = |archetype_info: ArchetypeInfo<&ArchetypeStorage>| {
-            let archetype_id = archetype_info.archetype_id();
+        let into_archetype_cache = |(archetype_id, _)| {
             let archetype_id = archetypes.map_archetype_id(archetype_id)?;
             let Some(archetype_storage) = archetypes.get_archetype_storage(archetype_id) else {
                 unreachable!("{archetype_id} should exist");
             };
 
-            let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
-            let archetype_cache =
-                ArchetypeCache::new(device, system_info, archetype_info, additional_entries)?;
+            let archetype_cache = ArchetypeCache::new(
+                device,
+                system_id,
+                system_shader,
+                archetype_id,
+                archetype_storage,
+                additional_entries,
+            )?;
             Some((archetype_id, archetype_cache))
         };
 
@@ -194,15 +194,18 @@ impl<'a> SystemCache<'a> {
             let Some(system_shader) = systems.get_system_shader(system_id) else {
                 unreachable!("{system_id} should exist");
             };
-            let system_info = GpuSystemInfo::new(system_id, system_shader);
-
             let Some(archetype_storage) = gpu_archetypes.get_archetype_storage(archetype_id) else {
                 unreachable!("{archetype_id} should exist");
             };
-            let archetype_info = GpuArchetypeInfo::new(archetype_id, archetype_storage);
 
-            let resync_result =
-                archetype_cache.resync(device, system_info, archetype_info, additional_entries);
+            let resync_result = archetype_cache.resync(
+                device,
+                system_id,
+                system_shader,
+                archetype_id,
+                archetype_storage,
+                additional_entries,
+            );
             let Ok(updated) = resync_result else {
                 return false;
             };
@@ -227,11 +230,9 @@ impl<'a> SystemCache<'a> {
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = GpuArchetypeInfo<&ArchetypeCache>> {
+    pub fn iter(&self) -> impl Iterator<Item = (GpuArchetypeId, &ArchetypeCache)> {
         let Self { archetypes, .. } = self;
-        archetypes
-            .iter()
-            .map(|(&id, cache)| GpuArchetypeInfo::new(id, cache))
+        archetypes.iter().map(|(&id, cache)| (id, cache))
     }
 }
 
@@ -244,21 +245,18 @@ pub struct ArchetypeCache {
 impl ArchetypeCache {
     fn new(
         device: &Device,
-        system_info: GpuSystemInfo<&GpuSystemShader>,
-        archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
+        system_id: GpuSystemId,
+        system_shader: &GpuSystemShader,
+        archetype_id: GpuArchetypeId,
+        archetype_storage: &GpuArchetypeStorage,
         additional_entries: &[BindGroupEntry<'_>],
     ) -> Option<Self> {
-        let archetype_id = archetype_info.archetype_id();
-        let archetype_storage = archetype_info.into_meta();
         if archetype_storage.is_empty() {
             return None;
         }
 
-        let shader = system_info.into_meta();
-        let system_id = system_info.system_id();
-
         let slices = archetype_storage.slices();
-        let shader_entries = shader.bind_group_layout_entries();
+        let shader_entries = system_shader.bind_group_layout_entries();
 
         let entity_binding = bind_group_entry(shader_entries.entities, slices.entities);
         let component_bindings =
@@ -267,7 +265,7 @@ impl ArchetypeCache {
                 .filter_map(|(entry, slice)| bind_group_entry(entry, slice));
         let additional_entries = additional_entries.iter().cloned();
 
-        let bind_group_label = match shader.label() {
+        let bind_group_label = match system_shader.label() {
             Some(label) => format!("`gpecs` {system_id:#} [{label}] {archetype_id:#} bind group"),
             None => format!("`gpecs` {system_id:#} {archetype_id:#} bind group"),
         };
@@ -276,7 +274,7 @@ impl ArchetypeCache {
             .collect::<Box<_>>();
         let bind_group_desc = BindGroupDescriptor {
             label: Some(&bind_group_label),
-            layout: shader.bind_group_layout(),
+            layout: system_shader.bind_group_layout(),
             entries: bind_group_entries.as_ref(),
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
@@ -297,14 +295,23 @@ impl ArchetypeCache {
     fn resync(
         &mut self,
         device: &Device,
-        system_info: GpuSystemInfo<&GpuSystemShader>,
-        archetype_info: GpuArchetypeInfo<&GpuArchetypeStorage>,
+        system_id: GpuSystemId,
+        system_shader: &GpuSystemShader,
+        archetype_id: GpuArchetypeId,
+        archetype_storage: &GpuArchetypeStorage,
         additional_entries: &[BindGroupEntry<'_>],
     ) -> Result<bool, ArchetypeCacheResyncError> {
         let Self { should_resync, .. } = *self;
 
         if should_resync {
-            let new = Self::new(device, system_info, archetype_info, additional_entries);
+            let new = Self::new(
+                device,
+                system_id,
+                system_shader,
+                archetype_id,
+                archetype_storage,
+                additional_entries,
+            );
             let Some(new) = new else {
                 return Err(ArchetypeCacheResyncError);
             };
@@ -344,12 +351,11 @@ fn component_entries_slices<'a, E, S>(
     slices: S,
 ) -> impl IntoIterator<Item = ComponentEntriesSlicesOutputItem<'a>>
 where
-    E: IntoIterator<Item = GpuComponentInfo<Option<&'a GpuSystemShaderEntry>>>,
-    S: IntoIterator<Item = GpuComponentInfo<GpuArchetypeStorageSlice<'a>>>,
+    E: IntoIterator<Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>)>,
+    S: IntoIterator<Item = (GpuComponentId, GpuArchetypeStorageSlice<'a>)>,
 {
-    let mut slices: IndexMap<_, _> = slices.into_iter().map(From::from).collect();
-    entries.into_iter().map(move |entry| {
-        let (component_id, entry) = entry.into();
+    let mut slices: IndexMap<_, _> = slices.into_iter().collect();
+    entries.into_iter().map(move |(component_id, entry)| {
         let Some(slice) = slices.swap_remove(&component_id) else {
             unreachable!("{component_id} should exist");
         };

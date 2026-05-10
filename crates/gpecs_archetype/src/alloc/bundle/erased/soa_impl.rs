@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use gpecs_component::registry::ComponentInfo;
+use gpecs_component::registry::ComponentId;
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaPtrs,
     ptr::slice::SliceItemPtrs,
@@ -140,8 +140,8 @@ where
     #[inline]
     unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
         let archetype = self.as_inner();
-        for (component_desc, to_drop) in zip_eq(archetype, ptrs) {
-            unsafe { D::drop_in_place_with(to_drop, component_desc.as_meta()) }
+        for ((_, meta), to_drop) in zip_eq(archetype, ptrs) {
+            unsafe { D::drop_in_place_with(to_drop, meta) }
         }
     }
 
@@ -233,8 +233,8 @@ where
     #[inline]
     unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
         let archetype = self.as_inner();
-        for (component_desc, to_drop) in zip_eq(archetype, slices) {
-            unsafe { D::drop_in_place_slice_with(to_drop, component_desc.as_meta()) }
+        for ((_, meta), to_drop) in zip_eq(archetype, slices) {
+            unsafe { D::drop_in_place_slice_with(to_drop, meta) }
         }
     }
 }
@@ -309,7 +309,7 @@ where
 {
     type Output = &'a ErasedArchetype<Meta>;
     type OutputIter = Iter<'a, Meta>;
-    type OutputItem = ComponentInfo<&'a Meta>;
+    type OutputItem = (ComponentId, &'a Meta);
 
     #[inline]
     fn field_layouts(&'a self) -> Self::Output {

@@ -4,10 +4,7 @@ use core::{
     borrow::Borrow,
 };
 
-use crate::{
-    Component,
-    registry::{ComponentId, ComponentInfo},
-};
+use crate::{Component, registry::ComponentId};
 
 pub trait WithComponentId {
     fn component_id(&self) -> ComponentId;
@@ -23,13 +20,15 @@ where
     }
 }
 
-impl<Meta> WithComponentId for ComponentInfo<Meta>
+impl<K, V> WithComponentId for (K, V)
 where
-    Meta: ?Sized,
+    K: WithComponentId,
+    V: ?Sized,
 {
     #[inline]
     fn component_id(&self) -> ComponentId {
-        ComponentInfo::component_id(self)
+        let (key, _) = self;
+        key.component_id()
     }
 }
 

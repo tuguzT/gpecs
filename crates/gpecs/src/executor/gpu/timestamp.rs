@@ -20,12 +20,9 @@ use wgpu::{
 
 use crate::{
     executor::gpu::{
-        archetype::registry::{GpuArchetypeId, GpuArchetypeInfo},
+        archetype::registry::GpuArchetypeId,
         cache::schedule::{ScheduleCache, SystemCache},
-        system::{
-            registry::{GpuSystemId, GpuSystemInfo},
-            schedule::GpuSystemSchedule,
-        },
+        system::{registry::GpuSystemId, schedule::GpuSystemSchedule},
     },
     hash::{BuildHasher, IndexMap},
 };
@@ -51,7 +48,7 @@ impl TimestampQueryResources {
 
         let count = schedule_cache
             .iter()
-            .map(|info| timestamp_count_for_system_cache(&info))
+            .map(|(_, system_cache)| timestamp_count_for_system_cache(system_cache))
             .sum::<usize>()
             .try_into()
             .expect("total timestamp count of schedule cache should fit into `u32`");
@@ -223,9 +220,8 @@ impl TimestampQueryStatistics {
             let Some(system_cache) = cache.system(system_id) else {
                 unreachable!("{system_id} should exist in schedule cache")
             };
-            let system_cache = GpuSystemInfo::new(system_id, system_cache);
             let system_stats =
-                TimestampQuerySystemStatistics::new(system_cache, queue, pairs.by_ref());
+                TimestampQuerySystemStatistics::new(system_id, system_cache, queue, pairs.by_ref());
 
             if stats.insert(system_id, system_stats).is_some() {
                 unreachable!("{system_id} should be unique in schedule")
@@ -264,7 +260,7 @@ impl Debug for TimestampQueryStatistics {
 }
 
 impl<'a> IntoIterator for &'a TimestampQueryStatistics {
-    type Item = GpuSystemInfo<&'a TimestampQuerySystemStatistics>;
+    type Item = (GpuSystemId, &'a TimestampQuerySystemStatistics);
     type IntoIter = TimestampQueryStatisticsIter<'a>;
 
     #[inline]
@@ -280,20 +276,18 @@ pub struct TimestampQueryStatisticsIter<'a> {
 
 impl Debug for TimestampQueryStatisticsIter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone().map(From::from);
+        let entries = self.clone();
         f.debug_map().entries(entries).finish()
     }
 }
 
 impl<'a> Iterator for TimestampQueryStatisticsIter<'a> {
-    type Item = GpuSystemInfo<&'a TimestampQuerySystemStatistics>;
+    type Item = (GpuSystemId, &'a TimestampQuerySystemStatistics);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .next()
-            .map(|(&id, stats)| GpuSystemInfo::new(id, stats))
+        inner.next().map(|(&id, stats)| (id, stats))
     }
 
     #[inline]
@@ -307,9 +301,7 @@ impl DoubleEndedIterator for TimestampQueryStatisticsIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .next_back()
-            .map(|(&id, stats)| GpuSystemInfo::new(id, stats))
+        inner.next_back().map(|(&id, stats)| (id, stats))
     }
 }
 
@@ -329,7 +321,8 @@ pub struct TimestampQuerySystemStatistics {
 
 impl TimestampQuerySystemStatistics {
     fn new(
-        system_cache: GpuSystemInfo<&SystemCache>,
+        system_id: GpuSystemId,
+        system_cache: &SystemCache,
         queue: &Queue,
         pairs: impl IntoIterator<Item = (u64, u64)>,
     ) -> Self {
@@ -339,9 +332,7 @@ impl TimestampQuerySystemStatistics {
         let mut stats = IndexMap::with_capacity_and_hasher(system_cache.len(), hash_builder);
 
         let timestamp_period_nanos = queue.get_timestamp_period();
-        let system_id = system_cache.system_id();
-        for archetype_cache in system_cache.iter() {
-            let archetype_id = archetype_cache.archetype_id();
+        for (archetype_id, _) in system_cache.iter() {
             let Some((first, second)) = pairs.next() else {
                 unreachable!("item for {system_id} and {archetype_id} should exist")
             };
@@ -389,7 +380,7 @@ impl Debug for TimestampQuerySystemStatistics {
 }
 
 impl<'a> IntoIterator for &'a TimestampQuerySystemStatistics {
-    type Item = GpuArchetypeInfo<TimestampQueryArchetypeStatistics>;
+    type Item = (GpuArchetypeId, TimestampQueryArchetypeStatistics);
     type IntoIter = TimestampQuerySystemStatisticsIter<'a>;
 
     #[inline]
@@ -405,20 +396,18 @@ pub struct TimestampQuerySystemStatisticsIter<'a> {
 
 impl Debug for TimestampQuerySystemStatisticsIter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone().map(From::from);
+        let entries = self.clone();
         f.debug_map().entries(entries).finish()
     }
 }
 
 impl Iterator for TimestampQuerySystemStatisticsIter<'_> {
-    type Item = GpuArchetypeInfo<TimestampQueryArchetypeStatistics>;
+    type Item = (GpuArchetypeId, TimestampQueryArchetypeStatistics);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .next()
-            .map(|(&id, &stats)| GpuArchetypeInfo::new(id, stats))
+        inner.next().map(|(&id, &stats)| (id, stats))
     }
 
     #[inline]
@@ -432,9 +421,7 @@ impl DoubleEndedIterator for TimestampQuerySystemStatisticsIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner
-            .next_back()
-            .map(|(&id, &stats)| GpuArchetypeInfo::new(id, stats))
+        inner.next_back().map(|(&id, &stats)| (id, stats))
     }
 }
 

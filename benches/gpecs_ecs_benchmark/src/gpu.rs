@@ -84,9 +84,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             |_| {},
         );
 
-        // let mut context_mapper = executor.context_mapper();
-        // context_mapper.map_all(&mut command_encoder);
-
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
 
@@ -98,13 +95,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             .poll(poll_type)
             .expect("device should be polled successfully");
 
-        // let _context = context_mapper
-        //     .get_all()
-        //     .expect("waiting poll should be successful");
-        // let _context = context_mapper
-        //     .get_all()
-        //     .expect("should be already at ready state");
-
         let elapsed = timestamp.elapsed();
 
         #[cfg(debug_assertions)]
@@ -112,35 +102,13 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
-            let statistics = statistics.expect("timestamp query statistics should be ready");
-            for (system, statistics) in &statistics {
-                let Some(system_shader) = executor.systems().get_system_shader(system) else {
-                    unreachable!("{system} should exist")
-                };
-
-                let label = system_shader.label().expect("GPU system should be labeled");
-                for (archetype, statistics) in statistics {
-                    let duration = statistics.duration;
-                    log::info!(">>>> {system} `{label}` with {archetype:#} took {duration:?}");
-                }
-            }
-        }
+        log_timestamp_query_statistics(&executor, &queue);
         log::info!(">>! Execution of all the GPU systems {i} took {elapsed:?}");
 
         time_delta = TimeDelta(elapsed.as_secs_f32());
-        let time_delta_slice = [time_delta.0];
-        queue.write_buffer(
-            &gpu_system_resources.time_delta_uniform,
-            0,
-            bytemuck::must_cast_slice(&time_delta_slice),
-        );
+        write_time_delta(time_delta, &queue, &gpu_system_resources);
 
-        let framebuffer_view = framebuffer_download_buffer.get_mapped_range(..);
-        let framebuffer_data = bytemuck::cast_slice(&framebuffer_view);
-        framebuffer.buffer_mut().copy_from_slice(framebuffer_data);
-
-        drop(framebuffer_view);
+        download_framebuffer(&mut framebuffer, &framebuffer_download_buffer);
         framebuffer_download_buffer.unmap();
 
         log::info!(">>> Saving framebuffer state {i} to file...");
@@ -448,6 +416,40 @@ fn setup_gpu_systems<'entries>(
     executor.set_additional_entries(systems.update_position, &additional_entries.update_position);
     executor.set_additional_entries(systems.update_data, &additional_entries.update_data);
     executor.set_additional_entries(systems.render_sprite, &additional_entries.render_sprite);
+}
+
+fn log_timestamp_query_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) {
+    let Some(statistics) = executor.timestamp_query_statistics(queue) else {
+        return;
+    };
+
+    let statistics = statistics.expect("timestamp query statistics should be ready");
+    for (system, statistics) in &statistics {
+        let Some(system_shader) = executor.systems().get_system_shader(system) else {
+            unreachable!("{system} should exist")
+        };
+
+        let label = system_shader.label().expect("GPU system should be labeled");
+        for (archetype, statistics) in statistics {
+            let duration = statistics.duration;
+            log::info!(">>>> {system} `{label}` with {archetype:#} took {duration:?}");
+        }
+    }
+}
+
+fn write_time_delta(time_delta: TimeDelta, queue: &wgpu::Queue, resources: &GpuSystemResources) {
+    let data = bytemuck::bytes_of(&time_delta);
+    queue.write_buffer(&resources.time_delta_uniform, 0, data);
+}
+
+fn download_framebuffer<B>(framebuffer: &mut Framebuffer<B>, download_buffer: &wgpu::Buffer)
+where
+    B: AsMut<[u32]>,
+{
+    let framebuffer_view = download_buffer.get_mapped_range(..);
+    let src = bytemuck::cast_slice(&framebuffer_view);
+    let dst = framebuffer.buffer_mut().as_mut();
+    dst.copy_from_slice(src);
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

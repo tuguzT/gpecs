@@ -1,7 +1,7 @@
 use std::{fs, time::Instant};
 
 use glam::Vec3;
-use gpecs::prelude::*;
+use gpecs::{archetype::storage, prelude::*};
 use gpecs_itertools::Itertools as _;
 use gpecs_simple_types::{Mass, Position, Tag};
 use num_traits::ToPrimitive;
@@ -9,7 +9,6 @@ use rayon::prelude::*;
 
 use crate::setup;
 
-#[expect(clippy::too_many_lines)]
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     setup::setup(context, entity_count);
 
@@ -25,40 +24,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         .register_archetype_of::<(Position, Tag)>()
         .expect("archetype of `Position` and `Tag` should contain unique component ids");
 
-    let shader_module = init_wgpu_shader(&device);
-
-    let position_gpu_id = executor.register_component::<Position>();
-    let position_gpu_system_descriptor = GpuSystemDescriptor {
-        label: Some("update entity position"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_entity_position"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: true,
-        bind_components: [(position_gpu_id, GpuComponentAccess::ReadWrite)],
-        additional_bindings: [],
-    };
-    let positions_gpu_system_id = executor
-        .register_system(position_gpu_system_descriptor)
-        .expect("GPU system by shader module should be registered");
-
-    let mass_gpu_id = executor.register_component::<Mass>();
-    let mass_gpu_system_descriptor = GpuSystemDescriptor {
-        label: Some("update entity mass"),
-        shader_module,
-        entry_point: Some("update_entity_mass"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: true,
-        bind_components: [(mass_gpu_id, GpuComponentAccess::ReadWrite)],
-        additional_bindings: [],
-    };
-    let mass_gpu_system_id = executor
-        .register_system(mass_gpu_system_descriptor)
-        .expect("GPU system by shader module should be registered");
-
-    let _tag_gpu_id = executor.register_component::<Tag>();
-
-    executor.add_system(positions_gpu_system_id);
-    executor.add_system(mass_gpu_system_id);
+    register_gpu_systems(&mut executor);
 
     log::info!("Starting to execute systems on GPU...");
     for i in (0_u128..).maybe_take(repeat_count) {
@@ -97,47 +63,91 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        let position_tag_bundles = position_tag_archetype_storage
+        let positions = position_tag_archetype_storage
             .as_bundles::<(Position,)>(&components.as_view())
             .expect("archetype should contain `Position` components");
-        position_tag_bundles
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(index, item)| {
-                let (entity, (position,)) = item;
-                let expected_position = Position {
-                    data: Vec3 {
-                        x: entity.index().to_f32().unwrap(),
-                        y: entity.index().to_f32().unwrap() / 2.0,
-                        z: -entity.index().to_f32().unwrap() / 2.0,
-                    },
-                    padding: Default::default(),
-                };
-                assert_eq!(
-                    position, &expected_position,
-                    "position does not match expected at {index}",
-                );
-            });
+        check_positions(positions);
 
-        // Check data inside of the timestamp query download buffer
-        if let Some(statistics) = executor.timestamp_query_statistics(&queue) {
-            let statistics = statistics.expect("timestamp query statistics should be ready");
-            for (system, statistics) in &statistics {
-                let Some(system_shader) = executor.systems().get_system_shader(system) else {
-                    unreachable!("{system} should exist")
-                };
-
-                let label = system_shader.label().expect("GPU system should be labeled");
-                for (archetype, statistics) in statistics {
-                    let duration = statistics.duration;
-                    log::info!("GPU {system} `{label}` with {archetype} took {duration:?}");
-                }
-            }
-        }
+        log_timestamp_query_statistics(&executor, &queue);
         log::info!("Execution of all the GPU systems {i} took {elapsed:?}");
     }
 
+    // Return context from the executor to the caller
     executor.into_context(&queue)
+}
+
+fn register_gpu_systems(executor: &mut GpuExecutor) {
+    let shader_module = init_wgpu_shader(executor.device());
+
+    let position_gpu_id = executor.register_component::<Position>();
+    let position_gpu_system_descriptor = GpuSystemDescriptor {
+        label: Some("update entity position"),
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_entity_position"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: true,
+        bind_components: [(position_gpu_id, GpuComponentAccess::ReadWrite)],
+        additional_bindings: [],
+    };
+    let positions_gpu_system_id = executor
+        .register_system(position_gpu_system_descriptor)
+        .expect("GPU system by shader module should be registered");
+
+    let mass_gpu_id = executor.register_component::<Mass>();
+    let mass_gpu_system_descriptor = GpuSystemDescriptor {
+        label: Some("update entity mass"),
+        shader_module,
+        entry_point: Some("update_entity_mass"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: true,
+        bind_components: [(mass_gpu_id, GpuComponentAccess::ReadWrite)],
+        additional_bindings: [],
+    };
+    let mass_gpu_system_id = executor
+        .register_system(mass_gpu_system_descriptor)
+        .expect("GPU system by shader module should be registered");
+
+    executor.add_system(positions_gpu_system_id);
+    executor.add_system(mass_gpu_system_id);
+}
+
+fn log_timestamp_query_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) {
+    let Some(statistics) = executor.timestamp_query_statistics(queue) else {
+        return;
+    };
+
+    let statistics = statistics.expect("timestamp query statistics should be ready");
+    for (system, statistics) in &statistics {
+        let Some(system_shader) = executor.systems().get_system_shader(system) else {
+            unreachable!("{system} should exist")
+        };
+
+        let label = system_shader.label().expect("GPU system should be labeled");
+        for (archetype, statistics) in statistics {
+            let duration = statistics.duration;
+            log::info!("GPU {system} `{label}` with {archetype} took {duration:?}");
+        }
+    }
+}
+
+fn check_positions(positions: storage::Bundles<(Position,)>) {
+    let positions = positions.into_par_iter().enumerate();
+    positions.for_each(|(index, item)| {
+        let (entity, (position,)) = item;
+        let expected_position = Position {
+            data: Vec3 {
+                x: entity.index().to_f32().unwrap(),
+                y: entity.index().to_f32().unwrap() / 2.0,
+                z: -entity.index().to_f32().unwrap() / 2.0,
+            },
+            padding: Default::default(),
+        };
+
+        assert_eq!(
+            position, &expected_position,
+            "position does not match expected at {index}",
+        );
+    });
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {

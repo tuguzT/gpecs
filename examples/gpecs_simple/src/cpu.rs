@@ -25,7 +25,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         log::info!("Execution of all the CPU systems {i} took {duration:?}");
     }
 
-    // Return context from the executor
+    // Return context from the executor to the caller
     executor.into_context()
 }
 

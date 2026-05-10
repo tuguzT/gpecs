@@ -2,7 +2,7 @@ use core::ops::Range;
 
 use bytemuck::{Pod, Zeroable};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct TimeDelta(pub f32);
 

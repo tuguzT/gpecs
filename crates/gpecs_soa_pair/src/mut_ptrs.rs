@@ -5,15 +5,14 @@ use core::{
     ptr,
 };
 
-use crate::{
-    item::{DenseItem, DensePtrs, DenseRefs, DenseRefsMut},
-    soa::{
-        traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaContext, SoaWrite, WriteSoaContext},
-        wrapper,
-    },
+use gpecs_soa::{
+    traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaContext, SoaWrite, WriteSoaContext},
+    wrapper,
 };
 
-pub struct DenseMutPtrs<'ctx, K, V>
+use crate::{KeyValueMutRefs, KeyValuePair, KeyValuePtrs, KeyValueRefs};
+
+pub struct KeyValueMutPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -21,7 +20,7 @@ where
     pub value: wrapper::MutPtrs<'ctx, V>,
 }
 
-impl<'ctx, K, V> DenseMutPtrs<'ctx, K, V>
+impl<'ctx, K, V> KeyValueMutPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -45,12 +44,12 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self, context: &'ctx V::Context) -> DensePtrs<'ctx, K, V> {
+    pub fn cast_const(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V> {
         let Self { key, value } = self;
 
         let key = key.cast_const();
         let value = context.ptrs_cast_const(value.into_inner());
-        DensePtrs::new(key, value)
+        KeyValuePtrs::new(key, value)
     }
 
     #[inline]
@@ -64,9 +63,9 @@ where
     }
 
     #[inline]
-    pub unsafe fn offset_from(self, context: &V::Context, origin: DensePtrs<'_, K, V>) -> isize {
+    pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
         let Self { key, value } = self;
-        let DensePtrs {
+        let KeyValuePtrs {
             key: origin_key,
             value: origin_value,
         } = origin;
@@ -82,12 +81,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn swap(self, context: &V::Context, with: DenseMutPtrs<'_, K, V>) {
+    pub unsafe fn swap(self, context: &V::Context, with: KeyValueMutPtrs<'_, K, V>) {
         let Self {
             key: this_key,
             value: this_value,
         } = self;
-        let DenseMutPtrs {
+        let KeyValueMutPtrs {
             key: with_key,
             value: with_value,
         } = with;
@@ -102,14 +101,14 @@ where
     pub unsafe fn copy_from_forward(
         self,
         context: &V::Context,
-        from: DensePtrs<'_, K, V>,
+        from: KeyValuePtrs<'_, K, V>,
         len: usize,
     ) {
         let Self {
             key: dst_key,
             value: dst_value,
         } = self;
-        let DensePtrs {
+        let KeyValuePtrs {
             key: src_key,
             value: src_value,
         } = from;
@@ -124,14 +123,14 @@ where
     pub unsafe fn copy_from_backward(
         self,
         context: &V::Context,
-        from: DensePtrs<'_, K, V>,
+        from: KeyValuePtrs<'_, K, V>,
         len: usize,
     ) {
         let Self {
             key: dst_key,
             value: dst_value,
         } = self;
-        let DensePtrs {
+        let KeyValuePtrs {
             key: src_key,
             value: src_value,
         } = from;
@@ -146,14 +145,14 @@ where
     pub unsafe fn copy_from_nonoverlapping(
         self,
         context: &V::Context,
-        from: DensePtrs<'_, K, V>,
+        from: KeyValuePtrs<'_, K, V>,
         len: usize,
     ) {
         let Self {
             key: dst_key,
             value: dst_value,
         } = self;
-        let DensePtrs {
+        let KeyValuePtrs {
             key: src_key,
             value: src_value,
         } = from;
@@ -177,7 +176,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn write<W>(self, context: &V::Context, value: DenseItem<K, W>)
+    pub unsafe fn write<W>(self, context: &V::Context, value: KeyValuePair<K, W>)
     where
         V: SoaWrite<W>,
     {
@@ -185,7 +184,7 @@ where
             key: key_ptr,
             value: value_ptr,
         } = self;
-        let DenseItem { key, value } = value;
+        let KeyValuePair { key, value } = value;
 
         unsafe {
             ptr::write(key_ptr, key);
@@ -194,12 +193,15 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> DenseMutPtrs<'ctx, K, V>
+impl<'ctx, 'a, K, V> KeyValueMutPtrs<'ctx, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub unsafe fn as_ref_unchecked(self, context: &'ctx V::Context) -> DenseRefs<'ctx, 'a, K, V> {
+    pub unsafe fn as_ref_unchecked(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValueRefs<'ctx, 'a, K, V> {
         unsafe { self.cast_const(context).as_ref_unchecked(context) }
     }
 
@@ -207,16 +209,16 @@ where
     pub unsafe fn as_mut_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> DenseRefsMut<'ctx, 'a, K, V> {
+    ) -> KeyValueMutRefs<'ctx, 'a, K, V> {
         let Self { key, value } = self;
 
         let key = unsafe { key.as_mut_unchecked() };
         let value = unsafe { context.mut_ptrs_to_mut_refs(value.into_inner()) };
-        DenseRefsMut::new(key, value)
+        KeyValueMutRefs::new(key, value)
     }
 }
 
-impl<'ctx, K, V> From<(*mut K, MutPtrs<'ctx, V>)> for DenseMutPtrs<'ctx, K, V>
+impl<'ctx, K, V> From<(*mut K, MutPtrs<'ctx, V>)> for KeyValueMutPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -227,31 +229,32 @@ where
     }
 }
 
-impl<'ctx, K, V> From<DenseMutPtrs<'ctx, K, V>> for (*mut K, MutPtrs<'ctx, V>)
+impl<'ctx, K, V> From<KeyValueMutPtrs<'ctx, K, V>> for (*mut K, MutPtrs<'ctx, V>)
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(value: DenseMutPtrs<'ctx, K, V>) -> Self {
+    fn from(value: KeyValueMutPtrs<'ctx, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for DenseMutPtrs<'_, K, V>
+impl<K, V> Debug for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
-        f.debug_struct("DenseMutPtrs")
+
+        f.debug_struct("KeyValueMutPtrs")
             .field("key", key)
             .field("value", value)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for DenseMutPtrs<'_, K, V>
+impl<K, V> PartialEq for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: PartialEq,
@@ -262,20 +265,21 @@ where
     }
 }
 
-impl<K, V> Eq for DenseMutPtrs<'_, K, V>
+impl<K, V> Eq for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: Eq,
 {
 }
 
-impl<K, V> PartialOrd for DenseMutPtrs<'_, K, V>
+impl<K, V> PartialOrd for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
+
         match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -284,13 +288,14 @@ where
     }
 }
 
-impl<K, V> Ord for DenseMutPtrs<'_, K, V>
+impl<K, V> Ord for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
+
         match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -299,31 +304,33 @@ where
     }
 }
 
-impl<K, V> Hash for DenseMutPtrs<'_, K, V>
+impl<K, V> Hash for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
+
         key.hash(state);
         value.hash(state);
     }
 }
 
-impl<K, V> Clone for DenseMutPtrs<'_, K, V>
+impl<K, V> Clone for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
         let Self { key, ref value } = *self;
+
         let value = value.clone();
         Self { key, value }
     }
 }
 
-impl<K, V> Copy for DenseMutPtrs<'_, K, V>
+impl<K, V> Copy for KeyValueMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, V>: Copy,

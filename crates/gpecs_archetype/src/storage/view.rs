@@ -20,7 +20,7 @@ use gpecs_soa_erased::{
 };
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DenseSlices, SparseItem},
+    item::{KeyValueSlices, SparseItem},
     view::{EpochSparseView, EpochSparseViewPtr},
 };
 
@@ -55,7 +55,7 @@ where
         let entities = must_cast_slice(entities);
         let dense = SoaSlices::new(
             Identity::from_inner_ref(context),
-            DenseSlices::new(context, entities, bundles),
+            KeyValueSlices::new(context, entities, bundles),
         );
 
         let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
@@ -73,7 +73,7 @@ where
         let entities = must_cast_slice(entities);
         let dense = SoaSlices::new(
             Identity::from_inner_ref(context),
-            DenseSlices::new(context, entities, bundles),
+            KeyValueSlices::new(context, entities, bundles),
         );
 
         let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();

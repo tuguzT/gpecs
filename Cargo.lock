@@ -853,11 +853,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpecs_soa_pair"
+version = "0.0.0"
+dependencies = [
+ "gpecs_soa",
+]
+
+[[package]]
 name = "gpecs_sparse"
 version = "0.0.0"
 dependencies = [
  "gpecs_itertools",
  "gpecs_soa",
+ "gpecs_soa_pair",
  "rayon",
 ]
 

@@ -5,15 +5,14 @@ use core::{
     ptr,
 };
 
-use crate::{
-    item::DenseSlicePtrs,
-    soa::{
-        traits::{Slices, Soa, SoaContext, SoaOwned},
-        wrapper,
-    },
+use gpecs_soa::{
+    traits::{Slices, Soa, SoaContext, SoaOwned},
+    wrapper,
 };
 
-pub struct DenseSlices<'ctx, 'a, K, V>
+use crate::KeyValueSlicePtrs;
+
+pub struct KeyValueSlices<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -21,7 +20,7 @@ where
     values: wrapper::Slices<'ctx, 'a, V>,
 }
 
-impl<'ctx, 'a, K, V> DenseSlices<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> KeyValueSlices<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -54,26 +53,26 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self, context: &'ctx V::Context) -> DenseSlicePtrs<'ctx, K, V> {
+    pub fn into_slice_ptrs(self, context: &'ctx V::Context) -> KeyValueSlicePtrs<'ctx, K, V> {
         let Self { keys, values } = self;
 
         let keys = ptr::from_ref(keys);
         let values = context.slices_as_slice_ptrs(values.into_inner());
-        unsafe { DenseSlicePtrs::new_unchecked(keys, values) }
+        unsafe { KeyValueSlicePtrs::new_unchecked(keys, values) }
     }
 }
 
-impl<'ctx, 'a, K, V> From<DenseSlices<'ctx, 'a, K, V>> for (&'a [K], Slices<'ctx, 'a, V>)
+impl<'ctx, 'a, K, V> From<KeyValueSlices<'ctx, 'a, K, V>> for (&'a [K], Slices<'ctx, 'a, V>)
 where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    fn from(value: DenseSlices<'ctx, 'a, K, V>) -> Self {
+    fn from(value: KeyValueSlices<'ctx, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for DenseSlices<'_, '_, K, V>
+impl<K, V> Debug for KeyValueSlices<'_, '_, K, V>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
@@ -81,14 +80,15 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
-        f.debug_struct("DenseSlices")
+
+        f.debug_struct("KeyValueSlices")
             .field("keys", keys)
             .field("values", values)
             .finish()
     }
 }
 
-impl<K, V> Default for DenseSlices<'_, '_, K, V>
+impl<K, V> Default for KeyValueSlices<'_, '_, K, V>
 where
     V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Default,
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<K, V> PartialEq for DenseSlices<'_, '_, K, V>
+impl<K, V> PartialEq for KeyValueSlices<'_, '_, K, V>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
@@ -113,7 +113,7 @@ where
     }
 }
 
-impl<K, V> Eq for DenseSlices<'_, '_, K, V>
+impl<K, V> Eq for KeyValueSlices<'_, '_, K, V>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
@@ -121,7 +121,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for DenseSlices<'_, '_, K, V>
+impl<K, V> PartialOrd for KeyValueSlices<'_, '_, K, V>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
@@ -129,6 +129,7 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
+
         match keys.partial_cmp(&other.keys) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -137,7 +138,7 @@ where
     }
 }
 
-impl<K, V> Ord for DenseSlices<'_, '_, K, V>
+impl<K, V> Ord for KeyValueSlices<'_, '_, K, V>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
@@ -145,6 +146,7 @@ where
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
+
         match keys.cmp(&other.keys) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -153,7 +155,7 @@ where
     }
 }
 
-impl<K, V> Hash for DenseSlices<'_, '_, K, V>
+impl<K, V> Hash for KeyValueSlices<'_, '_, K, V>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
@@ -161,12 +163,13 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
+
         keys.hash(state);
         values.hash(state);
     }
 }
 
-impl<K, V> Clone for DenseSlices<'_, '_, K, V>
+impl<K, V> Clone for KeyValueSlices<'_, '_, K, V>
 where
     V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Clone,
@@ -174,12 +177,13 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, ref values } = *self;
+
         let values = values.clone();
         Self { keys, values }
     }
 }
 
-impl<K, V> Copy for DenseSlices<'_, '_, K, V>
+impl<K, V> Copy for KeyValueSlices<'_, '_, K, V>
 where
     V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Copy,

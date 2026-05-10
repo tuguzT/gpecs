@@ -4,7 +4,7 @@ use core::{
 };
 
 use crate::{
-    item::{DenseItem, DenseSliceMutPtrs, DenseSlicesMut},
+    item::{KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair},
     iter::{Keys, RawIter, RawIterMut, ValuesMut},
     soa::{
         self,
@@ -16,7 +16,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, 'a, K, V> = soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>>;
+type Inner<'ctx, 'a, K, V> = soa::slice::IterMut<'ctx, 'a, KeyValuePair<K, V>>;
 
 #[repr(transparent)]
 pub struct IterMut<'ctx, 'a, K, V>
@@ -39,7 +39,7 @@ where
         keys: *mut [K],
         values: SliceMutPtrs<'ctx, V>,
     ) -> Self {
-        let slices = DenseSliceMutPtrs::new(context, keys, values);
+        let slices = KeyValueMutSlicePtrs::new(context, keys, values);
         let context = Identity::from_inner_ref(context);
         let inner = unsafe { Inner::from_parts(context, slices) };
         Self::from_inner(inner)
@@ -223,7 +223,7 @@ where
         keys: &'a mut [K],
         values: SlicesMut<'ctx, 'a, V>,
     ) -> Self {
-        let slices = DenseSlicesMut::new(context, keys, values);
+        let slices = KeyValueMutSlices::new(context, keys, values);
         let context = Identity::from_inner_ref(context);
         let inner = Inner::new(context, slices);
         Self::from_inner(inner)

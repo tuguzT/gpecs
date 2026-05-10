@@ -13,7 +13,7 @@ use gpecs_component::registry::{
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DenseSlices, SparseItem},
+    item::{KeyValueSlices, SparseItem},
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::{AsIdentitySlice, Identity, IdentitySlice},
@@ -58,7 +58,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let values = metas.as_identity_slice();
         let dense = SoaSlices::new(
             Identity::from_inner_ref(context),
-            DenseSlices::new(context, keys, values),
+            KeyValueSlices::new(context, keys, values),
         );
 
         let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
@@ -78,7 +78,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let dense = unsafe {
             SoaSlices::new(
                 Identity::from_inner_ref(context),
-                DenseSlices::new_unchecked(keys, values),
+                KeyValueSlices::new_unchecked(keys, values),
             )
         };
 

@@ -5,15 +5,14 @@ use core::{
     ptr,
 };
 
-use crate::{
-    item::DensePtrs,
-    soa::{
-        traits::{Refs, Soa, SoaContext, SoaOwned},
-        wrapper,
-    },
+use gpecs_soa::{
+    traits::{Refs, Soa, SoaContext, SoaOwned},
+    wrapper,
 };
 
-pub struct DenseRefs<'ctx, 'a, K, V>
+use crate::KeyValuePtrs;
+
+pub struct KeyValueRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -21,7 +20,7 @@ where
     pub value: wrapper::Refs<'ctx, 'a, V>,
 }
 
-impl<'ctx, 'a, K, V> DenseRefs<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> KeyValueRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -38,16 +37,16 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> DensePtrs<'ctx, K, V> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V> {
         let Self { key, value } = self;
 
         let key = ptr::from_ref(key);
         let value = context.refs_as_ptrs(value.into_inner());
-        DensePtrs::new(key, value)
+        KeyValuePtrs::new(key, value)
     }
 }
 
-impl<'ctx, 'a, K, V> From<(&'a K, Refs<'ctx, 'a, V>)> for DenseRefs<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> From<(&'a K, Refs<'ctx, 'a, V>)> for KeyValueRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -58,17 +57,17 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> From<DenseRefs<'ctx, 'a, K, V>> for (&'a K, Refs<'ctx, 'a, V>)
+impl<'ctx, 'a, K, V> From<KeyValueRefs<'ctx, 'a, K, V>> for (&'a K, Refs<'ctx, 'a, V>)
 where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    fn from(value: DenseRefs<'ctx, 'a, K, V>) -> Self {
+    fn from(value: KeyValueRefs<'ctx, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for DenseRefs<'_, '_, K, V>
+impl<K, V> Debug for KeyValueRefs<'_, '_, K, V>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
@@ -76,14 +75,15 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
-        f.debug_struct("DenseRefs")
+
+        f.debug_struct("KeyValueRefs")
             .field("key", key)
             .field("value", value)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for DenseRefs<'_, '_, K, V>
+impl<K, V> PartialEq for KeyValueRefs<'_, '_, K, V>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
@@ -95,7 +95,7 @@ where
     }
 }
 
-impl<K, V> Eq for DenseRefs<'_, '_, K, V>
+impl<K, V> Eq for KeyValueRefs<'_, '_, K, V>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
@@ -103,7 +103,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for DenseRefs<'_, '_, K, V>
+impl<K, V> PartialOrd for KeyValueRefs<'_, '_, K, V>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
@@ -111,6 +111,7 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
+
         match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -119,7 +120,7 @@ where
     }
 }
 
-impl<K, V> Ord for DenseRefs<'_, '_, K, V>
+impl<K, V> Ord for KeyValueRefs<'_, '_, K, V>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
@@ -127,6 +128,7 @@ where
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
+
         match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -135,7 +137,7 @@ where
     }
 }
 
-impl<K, V> Hash for DenseRefs<'_, '_, K, V>
+impl<K, V> Hash for KeyValueRefs<'_, '_, K, V>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
@@ -143,12 +145,13 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
+
         key.hash(state);
         value.hash(state);
     }
 }
 
-impl<K, V> Clone for DenseRefs<'_, '_, K, V>
+impl<K, V> Clone for KeyValueRefs<'_, '_, K, V>
 where
     V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Clone,
@@ -156,12 +159,13 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self { key, ref value } = *self;
+
         let value = value.clone();
         Self { key, value }
     }
 }
 
-impl<K, V> Copy for DenseRefs<'_, '_, K, V>
+impl<K, V> Copy for KeyValueRefs<'_, '_, K, V>
 where
     V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Copy,

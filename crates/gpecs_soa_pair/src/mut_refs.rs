@@ -5,15 +5,14 @@ use core::{
     ptr,
 };
 
-use crate::{
-    item::{DenseMutPtrs, DenseRefs},
-    soa::{
-        traits::{RefsMut, Soa, SoaContext, SoaOwned},
-        wrapper,
-    },
+use gpecs_soa::{
+    traits::{RefsMut, Soa, SoaContext, SoaOwned},
+    wrapper,
 };
 
-pub struct DenseRefsMut<'ctx, 'a, K, V>
+use crate::{KeyValueMutPtrs, KeyValueRefs};
+
+pub struct KeyValueMutRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -21,7 +20,7 @@ where
     pub value: wrapper::RefsMut<'ctx, 'a, V>,
 }
 
-impl<'ctx, 'a, K, V> DenseRefsMut<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> KeyValueMutRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -38,25 +37,25 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> DenseMutPtrs<'ctx, K, V> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V> {
         let Self { key, value } = self;
 
         let key = ptr::from_mut(key);
         let value = context.mut_refs_as_mut_ptrs(value.into_inner());
-        DenseMutPtrs::new(key, value)
+        KeyValueMutPtrs::new(key, value)
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'ctx V::Context) -> DenseRefs<'ctx, 'a, K, V> {
+    pub fn into_refs(self, context: &'ctx V::Context) -> KeyValueRefs<'ctx, 'a, K, V> {
         let Self { key, value } = self;
 
         let key = &*key;
         let value = context.mut_refs_as_refs(value.into_inner());
-        DenseRefs::new(key, value)
+        KeyValueRefs::new(key, value)
     }
 }
 
-impl<'ctx, 'a, K, V> From<(&'a mut K, RefsMut<'ctx, 'a, V>)> for DenseRefsMut<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> From<(&'a mut K, RefsMut<'ctx, 'a, V>)> for KeyValueMutRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
@@ -67,17 +66,17 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> From<DenseRefsMut<'ctx, 'a, K, V>> for (&'a mut K, RefsMut<'ctx, 'a, V>)
+impl<'ctx, 'a, K, V> From<KeyValueMutRefs<'ctx, 'a, K, V>> for (&'a mut K, RefsMut<'ctx, 'a, V>)
 where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    fn from(value: DenseRefsMut<'ctx, 'a, K, V>) -> Self {
+    fn from(value: KeyValueMutRefs<'ctx, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for DenseRefsMut<'_, '_, K, V>
+impl<K, V> Debug for KeyValueMutRefs<'_, '_, K, V>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
@@ -85,14 +84,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
-        f.debug_struct("DenseRefsMut")
+        f.debug_struct("KeyValueMutRefs")
             .field("key", key)
             .field("value", value)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for DenseRefsMut<'_, '_, K, V>
+impl<K, V> PartialEq for KeyValueMutRefs<'_, '_, K, V>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
@@ -104,7 +103,7 @@ where
     }
 }
 
-impl<K, V> Eq for DenseRefsMut<'_, '_, K, V>
+impl<K, V> Eq for KeyValueMutRefs<'_, '_, K, V>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
@@ -112,7 +111,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for DenseRefsMut<'_, '_, K, V>
+impl<K, V> PartialOrd for KeyValueMutRefs<'_, '_, K, V>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
@@ -120,6 +119,7 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
+
         match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -128,7 +128,7 @@ where
     }
 }
 
-impl<K, V> Ord for DenseRefsMut<'_, '_, K, V>
+impl<K, V> Ord for KeyValueMutRefs<'_, '_, K, V>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
@@ -136,6 +136,7 @@ where
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
+
         match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -144,7 +145,7 @@ where
     }
 }
 
-impl<K, V> Hash for DenseRefsMut<'_, '_, K, V>
+impl<K, V> Hash for KeyValueMutRefs<'_, '_, K, V>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
@@ -152,6 +153,7 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
+
         key.hash(state);
         value.hash(state);
     }

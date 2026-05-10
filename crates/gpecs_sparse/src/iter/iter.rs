@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    item::{DenseItem, DenseSlicePtrs, DenseSlices},
+    item::{KeyValuePair, KeyValueSlicePtrs, KeyValueSlices},
     iter::{Keys, RawIter, Values},
     soa::{
         self,
@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, 'a, K, V> = soa::slice::Iter<'ctx, 'a, DenseItem<K, V>>;
+type Inner<'ctx, 'a, K, V> = soa::slice::Iter<'ctx, 'a, KeyValuePair<K, V>>;
 
 #[repr(transparent)]
 pub struct Iter<'ctx, 'a, K, V>
@@ -38,7 +38,7 @@ where
         keys: *const [K],
         values: SlicePtrs<'ctx, V>,
     ) -> Self {
-        let slices = DenseSlicePtrs::new(context, keys, values);
+        let slices = KeyValueSlicePtrs::new(context, keys, values);
         let context = Identity::from_inner_ref(context);
         let inner = unsafe { Inner::from_parts(context, slices) };
         Self::from_inner(inner)
@@ -148,7 +148,7 @@ where
     #[inline]
     #[track_caller]
     pub fn new(context: &'ctx V::Context, keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
-        let slices = DenseSlices::new(context, keys, values);
+        let slices = KeyValueSlices::new(context, keys, values);
         let context = Identity::from_inner_ref(context);
         let inner = Inner::new(context, slices);
         Self::from_inner(inner)

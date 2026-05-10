@@ -6,7 +6,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    item::DenseItem,
+    item::KeyValuePair,
     iter::Iter,
     soa::{
         slice,
@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, 'a, K, V> = slice::ParIter<'ctx, 'a, DenseItem<K, V>>;
+type Inner<'ctx, 'a, K, V> = slice::ParIter<'ctx, 'a, KeyValuePair<K, V>>;
 
 #[repr(transparent)]
 pub struct ParIter<'ctx, 'a, K, V>

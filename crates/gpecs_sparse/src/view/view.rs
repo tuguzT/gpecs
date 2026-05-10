@@ -14,7 +14,7 @@ use crate::{
         sparse_index,
     },
     error::FromPartsError,
-    item::{DenseItem, DensePtrs, DenseSlicePtrs, DenseSlices, SparseItem},
+    item::{KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem},
     iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
     key::Key,
     soa::{
@@ -30,7 +30,7 @@ where
     V: RawSoa + ?Sized,
     V::Context: 'ctx,
 {
-    dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
+    dense: SoaSlices<'ctx, 'a, KeyValuePair<K, V>>,
     sparse: &'a [SparseItem<K>],
 }
 
@@ -41,7 +41,7 @@ where
 {
     #[inline]
     pub fn new(
-        dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
+        dense: SoaSlices<'ctx, 'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         check_parts(dense.slices(), sparse)?;
@@ -52,14 +52,14 @@ where
 
     #[inline]
     pub unsafe fn from_parts(
-        dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
+        dense: SoaSlices<'ctx, 'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Self {
         Self { dense, sparse }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (SoaSlices<'ctx, 'a, DenseItem<K, V>>, &'a [SparseItem<K>]) {
+    pub fn into_parts(self) -> (SoaSlices<'ctx, 'a, KeyValuePair<K, V>>, &'a [SparseItem<K>]) {
         let Self { dense, sparse } = self;
         (dense, sparse)
     }
@@ -110,13 +110,15 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (DensePtrs<'_, K, V>, *const SparseItem<K>) {
+    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V>, *const SparseItem<K>) {
         let (_, dense, sparse) = self.as_ptrs_with_context();
         (dense, sparse)
     }
 
     #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&V::Context, DensePtrs<'_, K, V>, *const SparseItem<K>) {
+    pub fn as_ptrs_with_context(
+        &self,
+    ) -> (&V::Context, KeyValuePtrs<'_, K, V>, *const SparseItem<K>) {
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.as_ptrs_with_context();
@@ -151,13 +153,13 @@ where
     }
 
     #[inline]
-    pub fn as_dense_ptrs(&self) -> DensePtrs<'_, K, V> {
+    pub fn as_dense_ptrs(&self) -> KeyValuePtrs<'_, K, V> {
         let (_, dense) = self.as_dense_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_dense_ptrs_with_context(&self) -> (&V::Context, DensePtrs<'_, K, V>) {
+    pub fn as_dense_ptrs_with_context(&self) -> (&V::Context, KeyValuePtrs<'_, K, V>) {
         let (context, dense, _) = self.as_ptrs_with_context();
         (context, dense)
     }
@@ -175,7 +177,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> (DensePtrs<'ctx, K, V>, *const SparseItem<K>) {
+    pub fn into_ptrs(self) -> (KeyValuePtrs<'ctx, K, V>, *const SparseItem<K>) {
         let (_, dense, sparse) = self.into_ptrs_with_context();
         (dense, sparse)
     }
@@ -185,7 +187,7 @@ where
         self,
     ) -> (
         &'ctx V::Context,
-        DensePtrs<'ctx, K, V>,
+        KeyValuePtrs<'ctx, K, V>,
         *const SparseItem<K>,
     ) {
         let Self { dense, sparse } = self;
@@ -222,13 +224,13 @@ where
     }
 
     #[inline]
-    pub fn into_dense_ptrs(self) -> DensePtrs<'ctx, K, V> {
+    pub fn into_dense_ptrs(self) -> KeyValuePtrs<'ctx, K, V> {
         let (_, dense) = self.into_dense_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn into_dense_ptrs_with_context(self) -> (&'ctx V::Context, DensePtrs<'ctx, K, V>) {
+    pub fn into_dense_ptrs_with_context(self) -> (&'ctx V::Context, KeyValuePtrs<'ctx, K, V>) {
         let (context, dense, _) = self.into_ptrs_with_context();
         (context, dense)
     }
@@ -246,7 +248,7 @@ where
     }
 
     #[inline]
-    pub fn as_slice_ptrs(&self) -> (DenseSlicePtrs<'_, K, V>, *const [SparseItem<K>]) {
+    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V>, *const [SparseItem<K>]) {
         let (_, dense, sparse) = self.as_slice_ptrs_with_context();
         (dense, sparse)
     }
@@ -256,7 +258,7 @@ where
         &self,
     ) -> (
         &V::Context,
-        DenseSlicePtrs<'_, K, V>,
+        KeyValueSlicePtrs<'_, K, V>,
         *const [SparseItem<K>],
     ) {
         let Self { dense, sparse } = self;
@@ -293,13 +295,13 @@ where
     }
 
     #[inline]
-    pub fn as_dense_slice_ptrs(&self) -> DenseSlicePtrs<'_, K, V> {
+    pub fn as_dense_slice_ptrs(&self) -> KeyValueSlicePtrs<'_, K, V> {
         let (_, dense) = self.as_dense_slice_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_dense_slice_ptrs_with_context(&self) -> (&V::Context, DenseSlicePtrs<'_, K, V>) {
+    pub fn as_dense_slice_ptrs_with_context(&self) -> (&V::Context, KeyValueSlicePtrs<'_, K, V>) {
         let (context, dense, _) = self.as_slice_ptrs_with_context();
         (context, dense)
     }
@@ -317,7 +319,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> (DenseSlicePtrs<'ctx, K, V>, *const [SparseItem<K>]) {
+    pub fn into_slice_ptrs(self) -> (KeyValueSlicePtrs<'ctx, K, V>, *const [SparseItem<K>]) {
         let (_, dense, sparse) = self.into_slice_ptrs_with_context();
         (dense, sparse)
     }
@@ -327,7 +329,7 @@ where
         self,
     ) -> (
         &'ctx V::Context,
-        DenseSlicePtrs<'ctx, K, V>,
+        KeyValueSlicePtrs<'ctx, K, V>,
         *const [SparseItem<K>],
     ) {
         let Self { dense, sparse } = self;
@@ -362,7 +364,7 @@ where
     }
 
     #[inline]
-    pub fn into_dense_slice_ptrs(self) -> DenseSlicePtrs<'ctx, K, V> {
+    pub fn into_dense_slice_ptrs(self) -> KeyValueSlicePtrs<'ctx, K, V> {
         let (_, dense) = self.into_dense_slice_ptrs_with_context();
         dense
     }
@@ -370,7 +372,7 @@ where
     #[inline]
     pub fn into_dense_slice_ptrs_with_context(
         self,
-    ) -> (&'ctx V::Context, DenseSlicePtrs<'ctx, K, V>) {
+    ) -> (&'ctx V::Context, KeyValueSlicePtrs<'ctx, K, V>) {
         let (context, dense, _) = self.into_slice_ptrs_with_context();
         (context, dense)
     }
@@ -674,7 +676,7 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn into_slices(self) -> (DenseSlices<'ctx, 'a, K, V>, &'a [SparseItem<K>]) {
+    pub fn into_slices(self) -> (KeyValueSlices<'ctx, 'a, K, V>, &'a [SparseItem<K>]) {
         let (_, dense, sparse) = self.into_slices_with_context();
         (dense, sparse)
     }
@@ -684,7 +686,7 @@ where
         self,
     ) -> (
         &'ctx V::Context,
-        DenseSlices<'ctx, 'a, K, V>,
+        KeyValueSlices<'ctx, 'a, K, V>,
         &'a [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.into_slice_ptrs_with_context();
@@ -707,13 +709,15 @@ where
     }
 
     #[inline]
-    pub fn into_dense_slices(self) -> DenseSlices<'ctx, 'a, K, V> {
+    pub fn into_dense_slices(self) -> KeyValueSlices<'ctx, 'a, K, V> {
         let (_, dense) = self.into_dense_slices_with_context();
         dense
     }
 
     #[inline]
-    pub fn into_dense_slices_with_context(self) -> (&'ctx V::Context, DenseSlices<'ctx, 'a, K, V>) {
+    pub fn into_dense_slices_with_context(
+        self,
+    ) -> (&'ctx V::Context, KeyValueSlices<'ctx, 'a, K, V>) {
         let (context, dense, _) = self.into_slices_with_context();
         (context, dense)
     }
@@ -837,7 +841,7 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> (DenseSlices<'a, 'a, K, V>, &'a [SparseItem<K>]) {
+    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V>, &'a [SparseItem<K>]) {
         let (_, dense, sparse) = self.as_slices_with_context();
         (dense, sparse)
     }
@@ -847,7 +851,7 @@ where
         &'a self,
     ) -> (
         &'a V::Context,
-        DenseSlices<'a, 'a, K, V>,
+        KeyValueSlices<'a, 'a, K, V>,
         &'a [SparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
@@ -870,13 +874,15 @@ where
     }
 
     #[inline]
-    pub fn as_dense_slices(&'a self) -> DenseSlices<'a, 'a, K, V> {
+    pub fn as_dense_slices(&'a self) -> KeyValueSlices<'a, 'a, K, V> {
         let (_, dense) = self.as_dense_slices_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_dense_slices_with_context(&'a self) -> (&'a V::Context, DenseSlices<'a, 'a, K, V>) {
+    pub fn as_dense_slices_with_context(
+        &'a self,
+    ) -> (&'a V::Context, KeyValueSlices<'a, 'a, K, V>) {
         let (context, dense, _) = self.as_slices_with_context();
         (context, dense)
     }
@@ -1003,7 +1009,7 @@ where
     K: Key,
     V: RawSoa + ?Sized,
     SparseItem<K>: Debug,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: Debug,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
@@ -1055,7 +1061,7 @@ impl<'ctx, 'a, K, V> Copy for EpochSparseView<'ctx, 'a, K, V>
 where
     K: Key,
     V: RawSoa + ?Sized,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: Copy,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: Copy,
 {
 }
 
@@ -1063,7 +1069,7 @@ impl<'ctx, 'a, K, V> PartialEq for EpochSparseView<'ctx, 'a, K, V>
 where
     K: Key,
     V: RawSoa + ?Sized,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: PartialEq,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { dense, sparse } = self;
@@ -1075,7 +1081,7 @@ impl<'ctx, 'a, K, V> Eq for EpochSparseView<'ctx, 'a, K, V>
 where
     K: Key,
     V: RawSoa + ?Sized,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: Eq,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: Eq,
 {
 }
 
@@ -1083,7 +1089,7 @@ impl<'ctx, 'a, K, V> PartialOrd for EpochSparseView<'ctx, 'a, K, V>
 where
     K: Key,
     V: RawSoa + ?Sized,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: PartialOrd,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { dense, sparse } = self;
@@ -1099,7 +1105,7 @@ impl<'ctx, 'a, K, V> Ord for EpochSparseView<'ctx, 'a, K, V>
 where
     K: Key,
     V: RawSoa + ?Sized,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: Ord,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { dense, sparse } = self;
@@ -1116,7 +1122,7 @@ where
     K: Key,
     V: RawSoa + ?Sized,
     SparseItem<K>: Hash,
-    SoaSlices<'ctx, 'a, DenseItem<K, V>>: Hash,
+    SoaSlices<'ctx, 'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { dense, sparse } = self;

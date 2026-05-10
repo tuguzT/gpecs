@@ -3,14 +3,14 @@ use core::{
     iter::{self, Chain, Once},
 };
 
-use crate::soa::{
+use gpecs_soa::{
     field::{FieldLayouts, IntoFieldLayouts, IntoFieldLayoutsIter},
     layout::WithLayout,
     traits::RawSoa,
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct DenseFieldLayouts<T>
+pub struct KeyValueFieldLayouts<T>
 where
     T: ?Sized,
 {
@@ -18,7 +18,7 @@ where
     values: T,
 }
 
-impl<T> DenseFieldLayouts<T> {
+impl<T> KeyValueFieldLayouts<T> {
     #[inline]
     pub fn new<'a, K, V>(context: &'a V::Context) -> Self
     where
@@ -37,7 +37,7 @@ impl<T> DenseFieldLayouts<T> {
     }
 }
 
-impl<T> IntoIterator for DenseFieldLayouts<T>
+impl<T> IntoIterator for KeyValueFieldLayouts<T>
 where
     T: IntoIterator<Item: WithLayout>,
 {

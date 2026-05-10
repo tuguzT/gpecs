@@ -10,7 +10,7 @@ use crate::{
         OccupiedSparseItemExpectedError, SparseIndexMismatchError, SparseIndexOutOfBoundsError,
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
-    item::{DenseItem, SparseItem, SparseItemKind},
+    item::{KeyValuePair, SparseItem, SparseItemKind},
     key::Key,
     soa::{slice::SoaSlices, traits::RawSoa},
 };
@@ -233,7 +233,7 @@ where
 }
 
 #[inline]
-pub fn dense_keys<'a, K, V>(dense: SoaSlices<'_, 'a, DenseItem<K, V>>) -> &'a [K]
+pub fn dense_keys<'a, K, V>(dense: SoaSlices<'_, 'a, KeyValuePair<K, V>>) -> &'a [K]
 where
     V: RawSoa + ?Sized,
 {
@@ -243,7 +243,7 @@ where
 
 #[inline]
 pub fn dense_keys_with_context<'ctx, 'a, K, V>(
-    dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
+    dense: SoaSlices<'ctx, 'a, KeyValuePair<K, V>>,
 ) -> (&'ctx V::Context, &'a [K])
 where
     V: RawSoa + ?Sized,
@@ -257,7 +257,7 @@ where
 }
 
 pub fn check_parts<'a, K, V>(
-    dense: SoaSlices<'_, 'a, DenseItem<K, V>>,
+    dense: SoaSlices<'_, 'a, KeyValuePair<K, V>>,
     sparse: &[SparseItem<K>],
 ) -> Result<(), FromPartsError<K>>
 where

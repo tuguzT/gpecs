@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    item::DenseItem,
+    item::KeyValuePair,
     soa::{
         traits::{
             AllocSoa, MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
@@ -30,7 +30,7 @@ where
 {
     #[inline]
     #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
-    pub(super) fn new(vec: vec::SoaVec<DenseItem<K, V>>) -> Self {
+    pub(super) fn new(vec: vec::SoaVec<KeyValuePair<K, V>>) -> Self {
         let (keys, _) = vec.as_slice_ptrs().into_parts();
         let keys = unsafe { keys.as_ref_unchecked() };
 
@@ -268,7 +268,7 @@ where
     V: AllocSoa + ?Sized,
     R: ?Sized,
 {
-    inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>,
+    inner: vec::IntoIter<KeyValuePair<K, V>, KeyValuePair<K, R>>,
 }
 
 impl<K, V, R> IntoValues<K, V, R>
@@ -277,7 +277,7 @@ where
     R: ?Sized,
 {
     #[inline]
-    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>) -> Self {
+    pub(super) fn new(inner: vec::IntoIter<KeyValuePair<K, V>, KeyValuePair<K, R>>) -> Self {
         Self { inner }
     }
 
@@ -468,7 +468,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|DenseItem { value, .. }| value)
+        inner.next().map(|KeyValuePair { value, .. }| value)
     }
 
     #[inline]
@@ -493,7 +493,7 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, DenseItem { value, .. }| f(acc, value))
+        inner.fold(init, |acc, KeyValuePair { value, .. }| f(acc, value))
     }
 }
 
@@ -504,7 +504,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|DenseItem { value, .. }| value)
+        inner.next_back().map(|KeyValuePair { value, .. }| value)
     }
 }
 
@@ -526,7 +526,7 @@ where
     V: AllocSoa + ?Sized,
     R: ?Sized,
 {
-    inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>,
+    inner: vec::IntoIter<KeyValuePair<K, V>, KeyValuePair<K, R>>,
 }
 
 impl<K, V, R> IntoIter<K, V, R>
@@ -535,7 +535,7 @@ where
     R: ?Sized,
 {
     #[inline]
-    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>) -> Self {
+    pub(super) fn new(inner: vec::IntoIter<KeyValuePair<K, V>, KeyValuePair<K, R>>) -> Self {
         Self { inner }
     }
 
@@ -835,7 +835,7 @@ where
     V::Context: 'a,
     R: ?Sized,
 {
-    inner: vec::Drain<'a, DenseItem<K, V>, DenseItem<K, R>>,
+    inner: vec::Drain<'a, KeyValuePair<K, V>, KeyValuePair<K, R>>,
 }
 
 impl<'a, K, V, R> Drain<'a, K, V, R>
@@ -844,7 +844,7 @@ where
     R: ?Sized,
 {
     #[inline]
-    pub(super) fn new(inner: vec::Drain<'a, DenseItem<K, V>, DenseItem<K, R>>) -> Self {
+    pub(super) fn new(inner: vec::Drain<'a, KeyValuePair<K, V>, KeyValuePair<K, R>>) -> Self {
         Self { inner }
     }
 

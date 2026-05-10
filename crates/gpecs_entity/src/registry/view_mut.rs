@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DenseSlicesMut, SparseItem},
+    item::{KeyValueMutSlices, SparseItem},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlicesMut,
@@ -42,7 +42,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let context = Self::CONTEXT;
         let dense = SoaSlicesMut::new(
             Identity::from_inner_ref(context),
-            DenseSlicesMut::new(context, entities, metas.as_identity_slice_mut()),
+            KeyValueMutSlices::new(context, entities, metas.as_identity_slice_mut()),
         );
 
         let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptr();
@@ -60,7 +60,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let dense = unsafe {
             SoaSlicesMut::new(
                 Identity::from_inner_ref(context),
-                DenseSlicesMut::new_unchecked(entities, metas.as_identity_slice_mut()),
+                KeyValueMutSlices::new_unchecked(entities, metas.as_identity_slice_mut()),
             )
         };
 

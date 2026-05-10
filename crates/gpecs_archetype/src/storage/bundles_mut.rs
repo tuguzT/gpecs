@@ -9,7 +9,7 @@ use bytemuck::must_cast_slice_mut;
 use gpecs_entity::Entity;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DenseSlicesMut, SparseItem},
+    item::{KeyValueMutSlices, SparseItem},
     soa::{
         identity::Identity,
         slice::SoaSlicesMut,
@@ -43,7 +43,7 @@ where
         sparse: &'a mut [SparseItem<NoEpochEntity>],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice_mut(entities);
-        let slices = DenseSlicesMut::new(B::CONTEXT, entities, bundles);
+        let slices = KeyValueMutSlices::new(B::CONTEXT, entities, bundles);
         let dense = SoaSlicesMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
 
         let inner = EpochSparseViewMut::new(dense, sparse)?;
@@ -58,7 +58,7 @@ where
         sparse: &'a mut [SparseItem<NoEpochEntity>],
     ) -> Self {
         let entities = must_cast_slice_mut(entities);
-        let slices = DenseSlicesMut::new(B::CONTEXT, entities, bundles);
+        let slices = KeyValueMutSlices::new(B::CONTEXT, entities, bundles);
         let dense = SoaSlicesMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
 
         let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) };

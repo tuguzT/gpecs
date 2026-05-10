@@ -6,7 +6,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    item::DenseItem,
+    item::KeyValuePair,
     iter::IterMut,
     soa::{
         slice,
@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, 'a, K, V> = slice::ParIterMut<'ctx, 'a, DenseItem<K, V>>;
+type Inner<'ctx, 'a, K, V> = slice::ParIterMut<'ctx, 'a, KeyValuePair<K, V>>;
 
 pub struct ParIterMut<'ctx, 'a, K, V>
 where

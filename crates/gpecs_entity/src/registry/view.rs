@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DenseSlices, SparseItem},
+    item::{KeyValueSlices, SparseItem},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlices,
@@ -42,7 +42,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let context = Self::CONTEXT;
         let dense = SoaSlices::new(
             Identity::from_inner_ref(context),
-            DenseSlices::new(context, entities, metas.as_identity_slice()),
+            KeyValueSlices::new(context, entities, metas.as_identity_slice()),
         );
 
         let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
@@ -60,7 +60,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
         let dense = unsafe {
             SoaSlices::new(
                 Identity::from_inner_ref(context),
-                DenseSlices::new_unchecked(entities, metas.as_identity_slice()),
+                KeyValueSlices::new_unchecked(entities, metas.as_identity_slice()),
             )
         };
 

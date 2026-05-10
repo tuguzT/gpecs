@@ -4,7 +4,7 @@ use core::{
 };
 
 use crate::{
-    item::DenseItem,
+    item::KeyValuePair,
     iter::{IterMut, RawIterMut, RawValues, Values, ValuesMut},
     soa::{
         self,
@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, K, V> = soa::slice::RawIterMut<'ctx, DenseItem<K, V>>;
+type Inner<'ctx, K, V> = soa::slice::RawIterMut<'ctx, KeyValuePair<K, V>>;
 
 #[repr(transparent)]
 pub struct RawValuesMut<'ctx, K, V>

@@ -1,10 +1,5 @@
-pub use self::{
-    dense::{
-        DenseFieldLayouts, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs, DenseRefs,
-        DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
-    },
-    sparse::{SparseItem, SparseItemKind},
-};
+pub use gpecs_soa_pair::*;
 
-mod dense;
+pub use self::sparse::{SparseItem, SparseItemKind};
+
 mod sparse;

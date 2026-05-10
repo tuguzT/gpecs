@@ -84,8 +84,8 @@ where
     for<'ctx> MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { ptrs, phantom } = self;
-        *ptrs == other.ptrs && *phantom == other.phantom
+        let Self { ptrs, .. } = self;
+        ptrs == &other.ptrs
     }
 }
 
@@ -102,13 +102,8 @@ where
     for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { ptrs, phantom } = self;
-
-        match ptrs.partial_cmp(&other.ptrs) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        phantom.partial_cmp(&other.phantom)
+        let Self { ptrs, .. } = self;
+        ptrs.partial_cmp(&other.ptrs)
     }
 }
 
@@ -118,13 +113,8 @@ where
     for<'ctx> MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { ptrs, phantom } = self;
-
-        match ptrs.cmp(&other.ptrs) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        phantom.cmp(&other.phantom)
+        let Self { ptrs, .. } = self;
+        ptrs.cmp(&other.ptrs)
     }
 }
 
@@ -134,9 +124,8 @@ where
     for<'ctx> MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { ptrs, phantom } = self;
+        let Self { ptrs, .. } = self;
         ptrs.hash(state);
-        phantom.hash(state);
     }
 }
 

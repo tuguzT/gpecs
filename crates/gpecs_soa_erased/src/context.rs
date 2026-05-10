@@ -173,7 +173,9 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self { layouts, .. } = self;
-        unsafe { Self::from_inner(layouts.clone()) }
+
+        let layouts = layouts.clone();
+        unsafe { Self::from_inner(layouts) }
     }
 }
 
@@ -190,8 +192,8 @@ where
     P: SliceItemPtrs,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { phantom, layouts } = self;
-        *phantom == other.phantom && *layouts == other.layouts
+        let Self { layouts, .. } = self;
+        layouts == &other.layouts
     }
 }
 
@@ -208,12 +210,7 @@ where
     P: SliceItemPtrs,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { phantom, layouts } = self;
-
-        match phantom.partial_cmp(&other.phantom) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
+        let Self { layouts, .. } = self;
         layouts.partial_cmp(&other.layouts)
     }
 }
@@ -224,12 +221,7 @@ where
     P: SliceItemPtrs,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { phantom, layouts } = self;
-
-        match phantom.cmp(&other.phantom) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
+        let Self { layouts, .. } = self;
         layouts.cmp(&other.layouts)
     }
 }
@@ -240,9 +232,7 @@ where
     P: SliceItemPtrs,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { phantom, layouts } = self;
-
-        phantom.hash(state);
+        let Self { layouts, .. } = self;
         layouts.hash(state);
     }
 }

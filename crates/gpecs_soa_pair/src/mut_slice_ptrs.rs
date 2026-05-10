@@ -160,10 +160,11 @@ where
     V: RawSoa + ?Sized,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialEq,
 {
-    #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
-        *keys == other.keys && *values == other.values
+
+        let other = (&other.keys, &other.values);
+        (keys, values) == other
     }
 }
 
@@ -179,15 +180,11 @@ where
     V: RawSoa + ?Sized,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialOrd,
 {
-    #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
 
-        match keys.partial_cmp(&other.keys) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        values.partial_cmp(&other.values)
+        let other = (&other.keys, &other.values);
+        (keys, values).partial_cmp(&other)
     }
 }
 
@@ -196,15 +193,11 @@ where
     V: RawSoa + ?Sized,
     for<'ctx> SliceMutPtrs<'ctx, V>: Ord,
 {
-    #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
 
-        match keys.cmp(&other.keys) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        values.cmp(&other.values)
+        let other = (&other.keys, &other.values);
+        (keys, values).cmp(&other)
     }
 }
 
@@ -215,9 +208,7 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
-
-        keys.hash(state);
-        values.hash(state);
+        (keys, values).hash(state);
     }
 }
 

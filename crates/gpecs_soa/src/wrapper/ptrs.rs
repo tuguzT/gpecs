@@ -68,16 +68,15 @@ where
     }
 }
 
-impl<T> Default for Ptrs<'_, T>
+impl<'ctx, T> Default for Ptrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: Default,
+    Inner<'ctx, T>: Default,
 {
+    #[inline]
     fn default() -> Self {
-        Self {
-            inner: Default::default(),
-            phantom: PhantomData,
-        }
+        let inner = Default::default();
+        Self::new(inner)
     }
 }
 
@@ -85,8 +84,10 @@ impl<T> Clone for Ptrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
+    #[inline]
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
+
         let inner = inner.clone();
         Self { inner, phantom }
     }
@@ -105,8 +106,8 @@ where
     for<'ctx> Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { inner, phantom } = self;
-        *inner == other.inner && *phantom == other.phantom
+        let Self { inner, .. } = self;
+        inner == &other.inner
     }
 }
 
@@ -123,12 +124,8 @@ where
     for<'ctx> Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { inner, phantom } = self;
-        match inner.partial_cmp(&other.inner) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        phantom.partial_cmp(&other.phantom)
+        let Self { inner, .. } = self;
+        inner.partial_cmp(&other.inner)
     }
 }
 
@@ -138,12 +135,8 @@ where
     for<'ctx> Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { inner, phantom } = self;
-        match inner.cmp(&other.inner) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        phantom.cmp(&other.phantom)
+        let Self { inner, .. } = self;
+        inner.cmp(&other.inner)
     }
 }
 
@@ -153,8 +146,7 @@ where
     for<'ctx> Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { inner, phantom } = self;
+        let Self { inner, .. } = self;
         inner.hash(state);
-        phantom.hash(state);
     }
 }

@@ -997,6 +997,7 @@ where
     V: RawSoa + ?Sized,
     &'ctx V::Context: Default,
 {
+    #[inline]
     fn default() -> Self {
         let context: &V::Context = Default::default();
         Self::from(context)
@@ -1011,6 +1012,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
+
         f.debug_struct("EpochSparseViewMutPtr")
             .field("dense", dense)
             .field("sparse", sparse)
@@ -1026,6 +1028,7 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self { ref dense, sparse } = *self;
+
         let dense = dense.clone();
         Self { dense, sparse }
     }
@@ -1048,7 +1051,9 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { dense, sparse } = self;
-        *dense == other.dense && ptr::eq(*sparse, other.sparse)
+
+        let other = (&other.dense, &other.sparse);
+        (dense, sparse) == other
     }
 }
 
@@ -1068,15 +1073,11 @@ where
     V::Context: PartialOrd,
     for<'ctx> MutPtrs<'ctx, V>: PartialOrd,
 {
-    #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { dense, sparse } = self;
 
-        match dense.partial_cmp(&other.dense) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        sparse.partial_cmp(&other.sparse)
+        let other = (&other.dense, &other.sparse);
+        (dense, sparse).partial_cmp(&other)
     }
 }
 
@@ -1087,15 +1088,11 @@ where
     V::Context: Ord,
     for<'ctx> MutPtrs<'ctx, V>: Ord,
 {
-    #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { dense, sparse } = self;
 
-        match dense.cmp(&other.dense) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        sparse.cmp(&other.sparse)
+        let other = (&other.dense, &other.sparse);
+        (dense, sparse).cmp(&other)
     }
 }
 
@@ -1108,8 +1105,7 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { dense, sparse } = self;
-        dense.hash(state);
-        sparse.hash(state);
+        (dense, sparse).hash(state);
     }
 }
 

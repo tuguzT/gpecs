@@ -1928,6 +1928,7 @@ where
     V: AllocSoa + ?Sized,
     V::Context: Default,
 {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -1946,9 +1947,8 @@ where
             sparse_vacant_head,
         } = self;
 
-        *dense == other.dense
-            && *sparse == other.sparse
-            && *sparse_vacant_head == other.sparse_vacant_head
+        let other = (&other.dense, &other.sparse, &other.sparse_vacant_head);
+        (dense, sparse, sparse_vacant_head) == other
     }
 }
 
@@ -1973,15 +1973,8 @@ where
             sparse_vacant_head,
         } = self;
 
-        match dense.partial_cmp(&other.dense) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match sparse.partial_cmp(&other.sparse) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        sparse_vacant_head.partial_cmp(&other.sparse_vacant_head)
+        let other = (&other.dense, &other.sparse, &other.sparse_vacant_head);
+        (dense, sparse, sparse_vacant_head).partial_cmp(&other)
     }
 }
 
@@ -1998,15 +1991,8 @@ where
             sparse_vacant_head,
         } = self;
 
-        match dense.cmp(&other.dense) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match sparse.cmp(&other.sparse) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        sparse_vacant_head.cmp(&other.sparse_vacant_head)
+        let other = (&other.dense, &other.sparse, &other.sparse_vacant_head);
+        (dense, sparse, sparse_vacant_head).cmp(&other)
     }
 }
 
@@ -2023,10 +2009,7 @@ where
             sparse,
             sparse_vacant_head,
         } = self;
-
-        dense.hash(state);
-        sparse.hash(state);
-        sparse_vacant_head.hash(state);
+        (dense, sparse, sparse_vacant_head).hash(state);
     }
 }
 

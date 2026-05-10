@@ -110,7 +110,9 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
-        *key == other.key && *value == other.value
+
+        let other = (&other.key, &other.value);
+        (key, value) == other
     }
 }
 
@@ -129,11 +131,8 @@ where
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
 
-        match key.partial_cmp(&other.key) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        value.partial_cmp(&other.value)
+        let other = (&other.key, &other.value);
+        (key, value).partial_cmp(&other)
     }
 }
 
@@ -145,11 +144,8 @@ where
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
 
-        match key.cmp(&other.key) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        value.cmp(&other.value)
+        let other = (&other.key, &other.value);
+        (key, value).cmp(&other)
     }
 }
 
@@ -160,9 +156,7 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
-
-        key.hash(state);
-        value.hash(state);
+        (key, value).hash(state);
     }
 }
 

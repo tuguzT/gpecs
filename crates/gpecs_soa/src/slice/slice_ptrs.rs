@@ -263,7 +263,9 @@ where
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         let Self { ptrs, context, len } = self;
-        *ptrs == other.ptrs && *context == other.context && *len == other.len
+
+        let other = (&other.len, &other.context, &other.ptrs);
+        (len, context, ptrs) == other
     }
 }
 
@@ -285,15 +287,8 @@ where
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { ptrs, context, len } = self;
 
-        match len.partial_cmp(&other.len) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match context.partial_cmp(&other.context) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        ptrs.partial_cmp(&other.ptrs)
+        let other = (&other.len, &other.context, &other.ptrs);
+        (len, context, ptrs).partial_cmp(&other)
     }
 }
 
@@ -307,15 +302,8 @@ where
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { ptrs, context, len } = self;
 
-        match len.cmp(&other.len) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match context.cmp(&other.context) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        ptrs.cmp(&other.ptrs)
+        let other = (&other.len, &other.context, &other.ptrs);
+        (len, context, ptrs).cmp(&other)
     }
 }
 
@@ -327,10 +315,7 @@ where
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { ptrs, context, len } = self;
-
-        len.hash(state);
-        context.hash(state);
-        ptrs.hash(state);
+        (len, context, ptrs).hash(state);
     }
 }
 

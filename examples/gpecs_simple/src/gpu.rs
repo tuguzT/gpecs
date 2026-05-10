@@ -20,9 +20,9 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         .register_archetype_of::<(Position, Mass, Tag)>()
         .expect("archetype of `Position`, `Mass` & `Tag` should contain unique component ids");
 
-    let position_tag_gpu_archetype_id = executor
-        .register_archetype_of::<(Position, Tag)>()
-        .expect("archetype of `Position` and `Tag` should contain unique component ids");
+    // let position_tag_gpu_archetype_id = executor
+    //     .register_archetype_of::<(Position, Tag)>()
+    //     .expect("archetype of `Position` and `Tag` should contain unique component ids");
 
     register_gpu_systems(&mut executor);
 
@@ -38,8 +38,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
 
-        let mut context_mapper = executor.context_mapper();
-        context_mapper.map_archetype(position_tag_gpu_archetype_id, &mut command_encoder);
+        // let mut context_mapper = executor.context_mapper();
+        // context_mapper.map_archetype(position_tag_gpu_archetype_id, &mut command_encoder);
 
         let command_buffer = command_encoder.finish();
         let submission_index = queue.submit([command_buffer]);
@@ -52,9 +52,9 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             .poll(poll_type)
             .expect("device should be polled successfully");
 
-        let (position_tag_archetype_storage, components) = context_mapper
-            .get_mut_archetype_with_components(position_tag_gpu_archetype_id)
-            .expect("archetype of `Position` and `Tag` should already be mapped");
+        // let (position_tag_archetype_storage, components) = context_mapper
+        //     .get_mut_archetype_with_components(position_tag_gpu_archetype_id)
+        //     .expect("archetype of `Position` and `Tag` should already be mapped");
 
         let elapsed = timestamp.elapsed();
 
@@ -63,10 +63,10 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        let positions = position_tag_archetype_storage
-            .as_bundles::<(Position,)>(&components.as_view())
-            .expect("archetype should contain `Position` components");
-        check_positions(positions);
+        // let positions = position_tag_archetype_storage
+        //     .as_bundles::<(Position,)>(&components.as_view())
+        //     .expect("archetype should contain `Position` components");
+        // check_positions(positions);
 
         log_timestamp_query_statistics(&executor, &queue);
         log::info!("Execution of all the GPU systems {i} took {elapsed:?}");
@@ -130,7 +130,7 @@ fn log_timestamp_query_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) {
     }
 }
 
-fn check_positions(positions: storage::Bundles<(Position,)>) {
+fn _check_positions(positions: storage::Bundles<(Position,)>) {
     let positions = positions.into_par_iter().enumerate();
     positions.for_each(|(index, item)| {
         let (entity, (position,)) = item;

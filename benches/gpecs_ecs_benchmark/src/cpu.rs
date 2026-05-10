@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
@@ -22,6 +26,14 @@ use crate::{
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct StatisticsRecord {
+    system: SystemId,
+    name: &'static str,
+    archetype: ArchetypeId,
+    elapsed: Duration,
+}
+
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     log::info!("> Running on CPU...");
 
@@ -43,16 +55,31 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
     let time_delta = Rc::new(RefCell::new(time_delta));
     let framebuffer = Rc::new(RefCell::new(framebuffer));
+    let statistics = Rc::new(RefCell::new(Vec::new()));
 
     log::info!(">> Registering CPU systems...");
-    register_cpu_systems(&mut executor, time_delta.clone(), framebuffer.clone());
+    register_cpu_systems(
+        &mut executor,
+        time_delta.clone(),
+        framebuffer.clone(),
+        statistics.clone(),
+    );
 
     log::info!(">> Running CPU systems...");
     for i in (0_u128..).maybe_take(repeat_count) {
-        let timestamp = Instant::now();
+        let start = Instant::now();
         executor.execute();
+        let elapsed = start.elapsed();
 
-        let elapsed = timestamp.elapsed();
+        for record in statistics.borrow_mut().drain(..) {
+            let StatisticsRecord {
+                system,
+                name,
+                archetype,
+                elapsed,
+            } = record;
+            log::info!(">>>> {system} `{name}` with {archetype} took {elapsed:?}");
+        }
         log::info!(">>! Execution of all the CPU systems {i} took {elapsed:?}");
 
         let time_delta = &mut *time_delta.borrow_mut();
@@ -71,33 +98,35 @@ fn register_cpu_systems<B>(
     executor: &mut CpuExecutor,
     time_delta: Rc<RefCell<TimeDelta>>,
     framebuffer: Rc<RefCell<Framebuffer<B>>>,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) where
     B: AsMut<[u32]> + 'static,
 {
-    let system = register_update_position_system(executor, time_delta.clone());
+    let system = register_update_position_system(executor, statistics.clone(), time_delta.clone());
     executor.add_system(system);
 
-    let system = register_update_data_system(executor, time_delta);
+    let system = register_update_data_system(executor, statistics.clone(), time_delta);
     executor.add_system(system);
 
-    let system = register_update_components_system(executor);
+    let system = register_update_components_system(executor, statistics.clone());
     executor.add_system(system);
 
-    let system = register_update_health_system(executor);
+    let system = register_update_health_system(executor, statistics.clone());
     executor.add_system(system);
 
-    let system = register_update_damage_system(executor);
+    let system = register_update_damage_system(executor, statistics.clone());
     executor.add_system(system);
 
-    let system = register_update_sprite_system(executor);
+    let system = register_update_sprite_system(executor, statistics.clone());
     executor.add_system(system);
 
-    let system = register_render_sprite_system(executor, framebuffer);
+    let system = register_render_sprite_system(executor, statistics, framebuffer);
     executor.add_system(system);
 }
 
 fn register_update_position_system(
     executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
     time_delta: Rc<RefCell<TimeDelta>>,
 ) -> SystemId {
     let system = move |system: SystemId, bundles: BundlesMut<(Position, Velocity)>| {
@@ -107,30 +136,33 @@ fn register_update_position_system(
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        let mut statistics = Vec::with_capacity(bundles.len());
+        let mut local_statistics = Vec::with_capacity(bundles.len());
 
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             bundles.into_iter().for_each(|(_, (position, velocity))| {
                 update_position(position, velocity, time_delta);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "update_position",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        map.collect_into_vec(&mut statistics);
-        statistics.sort();
+        map.collect_into_vec(&mut local_statistics);
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `update_position` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }
 
 fn register_update_data_system(
     executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
     time_delta: Rc<RefCell<TimeDelta>>,
 ) -> SystemId {
     let system = move |system: SystemId, bundles: BundlesMut<(Data,)>| {
@@ -140,144 +172,167 @@ fn register_update_data_system(
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        let mut statistics = Vec::with_capacity(bundles.len());
+        let mut local_statistics = Vec::with_capacity(bundles.len());
 
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             bundles.into_iter().for_each(|(_, (data,))| {
                 update_data(data, time_delta);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "update_data",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        map.collect_into_vec(&mut statistics);
-        statistics.sort();
+        map.collect_into_vec(&mut local_statistics);
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `update_data` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }
 
-fn register_update_components_system(executor: &mut CpuExecutor) -> SystemId {
-    let system = |system: SystemId, bundles: BundlesMut<(Position, Velocity, Data)>| {
+fn register_update_components_system(
+    executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
+) -> SystemId {
+    let system = move |system: SystemId, bundles: BundlesMut<(Position, Velocity, Data)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        let mut statistics = Vec::with_capacity(bundles.len());
+        let mut local_statistics = Vec::with_capacity(bundles.len());
 
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             let bundles = bundles.into_iter();
             bundles.for_each(|(_, (position, velocity, data))| {
                 update_components(position, velocity, data);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "update_components",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        map.collect_into_vec(&mut statistics);
-        statistics.sort();
+        map.collect_into_vec(&mut local_statistics);
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `update_components` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }
 
-fn register_update_health_system(executor: &mut CpuExecutor) -> SystemId {
-    let system = |system: SystemId, bundles: BundlesMut<(Health,)>| {
+fn register_update_health_system(
+    executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
+) -> SystemId {
+    let system = move |system: SystemId, bundles: BundlesMut<(Health,)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        let mut statistics = Vec::with_capacity(bundles.len());
+        let mut local_statistics = Vec::with_capacity(bundles.len());
 
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             bundles.into_iter().for_each(|(_, (health,))| {
                 update_health(health);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "update_health",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        map.collect_into_vec(&mut statistics);
-        statistics.sort();
+        map.collect_into_vec(&mut local_statistics);
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `update_health` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }
 
-fn register_update_damage_system(executor: &mut CpuExecutor) -> SystemId {
-    let system = |system: SystemId, bundles: BundlesMut<(Health, Damage)>| {
+fn register_update_damage_system(
+    executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
+) -> SystemId {
+    let system = move |system: SystemId, bundles: BundlesMut<(Health, Damage)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        let mut statistics = Vec::with_capacity(bundles.len());
+        let mut local_statistics = Vec::with_capacity(bundles.len());
 
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             bundles.into_iter().for_each(|(_, (health, damage))| {
                 update_damage(health, damage);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "update_damage",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        map.collect_into_vec(&mut statistics);
-        statistics.sort();
+        map.collect_into_vec(&mut local_statistics);
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `update_damage` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }
 
-fn register_update_sprite_system(executor: &mut CpuExecutor) -> SystemId {
-    let system = |system: SystemId, bundles: BundlesMut<(Sprite, Player, Health)>| {
+fn register_update_sprite_system(
+    executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
+) -> SystemId {
+    let system = move |system: SystemId, bundles: BundlesMut<(Sprite, Player, Health)>| {
         let bundles = bundles
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
             .into_par_iter();
-        let mut statistics = Vec::with_capacity(bundles.len());
+        let mut local_statistics = Vec::with_capacity(bundles.len());
 
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             let bundles = bundles.into_iter();
             bundles.for_each(|(_, (sprite, player, health))| {
                 update_sprite(sprite, player, health);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "update_sprite",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        map.collect_into_vec(&mut statistics);
-        statistics.sort();
+        map.collect_into_vec(&mut local_statistics);
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `update_sprite` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }
 
 fn register_render_sprite_system<B>(
     executor: &mut CpuExecutor,
+    statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
     framebuffer: Rc<RefCell<Framebuffer<B>>>,
 ) -> SystemId
 where
@@ -288,21 +343,23 @@ where
 
         let bundles = bundles.filter(|(_, bundles)| !bundles.is_empty());
         let map = bundles.map(|(archetype, bundles)| {
-            let timestamp = Instant::now();
+            let start = Instant::now();
 
             bundles.into_iter().for_each(|(_, (position, sprite))| {
                 render_sprite(position, sprite, framebuffer);
             });
 
-            let elapsed = timestamp.elapsed();
-            (archetype, elapsed)
+            StatisticsRecord {
+                system,
+                name: "render_sprite",
+                archetype,
+                elapsed: start.elapsed(),
+            }
         });
-        let mut statistics = map.collect_vec();
-        statistics.sort();
+        let mut local_statistics = map.collect_vec();
+        local_statistics.sort();
 
-        for (archetype, elapsed) in statistics {
-            log::info!(">>>> {system} `render_sprite` with {archetype} took {elapsed:?}");
-        }
+        statistics.borrow_mut().extend(local_statistics);
     };
     executor.register_system(system)
 }

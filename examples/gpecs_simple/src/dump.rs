@@ -27,7 +27,7 @@ impl CsvRecord {
 }
 
 pub fn create_csv_writer(group: &str, entity_count: u32) -> csv::Result<csv::Writer<impl Write>> {
-    let path = format!("./dump/{group}/statistics-{entity_count}.csv");
+    let path = format!("./dump/{group}-statistics-{entity_count}.csv");
     let path = Path::new(&path);
 
     let prefix = path.parent().expect("path should have a parent directory");

@@ -14,11 +14,12 @@ pub fn dump_framebuffer_into_file<B>(
     framebuffer: &Framebuffer<B>,
     group: &str,
     index: u128,
+    entity_count: u32,
 ) -> io::Result<()>
 where
     B: AsRef<[u32]>,
 {
-    let path = format!("./dump/{group}/framebuffer-{index}.txt");
+    let path = format!("./dump/{group}-framebuffer{index}-{entity_count}.txt");
     let path = Path::new(&path);
 
     let prefix = path.parent().expect("path should have a parent directory");
@@ -68,7 +69,7 @@ impl CsvRecord {
 }
 
 pub fn create_csv_writer(group: &str, entity_count: u32) -> csv::Result<csv::Writer<impl Write>> {
-    let path = format!("./dump/{group}/statistics-{entity_count}.csv");
+    let path = format!("./dump/{group}-statistics-{entity_count}.csv");
     let path = Path::new(&path);
 
     let prefix = path.parent().expect("path should have a parent directory");

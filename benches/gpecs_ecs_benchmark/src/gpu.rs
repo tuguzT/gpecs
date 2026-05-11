@@ -115,7 +115,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         framebuffer_download_buffer.unmap();
 
         log::info!(">>> Saving framebuffer state {i} to file...");
-        dump_framebuffer_into_file(&framebuffer, "gpu", i)
+        dump_framebuffer_into_file(&framebuffer, "gpu", i, entity_count)
             .expect("framebuffer should be saved successfully");
 
         let statistics = collect_statistics(&executor, &queue);

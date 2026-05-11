@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 use glam::Vec3;
 use gpecs::prelude::*;
@@ -12,15 +8,10 @@ use itertools::Itertools as _;
 use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
-use crate::setup;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct StatisticsRecord {
-    system: SystemId,
-    name: &'static str,
-    archetype: ArchetypeId,
-    elapsed: Duration,
-}
+use crate::{
+    setup,
+    statistics::{StatisticsRecord, log_statistics},
+};
 
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     setup::setup(context, entity_count);
@@ -35,16 +26,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         executor.execute();
         let elapsed = start.elapsed();
 
-        for record in statistics.borrow_mut().drain(..) {
-            let StatisticsRecord {
-                system,
-                name,
-                archetype,
-                elapsed,
-            } = record;
-            log::info!("CPU {system} `{name}` with {archetype} took {elapsed:?}");
-        }
-        log::info!("Execution of all the CPU systems {i} took {elapsed:?}");
+        log_statistics("CPU", statistics.borrow_mut().drain(..), i, elapsed);
     }
 
     // Return context from the executor to the caller
@@ -92,8 +74,8 @@ fn register_update_positions_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_positions",
+                system: system.into(),
+                name: "update_positions".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -128,8 +110,8 @@ fn register_update_masses_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_masses",
+                system: system.into(),
+                name: "update_masses".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -164,8 +146,8 @@ fn register_check_tags_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "check_tags",
+                system: system.into(),
+                name: "check_tags".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }

@@ -15,6 +15,7 @@ use crate::{
     dump::dump_framebuffer_into_file,
     framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
+    statistics::{StatisticsRecord, log_statistics},
 };
 
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
@@ -102,8 +103,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        log_timestamp_query_statistics(&executor, &queue);
-        log::info!(">>! Execution of all the GPU systems {i} took {elapsed:?}");
+        let statistics = collect_statistics(&executor, &queue);
+        log_statistics("GPU", statistics, i, elapsed);
 
         time_delta = TimeDelta(elapsed.as_secs_f32());
         write_time_delta(time_delta, &queue, &gpu_system_resources);
@@ -249,7 +250,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         count: None,
     };
     let update_position_system_descriptor = GpuSystemDescriptor {
-        label: Some("update position"),
+        label: Some("update_position"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_position"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -270,7 +271,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         ..time_delta_uniform_buffer_entry
     };
     let update_data_system_descriptor = GpuSystemDescriptor {
-        label: Some("update data"),
+        label: Some("update_data"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_data"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -284,7 +285,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     executor.add_system(update_data_system);
 
     let update_components_system_descriptor = GpuSystemDescriptor {
-        label: Some("update components"),
+        label: Some("update_components"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_components"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -302,7 +303,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     executor.add_system(update_components_system);
 
     let update_health_system_descriptor = GpuSystemDescriptor {
-        label: Some("update health"),
+        label: Some("update_health"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_health"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -316,7 +317,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     executor.add_system(update_health_system);
 
     let update_damage_system_descriptor = GpuSystemDescriptor {
-        label: Some("update damage"),
+        label: Some("update_damage"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_damage"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -333,7 +334,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     executor.add_system(update_damage_system);
 
     let update_sprite_system_descriptor = GpuSystemDescriptor {
-        label: Some("update sprite"),
+        label: Some("update_sprite"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_sprite"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -381,7 +382,7 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
         count: None,
     };
     let render_sprite_system_descriptor = GpuSystemDescriptor {
-        label: Some("render sprite"),
+        label: Some("render_sprite"),
         shader_module,
         entry_point: Some("render_sprite"),
         dispatch_strategy: DispatchStrategy::default(),
@@ -418,23 +419,33 @@ fn setup_gpu_systems<'entries>(
     executor.set_additional_entries(systems.render_sprite, &additional_entries.render_sprite);
 }
 
-fn log_timestamp_query_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) {
-    let Some(statistics) = executor.timestamp_query_statistics(queue) else {
-        return;
-    };
+fn collect_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) -> Vec<StatisticsRecord> {
+    let statistics = executor
+        .timestamp_query_statistics(queue)
+        .expect("timestamp queries should be enabled")
+        .expect("timestamp query statistics should be ready");
 
-    let statistics = statistics.expect("timestamp query statistics should be ready");
-    for (system, statistics) in &statistics {
-        let Some(system_shader) = executor.systems().get_system_shader(system) else {
-            unreachable!("{system} should exist")
-        };
+    statistics
+        .iter()
+        .flat_map(|(system, statistics)| {
+            let Some(system_shader) = executor.systems().get_system_shader(system) else {
+                unreachable!("{system} should exist")
+            };
 
-        let label = system_shader.label().expect("GPU system should be labeled");
-        for (archetype, statistics) in statistics {
-            let duration = statistics.duration;
-            log::info!(">>>> {system} `{label}` with {archetype:#} took {duration:?}");
-        }
-    }
+            let label = system_shader.label().expect("GPU system should be labeled");
+            let mut statistics: Vec<_> = statistics
+                .iter()
+                .map(|(archetype, statistics)| StatisticsRecord {
+                    system: system.into(),
+                    name: label.to_owned().into(),
+                    archetype: archetype.into(),
+                    elapsed: statistics.duration,
+                })
+                .collect();
+            statistics.sort();
+            statistics
+        })
+        .collect()
 }
 
 fn write_time_delta(time_delta: TimeDelta, queue: &wgpu::Queue, resources: &GpuSystemResources) {

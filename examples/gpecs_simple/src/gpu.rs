@@ -7,7 +7,10 @@ use gpecs_simple_types::{Mass, Position, Tag};
 use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
-use crate::setup;
+use crate::{
+    setup,
+    statistics::{StatisticsRecord, log_statistics},
+};
 
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     setup::setup(context, entity_count);
@@ -68,8 +71,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         //     .expect("archetype should contain `Position` components");
         // check_positions(positions);
 
-        log_timestamp_query_statistics(&executor, &queue);
-        log::info!("Execution of all the GPU systems {i} took {elapsed:?}");
+        let statistics = collect_statistics(&executor, &queue);
+        log_statistics("GPU", statistics, i, elapsed);
     }
 
     // Return context from the executor to the caller
@@ -111,23 +114,33 @@ fn register_gpu_systems(executor: &mut GpuExecutor) {
     executor.add_system(mass_gpu_system_id);
 }
 
-fn log_timestamp_query_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) {
-    let Some(statistics) = executor.timestamp_query_statistics(queue) else {
-        return;
-    };
+fn collect_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) -> Vec<StatisticsRecord> {
+    let statistics = executor
+        .timestamp_query_statistics(queue)
+        .expect("timestamp queries should be enabled")
+        .expect("timestamp query statistics should be ready");
 
-    let statistics = statistics.expect("timestamp query statistics should be ready");
-    for (system, statistics) in &statistics {
-        let Some(system_shader) = executor.systems().get_system_shader(system) else {
-            unreachable!("{system} should exist")
-        };
+    statistics
+        .iter()
+        .flat_map(|(system, statistics)| {
+            let Some(system_shader) = executor.systems().get_system_shader(system) else {
+                unreachable!("{system} should exist")
+            };
 
-        let label = system_shader.label().expect("GPU system should be labeled");
-        for (archetype, statistics) in statistics {
-            let duration = statistics.duration;
-            log::info!("GPU {system} `{label}` with {archetype} took {duration:?}");
-        }
-    }
+            let label = system_shader.label().expect("GPU system should be labeled");
+            let mut statistics: Vec<_> = statistics
+                .iter()
+                .map(|(archetype, statistics)| StatisticsRecord {
+                    system: system.into(),
+                    name: label.to_owned().into(),
+                    archetype: archetype.into(),
+                    elapsed: statistics.duration,
+                })
+                .collect();
+            statistics.sort();
+            statistics
+        })
+        .collect()
 }
 
 fn _check_positions(positions: storage::Bundles<(Position,)>) {

@@ -3,6 +3,7 @@ use gpecs::prelude::*;
 mod cpu;
 mod gpu;
 mod setup;
+mod statistics;
 
 const ENTITY_COUNT: u32 = if cfg!(debug_assertions) {
     2_400

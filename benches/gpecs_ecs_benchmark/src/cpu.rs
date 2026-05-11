@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
@@ -24,15 +20,8 @@ use crate::{
     dump::dump_framebuffer_into_file,
     framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
+    statistics::{StatisticsRecord, log_statistics},
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct StatisticsRecord {
-    system: SystemId,
-    name: &'static str,
-    archetype: ArchetypeId,
-    elapsed: Duration,
-}
 
 pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
     log::info!("> Running on CPU...");
@@ -71,16 +60,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         executor.execute();
         let elapsed = start.elapsed();
 
-        for record in statistics.borrow_mut().drain(..) {
-            let StatisticsRecord {
-                system,
-                name,
-                archetype,
-                elapsed,
-            } = record;
-            log::info!(">>>> {system} `{name}` with {archetype} took {elapsed:?}");
-        }
-        log::info!(">>! Execution of all the CPU systems {i} took {elapsed:?}");
+        log_statistics("CPU", statistics.borrow_mut().drain(..), i, elapsed);
 
         let time_delta = &mut *time_delta.borrow_mut();
         *time_delta = TimeDelta(elapsed.as_secs_f32());
@@ -146,8 +126,8 @@ fn register_update_position_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_position",
+                system: system.into(),
+                name: "update_position".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -182,8 +162,8 @@ fn register_update_data_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_data",
+                system: system.into(),
+                name: "update_data".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -216,8 +196,8 @@ fn register_update_components_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_components",
+                system: system.into(),
+                name: "update_components".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -249,8 +229,8 @@ fn register_update_health_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_health",
+                system: system.into(),
+                name: "update_health".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -282,8 +262,8 @@ fn register_update_damage_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_damage",
+                system: system.into(),
+                name: "update_damage".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -316,8 +296,8 @@ fn register_update_sprite_system(
             });
 
             StatisticsRecord {
-                system,
-                name: "update_sprite",
+                system: system.into(),
+                name: "update_sprite".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }
@@ -350,8 +330,8 @@ where
             });
 
             StatisticsRecord {
-                system,
-                name: "render_sprite",
+                system: system.into(),
+                name: "render_sprite".into(),
                 archetype,
                 elapsed: start.elapsed(),
             }

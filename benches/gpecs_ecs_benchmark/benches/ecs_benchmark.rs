@@ -10,9 +10,9 @@ fn main() {
 
     let context = &mut Context::new();
 
-    let context = cpu::run(context, ENTITY_COUNT, Some(25));
+    let context = cpu::run(context, ENTITY_COUNT, Some(12));
     context.destroy_all();
 
-    let context = gpu::run(context, ENTITY_COUNT, None);
+    let context = gpu::run(context, ENTITY_COUNT, Some(12));
     context.destroy_all();
 }

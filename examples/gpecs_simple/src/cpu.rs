@@ -9,6 +9,7 @@ use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
 use crate::{
+    dump::{CsvRecord, dump_csv_records_into_file},
     setup,
     statistics::{StatisticsRecord, log_statistics},
 };
@@ -20,14 +21,22 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     let statistics = Rc::new(RefCell::new(Vec::new()));
     register_cpu_systems(&mut executor, statistics.clone());
 
+    let mut csv_records = Vec::new();
+
     log::info!("Starting to execute systems on CPU...");
     for i in (0_u128..).maybe_take(repeat_count) {
         let start = Instant::now();
         executor.execute();
         let elapsed = start.elapsed();
 
-        log_statistics("CPU", statistics.borrow_mut().drain(..), i, elapsed);
+        let statistics = &mut *statistics.borrow_mut();
+        log_statistics("CPU", statistics.as_slice(), i, elapsed);
+
+        let record = CsvRecord::new(elapsed, statistics.drain(..));
+        csv_records.push(record);
     }
+
+    dump_csv_records_into_file(csv_records, "cpu", entity_count);
 
     // Return context from the executor to the caller
     executor.into_context()

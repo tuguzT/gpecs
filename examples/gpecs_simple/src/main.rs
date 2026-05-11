@@ -1,6 +1,7 @@
 use gpecs::prelude::*;
 
 mod cpu;
+mod dump;
 mod gpu;
 mod setup;
 mod statistics;
@@ -21,6 +22,6 @@ fn main() {
     let context = cpu::run(context, ENTITY_COUNT, Some(100));
     context.destroy_all();
 
-    let context = gpu::run(context, ENTITY_COUNT, None);
+    let context = gpu::run(context, ENTITY_COUNT, Some(100));
     context.destroy_all();
 }

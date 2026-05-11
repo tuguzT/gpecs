@@ -20,6 +20,7 @@ log = { workspace = true }
 env_logger = { workspace = true }
 wgpu = { workspace = true, features = ["spirv"] }
 rayon = { workspace = true }
+csv = { workspace = true }
 
 [build-dependencies]
 cargo-gpu-install = { workspace = true }

@@ -8,6 +8,7 @@ use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
 use crate::{
+    dump::{CsvRecord, dump_csv_records_into_file},
     setup,
     statistics::{StatisticsRecord, log_statistics},
 };
@@ -28,6 +29,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     //     .expect("archetype of `Position` and `Tag` should contain unique component ids");
 
     register_gpu_systems(&mut executor);
+
+    let mut csv_records = Vec::new();
 
     log::info!("Starting to execute systems on GPU...");
     for i in (0_u128..).maybe_take(repeat_count) {
@@ -72,8 +75,13 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         // check_positions(positions);
 
         let statistics = collect_statistics(&executor, &queue);
-        log_statistics("GPU", statistics, i, elapsed);
+        log_statistics("GPU", statistics.as_slice(), i, elapsed);
+
+        let record = CsvRecord::new(elapsed, statistics);
+        csv_records.push(record);
     }
+
+    dump_csv_records_into_file(csv_records, "gpu", entity_count);
 
     // Return context from the executor to the caller
     executor.into_context(&queue)

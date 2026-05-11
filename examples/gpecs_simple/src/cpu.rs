@@ -69,8 +69,6 @@ fn register_update_positions_system(
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, positions: BundlesMut<(Position,)>| {
-        // log::info!("Hello from the CPU system working with positions!");
-
         let positions = positions
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -86,13 +84,11 @@ fn register_update_positions_system(
                 // assert_eq!(position.data.y, -(entity.index() as f32));
                 // assert_eq!(position.data.z, 0.0);
 
-                // log::debug!("{entity} has position of {}", position.data);
                 position.data = Vec3 {
                     x: entity.index().to_f32().unwrap(),
                     y: entity.index().to_f32().unwrap() / 2.0,
                     z: -entity.index().to_f32().unwrap() / 2.0,
                 };
-                log::debug!("{entity} position have been updated to {}", position.data);
             });
 
             StatisticsRecord {
@@ -115,8 +111,6 @@ fn register_update_masses_system(
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, masses: BundlesMut<(Mass,)>| {
-        // log::info!("Hello from the CPU system working with masses!");
-
         let masses = masses
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -130,9 +124,7 @@ fn register_update_masses_system(
                 assert!(matches!(entity.index() % 3, 1 | 2));
                 // assert_eq!(mass.value, entity.index());
 
-                // log::debug!("{entity} has mass of {}", mass.value);
                 mass.value = entity.index();
-                log::debug!("{entity} mass have been updated to {}", mass.value);
             });
 
             StatisticsRecord {
@@ -155,8 +147,6 @@ fn register_check_tags_system(
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, tags: Bundles<(Tag,)>| {
-        // log::info!("Hello from the CPU system working with tags!");
-
         let tags = tags
             .filter(|(_, bundles)| !bundles.is_empty())
             .collect_vec()
@@ -170,7 +160,6 @@ fn register_check_tags_system(
                 assert!(matches!(entity.index() % 3, 0 | 1));
                 assert_eq!(tag, &Tag);
 
-                log::debug!("{entity} has {tag:?}");
                 // tags_count += 1;
             });
 

@@ -8,7 +8,7 @@ use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
 use crate::{
-    dump::{CsvRecord, dump_csv_records_into_file},
+    dump::{CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record},
     setup,
     statistics::{StatisticsRecord, log_statistics},
 };
@@ -30,7 +30,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
     register_gpu_systems(&mut executor);
 
-    let mut csv_records = Vec::new();
+    let mut csv_writer = create_csv_writer("gpu", entity_count)
+        .expect("csv writer & its file should be created successfully");
 
     log::info!("Starting to execute systems on GPU...");
     for i in (0_u128..).maybe_take(repeat_count) {
@@ -77,11 +78,18 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         let statistics = collect_statistics(&executor, &queue);
         log_statistics("GPU", statistics.as_slice(), i, elapsed);
 
-        let record = CsvRecord::new(elapsed, statistics);
-        csv_records.push(record);
-    }
+        let csv_record = CsvRecord::new(elapsed, statistics);
+        if i == 0 {
+            dump_csv_header(&csv_record, &mut csv_writer)
+                .expect("csv header should be written successfully");
+        }
+        dump_csv_record(csv_record, &mut csv_writer)
+            .expect("csv record should be written successfully");
 
-    dump_csv_records_into_file(csv_records, "gpu", entity_count);
+        csv_writer
+            .flush()
+            .expect("csv file should be saved successfully");
+    }
 
     // Return context from the executor to the caller
     executor.into_context(&queue)

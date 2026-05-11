@@ -6,19 +6,22 @@ use std::{
 
 use gpecs_ecs_benchmark_types::framebuffer::Framebuffer;
 
-pub fn dump_framebuffer_into_file<B>(framebuffer: &Framebuffer<B>, group: &str, index: u128)
+pub fn dump_framebuffer_into_file<B>(
+    framebuffer: &Framebuffer<B>,
+    group: &str,
+    index: u128,
+) -> io::Result<()>
 where
     B: AsRef<[u32]>,
 {
     let path = format!("./dump/{group}/framebuffer-{index}.txt");
     let path = Path::new(&path);
 
-    let prefix = path.parent().expect("failed to get parent directory");
-    fs::create_dir_all(prefix).expect("failed to create parent directory");
+    let prefix = path.parent().expect("path should have a parent directory");
+    fs::create_dir_all(prefix)?;
 
-    let framebuffer_file = File::create(path).expect("failed to create framebuffer file");
+    let framebuffer_file = File::create(path)?;
     dump_framebuffer(framebuffer, framebuffer_file)
-        .expect("framebuffer should successfully saved into file");
 }
 
 pub fn dump_framebuffer<B, W>(framebuffer: &Framebuffer<B>, mut writer: W) -> io::Result<()>

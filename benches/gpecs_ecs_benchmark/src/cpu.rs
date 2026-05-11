@@ -67,7 +67,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
         log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();
-        dump_framebuffer_into_file(framebuffer, "cpu", i);
+        dump_framebuffer_into_file(framebuffer, "cpu", i)
+            .expect("framebuffer should be saved successfully");
     }
 
     // Return context from the executor

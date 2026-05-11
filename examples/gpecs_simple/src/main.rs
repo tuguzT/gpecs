@@ -22,6 +22,6 @@ fn main() {
     let context = cpu::run(context, ENTITY_COUNT, Some(100));
     context.destroy_all();
 
-    let context = gpu::run(context, ENTITY_COUNT, Some(100));
+    let context = gpu::run(context, ENTITY_COUNT, None);
     context.destroy_all();
 }

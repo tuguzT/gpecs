@@ -12,7 +12,9 @@ use gpecs_itertools::Itertools as _;
 use wgpu::util::DeviceExt;
 
 use crate::{
-    dump::dump_framebuffer_into_file,
+    dump::{
+        CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record, dump_framebuffer_into_file,
+    },
     framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
     statistics::{StatisticsRecord, log_statistics},
@@ -59,6 +61,9 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     let gpu_systems = register_gpu_systems(&mut executor);
     setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_additional_entries);
 
+    let mut csv_writer = create_csv_writer("gpu", entity_count)
+        .expect("csv writer & its file should be created successfully");
+
     log::info!(">> Running GPU systems...");
     for i in (0_u128..).maybe_take(repeat_count) {
         #[cfg(debug_assertions)]
@@ -103,9 +108,6 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
             device.stop_graphics_debugger_capture();
         }
 
-        let statistics = collect_statistics(&executor, &queue);
-        log_statistics("GPU", statistics, i, elapsed);
-
         time_delta = TimeDelta(elapsed.as_secs_f32());
         write_time_delta(time_delta, &queue, &gpu_system_resources);
 
@@ -115,6 +117,21 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         log::info!(">>> Saving framebuffer state {i} to file...");
         dump_framebuffer_into_file(&framebuffer, "gpu", i)
             .expect("framebuffer should be saved successfully");
+
+        let statistics = collect_statistics(&executor, &queue);
+        log_statistics("GPU", statistics.as_slice(), i, elapsed);
+
+        let csv_record = CsvRecord::new(elapsed, statistics);
+        if i == 0 {
+            dump_csv_header(&csv_record, &mut csv_writer)
+                .expect("csv header should be written successfully");
+        }
+        dump_csv_record(csv_record, &mut csv_writer)
+            .expect("csv record should be written successfully");
+
+        csv_writer
+            .flush()
+            .expect("csv file should be saved successfully");
     }
 
     executor.into_context(&queue)

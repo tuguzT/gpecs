@@ -721,6 +721,7 @@ dependencies = [
  "bytemuck",
  "cargo-gpu-install",
  "const_format",
+ "csv",
  "env_logger",
  "glam",
  "gpecs",

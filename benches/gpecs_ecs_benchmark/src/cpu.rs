@@ -17,7 +17,9 @@ use itertools::Itertools as _;
 use rayon::prelude::*;
 
 use crate::{
-    dump::dump_framebuffer_into_file,
+    dump::{
+        CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record, dump_framebuffer_into_file,
+    },
     framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
     statistics::{StatisticsRecord, log_statistics},
@@ -54,13 +56,14 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         statistics.clone(),
     );
 
+    let mut csv_writer = create_csv_writer("cpu", entity_count)
+        .expect("csv writer & its file should be created successfully");
+
     log::info!(">> Running CPU systems...");
     for i in (0_u128..).maybe_take(repeat_count) {
         let start = Instant::now();
         executor.execute();
         let elapsed = start.elapsed();
-
-        log_statistics("CPU", statistics.borrow_mut().drain(..), i, elapsed);
 
         let time_delta = &mut *time_delta.borrow_mut();
         *time_delta = TimeDelta(elapsed.as_secs_f32());
@@ -69,6 +72,21 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         let framebuffer = &*framebuffer.borrow();
         dump_framebuffer_into_file(framebuffer, "cpu", i)
             .expect("framebuffer should be saved successfully");
+
+        let statistics = &mut *statistics.borrow_mut();
+        log_statistics("CPU", statistics.as_slice(), i, elapsed);
+
+        let csv_record = CsvRecord::new(elapsed, statistics.drain(..));
+        if i == 0 {
+            dump_csv_header(&csv_record, &mut csv_writer)
+                .expect("csv header should be written successfully");
+        }
+        dump_csv_record(csv_record, &mut csv_writer)
+            .expect("csv record should be written successfully");
+
+        csv_writer
+            .flush()
+            .expect("csv file should be saved successfully");
     }
 
     // Return context from the executor

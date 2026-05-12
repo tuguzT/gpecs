@@ -2,9 +2,7 @@ use std::{cell::RefCell, rc::Rc, time::Instant};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
-    components::{
-        DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, Position, Sprite, Velocity,
-    },
+    components::{DEFAULT_SEED, Damage, Data, Health, Player, Position, Sprite, Velocity},
     framebuffer::Framebuffer,
     systems::{
         render_sprite, update_components, update_damage, update_data, update_health,
@@ -20,12 +18,20 @@ use crate::{
     dump::{
         CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record, dump_framebuffer_into_file,
     },
-    framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
     statistics::{StatisticsRecord, log_statistics},
 };
 
-pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
+pub fn run<B>(
+    context: &mut Context,
+    entity_count: u32,
+    repeat_count: Option<usize>,
+    framebuffer: Framebuffer<B>,
+    spawn_area_margin: u32,
+) -> &mut Context
+where
+    B: AsRef<[u32]> + AsMut<[u32]> + 'static,
+{
     log::info!("> Running on CPU...");
 
     let mut rng = RandomXoshiro128::new(DEFAULT_SEED);
@@ -33,18 +39,17 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     let entities = create_entities_with_mixed_components(context, entity_count);
 
     log::info!(">> Preparing entities with mixed components...");
-    prepare_entities_with_mixed_components(context, &mut rng, &entities);
-
-    let time_delta = TimeDelta::default();
-    let framebuffer = Framebuffer::new(
-        u32::try_from(FRAMEBUFFER_WIDTH).unwrap(),
-        u32::try_from(FRAMEBUFFER_HEIGHT).unwrap(),
-        vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
+    prepare_entities_with_mixed_components(
+        context,
+        &mut rng,
+        &entities,
+        framebuffer.desc(),
+        spawn_area_margin,
     );
 
     let mut executor = CpuExecutor::new(context);
 
-    let time_delta = Rc::new(RefCell::new(time_delta));
+    let time_delta = Rc::new(RefCell::new(TimeDelta::default()));
     let framebuffer = Rc::new(RefCell::new(framebuffer));
     let statistics = Rc::new(RefCell::new(Vec::new()));
 

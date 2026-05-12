@@ -2,9 +2,7 @@ use std::{fs, time::Instant};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
-    components::{
-        DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, Position, Sprite, Velocity,
-    },
+    components::{DEFAULT_SEED, Damage, Data, Health, Player, Position, Sprite, Velocity},
     framebuffer::{Framebuffer, FramebufferDesc},
     utils::{RandomXoshiro128, TimeDelta},
 };
@@ -15,12 +13,20 @@ use crate::{
     dump::{
         CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record, dump_framebuffer_into_file,
     },
-    framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_SIZE, FRAMEBUFFER_WIDTH},
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
     statistics::{StatisticsRecord, log_statistics},
 };
 
-pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
+pub fn run<B>(
+    context: &mut Context,
+    entity_count: u32,
+    repeat_count: Option<usize>,
+    mut framebuffer: Framebuffer<B>,
+    spawn_area_margin: u32,
+) -> &mut Context
+where
+    B: AsRef<[u32]> + AsMut<[u32]> + 'static,
+{
     log::info!("> Running on GPU...");
 
     let mut rng = RandomXoshiro128::new(DEFAULT_SEED);
@@ -28,13 +34,12 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
     let entities = create_entities_with_mixed_components(context, entity_count);
 
     log::info!(">> Preparing entities with mixed components...");
-    prepare_entities_with_mixed_components(context, &mut rng, &entities);
-
-    let mut time_delta = TimeDelta::default();
-    let mut framebuffer = Framebuffer::new(
-        u32::try_from(FRAMEBUFFER_WIDTH).unwrap(),
-        u32::try_from(FRAMEBUFFER_HEIGHT).unwrap(),
-        vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
+    prepare_entities_with_mixed_components(
+        context,
+        &mut rng,
+        &entities,
+        framebuffer.desc(),
+        spawn_area_margin,
     );
 
     log::info!(">> Initializing GPU resources...");
@@ -45,6 +50,7 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         .register_archetype_of::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
         .expect("all the components should be unique");
 
+    let mut time_delta = TimeDelta::default();
     let gpu_system_resources = create_gpu_system_resources(&device, time_delta, &framebuffer);
     let gpu_system_additional_entries =
         create_gpu_systems_additional_entries(&gpu_system_resources);

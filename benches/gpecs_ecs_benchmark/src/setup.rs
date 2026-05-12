@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::UVec2;
 use gpecs::{
     bundle::erased::error::DowncastErrorKind, context::error::IncompatibleBundleError, prelude::*,
 };
@@ -7,11 +7,9 @@ use gpecs_ecs_benchmark_types::{
         Damage, Data, Health, Player, PlayerType, Position, SPAWN_SPRITE, Sprite, StatusEffect,
         Velocity,
     },
+    framebuffer::FramebufferDesc,
     utils::RandomXoshiro128,
 };
-use num_traits::ToPrimitive;
-
-use crate::framebuffer::{FRAMEBUFFER_HEIGHT, FRAMEBUFFER_WIDTH, SPAWN_AREA_MARGIN};
 
 pub fn create_entities_with_mixed_components(context: &mut Context, count: u32) -> Vec<Entity> {
     let entities_capacity = count.try_into().unwrap_or_default();
@@ -56,6 +54,8 @@ pub fn prepare_entities_with_mixed_components(
     context: &mut Context,
     rng: &mut RandomXoshiro128,
     entities: &[Entity],
+    framebuffer_desc: FramebufferDesc,
+    spawn_area_margin: u32,
 ) {
     let mut j = 0;
     let count = entities.len();
@@ -64,16 +64,44 @@ pub fn prepare_entities_with_mixed_components(
             if (count < 100 && i == 0) || count >= 100 || (j % 2) == 0 {
                 if i == 0 {
                     add_components(context, entity);
-                    init_components(context, entity, rng, Some(PlayerType::Hero));
+                    init_components(
+                        context,
+                        entity,
+                        rng,
+                        Some(PlayerType::Hero),
+                        framebuffer_desc,
+                        spawn_area_margin,
+                    );
                 } else if (i % 6) == 0 {
                     add_components(context, entity);
-                    init_components(context, entity, rng, None);
+                    init_components(
+                        context,
+                        entity,
+                        rng,
+                        None,
+                        framebuffer_desc,
+                        spawn_area_margin,
+                    );
                 } else if (i % 4) == 0 {
                     add_components(context, entity);
-                    init_components(context, entity, rng, Some(PlayerType::Hero));
+                    init_components(
+                        context,
+                        entity,
+                        rng,
+                        Some(PlayerType::Hero),
+                        framebuffer_desc,
+                        spawn_area_margin,
+                    );
                 } else if (i % 2) == 0 {
                     add_components(context, entity);
-                    init_components(context, entity, rng, Some(PlayerType::Monster));
+                    init_components(
+                        context,
+                        entity,
+                        rng,
+                        Some(PlayerType::Monster),
+                        framebuffer_desc,
+                        spawn_area_margin,
+                    );
                 }
             }
             j += 1;
@@ -147,6 +175,8 @@ fn init_components(
     entity: Entity,
     rng: &mut RandomXoshiro128,
     player_type: Option<PlayerType>,
+    framebuffer_desc: FramebufferDesc,
+    spawn_area_margin: u32,
 ) {
     let (position, player, health, damage, sprite) = context
         .get_bundle_mut::<(Position, Player, Health, Damage, Sprite)>(entity)
@@ -195,15 +225,11 @@ fn init_components(
         character: SPAWN_SPRITE,
     };
 
-    let framebuffer_width = u32::try_from(FRAMEBUFFER_WIDTH).unwrap();
-    let framebuffer_height = u32::try_from(FRAMEBUFFER_HEIGHT).unwrap();
-    let spawn_area_margin_float = SPAWN_AREA_MARGIN.to_f32().unwrap();
-    let x_rng = player.rng.range(0..framebuffer_width + SPAWN_AREA_MARGIN);
-    let y_rng = player.rng.range(0..framebuffer_height + SPAWN_AREA_MARGIN);
+    let rng = &mut player.rng;
+    let x = rng.range(0..framebuffer_desc.width + spawn_area_margin);
+    let y = rng.range(0..framebuffer_desc.height + spawn_area_margin);
+    let data = UVec2 { x, y }.as_ivec2() - spawn_area_margin.cast_signed();
     *position = Position {
-        data: Vec2 {
-            x: x_rng.to_f32().unwrap() - spawn_area_margin_float,
-            y: y_rng.to_f32().unwrap() - SPAWN_AREA_MARGIN.to_f32().unwrap(),
-        },
+        data: data.as_vec2(),
     };
 }

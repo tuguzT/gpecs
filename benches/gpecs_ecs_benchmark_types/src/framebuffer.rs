@@ -7,7 +7,7 @@ pub struct FramebufferDesc {
     pub height: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Framebuffer<B> {
     desc: FramebufferDesc,
     buffer: B,

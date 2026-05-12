@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use gpecs_ecs_benchmark_types::framebuffer::Framebuffer;
+use gpecs_ecs_benchmark_types::framebuffer::{Framebuffer, FramebufferDesc};
 
 use crate::statistics::StatisticsRecord;
 
@@ -19,7 +19,8 @@ pub fn dump_framebuffer_into_file<B>(
 where
     B: AsRef<[u32]>,
 {
-    let path = format!("./dump/{group}-framebuffer{index}-{entity_count}.txt");
+    let FramebufferDesc { width, height } = framebuffer.desc();
+    let path = format!("./dump/{group}-{entity_count}-framebuffer-{width}x{height}-i{index}.txt");
     let path = Path::new(&path);
 
     let prefix = path.parent().expect("path should have a parent directory");
@@ -69,7 +70,7 @@ impl CsvRecord {
 }
 
 pub fn create_csv_writer(group: &str, entity_count: u32) -> csv::Result<csv::Writer<impl Write>> {
-    let path = format!("./dump/{group}-statistics-{entity_count}.csv");
+    let path = format!("./dump/{group}-{entity_count}-statistics.csv");
     let path = Path::new(&path);
 
     let prefix = path.parent().expect("path should have a parent directory");

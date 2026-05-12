@@ -71,14 +71,14 @@ arrayvec = { version = "0.7", default-features = false }
 itertools = { version = "0.14", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 polonius-the-crab = { version = "0.5", default-features = false }
-criterion = { version = "0.8", features = ["html_reports"] }
-pollster = { version = "0.4", default-features = false }
 bytemuck = { version = "1.25", default-features = false }
-const_format = { version = "0.2", default-features = false }
-log = { version = "0.4", default-features = false }
 glam = { version = "0.32", default-features = false, features = ["nostd-libm"] }
-rayon = { version = "1.12" }
 wgpu = { version = "29" }
+rayon = { version = "1.12" }
+const_format = { version = "0.2", default-features = false }
+pollster = { version = "0.4", default-features = false }
+criterion = { version = "0.8", features = ["html_reports"] }
+log = { version = "0.4", default-features = false }
 env_logger = { version = "0.11" }
 csv = { version = "1.4" }
 dotenvy = { version = "0.15" }

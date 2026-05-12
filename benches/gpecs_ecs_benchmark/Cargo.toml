@@ -20,6 +20,7 @@ pollster = { workspace = true }
 itertools = { workspace = true }
 rayon = { workspace = true }
 csv = { workspace = true }
+dotenvy = { workspace = true }
 
 [build-dependencies]
 cargo-gpu-install = { workspace = true }

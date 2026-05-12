@@ -78,9 +78,10 @@ const_format = { version = "0.2", default-features = false }
 log = { version = "0.4", default-features = false }
 glam = { version = "0.32", default-features = false, features = ["nostd-libm"] }
 rayon = { version = "1.12" }
-env_logger = { version = "0.11" }
 wgpu = { version = "29" }
+env_logger = { version = "0.11" }
 csv = { version = "1.4" }
+dotenvy = { version = "0.15" }
 
 [patch.crates-io]
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "66b7eb3922f042becb223cfa83f088e7be42d608" }

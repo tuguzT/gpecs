@@ -4,9 +4,8 @@ use gpecs_ecs_benchmark::{cpu, gpu};
 const ENTITY_COUNT: u32 = 1_000_000;
 
 fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    dotenvy::dotenv().ok();
+    env_logger::builder().init();
 
     let context = &mut Context::new();
 

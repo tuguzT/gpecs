@@ -4,18 +4,18 @@
 use gpecs_entity::Entity;
 use gpecs_simple_types::{Mass, Position};
 use spirv_std::{
-    glam::{UVec3, Vec3},
+    glam::{USizeVec3, Vec3},
     num_traits::ToPrimitive,
     spirv,
 };
 
 #[spirv(compute(threads(64)))]
 pub fn update_entity_position(
-    #[spirv(global_invocation_id)] id: UVec3,
+    #[spirv(global_invocation_id)] id: USizeVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions: &mut [Position],
 ) {
-    let index = id.x as usize;
+    let index = id.x;
     let entity = entities[index];
     let position = &mut positions[index];
 
@@ -28,11 +28,11 @@ pub fn update_entity_position(
 
 #[spirv(compute(threads(64)))]
 pub fn update_entity_mass(
-    #[spirv(global_invocation_id)] id: UVec3,
+    #[spirv(global_invocation_id)] id: USizeVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] masses: &mut [Mass],
 ) {
-    let index = id.x as usize;
+    let index = id.x;
     let entity = entities[index];
     let mass = &mut masses[index];
 

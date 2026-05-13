@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::statistics::StatisticsRecord;
+use gpecs_simple_core::statistics::StatisticsRecord;
 
 pub struct CsvRecord {
     elapsed: Duration,
@@ -38,38 +38,41 @@ pub fn create_csv_writer(group: &str, entity_count: u32) -> csv::Result<csv::Wri
     Ok(writer)
 }
 
-pub fn dump_csv_header<W>(record: &CsvRecord, writer: &mut csv::Writer<W>) -> csv::Result<()>
-where
-    W: Write,
-{
-    fn record_header(record: &StatisticsRecord) -> String {
-        let StatisticsRecord {
-            system, archetype, ..
-        } = record;
-        format!("system {system} {archetype}")
-    }
-
-    let CsvRecord { statistics, .. } = record;
-
-    let record = statistics
-        .iter()
-        .map(record_header)
-        .chain(iter::once("total".into()));
-    writer.write_record(record)
-}
-
-pub fn dump_csv_record<W>(record: CsvRecord, writer: &mut csv::Writer<W>) -> csv::Result<()>
+pub fn dump_csv_record<W>(
+    record: CsvRecord,
+    with_header: bool,
+    writer: &mut csv::Writer<W>,
+) -> csv::Result<()>
 where
     W: Write,
 {
     let CsvRecord {
-        elapsed,
         statistics,
+        elapsed,
     } = record;
+
+    if with_header {
+        let record = statistics
+            .iter()
+            .map(record_header)
+            .chain(iter::once("total".into()));
+        writer.write_record(record)?;
+    }
 
     let record = statistics
         .iter()
-        .map(|statistics| statistics.elapsed.as_secs_f64().to_string())
-        .chain(iter::once(elapsed.as_secs_f64().to_string()));
+        .map(|statistics| record_elapsed(statistics.elapsed))
+        .chain(iter::once(record_elapsed(elapsed)));
     writer.write_record(record)
+}
+
+fn record_header(record: &StatisticsRecord) -> String {
+    let StatisticsRecord {
+        system, archetype, ..
+    } = record;
+    format!("system {system} {archetype}")
+}
+
+fn record_elapsed(elapsed: Duration) -> String {
+    elapsed.as_secs_f64().to_string()
 }

@@ -1,5 +1,2 @@
-pub mod cpu;
 pub mod dump;
-pub mod gpu;
-pub mod setup;
-pub mod statistics;
+pub mod logs;

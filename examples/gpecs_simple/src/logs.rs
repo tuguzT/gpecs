@@ -1,0 +1,19 @@
+use std::{borrow::Borrow, time::Duration};
+
+use gpecs_simple_core::statistics::StatisticsRecord;
+
+pub fn log_statistics<I>(group: &str, statistics: I, i: u128, elapsed: Duration)
+where
+    I: IntoIterator<Item: Borrow<StatisticsRecord>>,
+{
+    for record in statistics {
+        let StatisticsRecord {
+            system,
+            name,
+            archetype,
+            elapsed,
+        } = record.borrow();
+        log::info!("{group} system {system} `{name}` with {archetype} took {elapsed:?}");
+    }
+    log::info!("Execution {i} of all the {group} systems took {elapsed:?}");
+}

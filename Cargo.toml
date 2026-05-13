@@ -21,11 +21,13 @@ members = [
     "crates/gpecs_sparse",
     # standalone examples
     "examples/gpecs_simple",
+    "examples/gpecs_simple_core",
     "examples/gpecs_simple_types",
     "examples/gpecs_simple_shader",
     # standalone benchmarks
     "benches/gpecs_soa_bench",
     "benches/gpecs_ecs_benchmark",
+    "benches/gpecs_ecs_benchmark_core",
     "benches/gpecs_ecs_benchmark_types",
     "benches/gpecs_ecs_benchmark_shader",
 ]
@@ -57,8 +59,10 @@ gpecs_soa_pair = { path = "crates/gpecs_soa_pair", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false }
 gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
 # standalone examples
+gpecs_simple_core = { path = "examples/gpecs_simple_core" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 # standalone benchmarks
+gpecs_ecs_benchmark_core = { path = "benches/gpecs_ecs_benchmark_core" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
 cargo-gpu-install = { version = "0.10.0-alpha.1", default-features = false }

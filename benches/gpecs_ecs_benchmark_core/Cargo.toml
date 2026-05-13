@@ -1,0 +1,27 @@
+[package]
+name = "gpecs_ecs_benchmark_core"
+description = "Core of `ecs_benchmark` implementation for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+gpecs = { workspace = true, features = ["rayon"] }
+gpecs_itertools = { workspace = true }
+gpecs_ecs_benchmark_types = { workspace = true }
+bytemuck = { workspace = true, features = ["derive", "must_cast"] }
+num-traits = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+wgpu = { workspace = true, features = ["spirv"] }
+pollster = { workspace = true }
+itertools = { workspace = true }
+rayon = { workspace = true }
+
+[build-dependencies]
+cargo-gpu-install = { workspace = true }
+const_format = { workspace = true }
+
+[lints]
+workspace = true

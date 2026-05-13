@@ -1,4 +1,9 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    mem,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
@@ -15,20 +20,18 @@ use itertools::Itertools as _;
 use rayon::prelude::*;
 
 use crate::{
-    dump::{
-        CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record, dump_framebuffer_into_file,
-    },
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
-    statistics::{StatisticsRecord, log_statistics},
+    statistics::StatisticsRecord,
 };
 
-pub fn run<B>(
+pub fn run<B, E>(
     context: &mut Context,
     entity_count: u32,
     repeat_count: Option<usize>,
     framebuffer: Framebuffer<B>,
     spawn_area_margin: u32,
-) -> &mut Context
+    mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>, &Framebuffer<B>) -> Result<(), E>,
+) -> Result<&mut Context, E>
 where
     B: AsRef<[u32]> + AsMut<[u32]> + 'static,
 {
@@ -61,11 +64,8 @@ where
         statistics.clone(),
     );
 
-    let mut csv_writer = create_csv_writer("cpu", entity_count)
-        .expect("csv writer & its file should be created successfully");
-
     log::info!(">> Running CPU systems...");
-    for i in (0_u128..).maybe_take(repeat_count) {
+    for i in (0..).maybe_take(repeat_count) {
         let start = Instant::now();
         executor.execute();
         let elapsed = start.elapsed();
@@ -73,29 +73,13 @@ where
         let time_delta = &mut *time_delta.borrow_mut();
         *time_delta = TimeDelta(elapsed.as_secs_f32());
 
-        log::info!(">>> Saving framebuffer state {i} to file...");
-        let framebuffer = &*framebuffer.borrow();
-        dump_framebuffer_into_file(framebuffer, "cpu", i, entity_count)
-            .expect("framebuffer should be saved successfully");
-
         let statistics = &mut *statistics.borrow_mut();
-        log_statistics("CPU", statistics.as_slice(), i, elapsed);
-
-        let csv_record = CsvRecord::new(elapsed, statistics.drain(..));
-        if i == 0 {
-            dump_csv_header(&csv_record, &mut csv_writer)
-                .expect("csv header should be written successfully");
-        }
-        dump_csv_record(csv_record, &mut csv_writer)
-            .expect("csv record should be written successfully");
-
-        csv_writer
-            .flush()
-            .expect("csv file should be saved successfully");
+        let framebuffer = &*framebuffer.borrow();
+        f(i, elapsed, mem::take(statistics), framebuffer)?;
     }
 
     // Return context from the executor
-    executor.into_context()
+    Ok(executor.into_context())
 }
 
 fn register_cpu_systems<B>(

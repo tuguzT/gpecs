@@ -1,4 +1,9 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    mem,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use glam::Vec3;
 use gpecs::prelude::*;
@@ -8,46 +13,32 @@ use itertools::Itertools as _;
 use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
-use crate::{
-    dump::{CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record},
-    setup,
-    statistics::{StatisticsRecord, log_statistics},
-};
+use crate::{setup, statistics::StatisticsRecord};
 
-pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
+pub fn run<E>(
+    context: &mut Context,
+    entity_count: u32,
+    repeat_count: Option<usize>,
+    mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>) -> Result<(), E>,
+) -> Result<&mut Context, E> {
     setup::setup(context, entity_count);
 
     let mut executor = CpuExecutor::new(context);
     let statistics = Rc::new(RefCell::new(Vec::new()));
     register_cpu_systems(&mut executor, statistics.clone());
 
-    let mut csv_writer = create_csv_writer("cpu", entity_count)
-        .expect("csv writer & its file should be created successfully");
-
     log::info!("Starting to execute systems on CPU...");
-    for i in (0_u128..).maybe_take(repeat_count) {
+    for i in (0..).maybe_take(repeat_count) {
         let start = Instant::now();
         executor.execute();
         let elapsed = start.elapsed();
 
         let statistics = &mut *statistics.borrow_mut();
-        log_statistics("CPU", statistics.as_slice(), i, elapsed);
-
-        let csv_record = CsvRecord::new(elapsed, statistics.drain(..));
-        if i == 0 {
-            dump_csv_header(&csv_record, &mut csv_writer)
-                .expect("csv header should be written successfully");
-        }
-        dump_csv_record(csv_record, &mut csv_writer)
-            .expect("csv record should be written successfully");
-
-        csv_writer
-            .flush()
-            .expect("csv file should be saved successfully");
+        f(i, elapsed, mem::take(statistics))?;
     }
 
     // Return context from the executor to the caller
-    executor.into_context()
+    Ok(executor.into_context())
 }
 
 fn register_cpu_systems(

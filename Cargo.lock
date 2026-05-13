@@ -724,12 +724,22 @@ dependencies = [
 name = "gpecs_ecs_benchmark"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
- "cargo-gpu-install",
- "const_format",
  "csv",
  "dotenvy",
  "env_logger",
+ "gpecs",
+ "gpecs_ecs_benchmark_core",
+ "gpecs_ecs_benchmark_types",
+ "log",
+]
+
+[[package]]
+name = "gpecs_ecs_benchmark_core"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "cargo-gpu-install",
+ "const_format",
  "glam",
  "gpecs",
  "gpecs_ecs_benchmark_types",
@@ -816,12 +826,21 @@ dependencies = [
 name = "gpecs_simple"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
- "cargo-gpu-install",
- "const_format",
  "csv",
  "dotenvy",
  "env_logger",
+ "gpecs",
+ "gpecs_simple_core",
+ "log",
+]
+
+[[package]]
+name = "gpecs_simple_core"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "cargo-gpu-install",
+ "const_format",
  "glam",
  "gpecs",
  "gpecs_itertools",

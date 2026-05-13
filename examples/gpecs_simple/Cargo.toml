@@ -8,24 +8,12 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-gpecs = { workspace = true, features = ["rayon"] }
-gpecs_itertools = { workspace = true }
-gpecs_simple_types = { workspace = true }
-bytemuck = { workspace = true }
-itertools = { workspace = true }
-num-traits = { workspace = true }
-glam = { workspace = true }
-pollster = { workspace = true }
+gpecs = { workspace = true }
+gpecs_simple_core = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
-wgpu = { workspace = true, features = ["spirv"] }
-rayon = { workspace = true }
 csv = { workspace = true }
 dotenvy = { workspace = true }
-
-[build-dependencies]
-cargo-gpu-install = { workspace = true }
-const_format = { workspace = true }
 
 [lints]
 workspace = true

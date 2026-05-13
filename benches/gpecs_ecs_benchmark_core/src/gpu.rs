@@ -1,4 +1,7 @@
-use std::{fs, time::Instant};
+use std::{
+    fs,
+    time::{Duration, Instant},
+};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
@@ -10,20 +13,18 @@ use gpecs_itertools::Itertools as _;
 use wgpu::util::DeviceExt;
 
 use crate::{
-    dump::{
-        CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record, dump_framebuffer_into_file,
-    },
     setup::{create_entities_with_mixed_components, prepare_entities_with_mixed_components},
-    statistics::{StatisticsRecord, log_statistics},
+    statistics::StatisticsRecord,
 };
 
-pub fn run<B>(
+pub fn run<B, E>(
     context: &mut Context,
     entity_count: u32,
     repeat_count: Option<usize>,
     mut framebuffer: Framebuffer<B>,
     spawn_area_margin: u32,
-) -> &mut Context
+    mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>, &Framebuffer<B>) -> Result<(), E>,
+) -> Result<&mut Context, E>
 where
     B: AsRef<[u32]> + AsMut<[u32]> + 'static,
 {
@@ -67,11 +68,8 @@ where
     let gpu_systems = register_gpu_systems(&mut executor);
     setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_additional_entries);
 
-    let mut csv_writer = create_csv_writer("gpu", entity_count)
-        .expect("csv writer & its file should be created successfully");
-
     log::info!(">> Running GPU systems...");
-    for i in (0_u128..).maybe_take(repeat_count) {
+    for i in (0..).maybe_take(repeat_count) {
         #[cfg(debug_assertions)]
         unsafe {
             device.start_graphics_debugger_capture();
@@ -120,27 +118,11 @@ where
         download_framebuffer(&mut framebuffer, &framebuffer_download_buffer);
         framebuffer_download_buffer.unmap();
 
-        log::info!(">>> Saving framebuffer state {i} to file...");
-        dump_framebuffer_into_file(&framebuffer, "gpu", i, entity_count)
-            .expect("framebuffer should be saved successfully");
-
         let statistics = collect_statistics(&executor, &queue);
-        log_statistics("GPU", statistics.as_slice(), i, elapsed);
-
-        let csv_record = CsvRecord::new(elapsed, statistics);
-        if i == 0 {
-            dump_csv_header(&csv_record, &mut csv_writer)
-                .expect("csv header should be written successfully");
-        }
-        dump_csv_record(csv_record, &mut csv_writer)
-            .expect("csv record should be written successfully");
-
-        csv_writer
-            .flush()
-            .expect("csv file should be saved successfully");
+        f(i, elapsed, statistics, &framebuffer)?;
     }
 
-    executor.into_context(&queue)
+    Ok(executor.into_context(&queue))
 }
 
 #[derive(Debug)]

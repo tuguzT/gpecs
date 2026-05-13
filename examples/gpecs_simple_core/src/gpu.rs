@@ -1,4 +1,7 @@
-use std::{fs, time::Instant};
+use std::{
+    fs,
+    time::{Duration, Instant},
+};
 
 use glam::Vec3;
 use gpecs::{archetype::storage, prelude::*};
@@ -7,13 +10,14 @@ use gpecs_simple_types::{Mass, Position, Tag};
 use num_traits::ToPrimitive;
 use rayon::prelude::*;
 
-use crate::{
-    dump::{CsvRecord, create_csv_writer, dump_csv_header, dump_csv_record},
-    setup,
-    statistics::{StatisticsRecord, log_statistics},
-};
+use crate::{setup, statistics::StatisticsRecord};
 
-pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>) -> &mut Context {
+pub fn run<E>(
+    context: &mut Context,
+    entity_count: u32,
+    repeat_count: Option<usize>,
+    mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>) -> Result<(), E>,
+) -> Result<&mut Context, E> {
     setup::setup(context, entity_count);
 
     let (device, queue) = init_wgpu();
@@ -30,11 +34,8 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
 
     register_gpu_systems(&mut executor);
 
-    let mut csv_writer = create_csv_writer("gpu", entity_count)
-        .expect("csv writer & its file should be created successfully");
-
     log::info!("Starting to execute systems on GPU...");
-    for i in (0_u128..).maybe_take(repeat_count) {
+    for i in (0..).maybe_take(repeat_count) {
         #[cfg(debug_assertions)]
         unsafe {
             device.start_graphics_debugger_capture();
@@ -76,23 +77,11 @@ pub fn run(context: &mut Context, entity_count: u32, repeat_count: Option<usize>
         // check_positions(positions);
 
         let statistics = collect_statistics(&executor, &queue);
-        log_statistics("GPU", statistics.as_slice(), i, elapsed);
-
-        let csv_record = CsvRecord::new(elapsed, statistics);
-        if i == 0 {
-            dump_csv_header(&csv_record, &mut csv_writer)
-                .expect("csv header should be written successfully");
-        }
-        dump_csv_record(csv_record, &mut csv_writer)
-            .expect("csv record should be written successfully");
-
-        csv_writer
-            .flush()
-            .expect("csv file should be saved successfully");
+        f(i, elapsed, statistics)?;
     }
 
     // Return context from the executor to the caller
-    executor.into_context(&queue)
+    Ok(executor.into_context(&queue))
 }
 
 fn register_gpu_systems(executor: &mut GpuExecutor) {
@@ -216,7 +205,7 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
         adapter
             .features()
             .contains(wgpu::Features::MAPPABLE_PRIMARY_BUFFERS),
-        "adapter does not support mappable primary buffers, whic are required",
+        "adapter does not support mappable primary buffers, which are required",
     );
 
     let device_desc = wgpu::DeviceDescriptor {

@@ -1,4 +1,8 @@
-use core::{alloc::Layout, iter::FusedIterator, num::NonZeroUsize};
+use core::{
+    alloc::Layout,
+    iter::FusedIterator,
+    num::{NonZeroU32, TryFromIntError},
+};
 
 use bytemuck::{CheckedBitPattern, NoUninit};
 use gpecs_soa_erased::{
@@ -8,55 +12,62 @@ use gpecs_soa_erased::{
 };
 use spirv_std::arch::IndexUnchecked;
 
-/// FFI-compatible layout.
+/// Layout which consists of `u32`s.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, NoUninit, CheckedBitPattern)]
 #[repr(C)]
-pub struct FfiLayout {
-    size: usize,
-    align: NonZeroUsize,
+pub struct GpuLayout {
+    size: u32,
+    align: NonZeroU32,
 }
 
-impl FfiLayout {
-    /// Creates a new FFI-compatible layout from the given [`Layout`].
+impl GpuLayout {
+    /// Tries to create a new layout from the given [`Layout`].
     #[inline]
-    pub const fn new(layout: Layout) -> Self {
-        let size = layout.size();
+    pub fn new(layout: Layout) -> Result<Self, TryFromIntError> {
+        let size = layout.size().try_into()?;
+        let align = layout.align().try_into()?;
+
         // SAFETY: Layout::align() is guaranteed to be a power of two, which is non-zero
-        let align = unsafe { NonZeroUsize::new_unchecked(layout.align()) };
-        Self { size, align }
+        let align = unsafe { NonZeroU32::new_unchecked(align) };
+
+        let me = Self { size, align };
+        Ok(me)
     }
 
-    /// Creates a new FFI-compatible layout from the given type.
+    /// Tries to create a new layout from the given type.
     #[inline]
-    pub const fn of<T>() -> Self {
+    pub fn of<T>() -> Result<Self, TryFromIntError> {
         let layout = Layout::new::<T>();
         Self::new(layout)
     }
 
-    /// Returns the [`Layout`] of this FFI-compatible layout.
+    /// Returns the [`Layout`] of this layout.
     #[inline]
     pub const fn layout(self) -> Layout {
         let Self { size, align } = self;
+
         // SAFETY: self could only be created from a valid `Layout`
-        unsafe { Layout::from_size_align_unchecked(size, align.get()) }
+        unsafe { Layout::from_size_align_unchecked(size as usize, align.get() as usize) }
     }
 }
 
-impl From<Layout> for FfiLayout {
+impl TryFrom<Layout> for GpuLayout {
+    type Error = TryFromIntError;
+
     #[inline]
-    fn from(layout: Layout) -> Self {
+    fn try_from(layout: Layout) -> Result<Self, Self::Error> {
         Self::new(layout)
     }
 }
 
-impl From<FfiLayout> for Layout {
+impl From<GpuLayout> for Layout {
     #[inline]
-    fn from(layout: FfiLayout) -> Self {
+    fn from(layout: GpuLayout) -> Self {
         layout.layout()
     }
 }
 
-impl WithLayout for FfiLayout {
+impl WithLayout for GpuLayout {
     #[inline]
     fn layout(&self) -> Layout {
         Self::layout(*self)
@@ -66,15 +77,18 @@ impl WithLayout for FfiLayout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, NoUninit, CheckedBitPattern)]
 #[repr(C)]
 pub struct GpuFieldLayout {
-    layout: FfiLayout,
-    offset: usize,
+    layout: GpuLayout,
+    offset: u32,
 }
 
 impl GpuFieldLayout {
     #[inline]
-    pub const unsafe fn new(layout: Layout, offset: usize) -> Self {
-        let layout = FfiLayout::new(layout);
-        Self { layout, offset }
+    pub unsafe fn new(layout: Layout, offset: usize) -> Result<Self, TryFromIntError> {
+        let layout = GpuLayout::new(layout)?;
+        let offset = offset.try_into()?;
+
+        let me = Self { layout, offset };
+        Ok(me)
     }
 
     #[inline]
@@ -86,13 +100,13 @@ impl GpuFieldLayout {
     #[inline]
     pub const fn offset(self) -> usize {
         let Self { offset, .. } = self;
-        offset
+        offset as usize
     }
 
     #[inline]
     pub const fn into_parts(self) -> (Layout, usize) {
         let Self { layout, offset } = self;
-        (layout.layout(), offset)
+        (layout.layout(), offset as usize)
     }
 }
 
@@ -115,7 +129,7 @@ pub struct BufferOffsetsFromGpuFieldLayout;
 
 unsafe impl BufferOffsetsFrom<GpuFieldLayout> for BufferOffsetsFromGpuFieldLayout {
     unsafe fn next(&mut self, _: usize, desc: GpuFieldLayout) -> BufferOffset<GpuFieldLayout> {
-        BufferOffset::new(desc, desc.offset)
+        BufferOffset::new(desc, desc.offset())
     }
 }
 

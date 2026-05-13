@@ -4,15 +4,16 @@
 use core::convert::Infallible;
 use spirv_std::{TypedBuffer, glam::USizeVec3, spirv};
 
-use gpecs_soa_erased::{
-    ErasedSoa, ErasedSoaContext, ErasedSoaMutSlicePtrs, soa::slice::SoaSliceMutPtrs,
-};
+use gpecs_soa_erased::{ErasedSoa, ErasedSoaContext, ErasedSoaMutSlices, soa::slice::SoaSlicesMut};
+
+use self::convert::u32_to_usize;
 
 pub use self::{
-    layouts::{FfiLayout, GpuFieldLayout, GpuFieldLayouts},
+    layouts::{GpuFieldLayout, GpuFieldLayouts, GpuLayout},
     ptrs::{GpuSliceItemPtr, GpuSliceItemPtrs},
 };
 
+mod convert;
 mod layouts;
 mod ptrs;
 
@@ -20,32 +21,34 @@ pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSliceItemPtrs<u32>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub struct GpuErasedSoaDesc {
-    pub len: usize,
-    pub capacity: usize,
+pub struct ErasedSoaWorkDesc {
+    pub len: u32,
+    pub capacity: u32,
 }
 
-pub type DescUniform = TypedBuffer<GpuErasedSoaDesc>;
+pub type DescUniform = TypedBuffer<ErasedSoaWorkDesc>;
 pub type DenseStorage = TypedBuffer<[u32]>;
 pub type LayoutsStorage = TypedBuffer<[GpuFieldLayout]>;
 
 #[spirv(compute(threads(64)))]
 pub fn erased_soa_work(
     #[spirv(global_invocation_id)] id: USizeVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] erased_soa_desc: &DescUniform,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] desc: &DescUniform,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] dense: &mut DenseStorage,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] layouts: &LayoutsStorage,
 ) {
-    let dense = &mut **dense;
-    let layouts = &**layouts;
-
-    let layouts = GpuFieldLayouts::from(layouts);
-    let GpuErasedSoaDesc { len, capacity } = **erased_soa_desc;
     let invocation_id = id.x;
 
-    let context = unsafe { ErasedSoaContext::from_inner(layouts) };
-    let slices = unsafe { ErasedSoaMutSlicePtrs::new_unchecked(layouts, dense, capacity, 0, len) };
+    let dense = &mut **dense;
+    let layouts = &**layouts;
+    let ErasedSoaWorkDesc { len, capacity } = **desc;
+    let len = u32_to_usize(len);
+    let capacity = u32_to_usize(capacity);
 
-    let mut dense_soa = SoaSliceMutPtrs::<GpuErasedSoa<_>>::new(&context, slices);
-    unsafe { dense_soa.swap_unchecked(invocation_id, invocation_id + 64) }
+    let layouts = GpuFieldLayouts::from(layouts);
+    let context = unsafe { ErasedSoaContext::from_inner(layouts) };
+    let slices = unsafe { ErasedSoaMutSlices::new_unchecked(layouts, dense, capacity, 0, len) };
+
+    let mut dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
+    dense_soa.swap(invocation_id, invocation_id + 64);
 }

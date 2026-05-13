@@ -14,9 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let framebuffer_width = parse_env("FRAMEBUFFER_WIDTH")?.unwrap_or(320);
     let framebuffer_height = parse_env("FRAMEBUFFER_HEIGHT")?.unwrap_or(240);
-    let framebuffer_size = (framebuffer_width * framebuffer_height)
-        .try_into()
-        .expect("framebuffer size should fit into `usize`");
+    let framebuffer_size = (framebuffer_width * framebuffer_height).try_into()?;
     let framebuffer = Framebuffer::new(
         framebuffer_width,
         framebuffer_height,

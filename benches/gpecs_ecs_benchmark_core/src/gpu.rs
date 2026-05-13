@@ -5,7 +5,9 @@ use std::{
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
-    components::{DEFAULT_SEED, Damage, Data, Health, Player, Position, Sprite, Velocity},
+    components::{
+        DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, Position, Sprite, Velocity,
+    },
     framebuffer::{Framebuffer, FramebufferDesc},
     utils::{RandomXoshiro128, TimeDelta},
 };
@@ -35,6 +37,7 @@ where
     let entities = create_entities_with_mixed_components(context, entity_count);
 
     log::info!(">> Preparing entities with mixed components...");
+    framebuffer.buffer_mut().as_mut().fill(NONE_SPRITE);
     prepare_entities_with_mixed_components(
         context,
         &mut rng,
@@ -64,12 +67,21 @@ where
     };
     let framebuffer_download_buffer = device.create_buffer(&framebuffer_download_buffer_desc);
 
+    let framebuffer_clear_buffer_desc = wgpu::util::BufferInitDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` framebuffer clear buffer"),
+        contents: bytemuck::must_cast_slice(framebuffer.buffer().as_ref()),
+        usage: wgpu::BufferUsages::COPY_SRC,
+    };
+    let framebuffer_clear_buffer = device.create_buffer_init(&framebuffer_clear_buffer_desc);
+
     log::info!(">> Registering GPU systems...");
     let gpu_systems = register_gpu_systems(&mut executor);
     setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_additional_entries);
 
     log::info!(">> Running GPU systems...");
     for i in (0..).maybe_take(repeat_count) {
+        framebuffer.buffer_mut().as_mut().fill(NONE_SPRITE);
+
         #[cfg(debug_assertions)]
         unsafe {
             device.start_graphics_debugger_capture();
@@ -78,6 +90,14 @@ where
         let timestamp = Instant::now();
 
         let mut command_encoder = init_wgpu_command_encoder(&device);
+        command_encoder.copy_buffer_to_buffer(
+            &framebuffer_clear_buffer,
+            0,
+            &gpu_system_resources.framebuffer_data_storage,
+            0,
+            framebuffer_clear_buffer.size(),
+        );
+
         executor.execute(&mut command_encoder);
 
         command_encoder.copy_buffer_to_buffer(
@@ -148,7 +168,9 @@ fn create_gpu_system_resources(
     let framebuffer_data_storage_buffer_desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer data storage buffer"),
         contents: bytemuck::must_cast_slice(framebuffer.buffer().as_ref()),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+        usage: wgpu::BufferUsages::STORAGE
+            | wgpu::BufferUsages::COPY_SRC
+            | wgpu::BufferUsages::COPY_DST,
     };
     let framebuffer_data_storage = device.create_buffer_init(&framebuffer_data_storage_buffer_desc);
 

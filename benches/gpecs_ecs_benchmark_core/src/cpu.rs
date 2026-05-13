@@ -7,7 +7,9 @@ use std::{
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark_types::{
-    components::{DEFAULT_SEED, Damage, Data, Health, Player, Position, Sprite, Velocity},
+    components::{
+        DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, Position, Sprite, Velocity,
+    },
     framebuffer::Framebuffer,
     systems::{
         render_sprite, update_components, update_damage, update_data, update_health,
@@ -66,6 +68,12 @@ where
 
     log::info!(">> Running CPU systems...");
     for i in (0..).maybe_take(repeat_count) {
+        framebuffer
+            .borrow_mut()
+            .buffer_mut()
+            .as_mut()
+            .fill(NONE_SPRITE);
+
         let start = Instant::now();
         executor.execute();
         let elapsed = start.elapsed();

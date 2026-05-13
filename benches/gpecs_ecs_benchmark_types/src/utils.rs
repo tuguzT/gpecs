@@ -25,7 +25,7 @@ impl RandomXoshiro128 {
     pub fn generate(&mut self) -> u32 {
         let Self { state } = self;
 
-        let result = u32::rotate_left(state[1] * 5, 7) * 9;
+        let result = state[1].wrapping_mul(5).rotate_left(7).wrapping_mul(9);
 
         let t = state[1] << 9;
         state[2] ^= state[0];
@@ -33,7 +33,7 @@ impl RandomXoshiro128 {
         state[1] ^= state[2];
         state[0] ^= state[3];
         state[2] ^= t;
-        state[3] = u32::rotate_left(state[3], 11);
+        state[3] = state[3].rotate_left(11);
 
         result
     }

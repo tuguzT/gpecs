@@ -399,63 +399,26 @@ where
 {
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct OccupiedSparseItemExpectedError<K>
-where
-    K: Key,
-{
-    next_vacant: K::SparseIndex,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OccupiedSparseItemExpectedError {
+    sparse_index: usize,
 }
 
-impl<K> OccupiedSparseItemExpectedError<K>
-where
-    K: Key,
-{
+impl OccupiedSparseItemExpectedError {
     #[inline]
-    pub(crate) fn new(next_vacant: K::SparseIndex) -> Self {
-        Self { next_vacant }
-    }
-
-    #[inline]
-    pub fn next_vacant(&self) -> K::SparseIndex {
-        let Self { next_vacant, .. } = *self;
-        next_vacant
+    pub(crate) fn new(sparse_index: usize) -> Self {
+        Self { sparse_index }
     }
 }
 
-impl<K> Debug for OccupiedSparseItemExpectedError<K>
-where
-    K: Key,
-    K::SparseIndex: Debug,
-{
+impl Display for OccupiedSparseItemExpectedError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { next_vacant } = self;
-        f.debug_struct("OccupiedSparseItemExpectedError")
-            .field("next_vacant", next_vacant)
-            .finish()
+        let Self { sparse_index } = *self;
+        write!(f, "occupied sparse item expected at {sparse_index}")
     }
 }
 
-impl<K> Display for OccupiedSparseItemExpectedError<K>
-where
-    K: Key,
-    K::SparseIndex: Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { next_vacant } = *self;
-        write!(
-            f,
-            "occupied sparse item expected, but got vacant one with next vacant index {next_vacant}",
-        )
-    }
-}
-
-impl<K> Error for OccupiedSparseItemExpectedError<K>
-where
-    K: Key,
-    K::SparseIndex: Debug + Display,
-{
-}
+impl Error for OccupiedSparseItemExpectedError {}
 
 pub enum FromPartsError<K>
 where
@@ -463,7 +426,7 @@ where
 {
     TooLargeSparseIndex(TooLargeSparseIndexError<K>),
     TooSmallSparseIndex(TooSmallSparseIndexError<K>),
-    OccupiedSparseItemExpected(OccupiedSparseItemExpectedError<K>),
+    OccupiedSparseItemExpected(OccupiedSparseItemExpectedError),
     DenseIndexOutOfBounds(DenseIndexOutOfBoundsError),
     SparseIndexOutOfBounds(SparseIndexOutOfBoundsError),
     DenseIndexMismatch(DenseIndexMismatchError<K>),
@@ -476,7 +439,6 @@ where
     K: Key,
     TooLargeSparseIndexError<K>: Debug,
     TooSmallSparseIndexError<K>: Debug,
-    OccupiedSparseItemExpectedError<K>: Debug,
     DenseIndexMismatchError<K>: Debug,
     SparseIndexMismatchError<K>: Debug,
     EpochMismatchError<K>: Debug,
@@ -516,7 +478,6 @@ where
     K: Key,
     TooLargeSparseIndexError<K>: Display,
     TooSmallSparseIndexError<K>: Display,
-    OccupiedSparseItemExpectedError<K>: Display,
     DenseIndexMismatchError<K>: Display,
     SparseIndexMismatchError<K>: Display,
     EpochMismatchError<K>: Display,
@@ -540,7 +501,6 @@ where
     K: Key,
     TooLargeSparseIndexError<K>: Error,
     TooSmallSparseIndexError<K>: Error,
-    OccupiedSparseItemExpectedError<K>: Error,
     DenseIndexMismatchError<K>: Error,
     SparseIndexMismatchError<K>: Error,
     EpochMismatchError<K>: Error,
@@ -565,11 +525,11 @@ where
     }
 }
 
-impl<K> From<OccupiedSparseItemExpectedError<K>> for FromPartsError<K>
+impl<K> From<OccupiedSparseItemExpectedError> for FromPartsError<K>
 where
     K: Key,
 {
-    fn from(value: OccupiedSparseItemExpectedError<K>) -> Self {
+    fn from(value: OccupiedSparseItemExpectedError) -> Self {
         Self::OccupiedSparseItemExpected(value)
     }
 }

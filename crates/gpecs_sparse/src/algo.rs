@@ -275,11 +275,11 @@ where
 {
     let dense = dense_keys(dense);
 
-    for (sparse_index, &DefaultSparseItem { kind, epoch }) in sparse.iter().enumerate() {
+    for (sparse_index, sparse_item) in sparse.iter().enumerate() {
         let sparse_index = sparse_index
             .try_into()
             .map_err(TooSmallSparseIndexError::new)?;
-        let Some(dense_index) = kind.dense_index().copied() else {
+        let Some(dense_index) = sparse_item.dense_index().copied() else {
             continue;
         };
 
@@ -297,7 +297,7 @@ where
         }
 
         let epoch_from_key = key.epoch();
-        let expected_epoch = epoch;
+        let expected_epoch = sparse_item.epoch;
         if epoch_from_key != expected_epoch {
             let error = EpochMismatchError::new(epoch_from_key, expected_epoch);
             return Err(error.into());
@@ -318,8 +318,8 @@ where
             .map_err(TooSmallSparseIndexError::new)?;
         let dense_index_from_item = match *sparse_item.kind() {
             DefaultSparseItemKind::Occupied { dense_index } => dense_index,
-            DefaultSparseItemKind::Vacant { next_vacant } => {
-                let error = OccupiedSparseItemExpectedError::new(next_vacant);
+            DefaultSparseItemKind::Vacant { .. } => {
+                let error = OccupiedSparseItemExpectedError::new(sparse_index);
                 return Err(error.into());
             }
         };

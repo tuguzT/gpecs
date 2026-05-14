@@ -1080,10 +1080,10 @@ where
         let (sparse_index, epoch) = sparse
             .iter()
             .enumerate()
-            .find(|(_, DefaultSparseItem { kind, .. })| kind.is_vacant())
+            .find(|(_, sparse_item)| sparse_item.is_vacant())
             .map_or_else(
                 || (sparse.len(), Default::default()),
-                |(sparse_index, &DefaultSparseItem { epoch, .. })| (sparse_index, epoch),
+                |(sparse_index, sparse_item)| (sparse_index, sparse_item.epoch),
             );
 
         let sparse_index = match sparse_index.try_into() {

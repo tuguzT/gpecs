@@ -13,7 +13,7 @@ use gpecs_component::{
 };
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
-    item::SparseItem,
+    item::DefaultSparseItem,
     set::EpochSparseSet,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
@@ -227,7 +227,7 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[SparseItem<u32>]) {
+    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[DefaultSparseItem<u32>]) {
         let (component_ids, metas, sparse) = self.as_view().into_parts();
         (component_ids, metas, sparse)
     }
@@ -245,13 +245,19 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<u32>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<u32>] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const ComponentId, *const Meta, *const SparseItem<u32>) {
+    pub fn as_ptrs(
+        &self,
+    ) -> (
+        *const ComponentId,
+        *const Meta,
+        *const DefaultSparseItem<u32>,
+    ) {
         self.as_view().as_ptrs()
     }
 

@@ -1,5 +1,5 @@
 pub use crate::{
-    item::{SparseItem, SparseItemKind},
+    item::{DefaultSparseItem, DefaultSparseItemKind},
     key::{Epoch, EpochKey, Key},
     soa::prelude::*,
     view::{EpochSparseView, EpochSparseViewMut, SparseView, SparseViewMut},

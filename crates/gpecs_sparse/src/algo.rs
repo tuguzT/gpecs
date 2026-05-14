@@ -10,25 +10,28 @@ use crate::{
         OccupiedSparseItemExpectedError, SparseIndexMismatchError, SparseIndexOutOfBoundsError,
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
-    item::{KeyValuePair, SparseItem, SparseItemKind},
+    item::{DefaultSparseItem, DefaultSparseItemKind, KeyValuePair},
     key::Key,
     soa::{slice::SoaSlices, traits::RawSoa},
 };
 
 #[inline]
 unsafe fn sparse_item_unchecked<K>(
-    sparse: *const [SparseItem<K>],
+    sparse: *const [DefaultSparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> *const SparseItem<K>
+) -> *const DefaultSparseItem<K>
 where
     K: Key,
 {
     let sparse_index = unsafe { sparse_index.try_into().unwrap_unchecked() };
-    unsafe { sparse.cast::<SparseItem<K>>().add(sparse_index) }
+    unsafe { sparse.cast::<DefaultSparseItem<K>>().add(sparse_index) }
 }
 
 #[inline]
-fn sparse_item<K>(sparse: &[SparseItem<K>], sparse_index: usize) -> Option<&SparseItem<K>>
+fn sparse_item<K>(
+    sparse: &[DefaultSparseItem<K>],
+    sparse_index: usize,
+) -> Option<&DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -37,9 +40,9 @@ where
 
 #[inline]
 fn sparse_item_mut<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     sparse_index: usize,
-) -> Option<&mut SparseItem<K>>
+) -> Option<&mut DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -47,7 +50,7 @@ where
 }
 
 #[inline]
-fn filter_sparse_item<K>(sparse_item: &SparseItem<K>, epoch: K::Epoch) -> bool
+fn filter_sparse_item<K>(sparse_item: &DefaultSparseItem<K>, epoch: K::Epoch) -> bool
 where
     K: Key,
 {
@@ -56,10 +59,10 @@ where
 
 #[inline]
 pub fn sparse_item_by_epoch<K>(
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
     sparse_index: usize,
     epoch: K::Epoch,
-) -> Option<&SparseItem<K>>
+) -> Option<&DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -68,10 +71,10 @@ where
 
 #[inline]
 pub fn sparse_item_mut_by_epoch<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     sparse_index: usize,
     epoch: K::Epoch,
-) -> Option<&mut SparseItem<K>>
+) -> Option<&mut DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -80,9 +83,9 @@ where
 
 #[inline]
 pub fn sparse_item_by_index<K>(
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> Option<&SparseItem<K>>
+) -> Option<&DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -92,9 +95,9 @@ where
 
 #[inline]
 pub fn sparse_item_mut_by_index<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> Option<&mut SparseItem<K>>
+) -> Option<&mut DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -103,7 +106,10 @@ where
 }
 
 #[inline]
-pub fn sparse_item_by_key<K>(sparse: &[SparseItem<K>], key: K) -> Option<&SparseItem<K>>
+pub fn sparse_item_by_key<K>(
+    sparse: &[DefaultSparseItem<K>],
+    key: K,
+) -> Option<&DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -112,7 +118,10 @@ where
 }
 
 #[inline]
-pub fn sparse_item_mut_by_key<K>(sparse: &mut [SparseItem<K>], key: K) -> Option<&mut SparseItem<K>>
+pub fn sparse_item_mut_by_key<K>(
+    sparse: &mut [DefaultSparseItem<K>],
+    key: K,
+) -> Option<&mut DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -122,7 +131,7 @@ where
 
 pub unsafe fn sparse_get_unchecked<K, T>(
     dense: impl IntoIterator<Item = T>,
-    sparse: *const [SparseItem<K>],
+    sparse: *const [DefaultSparseItem<K>],
     sparse_index: K::SparseIndex,
 ) -> T
 where
@@ -136,7 +145,7 @@ where
 
 pub fn sparse_get<K, T>(
     dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
     key: K,
 ) -> Option<T>
 where
@@ -166,7 +175,7 @@ where
 #[track_caller]
 pub fn sparse_index<K, T>(
     dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
     key: K,
 ) -> T
 where
@@ -180,7 +189,7 @@ where
 
 pub fn sparse_get_with_key<K, T>(
     dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
     sparse_index: K::SparseIndex,
 ) -> Option<(K, T)>
 where
@@ -198,7 +207,7 @@ where
 
 pub fn sparse_get_epoch<K>(
     dense_keys: &[K],
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
     sparse_index: K::SparseIndex,
 ) -> Option<K::Epoch>
 where
@@ -216,14 +225,14 @@ where
     Some(epoch)
 }
 
-pub fn sparse_contains_key<K>(dense_keys: &[K], sparse: &[SparseItem<K>], key: K) -> bool
+pub fn sparse_contains_key<K>(dense_keys: &[K], sparse: &[DefaultSparseItem<K>], key: K) -> bool
 where
     K: Key,
 {
     let Some(sparse_item) = sparse_item_by_key(sparse, key) else {
         return false;
     };
-    let SparseItemKind::Occupied { dense_index } = sparse_item.kind else {
+    let DefaultSparseItemKind::Occupied { dense_index } = sparse_item.kind else {
         return false;
     };
     let dense_index = unwrap_into_usize(dense_index);
@@ -258,7 +267,7 @@ where
 
 pub fn check_parts<'a, K, V>(
     dense: SoaSlices<'_, 'a, KeyValuePair<K, V>>,
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
 ) -> Result<(), FromPartsError<K>>
 where
     K: Key + 'a,
@@ -266,7 +275,7 @@ where
 {
     let dense = dense_keys(dense);
 
-    for (sparse_index, &SparseItem { kind, epoch }) in sparse.iter().enumerate() {
+    for (sparse_index, &DefaultSparseItem { kind, epoch }) in sparse.iter().enumerate() {
         let sparse_index = sparse_index
             .try_into()
             .map_err(TooSmallSparseIndexError::new)?;
@@ -308,8 +317,8 @@ where
             .try_into()
             .map_err(TooSmallSparseIndexError::new)?;
         let dense_index_from_item = match *sparse_item.kind() {
-            SparseItemKind::Occupied { dense_index } => dense_index,
-            SparseItemKind::Vacant { next_vacant } => {
+            DefaultSparseItemKind::Occupied { dense_index } => dense_index,
+            DefaultSparseItemKind::Vacant { next_vacant } => {
                 let error = OccupiedSparseItemExpectedError::new(next_vacant);
                 return Err(error.into());
             }

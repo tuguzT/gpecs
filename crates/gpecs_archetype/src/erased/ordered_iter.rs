@@ -4,18 +4,17 @@ use core::{
     slice::Iter,
 };
 
-use gpecs_sparse::item::SparseItem;
-
 use gpecs_component::registry::ComponentId;
+use gpecs_sparse::item::DefaultSparseItem;
 
 pub struct ComponentIdOrderedIter<'a, Meta> {
     dense: &'a [Meta],
-    sparse: Enumerate<Iter<'a, SparseItem<u32>>>,
+    sparse: Enumerate<Iter<'a, DefaultSparseItem<u32>>>,
 }
 
 impl<'a, Meta> ComponentIdOrderedIter<'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(dense: &'a [Meta], sparse: &'a [SparseItem<u32>]) -> Self {
+    pub(super) fn from_inner(dense: &'a [Meta], sparse: &'a [DefaultSparseItem<u32>]) -> Self {
         let sparse = sparse.iter().enumerate();
         Self { dense, sparse }
     }

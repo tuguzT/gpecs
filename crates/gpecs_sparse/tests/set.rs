@@ -408,9 +408,9 @@ fn one_item_parts() {
     assert_eq!(
         sparse,
         &[
-            SparseItem::vacant(0, ()),
-            SparseItem::vacant(0, ()),
-            SparseItem::occupied(0, ()),
+            DefaultSparseItem::vacant(0, ()),
+            DefaultSparseItem::vacant(0, ()),
+            DefaultSparseItem::occupied(0, ()),
         ]
     );
 
@@ -969,12 +969,12 @@ fn three_items_parts() {
     assert_eq!(
         sparse,
         &[
-            SparseItem::vacant(0, ()),
-            SparseItem::occupied(1, ()),
-            SparseItem::occupied(0, ()),
-            SparseItem::vacant(0, ()),
-            SparseItem::vacant(0, ()),
-            SparseItem::occupied(2, ()),
+            DefaultSparseItem::vacant(0, ()),
+            DefaultSparseItem::occupied(1, ()),
+            DefaultSparseItem::occupied(0, ()),
+            DefaultSparseItem::vacant(0, ()),
+            DefaultSparseItem::vacant(0, ()),
+            DefaultSparseItem::occupied(2, ()),
         ]
     );
 

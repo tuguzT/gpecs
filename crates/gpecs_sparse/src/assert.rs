@@ -1,13 +1,16 @@
 use gpecs_itertools::Itertools;
 
 use crate::{
-    item::{SparseItem, SparseItemKind},
+    item::{DefaultSparseItem, DefaultSparseItemKind},
     key::{Epoch, Key, SparseIndex},
 };
 
 #[inline]
 #[track_caller]
-pub fn unwrap_sparse_item<K>(sparse: &[SparseItem<K>], sparse_index: usize) -> &SparseItem<K>
+pub fn unwrap_sparse_item<K>(
+    sparse: &[DefaultSparseItem<K>],
+    sparse_index: usize,
+) -> &DefaultSparseItem<K>
 where
     K: Key,
 {
@@ -21,9 +24,9 @@ where
 #[track_caller]
 #[cfg_attr(not(feature = "alloc"), expect(dead_code))]
 pub fn unwrap_sparse_item_mut<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     sparse_index: usize,
-) -> &mut SparseItem<K>
+) -> &mut DefaultSparseItem<K>
 where
     K: Key,
 {
@@ -42,7 +45,7 @@ const fn unwrap_dense_index_failed() -> ! {
 
 #[inline]
 #[track_caller]
-pub const fn unwrap_dense_index<I>(kind: &SparseItemKind<I>) -> &I {
+pub const fn unwrap_dense_index<I>(kind: &DefaultSparseItemKind<I>) -> &I {
     let Some(dense_index) = kind.dense_index() else {
         unwrap_dense_index_failed()
     };
@@ -51,7 +54,7 @@ pub const fn unwrap_dense_index<I>(kind: &SparseItemKind<I>) -> &I {
 
 #[inline]
 #[track_caller]
-pub fn unwrap_dense_index_mut<I>(kind: &mut SparseItemKind<I>) -> &mut I {
+pub fn unwrap_dense_index_mut<I>(kind: &mut DefaultSparseItemKind<I>) -> &mut I {
     let Some(dense_index) = kind.dense_index_mut() else {
         unwrap_dense_index_failed()
     };
@@ -68,7 +71,7 @@ const fn unwrap_next_vacant_failed() -> ! {
 #[inline]
 #[track_caller]
 #[cfg_attr(not(feature = "alloc"), expect(dead_code))]
-pub const fn unwrap_next_vacant<I>(kind: &SparseItemKind<I>) -> &I {
+pub const fn unwrap_next_vacant<I>(kind: &DefaultSparseItemKind<I>) -> &I {
     let Some(next_vacant) = kind.next_vacant() else {
         unwrap_next_vacant_failed()
     };
@@ -78,7 +81,7 @@ pub const fn unwrap_next_vacant<I>(kind: &SparseItemKind<I>) -> &I {
 #[inline]
 #[track_caller]
 #[cfg_attr(not(feature = "alloc"), expect(dead_code))]
-pub const fn unwrap_next_vacant_mut<I>(kind: &mut SparseItemKind<I>) -> &mut I {
+pub const fn unwrap_next_vacant_mut<I>(kind: &mut DefaultSparseItemKind<I>) -> &mut I {
     let Some(next_vacant) = kind.next_vacant_mut() else {
         unwrap_next_vacant_failed()
     };
@@ -124,10 +127,10 @@ const fn unwrap_sparse_items_pair_mut_failed() -> ! {
 #[inline]
 #[track_caller]
 pub fn unwrap_sparse_items_pair_mut<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     first_index: usize,
     second_index: usize,
-) -> (&mut SparseItem<K>, &mut SparseItem<K>)
+) -> (&mut DefaultSparseItem<K>, &mut DefaultSparseItem<K>)
 where
     K: Key,
 {
@@ -180,7 +183,7 @@ where
 pub fn unwrap_dense_from_sparse_index<K, V>(
     sparse_index: K::SparseIndex,
     dense: impl IntoIterator<Item = V>,
-    sparse: &[SparseItem<K>],
+    sparse: &[DefaultSparseItem<K>],
 ) -> V
 where
     K: Key,

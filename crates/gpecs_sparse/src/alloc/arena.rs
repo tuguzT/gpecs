@@ -19,8 +19,8 @@ use crate::{
         TryModifyErrorKind, TryReserveError,
     },
     item::{
-        KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair, KeyValuePtrs,
-        KeyValueSlicePtrs, KeyValueSlices, SparseItem, SparseItemKind,
+        DefaultSparseItem, DefaultSparseItemKind, KeyValueMutPtrs, KeyValueMutSlicePtrs,
+        KeyValueMutSlices, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
     },
     iter::{
         Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
@@ -54,7 +54,7 @@ where
     V: AllocSoa + ?Sized,
 {
     dense: SoaVec<KeyValuePair<K, V>>,
-    sparse: Vec<SparseItem<K>>,
+    sparse: Vec<DefaultSparseItem<K>>,
     sparse_vacant_head: usize,
 }
 
@@ -133,7 +133,7 @@ where
     #[inline]
     pub fn from_parts(
         dense: SoaVec<KeyValuePair<K, V>>,
-        mut sparse: Vec<SparseItem<K>>,
+        mut sparse: Vec<DefaultSparseItem<K>>,
     ) -> Result<Self, FromPartsError<K>> {
         check_parts(dense.slices(), sparse.as_slice())?;
 
@@ -149,7 +149,7 @@ where
             let dense_index = dense_index
                 .try_into()
                 .map_err(TooSmallSparseIndexError::new)?;
-            let item = SparseItem::occupied(dense_index, epoch);
+            let item = DefaultSparseItem::occupied(dense_index, epoch);
 
             if sparse_index >= sparse.len() {
                 let new_len = sparse_index.saturating_add(1);
@@ -176,7 +176,7 @@ where
     #[inline]
     pub unsafe fn from_parts_unchecked(
         dense: SoaVec<KeyValuePair<K, V>>,
-        sparse: Vec<SparseItem<K>>,
+        sparse: Vec<DefaultSparseItem<K>>,
         sparse_vacant_head: usize,
     ) -> Self {
         Self {
@@ -188,7 +188,7 @@ where
 
     #[inline]
     #[must_use]
-    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<SparseItem<K>>, usize) {
+    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<DefaultSparseItem<K>>, usize) {
         let Self {
             dense,
             sparse,
@@ -347,7 +347,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V>, *const SparseItem<K>) {
+    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V>, *const DefaultSparseItem<K>) {
         let (_, dense, sparse) = self.as_ptrs_with_context();
         (dense, sparse)
     }
@@ -355,7 +355,11 @@ where
     #[inline]
     pub fn as_ptrs_with_context(
         &self,
-    ) -> (&V::Context, KeyValuePtrs<'_, K, V>, *const SparseItem<K>) {
+    ) -> (
+        &V::Context,
+        KeyValuePtrs<'_, K, V>,
+        *const DefaultSparseItem<K>,
+    ) {
         let Self { dense, sparse, .. } = self;
 
         let (context, dense) = dense.as_ptrs_with_context();
@@ -364,7 +368,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (KeyValueMutPtrs<'_, K, V>, *mut SparseItem<K>) {
+    pub fn as_mut_ptrs(&mut self) -> (KeyValueMutPtrs<'_, K, V>, *mut DefaultSparseItem<K>) {
         let (_, dense, sparse) = self.as_mut_ptrs_with_context();
         (dense, sparse)
     }
@@ -372,7 +376,11 @@ where
     #[inline]
     pub fn as_mut_ptrs_with_context(
         &mut self,
-    ) -> (&V::Context, KeyValueMutPtrs<'_, K, V>, *mut SparseItem<K>) {
+    ) -> (
+        &V::Context,
+        KeyValueMutPtrs<'_, K, V>,
+        *mut DefaultSparseItem<K>,
+    ) {
         let Self { dense, sparse, .. } = self;
 
         let (context, dense) = dense.as_mut_ptrs_with_context();
@@ -457,31 +465,31 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_ptr(&self) -> *const SparseItem<K> {
+    pub fn as_sparse_ptr(&self) -> *const DefaultSparseItem<K> {
         let (_, sparse) = self.as_sparse_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_ptr_with_context(&self) -> (&V::Context, *const SparseItem<K>) {
+    pub fn as_sparse_ptr_with_context(&self) -> (&V::Context, *const DefaultSparseItem<K>) {
         let (context, _, sparse) = self.as_ptrs_with_context();
         (context, sparse)
     }
 
     #[inline]
-    pub fn as_mut_sparse_ptr(&mut self) -> *mut SparseItem<K> {
+    pub fn as_mut_sparse_ptr(&mut self) -> *mut DefaultSparseItem<K> {
         let (_, sparse) = self.as_mut_sparse_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_mut_sparse_ptr_with_context(&mut self) -> (&V::Context, *mut SparseItem<K>) {
+    pub fn as_mut_sparse_ptr_with_context(&mut self) -> (&V::Context, *mut DefaultSparseItem<K>) {
         let (context, _, sparse) = self.as_mut_ptrs_with_context();
         (context, sparse)
     }
 
     #[inline]
-    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V>, *const [SparseItem<K>]) {
+    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V>, *const [DefaultSparseItem<K>]) {
         let (_, dense, sparse) = self.as_slice_ptrs_with_context();
         (dense, sparse)
     }
@@ -492,7 +500,7 @@ where
     ) -> (
         &V::Context,
         KeyValueSlicePtrs<'_, K, V>,
-        *const [SparseItem<K>],
+        *const [DefaultSparseItem<K>],
     ) {
         let Self { dense, sparse, .. } = self;
 
@@ -502,7 +510,9 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slice_ptrs(&mut self) -> (KeyValueMutSlicePtrs<'_, K, V>, *mut [SparseItem<K>]) {
+    pub fn as_mut_slice_ptrs(
+        &mut self,
+    ) -> (KeyValueMutSlicePtrs<'_, K, V>, *mut [DefaultSparseItem<K>]) {
         let (_, dense, sparse) = self.as_mut_slice_ptrs_with_context();
         (dense, sparse)
     }
@@ -513,7 +523,7 @@ where
     ) -> (
         &V::Context,
         KeyValueMutSlicePtrs<'_, K, V>,
-        *mut [SparseItem<K>],
+        *mut [DefaultSparseItem<K>],
     ) {
         let Self { dense, sparse, .. } = self;
 
@@ -601,25 +611,27 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_slice_ptr(&self) -> *const [SparseItem<K>] {
+    pub fn as_sparse_slice_ptr(&self) -> *const [DefaultSparseItem<K>] {
         let (_, sparse) = self.as_sparse_slice_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_slice_ptr_with_context(&self) -> (&V::Context, *const [SparseItem<K>]) {
+    pub fn as_sparse_slice_ptr_with_context(&self) -> (&V::Context, *const [DefaultSparseItem<K>]) {
         let (context, _, sparse) = self.as_slice_ptrs_with_context();
         (context, sparse)
     }
 
     #[inline]
-    pub fn as_mut_sparse_slice_ptr(&mut self) -> *mut [SparseItem<K>] {
+    pub fn as_mut_sparse_slice_ptr(&mut self) -> *mut [DefaultSparseItem<K>] {
         let (_, sparse) = self.as_mut_sparse_slice_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_mut_sparse_slice_ptr_with_context(&mut self) -> (&V::Context, *mut [SparseItem<K>]) {
+    pub fn as_mut_sparse_slice_ptr_with_context(
+        &mut self,
+    ) -> (&V::Context, *mut [DefaultSparseItem<K>]) {
         let (context, _, sparse) = self.as_mut_slice_ptrs_with_context();
         (context, sparse)
     }
@@ -651,20 +663,20 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
+    pub fn as_sparse_slice(&self) -> &[DefaultSparseItem<K>] {
         let (_, sparse) = self.as_sparse_slice_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_slice_with_context(&self) -> (&V::Context, &[SparseItem<K>]) {
+    pub fn as_sparse_slice_with_context(&self) -> (&V::Context, &[DefaultSparseItem<K>]) {
         let (context, sparse) = self.as_sparse_slice_ptr_with_context();
         let sparse = unsafe { sparse.as_ref_unchecked() };
         (context, sparse)
     }
 
     #[inline]
-    pub unsafe fn as_mut_sparse_slice(&mut self) -> &mut [SparseItem<K>] {
+    pub unsafe fn as_mut_sparse_slice(&mut self) -> &mut [DefaultSparseItem<K>] {
         let (_, sparse) = unsafe { self.as_mut_sparse_slice_with_context() };
         sparse
     }
@@ -672,7 +684,7 @@ where
     #[inline]
     pub unsafe fn as_mut_sparse_slice_with_context(
         &mut self,
-    ) -> (&V::Context, &mut [SparseItem<K>]) {
+    ) -> (&V::Context, &mut [DefaultSparseItem<K>]) {
         let (context, sparse) = self.as_mut_sparse_slice_ptr_with_context();
         let sparse = unsafe { sparse.as_mut_unchecked() };
         (context, sparse)
@@ -798,7 +810,7 @@ where
         for key in dense_keys(dense.slices()) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let next_vacant = unwrap_into_index(*sparse_vacant_head);
-            sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+            sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
             *sparse_vacant_head = sparse_index;
         }
         dense.clear();
@@ -853,7 +865,7 @@ where
         };
 
         let dense_index = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
-            .and_then(SparseItem::dense_index)
+            .and_then(DefaultSparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
             return f(dense.context(), None);
@@ -874,12 +886,12 @@ where
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             match sparse_item.kind_mut() {
-                SparseItemKind::Occupied { dense_index: index } => *index = dense_index,
-                SparseItemKind::Vacant { next_vacant } => *next_vacant = dense_index,
+                DefaultSparseItemKind::Occupied { dense_index: index } => *index = dense_index,
+                DefaultSparseItemKind::Vacant { next_vacant } => *next_vacant = dense_index,
             }
         }
         let next_vacant = unwrap_into_index(*sparse_vacant_head);
-        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+        sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
         *sparse_vacant_head = sparse_index;
 
         result
@@ -912,7 +924,7 @@ where
         };
 
         let dense_index = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
-            .and_then(SparseItem::dense_index)
+            .and_then(DefaultSparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
             return f(dense.context(), None);
@@ -936,7 +948,7 @@ where
             *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - 1);
         }
         let next_vacant = unwrap_into_index(*sparse_vacant_head);
-        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+        sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
         *sparse_vacant_head = sparse_index;
 
         result
@@ -976,7 +988,7 @@ where
             let result = f(context, Some((key, value.into_inner())));
 
             let next_vacant = unwrap_into_index(*sparse_vacant_head);
-            sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+            sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
             *sparse_vacant_head = sparse_index;
 
             result
@@ -1043,7 +1055,7 @@ where
 
         match sparse.get_mut(sparse_index) {
             Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
-                SparseItemKind::Occupied { dense_index } => {
+                DefaultSparseItemKind::Occupied { dense_index } => {
                     let (context, dense) = dense.mut_slice_ptrs().into_iter_with_context();
 
                     let dense_index = unwrap_into_usize(dense_index);
@@ -1057,7 +1069,7 @@ where
 
                     result
                 }
-                SparseItemKind::Vacant { next_vacant } => {
+                DefaultSparseItemKind::Vacant { next_vacant } => {
                     let next_vacant = unwrap_into_usize(next_vacant);
                     remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
 
@@ -1079,7 +1091,8 @@ where
                         let (key_ptr, value_ptrs) = dst.into();
                         let result = f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
-                        sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
+                        sparse[sparse_index] =
+                            DefaultSparseItem::occupied(dense_index, key.epoch());
                         unsafe { ptr::write(key_ptr, key) }
 
                         result
@@ -1119,7 +1132,7 @@ where
                     let (key_ptr, value_ptrs) = dst.into();
                     let result = f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
-                    sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
+                    sparse[sparse_index] = DefaultSparseItem::occupied(dense_index, key.epoch());
                     unsafe { ptr::write(key_ptr, key) }
 
                     result
@@ -1213,7 +1226,7 @@ where
                     return f(context, Err(error));
                 }
             };
-            let sparse_item_kind = SparseItemKind::occupied(dense_index);
+            let sparse_item_kind = DefaultSparseItemKind::occupied(dense_index);
 
             if let Err(error) = dense.try_reserve(1) {
                 let context = dense.context();
@@ -1251,7 +1264,7 @@ where
                 return f(context, Err(error));
             }
         };
-        let sparse_item = SparseItem::occupied(dense_index, Default::default());
+        let sparse_item = DefaultSparseItem::occupied(dense_index, Default::default());
 
         if let Err(error) = dense.try_reserve(1) {
             let context = dense.context();
@@ -1307,7 +1320,7 @@ where
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
         let Some(dense_index) = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
-            .and_then(SparseItem::dense_index)
+            .and_then(DefaultSparseItem::dense_index)
             .copied()
         else {
             let entry = VacantEntry::new(key, self);
@@ -1429,7 +1442,7 @@ where
             let sparse_index = unwrap_into_usize(key.sparse_index());
 
             let next_vacant = unwrap_into_index(*sparse_vacant_head);
-            sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+            sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
             *sparse_vacant_head = sparse_index;
         }
 
@@ -1464,7 +1477,7 @@ where
     V: AllocSoa + Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V>, &'a [SparseItem<K>]) {
+    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V>, &'a [DefaultSparseItem<K>]) {
         let (_, dense, sparse) = self.as_slices_with_context();
         (dense, sparse)
     }
@@ -1475,7 +1488,7 @@ where
     ) -> (
         &'a V::Context,
         KeyValueSlices<'a, 'a, K, V>,
-        &'a [SparseItem<K>],
+        &'a [DefaultSparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
         let dense = unsafe { dense.as_ref_unchecked(context) };
@@ -1486,7 +1499,10 @@ where
     #[inline]
     pub unsafe fn as_mut_slices(
         &'a mut self,
-    ) -> (KeyValueMutSlices<'a, 'a, K, V>, &'a mut [SparseItem<K>]) {
+    ) -> (
+        KeyValueMutSlices<'a, 'a, K, V>,
+        &'a mut [DefaultSparseItem<K>],
+    ) {
         let (_, dense, sparse) = unsafe { self.as_mut_slices_with_context() };
         (dense, sparse)
     }
@@ -1497,7 +1513,7 @@ where
     ) -> (
         &'a V::Context,
         KeyValueMutSlices<'a, 'a, K, V>,
-        &'a mut [SparseItem<K>],
+        &'a mut [DefaultSparseItem<K>],
     ) {
         let (context, dense, sparse) = self.as_mut_slice_ptrs_with_context();
         let dense = unsafe { dense.as_mut_unchecked(context) };
@@ -1803,7 +1819,7 @@ where
                 let sparse_index = unwrap_into_usize(key.sparse_index());
 
                 let next_vacant = unwrap_into_index(*sparse_vacant_head);
-                sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+                sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
                 *sparse_vacant_head = sparse_index;
                 continue;
             }
@@ -1904,7 +1920,7 @@ impl<K, V> Debug for EpochSparseArena<K, V>
 where
     K: Key,
     V: AllocSoa + ?Sized,
-    SparseItem<K>: Debug,
+    DefaultSparseItem<K>: Debug,
     SoaVec<KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -2000,7 +2016,7 @@ impl<K, V> Hash for EpochSparseArena<K, V>
 where
     K: Key,
     V: AllocSoa + ?Sized,
-    SparseItem<K>: Hash,
+    DefaultSparseItem<K>: Hash,
     SoaVec<KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -2291,9 +2307,9 @@ const fn last_vacant_item_failed() -> ! {
 
 #[track_caller]
 fn last_vacant_item<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     first_vacant: usize,
-) -> Option<&mut SparseItem<K>>
+) -> Option<&mut DefaultSparseItem<K>>
 where
     K: Key,
 {
@@ -2318,7 +2334,7 @@ where
 }
 
 fn extend_sparse<K>(
-    sparse: &mut Vec<SparseItem<K>>,
+    sparse: &mut Vec<DefaultSparseItem<K>>,
     new_len: usize,
     sparse_vacant_head: &mut usize,
 ) -> Result<(), TooSmallSparseIndexError<K>>
@@ -2344,7 +2360,7 @@ where
     let mut current_vacant = old_len;
     sparse.resize_with(new_len, || {
         let epoch = Default::default();
-        let item = SparseItem::vacant(unwrap_into_index(next_vacant), epoch);
+        let item = DefaultSparseItem::vacant(unwrap_into_index(next_vacant), epoch);
         next_vacant = current_vacant;
         current_vacant += 1;
         item
@@ -2360,7 +2376,7 @@ where
 }
 
 fn remove_from_vacant_list<K>(
-    sparse: &mut [SparseItem<K>],
+    sparse: &mut [DefaultSparseItem<K>],
     sparse_vacant_head: &mut usize,
     sparse_index: usize,
     next_vacant: usize,

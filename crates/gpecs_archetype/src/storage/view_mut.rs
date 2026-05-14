@@ -23,7 +23,7 @@ use gpecs_soa_erased::{
 };
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{KeyValueMutSlices, SparseItem},
+    item::{DefaultSparseItem, KeyValueMutSlices},
     view::{EpochSparseViewMut, EpochSparseViewMutPtr},
 };
 
@@ -56,7 +56,7 @@ where
         context: &'ctx T::Context,
         entities: &'a mut [Entity],
         bundles: ErasedBundlesMut<'ctx, 'a, T>,
-        sparse: &'a mut [SparseItem<NoEpochEntity>],
+        sparse: &'a mut [DefaultSparseItem<NoEpochEntity>],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice_mut(entities);
         let dense = SoaSlicesMut::new(
@@ -74,7 +74,7 @@ where
         context: &'ctx T::Context,
         entities: &'a mut [Entity],
         bundles: ErasedBundlesMut<'ctx, 'a, T>,
-        sparse: &'a mut [SparseItem<NoEpochEntity>],
+        sparse: &'a mut [DefaultSparseItem<NoEpochEntity>],
     ) -> Self {
         let entities = must_cast_slice_mut(entities);
         let dense = SoaSlicesMut::new(
@@ -137,7 +137,7 @@ where
     }
 
     #[inline]
-    pub fn into_sparse(self) -> &'a [SparseItem<NoEpochEntity>] {
+    pub fn into_sparse(self) -> &'a [DefaultSparseItem<NoEpochEntity>] {
         let (_, _, sparse) = self.into_slices();
         sparse
     }
@@ -217,7 +217,7 @@ where
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<NoEpochEntity>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<NoEpochEntity>] {
         self.as_view().into_sparse()
     }
 
@@ -631,23 +631,23 @@ where
 type SlicesWithArchetype<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [SparseItem<NoEpochEntity>],
+    &'a [DefaultSparseItem<NoEpochEntity>],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
 type Slices<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [SparseItem<NoEpochEntity>],
+    &'a [DefaultSparseItem<NoEpochEntity>],
 );
 
 type MutSlicesWithArchetype<'ctx, 'a, T> = (
     &'a mut [Entity],
     ErasedBundlesMut<'ctx, 'a, T>,
-    &'a mut [SparseItem<NoEpochEntity>],
+    &'a mut [DefaultSparseItem<NoEpochEntity>],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
 type MutSlices<'ctx, 'a, T> = (
     &'a mut [Entity],
     ErasedBundlesMut<'ctx, 'a, T>,
-    &'a mut [SparseItem<NoEpochEntity>],
+    &'a mut [DefaultSparseItem<NoEpochEntity>],
 );

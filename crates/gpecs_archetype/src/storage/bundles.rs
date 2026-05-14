@@ -9,7 +9,7 @@ use bytemuck::must_cast_slice;
 use gpecs_entity::Entity;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{KeyValueSlices, SparseItem},
+    item::{DefaultSparseItem, KeyValueSlices},
     soa::{
         identity::Identity,
         slice::SoaSlices,
@@ -40,7 +40,7 @@ where
     pub fn new(
         entities: &'a [Entity],
         bundles: BundleSlices<'a, B>,
-        sparse: &'a [SparseItem<NoEpochEntity>],
+        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice(entities);
         let slices = KeyValueSlices::new(B::CONTEXT, entities, bundles);
@@ -55,7 +55,7 @@ where
     pub unsafe fn from_parts(
         entities: &'a [Entity],
         bundles: BundleSlices<'a, B>,
-        sparse: &'a [SparseItem<NoEpochEntity>],
+        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
     ) -> Self {
         let entities = must_cast_slice(entities);
         let slices = KeyValueSlices::new(B::CONTEXT, entities, bundles);
@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    pub fn into_sparse(self) -> &'a [SparseItem<NoEpochEntity>] {
+    pub fn into_sparse(self) -> &'a [DefaultSparseItem<NoEpochEntity>] {
         let (_, _, sparse) = self.into_parts();
         sparse
     }
@@ -146,7 +146,7 @@ where
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<NoEpochEntity>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<NoEpochEntity>] {
         self.as_bundles().into_sparse()
     }
 
@@ -351,7 +351,7 @@ where
 type Parts<'a, B> = (
     &'a [Entity],
     BundleSlices<'a, B>,
-    &'a [SparseItem<NoEpochEntity>],
+    &'a [DefaultSparseItem<NoEpochEntity>],
 );
 
 #[inline]

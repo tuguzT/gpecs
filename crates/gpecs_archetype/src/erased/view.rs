@@ -13,7 +13,7 @@ use gpecs_component::registry::{
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{KeyValueSlices, SparseItem},
+    item::{DefaultSparseItem, KeyValueSlices},
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::{AsIdentitySlice, Identity, IdentitySlice},
@@ -51,7 +51,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     pub fn new(
         component_ids: &'a [ComponentId],
         metas: &'a [Meta],
-        sparse: &'a [SparseItem<u32>],
+        sparse: &'a [DefaultSparseItem<u32>],
     ) -> Result<Self, FromPartsError<u32>> {
         let context = Self::CONTEXT;
         let keys = component_ids_to_u32s(component_ids);
@@ -70,7 +70,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     pub unsafe fn from_parts(
         component_ids: &'a [ComponentId],
         metas: &'a [Meta],
-        sparse: &'a [SparseItem<u32>],
+        sparse: &'a [DefaultSparseItem<u32>],
     ) -> Self {
         let context = Self::CONTEXT;
         let keys = component_ids_to_u32s(component_ids);
@@ -98,7 +98,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [ComponentId], &'a [Meta], &'a [SparseItem<u32>]) {
+    pub fn into_parts(self) -> (&'a [ComponentId], &'a [Meta], &'a [DefaultSparseItem<u32>]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_slice_ptrs();
@@ -130,7 +130,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[SparseItem<u32>]) {
+    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[DefaultSparseItem<u32>]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
@@ -157,13 +157,19 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<u32>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<u32>] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const ComponentId, *const Meta, *const SparseItem<u32>) {
+    pub fn as_ptrs(
+        &self,
+    ) -> (
+        *const ComponentId,
+        *const Meta,
+        *const DefaultSparseItem<u32>,
+    ) {
         let (component_ids, metas, sparse) = self.as_slices();
         (component_ids.as_ptr(), metas.as_ptr(), sparse.as_ptr())
     }

@@ -7,7 +7,9 @@ use core::{
 
 pub use error::TryReserveError;
 
-use gpecs_sparse::{arena::EpochSparseArena, error, item::SparseItem, soa::identity::Identity};
+use gpecs_sparse::{
+    arena::EpochSparseArena, error, item::DefaultSparseItem, soa::identity::Identity,
+};
 use gpecs_world::id::WorldId;
 
 use crate::entity::{Entity, EntityEpoch};
@@ -111,7 +113,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[SparseItem<Entity>]) {
+    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[DefaultSparseItem<Entity>]) {
         let (entities, metas, sparse) = self.as_view().into_parts();
         (entities, metas, sparse)
     }
@@ -129,7 +131,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<Entity>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<Entity>] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
@@ -137,7 +139,7 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     pub unsafe fn as_mut_slices(
         &mut self,
-    ) -> (&mut [Entity], &mut [Meta], &mut [SparseItem<Entity>]) {
+    ) -> (&mut [Entity], &mut [Meta], &mut [DefaultSparseItem<Entity>]) {
         let (entities, metas, sparse) = unsafe { self.as_mut_view().into_parts() };
         (entities, metas, sparse)
     }
@@ -149,12 +151,12 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const DefaultSparseItem<Entity>) {
         self.as_view().as_ptrs()
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut SparseItem<Entity>) {
+    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut DefaultSparseItem<Entity>) {
         self.as_mut_view().as_mut_ptrs()
     }
 

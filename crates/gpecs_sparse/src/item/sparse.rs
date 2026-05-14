@@ -6,32 +6,32 @@ use core::{
 
 use crate::key::Key;
 
-pub struct SparseItem<K>
+pub struct DefaultSparseItem<K>
 where
     K: Key,
 {
-    pub kind: SparseItemKind<K::SparseIndex>,
+    pub kind: DefaultSparseItemKind<K::SparseIndex>,
     pub epoch: K::Epoch,
 }
 
-impl<K> SparseItem<K>
+impl<K> DefaultSparseItem<K>
 where
     K: Key,
 {
     #[inline]
-    pub const fn new(kind: SparseItemKind<K::SparseIndex>, epoch: K::Epoch) -> Self {
+    pub const fn new(kind: DefaultSparseItemKind<K::SparseIndex>, epoch: K::Epoch) -> Self {
         Self { kind, epoch }
     }
 
     #[inline]
     pub const fn occupied(dense_index: K::SparseIndex, epoch: K::Epoch) -> Self {
-        let kind = SparseItemKind::occupied(dense_index);
+        let kind = DefaultSparseItemKind::occupied(dense_index);
         Self::new(kind, epoch)
     }
 
     #[inline]
     pub const fn vacant(next_vacant: K::SparseIndex, epoch: K::Epoch) -> Self {
-        let kind = SparseItemKind::vacant(next_vacant);
+        let kind = DefaultSparseItemKind::vacant(next_vacant);
         Self::new(kind, epoch)
     }
 
@@ -48,19 +48,19 @@ where
     }
 
     #[inline]
-    pub const fn kind(&self) -> &SparseItemKind<K::SparseIndex> {
+    pub const fn kind(&self) -> &DefaultSparseItemKind<K::SparseIndex> {
         let Self { kind, .. } = self;
         kind
     }
 
     #[inline]
-    pub const fn kind_mut(&mut self) -> &mut SparseItemKind<K::SparseIndex> {
+    pub const fn kind_mut(&mut self) -> &mut DefaultSparseItemKind<K::SparseIndex> {
         let Self { kind, .. } = self;
         kind
     }
 
     #[inline]
-    pub fn into_kind(self) -> SparseItemKind<K::SparseIndex> {
+    pub fn into_kind(self) -> DefaultSparseItemKind<K::SparseIndex> {
         let Self { kind, .. } = self;
         kind
     }
@@ -102,7 +102,7 @@ where
     }
 }
 
-impl<K> Debug for SparseItem<K>
+impl<K> Debug for DefaultSparseItem<K>
 where
     K: Key,
     K::SparseIndex: Debug,
@@ -110,14 +110,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { kind, epoch } = self;
-        f.debug_struct("SparseItem")
+        f.debug_struct("DefaultSparseItem")
             .field("kind", kind)
             .field("epoch", epoch)
             .finish()
     }
 }
 
-impl<K> Clone for SparseItem<K>
+impl<K> Clone for DefaultSparseItem<K>
 where
     K: Key,
 {
@@ -127,9 +127,9 @@ where
     }
 }
 
-impl<K> Copy for SparseItem<K> where K: Key {}
+impl<K> Copy for DefaultSparseItem<K> where K: Key {}
 
-impl<K> PartialEq for SparseItem<K>
+impl<K> PartialEq for DefaultSparseItem<K>
 where
     K: Key,
 {
@@ -142,9 +142,9 @@ where
     }
 }
 
-impl<K> Eq for SparseItem<K> where K: Key {}
+impl<K> Eq for DefaultSparseItem<K> where K: Key {}
 
-impl<K> PartialOrd for SparseItem<K>
+impl<K> PartialOrd for DefaultSparseItem<K>
 where
     K: Key,
 {
@@ -154,7 +154,7 @@ where
     }
 }
 
-impl<K> Ord for SparseItem<K>
+impl<K> Ord for DefaultSparseItem<K>
 where
     K: Key,
 {
@@ -167,7 +167,7 @@ where
     }
 }
 
-impl<K> Hash for SparseItem<K>
+impl<K> Hash for DefaultSparseItem<K>
 where
     K: Key,
     K::SparseIndex: Hash,
@@ -181,12 +181,12 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SparseItemKind<I> {
+pub enum DefaultSparseItemKind<I> {
     Occupied { dense_index: I },
     Vacant { next_vacant: I },
 }
 
-impl<I> SparseItemKind<I> {
+impl<I> DefaultSparseItemKind<I> {
     #[inline]
     pub const fn occupied(dense_index: I) -> Self {
         Self::Occupied { dense_index }

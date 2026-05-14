@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{KeyValueMutSlices, SparseItem},
+    item::{DefaultSparseItem, KeyValueMutSlices},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlicesMut,
@@ -37,7 +37,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     pub fn new(
         entities: &'a mut [Entity],
         metas: &'a mut [Meta],
-        sparse: &'a mut [SparseItem<Entity>],
+        sparse: &'a mut [DefaultSparseItem<Entity>],
     ) -> Result<Self, FromPartsError<Entity>> {
         let context = Self::CONTEXT;
         let dense = SoaSlicesMut::new(
@@ -54,7 +54,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     pub unsafe fn from_parts(
         entities: &'a mut [Entity],
         metas: &'a mut [Meta],
-        sparse: &'a mut [SparseItem<Entity>],
+        sparse: &'a mut [DefaultSparseItem<Entity>],
     ) -> Self {
         let context = Self::CONTEXT;
         let dense = unsafe {
@@ -86,7 +86,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     ) -> (
         &'a mut [Entity],
         &'a mut [Meta],
-        &'a mut [SparseItem<Entity>],
+        &'a mut [DefaultSparseItem<Entity>],
     ) {
         let Self { inner } = self;
 
@@ -126,7 +126,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[SparseItem<Entity>]) {
+    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[DefaultSparseItem<Entity>]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
@@ -152,7 +152,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<Entity>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<Entity>] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
@@ -160,7 +160,7 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     #[inline]
     pub unsafe fn as_mut_slices(
         &mut self,
-    ) -> (&mut [Entity], &mut [Meta], &mut [SparseItem<Entity>]) {
+    ) -> (&mut [Entity], &mut [Meta], &mut [DefaultSparseItem<Entity>]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_mut_slice_ptrs();
@@ -180,13 +180,13 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const DefaultSparseItem<Entity>) {
         let (entities, metas, sparse) = self.as_slices();
         (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut SparseItem<Entity>) {
+    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut DefaultSparseItem<Entity>) {
         let (entities, metas, sparse) = unsafe { self.as_mut_slices() };
         (
             entities.as_mut_ptr(),

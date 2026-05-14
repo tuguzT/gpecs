@@ -20,7 +20,7 @@ use gpecs_soa_erased::{
 };
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{KeyValueSlices, SparseItem},
+    item::{DefaultSparseItem, KeyValueSlices},
     view::{EpochSparseView, EpochSparseViewPtr},
 };
 
@@ -50,7 +50,7 @@ where
         context: &'ctx T::Context,
         entities: &'a [Entity],
         bundles: ErasedBundles<'ctx, 'a, T>,
-        sparse: &'a [SparseItem<NoEpochEntity>],
+        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice(entities);
         let dense = SoaSlices::new(
@@ -68,7 +68,7 @@ where
         context: &'ctx T::Context,
         entities: &'a [Entity],
         bundles: ErasedBundles<'ctx, 'a, T>,
-        sparse: &'a [SparseItem<NoEpochEntity>],
+        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
     ) -> Self {
         let entities = must_cast_slice(entities);
         let dense = SoaSlices::new(
@@ -119,7 +119,7 @@ where
     }
 
     #[inline]
-    pub fn into_sparse(self) -> &'a [SparseItem<NoEpochEntity>] {
+    pub fn into_sparse(self) -> &'a [DefaultSparseItem<NoEpochEntity>] {
         let (_, _, sparse) = self.into_slices();
         sparse
     }
@@ -183,7 +183,7 @@ where
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<NoEpochEntity>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<NoEpochEntity>] {
         self.as_view().into_sparse()
     }
 
@@ -444,11 +444,11 @@ where
 type SlicesWithArchetype<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [SparseItem<NoEpochEntity>],
+    &'a [DefaultSparseItem<NoEpochEntity>],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
 type Slices<'ctx, 'a, T> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [SparseItem<NoEpochEntity>],
+    &'a [DefaultSparseItem<NoEpochEntity>],
 );

@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     algo::sparse_get_unchecked,
-    item::{KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, SparseItem},
+    item::{DefaultSparseItem, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs},
     iter::{RawIter, RawKeys, RawValues},
     key::Key,
     soa::{
@@ -25,7 +25,7 @@ where
     V::Context: 'ctx,
 {
     dense: SoaSlicePtrs<'ctx, KeyValuePair<K, V>>,
-    sparse: *const [SparseItem<K>],
+    sparse: *const [DefaultSparseItem<K>],
 }
 
 impl<'ctx, K, V> EpochSparseViewPtr<'ctx, K, V>
@@ -36,7 +36,7 @@ where
     #[inline]
     pub unsafe fn from_parts(
         dense: SoaSlicePtrs<'ctx, KeyValuePair<K, V>>,
-        sparse: *const [SparseItem<K>],
+        sparse: *const [DefaultSparseItem<K>],
     ) -> Self {
         Self { dense, sparse }
     }
@@ -46,7 +46,7 @@ where
         self,
     ) -> (
         SoaSlicePtrs<'ctx, KeyValuePair<K, V>>,
-        *const [SparseItem<K>],
+        *const [DefaultSparseItem<K>],
     ) {
         let Self { dense, sparse } = self;
         (dense, sparse)
@@ -99,7 +99,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V>, *const SparseItem<K>) {
+    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V>, *const DefaultSparseItem<K>) {
         let (_, dense, sparse) = self.as_ptrs_with_context();
         (dense, sparse)
     }
@@ -107,7 +107,11 @@ where
     #[inline]
     pub fn as_ptrs_with_context(
         &self,
-    ) -> (&V::Context, KeyValuePtrs<'_, K, V>, *const SparseItem<K>) {
+    ) -> (
+        &V::Context,
+        KeyValuePtrs<'_, K, V>,
+        *const DefaultSparseItem<K>,
+    ) {
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.as_ptrs_with_context();
@@ -154,19 +158,19 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_ptr(&self) -> *const SparseItem<K> {
+    pub fn as_sparse_ptr(&self) -> *const DefaultSparseItem<K> {
         let (_, sparse) = self.as_sparse_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_ptr_with_context(&self) -> (&V::Context, *const SparseItem<K>) {
+    pub fn as_sparse_ptr_with_context(&self) -> (&V::Context, *const DefaultSparseItem<K>) {
         let (context, _, sparse) = self.as_ptrs_with_context();
         (context, sparse)
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> (KeyValuePtrs<'ctx, K, V>, *const SparseItem<K>) {
+    pub fn into_ptrs(self) -> (KeyValuePtrs<'ctx, K, V>, *const DefaultSparseItem<K>) {
         let (_, dense, sparse) = self.into_ptrs_with_context();
         (dense, sparse)
     }
@@ -177,7 +181,7 @@ where
     ) -> (
         &'ctx V::Context,
         KeyValuePtrs<'ctx, K, V>,
-        *const SparseItem<K>,
+        *const DefaultSparseItem<K>,
     ) {
         let Self { dense, sparse } = self;
 
@@ -225,19 +229,19 @@ where
     }
 
     #[inline]
-    pub fn into_sparse_ptr(self) -> *const SparseItem<K> {
+    pub fn into_sparse_ptr(self) -> *const DefaultSparseItem<K> {
         let (_, sparse) = self.into_sparse_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn into_sparse_ptr_with_context(self) -> (&'ctx V::Context, *const SparseItem<K>) {
+    pub fn into_sparse_ptr_with_context(self) -> (&'ctx V::Context, *const DefaultSparseItem<K>) {
         let (context, _, sparse) = self.into_ptrs_with_context();
         (context, sparse)
     }
 
     #[inline]
-    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V>, *const [SparseItem<K>]) {
+    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V>, *const [DefaultSparseItem<K>]) {
         let (_, dense, sparse) = self.as_slice_ptrs_with_context();
         (dense, sparse)
     }
@@ -248,7 +252,7 @@ where
     ) -> (
         &V::Context,
         KeyValueSlicePtrs<'_, K, V>,
-        *const [SparseItem<K>],
+        *const [DefaultSparseItem<K>],
     ) {
         let Self { ref dense, sparse } = *self;
         let (context, dense) = dense.as_slice_ptrs_with_context();
@@ -294,19 +298,19 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_slice_ptr(&self) -> *const [SparseItem<K>] {
+    pub fn as_sparse_slice_ptr(&self) -> *const [DefaultSparseItem<K>] {
         let (_, sparse) = self.as_sparse_slice_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_slice_ptr_with_context(&self) -> (&V::Context, *const [SparseItem<K>]) {
+    pub fn as_sparse_slice_ptr_with_context(&self) -> (&V::Context, *const [DefaultSparseItem<K>]) {
         let (context, _, sparse) = self.as_slice_ptrs_with_context();
         (context, sparse)
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> (KeyValueSlicePtrs<'ctx, K, V>, *const [SparseItem<K>]) {
+    pub fn into_slice_ptrs(self) -> (KeyValueSlicePtrs<'ctx, K, V>, *const [DefaultSparseItem<K>]) {
         let (_, dense, sparse) = self.into_slice_ptrs_with_context();
         (dense, sparse)
     }
@@ -317,7 +321,7 @@ where
     ) -> (
         &'ctx V::Context,
         KeyValueSlicePtrs<'ctx, K, V>,
-        *const [SparseItem<K>],
+        *const [DefaultSparseItem<K>],
     ) {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.into_slice_ptrs_with_context();
@@ -365,13 +369,15 @@ where
     }
 
     #[inline]
-    pub fn into_sparse_slice_ptr(self) -> *const [SparseItem<K>] {
+    pub fn into_sparse_slice_ptr(self) -> *const [DefaultSparseItem<K>] {
         let (_, sparse) = self.into_sparse_slice_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn into_sparse_slice_ptr_with_context(self) -> (&'ctx V::Context, *const [SparseItem<K>]) {
+    pub fn into_sparse_slice_ptr_with_context(
+        self,
+    ) -> (&'ctx V::Context, *const [DefaultSparseItem<K>]) {
         let (context, _, sparse) = self.into_slice_ptrs_with_context();
         (context, sparse)
     }

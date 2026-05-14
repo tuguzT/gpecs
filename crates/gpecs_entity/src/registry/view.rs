@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{KeyValueSlices, SparseItem},
+    item::{DefaultSparseItem, KeyValueSlices},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlices,
@@ -37,7 +37,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     pub fn new(
         entities: &'a [Entity],
         metas: &'a [Meta],
-        sparse: &'a [SparseItem<Entity>],
+        sparse: &'a [DefaultSparseItem<Entity>],
     ) -> Result<Self, FromPartsError<Entity>> {
         let context = Self::CONTEXT;
         let dense = SoaSlices::new(
@@ -54,7 +54,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     pub unsafe fn from_parts(
         entities: &'a [Entity],
         metas: &'a [Meta],
-        sparse: &'a [SparseItem<Entity>],
+        sparse: &'a [DefaultSparseItem<Entity>],
     ) -> Self {
         let context = Self::CONTEXT;
         let dense = unsafe {
@@ -81,7 +81,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [Entity], &'a [Meta], &'a [SparseItem<Entity>]) {
+    pub fn into_parts(self) -> (&'a [Entity], &'a [Meta], &'a [DefaultSparseItem<Entity>]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_slice_ptrs();
@@ -112,7 +112,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[SparseItem<Entity>]) {
+    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[DefaultSparseItem<Entity>]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
@@ -138,13 +138,13 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[SparseItem<Entity>] {
+    pub fn as_sparse(&self) -> &[DefaultSparseItem<Entity>] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const DefaultSparseItem<Entity>) {
         let (entities, metas, sparse) = self.as_slices();
         (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
     }

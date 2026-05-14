@@ -173,7 +173,8 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     let instance = wgpu::Instance::new(instance_desc);
 
     let adapter_options = wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
+        power_preference: wgpu::PowerPreference::from_env()
+            .unwrap_or(wgpu::PowerPreference::HighPerformance),
         ..Default::default()
     };
     let adapter = pollster::block_on(instance.request_adapter(&adapter_options))

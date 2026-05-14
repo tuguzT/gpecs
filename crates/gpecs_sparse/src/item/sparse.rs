@@ -136,7 +136,9 @@ where
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         let Self { kind, epoch } = self;
-        *kind == other.kind && *epoch == other.epoch
+
+        let other = (&other.kind, &other.epoch);
+        (kind, epoch) == other
     }
 }
 
@@ -160,11 +162,8 @@ where
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { kind, epoch } = self;
 
-        match kind.cmp(&other.kind) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        epoch.cmp(&other.epoch)
+        let other = (&other.kind, &other.epoch);
+        (kind, epoch).cmp(&other)
     }
 }
 
@@ -177,8 +176,7 @@ where
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { kind, epoch } = self;
-        kind.hash(state);
-        epoch.hash(state);
+        (kind, epoch).hash(state);
     }
 }
 

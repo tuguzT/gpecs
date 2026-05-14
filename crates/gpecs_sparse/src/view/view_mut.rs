@@ -14,9 +14,8 @@ use crate::{
     },
     assert::{
         assert_compatible_key, assert_equal_epoch, assert_equal_key, assert_equal_sparse_index,
-        unwrap_dense, unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_index_mut,
-        unwrap_dense_pair, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item,
-        unwrap_sparse_items_pair_mut,
+        unwrap_dense, unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_pair,
+        unwrap_into_index, unwrap_into_usize, unwrap_sparse_item, unwrap_sparse_pair,
     },
     error::FromPartsError,
     item::{
@@ -1072,14 +1071,14 @@ where
         let first_index = {
             let first_item = unwrap_sparse_item(sparse, first_index);
             assert_equal_epoch(first_item.epoch, first_key.epoch());
-            let first_index = unwrap_dense_index(first_item.kind());
-            unwrap_into_usize(*first_index)
+            let first_index = unwrap_dense_index(first_item);
+            unwrap_into_usize(first_index)
         };
         let second_index = {
             let second_item = unwrap_sparse_item(sparse, second_index);
             assert_equal_epoch(second_item.epoch, second_key.epoch());
-            let second_index = unwrap_dense_index(second_item.kind());
-            unwrap_into_usize(*second_index)
+            let second_index = unwrap_dense_index(second_item);
+            unwrap_into_usize(second_index)
         };
 
         let (first_value, second_value) = unwrap_dense_pair(dense, first_index, second_index);
@@ -1099,17 +1098,17 @@ where
         }
 
         let (first_item, second_item) =
-            unwrap_sparse_items_pair_mut(sparse, first_index, second_index);
+            unwrap_sparse_pair(sparse.iter_mut(), first_index, second_index);
 
         let first_index = {
             assert_equal_epoch(first_item.epoch, first_key.epoch());
-            let first_index = unwrap_dense_index(first_item.kind());
-            unwrap_into_usize(*first_index)
+            let first_index = unwrap_dense_index(first_item);
+            unwrap_into_usize(first_index)
         };
         let second_index = {
             assert_equal_epoch(second_item.epoch, second_key.epoch());
-            let second_index = unwrap_dense_index(second_item.kind());
-            unwrap_into_usize(*second_index)
+            let second_index = unwrap_dense_index(second_item);
+            unwrap_into_usize(second_index)
         };
 
         let (first_key, second_key) = unwrap_dense_pair(keys, first_index, second_index);
@@ -2047,8 +2046,8 @@ where
                 let sparse_index = unwrap_dense(keys, curr).sparse_index();
                 let sparse_index = unwrap_into_usize(sparse_index);
                 let sparse_item = unwrap_sparse_item(sparse, sparse_index);
-                let dense_index = unwrap_dense_index(sparse_item.kind());
-                unwrap_into_usize(*dense_index)
+                let dense_index = unwrap_dense_index(sparse_item);
+                unwrap_into_usize(dense_index)
             };
 
             while curr != next {
@@ -2057,18 +2056,18 @@ where
                     let first_index = unwrap_into_usize(first_index);
                     let second_index = unwrap_dense(keys, next).sparse_index();
                     let second_index = unwrap_into_usize(second_index);
-                    unwrap_sparse_items_pair_mut(sparse, first_index, second_index)
+                    unwrap_sparse_pair(sparse.iter_mut(), first_index, second_index)
                 };
-                let curr_dense_index = unwrap_dense_index_mut(curr_item.kind_mut());
-                let next_dense_index = unwrap_dense_index_mut(next_item.kind_mut());
+                let curr_dense_index = unwrap_dense_index(curr_item);
+                let next_dense_index = unwrap_dense_index(next_item);
                 values.swap(
-                    unwrap_into_usize(*curr_dense_index),
-                    unwrap_into_usize(*next_dense_index),
+                    unwrap_into_usize(curr_dense_index),
+                    unwrap_into_usize(next_dense_index),
                 );
 
-                *curr_dense_index = unwrap_into_index(curr);
+                *curr_item = DefaultSparseItem::occupied(unwrap_into_index(curr), curr_item.epoch);
                 curr = next;
-                next = unwrap_into_usize(*next_dense_index);
+                next = unwrap_into_usize(next_dense_index);
             }
         }
     }

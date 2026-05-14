@@ -1,19 +1,13 @@
 use gpecs_itertools::Itertools;
 
 use crate::{
-    item::{DefaultSparseItem, DefaultSparseItemKind},
+    item::DefaultSparseItem,
     key::{Epoch, Key, SparseIndex},
 };
 
 #[inline]
 #[track_caller]
-pub fn unwrap_sparse_item<K>(
-    sparse: &[DefaultSparseItem<K>],
-    sparse_index: usize,
-) -> &DefaultSparseItem<K>
-where
-    K: Key,
-{
+pub fn unwrap_sparse_item<T>(sparse: &[T], sparse_index: usize) -> &T {
     let Some(item) = sparse.get(sparse_index) else {
         assert_key_bounds_failed()
     };
@@ -23,13 +17,7 @@ where
 #[inline]
 #[track_caller]
 #[cfg_attr(not(feature = "alloc"), expect(dead_code))]
-pub fn unwrap_sparse_item_mut<K>(
-    sparse: &mut [DefaultSparseItem<K>],
-    sparse_index: usize,
-) -> &mut DefaultSparseItem<K>
-where
-    K: Key,
-{
+pub fn unwrap_sparse_item_mut<T>(sparse: &mut [T], sparse_index: usize) -> &mut T {
     let Some(item) = sparse.get_mut(sparse_index) else {
         assert_key_bounds_failed()
     };
@@ -45,47 +33,14 @@ const fn unwrap_dense_index_failed() -> ! {
 
 #[inline]
 #[track_caller]
-pub const fn unwrap_dense_index<I>(kind: &DefaultSparseItemKind<I>) -> &I {
-    let Some(dense_index) = kind.dense_index() else {
+pub const fn unwrap_dense_index<K>(item: &DefaultSparseItem<K>) -> K::SparseIndex
+where
+    K: Key,
+{
+    let Some(&dense_index) = item.dense_index() else {
         unwrap_dense_index_failed()
     };
     dense_index
-}
-
-#[inline]
-#[track_caller]
-pub fn unwrap_dense_index_mut<I>(kind: &mut DefaultSparseItemKind<I>) -> &mut I {
-    let Some(dense_index) = kind.dense_index_mut() else {
-        unwrap_dense_index_failed()
-    };
-    dense_index
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn unwrap_next_vacant_failed() -> ! {
-    panic!("current sparse item should be vacant")
-}
-
-#[inline]
-#[track_caller]
-#[cfg_attr(not(feature = "alloc"), expect(dead_code))]
-pub const fn unwrap_next_vacant<I>(kind: &DefaultSparseItemKind<I>) -> &I {
-    let Some(next_vacant) = kind.next_vacant() else {
-        unwrap_next_vacant_failed()
-    };
-    next_vacant
-}
-
-#[inline]
-#[track_caller]
-#[cfg_attr(not(feature = "alloc"), expect(dead_code))]
-pub const fn unwrap_next_vacant_mut<I>(kind: &mut DefaultSparseItemKind<I>) -> &mut I {
-    let Some(next_vacant) = kind.next_vacant_mut() else {
-        unwrap_next_vacant_failed()
-    };
-    next_vacant
 }
 
 #[inline]
@@ -100,7 +55,7 @@ pub fn unwrap_dense<T>(dense: impl IntoIterator<Item = T>, dense_index: usize) -
 #[cold]
 #[track_caller]
 #[inline(never)]
-const fn unwrap_dense_value_pair_mut_failed() -> ! {
+const fn unwrap_dense_pair_failed() -> ! {
     panic!("indices from sparse should be in bounds of dense and differ from each other")
 }
 
@@ -112,7 +67,7 @@ pub fn unwrap_dense_pair<T>(
     second_index: usize,
 ) -> (T, T) {
     let Some(pair) = iter.into_iter().get_pair(first_index, second_index) else {
-        unwrap_dense_value_pair_mut_failed()
+        unwrap_dense_pair_failed()
     };
     pair
 }
@@ -120,22 +75,19 @@ pub fn unwrap_dense_pair<T>(
 #[cold]
 #[track_caller]
 #[inline(never)]
-const fn unwrap_sparse_items_pair_mut_failed() -> ! {
+const fn unwrap_sparse_pair_failed() -> ! {
     panic!("keys should be in bounds of sparse and differ from each other")
 }
 
 #[inline]
 #[track_caller]
-pub fn unwrap_sparse_items_pair_mut<K>(
-    sparse: &mut [DefaultSparseItem<K>],
+pub fn unwrap_sparse_pair<T>(
+    iter: impl IntoIterator<Item = T>,
     first_index: usize,
     second_index: usize,
-) -> (&mut DefaultSparseItem<K>, &mut DefaultSparseItem<K>)
-where
-    K: Key,
-{
-    let Some(pair) = sparse.iter_mut().get_pair(first_index, second_index) else {
-        unwrap_sparse_items_pair_mut_failed()
+) -> (T, T) {
+    let Some(pair) = iter.into_iter().get_pair(first_index, second_index) else {
+        unwrap_sparse_pair_failed()
     };
     pair
 }
@@ -190,8 +142,8 @@ where
 {
     let sparse_index = unwrap_into_usize(sparse_index);
     let sparse_item = unwrap_sparse_item(sparse, sparse_index);
-    let dense_index = unwrap_dense_index(&sparse_item.kind);
-    let dense_index = unwrap_into_usize(*dense_index);
+    let dense_index = unwrap_dense_index(sparse_item);
+    let dense_index = unwrap_into_usize(dense_index);
     unwrap_dense(dense, dense_index)
 }
 

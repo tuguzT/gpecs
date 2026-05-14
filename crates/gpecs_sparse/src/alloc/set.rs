@@ -11,15 +11,15 @@ use crate::{
     algo::{check_parts, dense_keys, sparse_item_by_epoch},
     assert::{
         assert_dense_index_bounds, assert_equal_key, assert_key_bounds, unwrap_dense,
-        unwrap_dense_index_mut, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item_mut,
+        unwrap_dense_index, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item_mut,
     },
     error::{
         FromPartsError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryModifyError,
         TryModifyErrorKind, TryReserveError,
     },
     item::{
-        DefaultSparseItem, DefaultSparseItemKind, KeyValueMutPtrs, KeyValueMutSlicePtrs,
-        KeyValueMutSlices, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
+        DefaultSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair,
+        KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
     },
     iter::{
         Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
@@ -876,8 +876,10 @@ where
         for key in keys.iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - 1);
+            let dense_index = unwrap_dense_index(sparse_item);
+
+            let dense_index = unwrap_into_index(unwrap_into_usize(dense_index) - 1);
+            *sparse_item = DefaultSparseItem::occupied(dense_index, sparse_item.epoch);
         }
         sparse[sparse_index] = DefaultSparseItem::vacant(unwrap_into_index(0), key.epoch().next());
 
@@ -985,7 +987,7 @@ where
             return f(dense.context(), Ok(None));
         }
 
-        if let DefaultSparseItemKind::Occupied { dense_index } = sparse_item.kind {
+        if let Some(dense_index) = sparse_item.into_dense_index() {
             let (context, dense) = dense.mut_slice_ptrs().into_iter_with_context();
 
             let dense_index = unwrap_into_usize(dense_index);
@@ -1631,8 +1633,10 @@ where
 
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - (curr - last));
+            let dense_index = unwrap_dense_index(sparse_item);
+
+            let dense_index = unwrap_into_index(unwrap_into_usize(dense_index) - (curr - last));
+            *sparse_item = DefaultSparseItem::occupied(dense_index, sparse_item.epoch);
 
             last += 1;
         }

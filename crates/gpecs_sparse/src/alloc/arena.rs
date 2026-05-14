@@ -11,8 +11,8 @@ use crate::{
     algo::{check_parts, dense_keys, sparse_item_by_epoch},
     assert::{
         assert_dense_index_bounds, assert_equal_key, assert_key_bounds, unwrap_dense,
-        unwrap_dense_index_mut, unwrap_into_index, unwrap_into_usize, unwrap_next_vacant,
-        unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
+        unwrap_dense_index, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item,
+        unwrap_sparse_item_mut,
     },
     error::{
         FromPartsError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryModifyError,
@@ -41,7 +41,10 @@ use crate::{
 
 use super::{
     access::TryInsertAccess,
-    assert::{try_entry_failed, try_insert_failed, try_push_failed},
+    assert::{
+        try_entry_failed, try_insert_failed, try_push_failed, unwrap_next_vacant,
+        unwrap_next_vacant_mut,
+    },
     entry::generate_entry_types,
     set,
 };
@@ -156,7 +159,7 @@ where
                 extend_sparse(&mut sparse, new_len, &mut sparse_vacant_head)?;
             } else {
                 let sparse_item = unwrap_sparse_item(sparse.as_slice(), sparse_index);
-                let next_vacant = (*unwrap_next_vacant(sparse_item.kind()))
+                let next_vacant = (*unwrap_next_vacant(sparse_item))
                     .try_into()
                     .map_err(TooLargeSparseIndexError::new)?;
                 remove_from_vacant_list(
@@ -944,8 +947,10 @@ where
         for key in keys.iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - 1);
+            let dense_index = unwrap_dense_index(sparse_item);
+
+            let dense_index = unwrap_into_index(unwrap_into_usize(dense_index) - 1);
+            *sparse_item = DefaultSparseItem::occupied(dense_index, sparse_item.epoch);
         }
         let next_vacant = unwrap_into_index(*sparse_vacant_head);
         sparse[sparse_index] = DefaultSparseItem::vacant(next_vacant, key.epoch().next());
@@ -1199,7 +1204,7 @@ where
         } = self;
 
         if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
-            let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
+            let next_vacant = match (*unwrap_next_vacant(sparse_item)).try_into() {
                 Ok(next_vacant) => next_vacant,
                 Err(error) => {
                     let context = dense.context();
@@ -1828,8 +1833,10 @@ where
 
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - (curr - last));
+            let dense_index = unwrap_dense_index(sparse_item);
+
+            let dense_index = unwrap_into_index(unwrap_into_usize(dense_index) - (curr - last));
+            *sparse_item = DefaultSparseItem::occupied(dense_index, sparse_item.epoch);
 
             last += 1;
         }
@@ -2321,7 +2328,7 @@ where
     let mut last_vacant = first_vacant;
     for _ in 0..old_len {
         let last_vacant_item = unwrap_sparse_item_mut(sparse, last_vacant);
-        let next_vacant = unwrap_next_vacant(last_vacant_item.kind_mut());
+        let next_vacant = unwrap_next_vacant(last_vacant_item);
         let next_vacant = unwrap_into_usize(*next_vacant);
         if next_vacant == old_len {
             // should be `Some(last_vacant_item)`, but the lack of Polonius strikes again
@@ -2348,7 +2355,7 @@ where
 
     let max_vacant = new_len.try_into().map_err(TooSmallSparseIndexError::new)?;
     if let Some(last_vacant_item) = last_vacant_item(sparse, *sparse_vacant_head) {
-        let next_vacant = unwrap_next_vacant_mut(last_vacant_item.kind_mut());
+        let next_vacant = unwrap_next_vacant_mut(last_vacant_item);
         *next_vacant = max_vacant;
     }
 
@@ -2369,7 +2376,7 @@ where
     let last_sparse_item = sparse
         .last()
         .expect("sparse should contain at least one item");
-    let next_vacant = unwrap_next_vacant(last_sparse_item.kind());
+    let next_vacant = unwrap_next_vacant(last_sparse_item);
     *sparse_vacant_head = unwrap_into_usize(*next_vacant);
 
     Ok(())
@@ -2390,7 +2397,7 @@ fn remove_from_vacant_list<K>(
             result = Some(next_vacant);
 
             let vacant_item = unwrap_sparse_item(sparse, next_vacant);
-            next_vacant = unwrap_into_usize(*unwrap_next_vacant(vacant_item.kind()));
+            next_vacant = unwrap_into_usize(*unwrap_next_vacant(vacant_item));
         }
         result
     };
@@ -2398,7 +2405,7 @@ fn remove_from_vacant_list<K>(
     match vacant_to_fix {
         Some(vacant_to_fix) => {
             let vacant_item = unwrap_sparse_item_mut(sparse, vacant_to_fix);
-            let next_vacant_mut = unwrap_next_vacant_mut(vacant_item.kind_mut());
+            let next_vacant_mut = unwrap_next_vacant_mut(vacant_item);
             *next_vacant_mut = unwrap_into_index(next_vacant);
         }
         None => *sparse_vacant_head = next_vacant,

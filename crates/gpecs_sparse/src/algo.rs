@@ -10,7 +10,7 @@ use crate::{
         OccupiedSparseItemExpectedError, SparseIndexMismatchError, SparseIndexOutOfBoundsError,
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
-    item::{DefaultSparseItem, DefaultSparseItemKind, KeyValuePair},
+    item::{DefaultSparseItem, KeyValuePair},
     key::Key,
     soa::{slice::SoaSlices, traits::RawSoa},
 };
@@ -232,7 +232,7 @@ where
     let Some(sparse_item) = sparse_item_by_key(sparse, key) else {
         return false;
     };
-    let DefaultSparseItemKind::Occupied { dense_index } = sparse_item.kind else {
+    let Some(dense_index) = sparse_item.into_dense_index() else {
         return false;
     };
     let dense_index = unwrap_into_usize(dense_index);
@@ -316,12 +316,9 @@ where
         let dense_index = dense_index
             .try_into()
             .map_err(TooSmallSparseIndexError::new)?;
-        let dense_index_from_item = match *sparse_item.kind() {
-            DefaultSparseItemKind::Occupied { dense_index } => dense_index,
-            DefaultSparseItemKind::Vacant { .. } => {
-                let error = OccupiedSparseItemExpectedError::new(sparse_index);
-                return Err(error.into());
-            }
+        let Some(dense_index_from_item) = sparse_item.into_dense_index() else {
+            let error = OccupiedSparseItemExpectedError::new(sparse_index);
+            return Err(error.into());
         };
         if dense_index_from_item != dense_index {
             let error = DenseIndexMismatchError::new(dense_index_from_item, dense_index);

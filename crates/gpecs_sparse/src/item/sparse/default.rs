@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
 };
 
-use crate::key::Key;
+use crate::{assert::unwrap_into_index, item::SparseItem, key::Key};
 
 pub struct DefaultSparseItem<K>
 where
@@ -177,6 +177,34 @@ where
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { kind, epoch } = self;
         (kind, epoch).hash(state);
+    }
+}
+
+impl<K> SparseItem for DefaultSparseItem<K>
+where
+    K: Key,
+{
+    type Index = K::SparseIndex;
+    type Epoch = K::Epoch;
+
+    #[inline]
+    fn occupied(epoch: Self::Epoch, dense_index: Self::Index) -> Self {
+        Self::occupied(dense_index, epoch)
+    }
+
+    #[inline]
+    fn vacant(epoch: Self::Epoch) -> Self {
+        Self::vacant(unwrap_into_index(0), epoch)
+    }
+
+    #[inline]
+    fn epoch(self) -> Self::Epoch {
+        self.epoch
+    }
+
+    #[inline]
+    fn dense_index(self) -> Option<Self::Index> {
+        self.into_dense_index()
     }
 }
 

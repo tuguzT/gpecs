@@ -1,7 +1,7 @@
 use gpecs_itertools::Itertools;
 
 use crate::{
-    item::DefaultSparseItem,
+    item::SparseItem,
     key::{Epoch, Key, SparseIndex},
 };
 
@@ -33,11 +33,11 @@ const fn unwrap_dense_index_failed() -> ! {
 
 #[inline]
 #[track_caller]
-pub const fn unwrap_dense_index<K>(item: &DefaultSparseItem<K>) -> K::SparseIndex
+pub fn unwrap_dense_index<T>(item: &T) -> T::Index
 where
-    K: Key,
+    T: SparseItem,
 {
-    let Some(&dense_index) = item.dense_index() else {
+    let Some(dense_index) = item.dense_index() else {
         unwrap_dense_index_failed()
     };
     dense_index
@@ -135,7 +135,7 @@ where
 pub fn unwrap_dense_from_sparse_index<K, V>(
     sparse_index: K::SparseIndex,
     dense: impl IntoIterator<Item = V>,
-    sparse: &[DefaultSparseItem<K>],
+    sparse: &[impl SparseItem<Index = K::SparseIndex>],
 ) -> V
 where
     K: Key,

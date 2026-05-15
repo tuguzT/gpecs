@@ -867,7 +867,7 @@ where
             return f(dense.context(), None);
         };
 
-        let dense_index = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
+        let dense_index = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .and_then(DefaultSparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
@@ -926,7 +926,7 @@ where
             return f(dense.context(), None);
         };
 
-        let dense_index = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
+        let dense_index = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .and_then(DefaultSparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
@@ -1324,7 +1324,7 @@ where
             .sparse_index()
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
-        let Some(dense_index) = sparse_item_by_epoch(sparse, sparse_index, key.epoch())
+        let Some(dense_index) = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .and_then(DefaultSparseItem::dense_index)
             .copied()
         else {

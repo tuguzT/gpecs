@@ -1624,7 +1624,7 @@ fn from_arena() {
     sparse_arena.insert(1, Identity(42));
     sparse_arena.insert(5, Identity(69));
 
-    let sparse_set = SparseSet::from(sparse_arena);
+    let sparse_set = SparseSet::<_>::from(sparse_arena);
     assert_eq!(sparse_set.len(), 3);
     assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 5]);
     assert_eq!(

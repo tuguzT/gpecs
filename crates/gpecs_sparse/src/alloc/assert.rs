@@ -1,37 +1,6 @@
-use crate::{error::TooLargeSparseIndexError, item::DefaultSparseItem, key::Key};
+use crate::{error::TooLargeSparseIndexError, key::Key};
 
 use super::error::TryModifyErrorKind;
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn unwrap_next_vacant_failed() -> ! {
-    panic!("current sparse item should be vacant")
-}
-
-#[inline]
-#[track_caller]
-pub const fn unwrap_next_vacant<K>(item: &DefaultSparseItem<K>) -> &K::SparseIndex
-where
-    K: Key,
-{
-    let Some(next_vacant) = item.next_vacant() else {
-        unwrap_next_vacant_failed()
-    };
-    next_vacant
-}
-
-#[inline]
-#[track_caller]
-pub const fn unwrap_next_vacant_mut<K>(item: &mut DefaultSparseItem<K>) -> &mut K::SparseIndex
-where
-    K: Key,
-{
-    let Some(next_vacant) = item.next_vacant_mut() else {
-        unwrap_next_vacant_failed()
-    };
-    next_vacant
-}
 
 #[cold]
 #[inline(never)]

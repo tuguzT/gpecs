@@ -1,7 +1,7 @@
 use gpecs_itertools::Itertools;
 
 use crate::{
-    item::SparseItem,
+    item::{ArenaSparseItem, SparseItem},
     key::{Epoch, Key, SparseIndex},
 };
 
@@ -27,8 +27,33 @@ pub fn unwrap_sparse_item_mut<T>(sparse: &mut [T], sparse_index: usize) -> &mut 
 #[cold]
 #[track_caller]
 #[inline(never)]
-const fn unwrap_dense_index_failed() -> ! {
+const fn assert_occupied_failed() -> ! {
     panic!("current sparse item should be occupied")
+}
+
+#[inline]
+#[track_caller]
+pub fn assert_occupied(item: &impl SparseItem) {
+    if item.is_occupied() {
+        return;
+    }
+    assert_occupied_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn assert_vacant_failed() -> ! {
+    panic!("current sparse item should be vacant")
+}
+
+#[inline]
+#[track_caller]
+pub fn assert_vacant(item: &impl SparseItem) {
+    if item.is_vacant() {
+        return;
+    }
+    assert_vacant_failed()
 }
 
 #[inline]
@@ -38,9 +63,21 @@ where
     T: SparseItem,
 {
     let Some(dense_index) = item.dense_index() else {
-        unwrap_dense_index_failed()
+        assert_occupied_failed()
     };
     dense_index
+}
+
+#[inline]
+#[track_caller]
+pub fn unwrap_next_vacant<T>(item: &T) -> T::Index
+where
+    T: ArenaSparseItem,
+{
+    let Some(next_vacant) = item.next_vacant() else {
+        assert_vacant_failed()
+    };
+    next_vacant
 }
 
 #[inline]

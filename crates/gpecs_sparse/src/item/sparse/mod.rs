@@ -1,6 +1,6 @@
 pub use self::{
     default::{DefaultSparseItem, DefaultSparseItemKind},
-    traits::SparseItem,
+    traits::{ArenaSparseItem, SparseIndexKind, SparseItem},
 };
 
 mod default;

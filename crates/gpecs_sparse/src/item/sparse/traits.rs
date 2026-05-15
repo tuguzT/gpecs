@@ -1,4 +1,7 @@
-use crate::key::{Epoch, SparseIndex};
+use crate::{
+    assert::{assert_occupied, assert_vacant},
+    key::{Epoch, SparseIndex},
+};
 
 pub trait SparseItem: Copy {
     type Index: SparseIndex;
@@ -19,4 +22,31 @@ pub trait SparseItem: Copy {
     fn is_vacant(self) -> bool {
         !self.is_occupied()
     }
+}
+
+pub trait ArenaSparseItem: SparseItem {
+    fn with_next_vacant(epoch: Self::Epoch, next_vacant: Self::Index) -> Self;
+
+    fn index(self) -> (Self::Index, SparseIndexKind);
+
+    #[inline]
+    fn next_vacant(self) -> Option<Self::Index> {
+        let (index, kind) = self.index();
+        match kind {
+            SparseIndexKind::Dense => {
+                assert_occupied(&self);
+                None
+            }
+            SparseIndexKind::NextVacant => {
+                assert_vacant(&self);
+                Some(index)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SparseIndexKind {
+    Dense,
+    NextVacant,
 }

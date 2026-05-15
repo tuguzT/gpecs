@@ -4,7 +4,11 @@ use core::{
     hash::{self, Hash},
 };
 
-use crate::{assert::unwrap_into_index, item::SparseItem, key::Key};
+use crate::{
+    assert::unwrap_into_index,
+    item::{ArenaSparseItem, SparseIndexKind, SparseItem},
+    key::Key,
+};
 
 pub struct DefaultSparseItem<K>
 where
@@ -205,6 +209,32 @@ where
     #[inline]
     fn dense_index(self) -> Option<Self::Index> {
         self.into_dense_index()
+    }
+}
+
+impl<K> ArenaSparseItem for DefaultSparseItem<K>
+where
+    K: Key,
+{
+    #[inline]
+    fn with_next_vacant(epoch: Self::Epoch, next_vacant: Self::Index) -> Self {
+        Self::vacant(next_vacant, epoch)
+    }
+
+    #[inline]
+    fn index(self) -> (Self::Index, SparseIndexKind) {
+        use DefaultSparseItemKind::{Occupied, Vacant};
+
+        let Self { kind, .. } = self;
+        match kind {
+            Occupied { dense_index } => (dense_index, SparseIndexKind::Dense),
+            Vacant { next_vacant } => (next_vacant, SparseIndexKind::NextVacant),
+        }
+    }
+
+    #[inline]
+    fn next_vacant(self) -> Option<Self::Index> {
+        self.into_next_vacant()
     }
 }
 

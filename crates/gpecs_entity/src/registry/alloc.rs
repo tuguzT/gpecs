@@ -21,7 +21,7 @@ use super::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut};
 
 pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 
-pub struct EntityRegistry<Meta = (), S = DefaultSparseItem<Entity>>
+pub struct EntityRegistry<Meta, S = DefaultSparseItem<Entity>>
 where
     S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
 {

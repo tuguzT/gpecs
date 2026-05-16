@@ -37,7 +37,7 @@ use crate::{
 type Inner<Meta, S> = EpochSparseSet<u32, Identity<Meta>, S>;
 
 #[derive(Clone)]
-pub struct ErasedArchetype<Meta = (), S = DefaultSparseItem<u32>>
+pub struct ErasedArchetype<Meta, S = DefaultSparseItem<u32>>
 where
     S: SparseItem<Index = u32, Epoch = ()>,
 {

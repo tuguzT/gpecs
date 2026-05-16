@@ -1,3 +1,5 @@
+use gpecs_sparse::item::SparseItem;
+
 use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     bundle::Bundle,
@@ -22,7 +24,7 @@ where
     #[inline]
     fn get_gpu_components(
         components: &Components,
-        gpu_components: &GpuComponentRegistry,
+        gpu_components: &GpuComponentRegistry<impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<Self::GpuComponents, ArchetypeError> {
         let [component_id] = Self::get_components(&components.as_view())?
             .map(|id| gpu_components.map_component_id(id));
@@ -33,7 +35,7 @@ where
     #[inline]
     fn register_gpu_components(
         components: &mut Components,
-        gpu_components: &mut GpuComponentRegistry,
+        gpu_components: &mut GpuComponentRegistry<impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<Self::GpuComponents, DuplicateComponentError> {
         Self::register_components(components)?;
 
@@ -54,7 +56,7 @@ macro_rules! gpu_bundle_tuple_impl {
             #[inline]
             fn get_gpu_components(
                 components: &Components,
-                gpu_components: &GpuComponentRegistry,
+                gpu_components: &GpuComponentRegistry<impl SparseItem<Index = u32, Epoch = ()>>,
             ) -> Result<Self::GpuComponents, ArchetypeError> {
                 let component_ids = Self::get_components(&components.as_view())?
                     .map(|id| gpu_components.map_component_id(id));
@@ -66,7 +68,7 @@ macro_rules! gpu_bundle_tuple_impl {
             #[inline]
             fn register_gpu_components(
                 components: &mut Components,
-                gpu_components: &mut GpuComponentRegistry,
+                gpu_components: &mut GpuComponentRegistry<impl SparseItem<Index = u32, Epoch = ()>>,
             ) -> Result<Self::GpuComponents, DuplicateComponentError> {
                 Self::register_components(components)?;
 

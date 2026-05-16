@@ -1,3 +1,5 @@
+use gpecs_sparse::item::SparseItem;
+
 use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     bundle::Bundle,
@@ -25,7 +27,7 @@ pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     ///   (in other words, there are duplicated components).
     fn get_gpu_components(
         components: &Components,
-        gpu_components: &GpuComponentRegistry,
+        gpu_components: &GpuComponentRegistry<impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<Self::GpuComponents, ArchetypeError>;
 
     /// Registers all GPU components of this bundle inside of provided registry
@@ -37,6 +39,6 @@ pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     /// are occuring more than once in the type itself (in other words, there are duplicated components).
     fn register_gpu_components(
         components: &mut Components,
-        gpu_components: &mut GpuComponentRegistry,
+        gpu_components: &mut GpuComponentRegistry<impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<Self::GpuComponents, DuplicateComponentError>;
 }

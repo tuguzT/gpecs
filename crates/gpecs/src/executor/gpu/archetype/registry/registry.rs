@@ -1,6 +1,9 @@
 #![expect(clippy::module_inception)]
 
-use gpecs_sparse::set::EpochSparseSet;
+use gpecs_sparse::{
+    item::{DefaultSparseItem, SparseItem},
+    set::EpochSparseSet,
+};
 use wgpu::Device;
 
 use crate::{
@@ -21,17 +24,23 @@ use crate::{
     soa::identity::Identity,
 };
 
-type GpuArchetypes = EpochSparseSet<u32, Identity<GpuArchetypeStorage>>;
+type Inner<S> = EpochSparseSet<u32, Identity<GpuArchetypeStorage>, S>;
 
 #[derive(Debug, Default)]
-pub struct GpuArchetypeRegistry {
-    gpu_archetypes: GpuArchetypes,
+pub struct GpuArchetypeRegistry<S = DefaultSparseItem<u32>>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
+    gpu_archetypes: Inner<S>,
 }
 
-impl GpuArchetypeRegistry {
+impl<S> GpuArchetypeRegistry<S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn new() -> Self {
-        let gpu_archetypes = GpuArchetypes::new();
+        let gpu_archetypes = Inner::new();
         Self { gpu_archetypes }
     }
 
@@ -77,7 +86,7 @@ impl GpuArchetypeRegistry {
     #[inline]
     fn register(
         archetypes: &ArchetypeRegistry,
-        gpu_archetypes: &mut GpuArchetypes,
+        gpu_archetypes: &mut Inner<S>,
         gpu_device: &Device,
         archetype_id: ArchetypeId,
     ) -> GpuArchetypeId {

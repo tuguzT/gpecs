@@ -1,6 +1,9 @@
 #![expect(clippy::module_inception)]
 
-use gpecs_sparse::set::EpochSparseSet;
+use gpecs_sparse::{
+    item::{DefaultSparseItem, SparseItem},
+    set::EpochSparseSet,
+};
 
 use crate::{
     component::registry::ComponentId,
@@ -15,11 +18,17 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct GpuComponentRegistry {
-    components: EpochSparseSet<u32, ()>,
+pub struct GpuComponentRegistry<S = DefaultSparseItem<u32>>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
+    components: EpochSparseSet<u32, (), S>,
 }
 
-impl GpuComponentRegistry {
+impl<S> GpuComponentRegistry<S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn new() -> Self {
         let components = EpochSparseSet::new();

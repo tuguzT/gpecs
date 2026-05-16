@@ -3,7 +3,7 @@
 #![cfg_attr(not(test), no_std)]
 
 pub use self::{
-    entity::Entity,
+    entity::{Entity, NoEpochEntity},
     epoch::{EntityEpoch, EpochFromU32Error},
 };
 

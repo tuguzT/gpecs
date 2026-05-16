@@ -5,13 +5,10 @@ use core::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_sparse::{iter::Iter, soa::traits::Slices};
 
-use crate::{
-    bundle::{Bundle, BundlePtrs, BundleRefs, BundleSlicePtrs, BundleSlices},
-    storage::NoEpochEntity,
-};
+use crate::bundle::{Bundle, BundlePtrs, BundleRefs, BundleSlicePtrs, BundleSlices};
 
 type Inner<'a, B> = Iter<'static, 'a, NoEpochEntity, B>;
 

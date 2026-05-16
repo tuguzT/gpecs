@@ -6,7 +6,7 @@ use core::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_sparse::{
     error::FromPartsError,
     item::{DefaultSparseItem, KeyValueSlices, SparseItem},
@@ -20,7 +20,7 @@ use gpecs_sparse::{
 
 use crate::{
     bundle::{Bundle, BundleRefs, BundleSlices},
-    storage::{BundleIter, NoEpochEntity},
+    storage::BundleIter,
 };
 
 type Inner<'a, B, S> = EpochSparseView<'static, 'a, NoEpochEntity, B, S>;

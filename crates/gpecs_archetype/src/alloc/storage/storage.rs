@@ -6,7 +6,7 @@ use gpecs_component::registry::{
     ComponentId, ComponentRegistry, ComponentRegistryView,
     traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
 };
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_soa_erased::{
     ErasedSoaContext,
     ptr::slice::{PtrsItem, SliceItemPtrs},
@@ -47,7 +47,7 @@ use crate::{
     },
     storage::{
         ArchetypeStorageView, ArchetypeStorageViewMut, BundleIter, BundleIterMut, Bundles,
-        BundlesMut, ErasedArchetypeSoa, Iter, IterMut, NoEpochEntity,
+        BundlesMut, ErasedArchetypeSoa, Iter, IterMut,
         error::{
             EntityFoundError, EntityNotFoundError, IncompatibleBundleValueError, MoveIntoError,
             MoveIntoWithInsertBundleError, MoveIntoWithInsertBundleErrorKind,

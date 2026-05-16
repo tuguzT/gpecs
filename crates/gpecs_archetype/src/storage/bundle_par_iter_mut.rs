@@ -4,7 +4,7 @@ use core::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_sparse::{
     iter::ParIterMut,
     soa::traits::{Slices, SlicesMut},
@@ -16,7 +16,7 @@ use rayon::iter::{
 
 use crate::{
     bundle::{Bundle, BundleRefsMut, BundleSlices, BundleSlicesMut},
-    storage::{BundleIterMut, NoEpochEntity},
+    storage::BundleIterMut,
 };
 
 type Inner<'a, B> = ParIterMut<'static, 'a, NoEpochEntity, B>;

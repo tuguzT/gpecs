@@ -1,7 +1,7 @@
 pub use self::{
     bundle_iter::BundleIter, bundle_iter_mut::BundleIterMut, bundles::Bundles,
-    bundles_mut::BundlesMut, entity::NoEpochEntity, iter::Iter, iter_mut::IterMut,
-    traits::ErasedArchetypeSoa, view::ArchetypeStorageView, view_mut::ArchetypeStorageViewMut,
+    bundles_mut::BundlesMut, iter::Iter, iter_mut::IterMut, traits::ErasedArchetypeSoa,
+    view::ArchetypeStorageView, view_mut::ArchetypeStorageViewMut,
 };
 
 #[cfg(feature = "alloc")]
@@ -16,7 +16,6 @@ mod bundle_iter;
 mod bundle_iter_mut;
 mod bundles;
 mod bundles_mut;
-mod entity;
 mod iter;
 mod iter_mut;
 mod traits;

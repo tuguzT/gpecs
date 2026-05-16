@@ -5,7 +5,7 @@ use core::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_soa_erased::{
     ptr::slice::PtrsItem,
     soa::{
@@ -14,10 +14,7 @@ use gpecs_soa_erased::{
     },
 };
 
-use crate::{
-    erased::ErasedArchetypeView,
-    storage::{ErasedArchetypeSoa, NoEpochEntity},
-};
+use crate::{erased::ErasedArchetypeView, storage::ErasedArchetypeSoa};
 
 type Inner<'ctx, T> = gpecs_sparse::iter::RawIterMut<'ctx, NoEpochEntity, T>;
 

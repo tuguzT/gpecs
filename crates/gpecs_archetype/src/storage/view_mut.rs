@@ -8,7 +8,7 @@ use gpecs_component::registry::{
     ComponentRegistryView,
     traits::{ComponentIdFrom, FromComponentType},
 };
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_soa_erased::{
     ptr::slice::PtrsItem,
     soa::{
@@ -32,7 +32,7 @@ use crate::{
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
     storage::{
         ArchetypeStorageView, BundleIter, BundleIterMut, Bundles, BundlesMut, Iter, IterMut,
-        NoEpochEntity, traits::ErasedArchetypeSoa,
+        traits::ErasedArchetypeSoa,
     },
 };
 

@@ -4,7 +4,7 @@ use core::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_sparse::{iter::ParIter, soa::traits::Slices};
 use rayon::iter::{
     IndexedParallelIterator, ParallelIterator,
@@ -13,7 +13,7 @@ use rayon::iter::{
 
 use crate::{
     bundle::{Bundle, BundleRefs, BundleSlices},
-    storage::{BundleIter, NoEpochEntity},
+    storage::BundleIter,
 };
 
 type Inner<'a, B> = ParIter<'static, 'a, NoEpochEntity, B>;

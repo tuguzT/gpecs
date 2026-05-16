@@ -6,7 +6,7 @@ use core::{
 };
 
 use bytemuck::must_cast_slice_mut;
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_sparse::{
     error::FromPartsError,
     item::{DefaultSparseItem, KeyValueMutSlices, SparseItem},
@@ -20,7 +20,7 @@ use gpecs_sparse::{
 
 use crate::{
     bundle::{Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut},
-    storage::{BundleIter, BundleIterMut, Bundles, NoEpochEntity},
+    storage::{BundleIter, BundleIterMut, Bundles},
 };
 
 type Inner<'a, B, S> = EpochSparseViewMut<'static, 'a, NoEpochEntity, B, S>;

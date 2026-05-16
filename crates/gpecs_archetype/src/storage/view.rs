@@ -8,7 +8,7 @@ use gpecs_component::registry::{
     ComponentRegistryView,
     traits::{ComponentIdFrom, FromComponentType},
 };
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_soa_erased::{
     ptr::slice::PtrsItem,
     soa::{
@@ -27,7 +27,7 @@ use gpecs_sparse::{
 use crate::{
     bundle::{Bundle, BundleRefs, erased::error::DowncastError},
     erased::{ErasedArchetypeView, error::IncompatibleArchetypeError},
-    storage::{BundleIter, Bundles, Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
+    storage::{BundleIter, Bundles, Iter, traits::ErasedArchetypeSoa},
 };
 
 type Inner<'ctx, T, S> = EpochSparseViewPtr<'ctx, NoEpochEntity, T, S>;

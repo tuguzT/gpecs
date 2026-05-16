@@ -5,15 +5,12 @@ use core::{
 };
 
 use bytemuck::{must_cast_slice, must_cast_slice_mut};
-use gpecs_entity::Entity;
+use gpecs_entity::{Entity, NoEpochEntity};
 use gpecs_sparse::{iter::IterMut, soa::traits::Slices};
 
-use crate::{
-    bundle::{
-        Bundle, BundleMutPtrs, BundlePtrs, BundleRefsMut, BundleSliceMutPtrs, BundleSlicePtrs,
-        BundleSlices, BundleSlicesMut,
-    },
-    storage::NoEpochEntity,
+use crate::bundle::{
+    Bundle, BundleMutPtrs, BundlePtrs, BundleRefsMut, BundleSliceMutPtrs, BundleSlicePtrs,
+    BundleSlices, BundleSlicesMut,
 };
 
 type Inner<'a, B> = IterMut<'static, 'a, NoEpochEntity, B>;

@@ -15,10 +15,7 @@ use gpecs_sparse::{
     view::{EpochSparseView, EpochSparseViewPtr},
 };
 
-use crate::{
-    entity::{Entity, EntityEpoch},
-    registry::Iter,
-};
+use crate::{Entity, EntityEpoch, registry::Iter};
 
 type Inner<'a, Meta, S> = EpochSparseViewPtr<'a, Entity, Identity<Meta>, S>;
 

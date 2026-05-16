@@ -8,7 +8,7 @@ use gpecs_sparse::{
     soa::identity::{Identity, IdentitySlice},
 };
 
-use crate::entity::Entity;
+use crate::Entity;
 
 type Inner<'a, Meta> = RawIter<'a, Entity, Identity<Meta>>;
 

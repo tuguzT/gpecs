@@ -15,9 +15,10 @@ use gpecs_sparse::{
 };
 use gpecs_world::id::WorldId;
 
-use crate::entity::{Entity, EntityEpoch};
-
-use super::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut};
+use crate::{
+    Entity, EntityEpoch,
+    registry::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut},
+};
 
 pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 

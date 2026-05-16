@@ -16,7 +16,7 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    entity::{Entity, EntityEpoch},
+    Entity, EntityEpoch,
     registry::{EntityRegistryView, Iter, IterMut},
 };
 

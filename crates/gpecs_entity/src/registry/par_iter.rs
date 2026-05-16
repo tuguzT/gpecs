@@ -7,7 +7,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    entity::{Entity, EntityEpoch},
+    Entity, EntityEpoch,
     registry::{EntityRegistryView, Iter},
 };
 

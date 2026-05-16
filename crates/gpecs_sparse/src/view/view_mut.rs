@@ -19,7 +19,7 @@ use crate::{
     },
     error::FromPartsError,
     item::{
-        KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair, KeyValuePtrs,
+        self, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair, KeyValuePtrs,
         KeyValueSlicePtrs, KeyValueSlices, SparseItem,
     },
     iter::{
@@ -37,10 +37,10 @@ use crate::{
     view::{EpochSparseView, EpochSparseViewMutPtr, EpochSparseViewPtr},
 };
 
-pub type SparseViewMut<'ctx, 'a, T, S = crate::item::DefaultSparseItem<usize>> =
+pub type SparseViewMut<'ctx, 'a, T, S = item::DefaultSparseItem<usize>> =
     EpochSparseViewMut<'ctx, 'a, usize, T, S>;
 
-pub struct EpochSparseViewMut<'ctx, 'a, K, V, S = crate::item::DefaultSparseItem<K>>
+pub struct EpochSparseViewMut<'ctx, 'a, K, V, S = item::DefaultSparseItem<K>>
 where
     K: Key + 'a,
     V: RawSoa<Context: 'ctx> + ?Sized,
@@ -988,7 +988,7 @@ where
 
         let dense_index = sparse_item_by_key(sparse, key)
             .copied()
-            .and_then(SparseItem::dense_index)?;
+            .and_then(S::dense_index)?;
         let dense_index = unwrap_into_usize(dense_index);
 
         let (keys, _) = dense.as_mut_slice_ptrs().into_parts();
@@ -2119,9 +2119,9 @@ where
 impl<T, K, V, S> Index<K> for EpochSparseViewMut<'_, '_, K, V, S>
 where
     K: Key + Debug,
-    V: ?Sized,
+    V: SoaOwned + ?Sized,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T>>,
+    for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T>,
 {
     type Output = T;
 
@@ -2134,10 +2134,9 @@ where
 impl<T, K, V, S> IndexMut<K> for EpochSparseViewMut<'_, '_, K, V, S>
 where
     K: Key + Debug,
-    V: ?Sized,
+    V: SoaOwned + ?Sized,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    for<'ctx, 'a> V:
-        Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
+    for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {

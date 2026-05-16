@@ -8,7 +8,7 @@ use core::{
 use crate::{
     algo::sparse_get_unchecked,
     item::{
-        KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs,
+        self, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs,
         SparseItem,
     },
     iter::{RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut},
@@ -21,10 +21,10 @@ use crate::{
     view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewPtr},
 };
 
-pub type SparseViewMutPtr<'ctx, T, S = crate::item::DefaultSparseItem<usize>> =
+pub type SparseViewMutPtr<'ctx, T, S = item::DefaultSparseItem<usize>> =
     EpochSparseViewMutPtr<'ctx, usize, T, S>;
 
-pub struct EpochSparseViewMutPtr<'ctx, K, V, S = crate::item::DefaultSparseItem<K>>
+pub struct EpochSparseViewMutPtr<'ctx, K, V, S = item::DefaultSparseItem<K>>
 where
     K: Key,
     V: RawSoa<Context: 'ctx> + ?Sized,

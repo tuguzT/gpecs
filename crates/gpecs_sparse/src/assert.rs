@@ -70,6 +70,7 @@ where
 
 #[inline]
 #[track_caller]
+#[cfg_attr(not(feature = "alloc"), expect(dead_code))]
 pub fn unwrap_next_vacant<T>(item: &T) -> T::Index
 where
     T: ArenaSparseItem,

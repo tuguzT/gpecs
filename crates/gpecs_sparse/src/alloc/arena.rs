@@ -19,8 +19,8 @@ use crate::{
         TryModifyErrorKind, TryReserveError,
     },
     item::{
-        ArenaSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair,
-        KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseIndexKind, SparseItem,
+        self, ArenaSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices,
+        KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseIndexKind,
     },
     iter::{
         Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
@@ -46,9 +46,9 @@ use super::{
     set,
 };
 
-pub type SparseArena<T, S = crate::item::DefaultSparseItem<usize>> = EpochSparseArena<usize, T, S>;
+pub type SparseArena<T, S = item::DefaultSparseItem<usize>> = EpochSparseArena<usize, T, S>;
 
-pub struct EpochSparseArena<K, V, S = crate::item::DefaultSparseItem<K>>
+pub struct EpochSparseArena<K, V, S = item::DefaultSparseItem<K>>
 where
     K: Key,
     V: AllocSoa + ?Sized,
@@ -842,7 +842,7 @@ where
 
         let dense_index = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .copied()
-            .and_then(SparseItem::dense_index);
+            .and_then(S::dense_index);
         let Some(dense_index) = dense_index else {
             return f(dense.context(), None);
         };
@@ -909,7 +909,7 @@ where
 
         let dense_index = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .copied()
-            .and_then(SparseItem::dense_index);
+            .and_then(S::dense_index);
         let Some(dense_index) = dense_index else {
             return f(dense.context(), None);
         };
@@ -1325,7 +1325,7 @@ where
             .map_err(TooLargeSparseIndexError::new)?;
         let Some(dense_index) = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .copied()
-            .and_then(SparseItem::dense_index)
+            .and_then(item::DefaultSparseItem::into_dense_index)
         else {
             let entry = VacantEntry::new(key, self);
             return Ok(Entry::Vacant(entry));
@@ -2078,9 +2078,9 @@ where
 impl<T, K, V, S> Index<K> for EpochSparseArena<K, V, S>
 where
     K: Key + Debug,
-    V: AllocSoa + ?Sized,
+    V: SoaOwned + AllocSoa + ?Sized,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T>>,
+    for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T>,
 {
     type Output = T;
 
@@ -2093,10 +2093,9 @@ where
 impl<T, K, V, S> IndexMut<K> for EpochSparseArena<K, V, S>
 where
     K: Key + Debug,
-    V: AllocSoa + ?Sized,
+    V: SoaOwned + AllocSoa + ?Sized,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    for<'ctx, 'a> V:
-        Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
+    for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {

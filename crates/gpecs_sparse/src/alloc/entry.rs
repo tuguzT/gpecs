@@ -13,8 +13,8 @@ use crate::{
         self,
         slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
         traits::{
-            AllocSoa, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaRead, SoaReadOwned,
-            SoaWrite,
+            AllocSoa, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned, SoaRead,
+            SoaReadOwned, SoaWrite,
         },
     },
 };
@@ -259,9 +259,9 @@ where
 impl<K, V, C> Debug for OccupiedEntry<'_, K, V, C>
 where
     K: Key + Debug,
-    V: AllocSoa + ?Sized,
+    V: SoaOwned + AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx>: Debug>>,
+    for<'ctx, 'a> Refs<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -270,7 +270,7 @@ where
         f.debug_struct("OccupiedEntry")
             .field("key", key)
             .field("value", value)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -342,7 +342,9 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
-        f.debug_struct("VacantEntry").field("key", key).finish()
+        f.debug_struct("VacantEntry")
+            .field("key", key)
+            .finish_non_exhaustive()
     }
 }
 
@@ -732,11 +734,8 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for Entry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
-            for<'ctx, 'a> V: $crate::soa::traits::Soa<
-                    'a,
-                    Context: $crate::soa::traits::SoaContext<'a, V, Refs<'ctx>: Debug>,
-                >,
+            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            for<'ctx, 'a> $crate::soa::traits::Refs<'ctx, 'a, V>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -930,11 +929,8 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for OccupiedEntry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
-            for<'ctx, 'a> V: $crate::soa::traits::Soa<
-                    'a,
-                    Context: $crate::soa::traits::SoaContext<'a, V, Refs<'ctx>: core::fmt::Debug>,
-                >,
+            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            for<'ctx, 'a> $crate::soa::traits::Refs<'ctx, 'a, V>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

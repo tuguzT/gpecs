@@ -14,7 +14,7 @@ use crate::{
         sparse_index,
     },
     error::FromPartsError,
-    item::{KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem},
+    item::{self, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem},
     iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
     key::Key,
     soa::{
@@ -24,10 +24,10 @@ use crate::{
     view::EpochSparseViewPtr,
 };
 
-pub type SparseView<'ctx, 'a, T, S = crate::item::DefaultSparseItem<usize>> =
+pub type SparseView<'ctx, 'a, T, S = item::DefaultSparseItem<usize>> =
     EpochSparseView<'ctx, 'a, usize, T, S>;
 
-pub struct EpochSparseView<'ctx, 'a, K, V, S = crate::item::DefaultSparseItem<K>>
+pub struct EpochSparseView<'ctx, 'a, K, V, S = item::DefaultSparseItem<K>>
 where
     K: Key + 'a,
     V: RawSoa<Context: 'ctx> + ?Sized,
@@ -1124,9 +1124,9 @@ where
 impl<T, K, V, S> Index<K> for EpochSparseView<'_, '_, K, V, S>
 where
     K: Key + Debug,
-    V: ?Sized,
+    V: SoaOwned + ?Sized,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T>>,
+    for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T>,
 {
     type Output = T;
 

@@ -46,7 +46,7 @@ where
         let iter = iter
             .into_iter()
             .map(|component| (component.component_id(), component));
-        let components = ErasedArchetype::from_iter(components, iter)?;
+        let components = ErasedArchetype::<_>::from_iter(components, iter)?;
 
         let iter = components.iter().map(|(component_id, component)| {
             let meta = Meta::from_erased_component(component);

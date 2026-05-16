@@ -1,11 +1,15 @@
 use gpecs_component::registry::{ComponentId, ComponentRegistryView};
+use gpecs_sparse::item::SparseItem;
 
 use crate::erased::{
     ErasedArchetype, ErasedArchetypeView,
     error::{IncompatibleArchetypeError, IncompatibleArchetypeExactError},
 };
 
-impl<Meta> ErasedArchetypeView<'_, Meta> {
+impl<Meta, S> ErasedArchetypeView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn check_compatibility_for<I>(
         &self,

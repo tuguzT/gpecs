@@ -13,7 +13,7 @@ use gpecs_component::{
 };
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
-    item::DefaultSparseItem,
+    item::{DefaultSparseItem, SparseItem},
     set::EpochSparseSet,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
@@ -34,14 +34,20 @@ use crate::{
     },
 };
 
-type Inner<Meta> = EpochSparseSet<u32, Identity<Meta>>;
+type Inner<Meta, S> = EpochSparseSet<u32, Identity<Meta>, S>;
 
 #[derive(Clone)]
-pub struct ErasedArchetype<Meta = ()> {
-    components: Inner<Meta>,
+pub struct ErasedArchetype<Meta = (), S = DefaultSparseItem<u32>>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
+    components: Inner<Meta, S>,
 }
 
-impl<Meta> ErasedArchetype<Meta> {
+impl<Meta, S> ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn from_iter<I>(
         components: &ComponentRegistryView<impl Sized, impl ?Sized>,
@@ -111,7 +117,10 @@ where
     }
 }
 
-impl<Meta> ErasedArchetype<Meta> {
+impl<Meta, S> ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn new<'a, I, T>(
         components: &'a ComponentRegistryView<T, impl ?Sized>,
@@ -181,7 +190,10 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 }
 
-impl<T, U> ErasedArchetype<(T, U)> {
+impl<T, U, S> ErasedArchetype<(T, U), S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn new_with<'a, I, W>(
         components: &'a ComponentRegistryView<W, impl ?Sized>,
@@ -206,7 +218,10 @@ impl<T, U> ErasedArchetype<(T, U)> {
     }
 }
 
-impl<Meta> ErasedArchetype<Meta> {
+impl<Meta, S> ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     pub fn len(&self) -> usize {
         let Self { components } = self;
@@ -219,7 +234,7 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
+    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta, S> {
         let Self { components } = self;
 
         let inner = components.as_view_ptr();
@@ -227,7 +242,7 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[DefaultSparseItem<u32>]) {
+    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[S]) {
         let (component_ids, metas, sparse) = self.as_view().into_parts();
         (component_ids, metas, sparse)
     }
@@ -245,19 +260,13 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<u32>] {
+    pub fn as_sparse(&self) -> &[S] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_ptrs(
-        &self,
-    ) -> (
-        *const ComponentId,
-        *const Meta,
-        *const DefaultSparseItem<u32>,
-    ) {
+    pub fn as_ptrs(&self) -> (*const ComponentId, *const Meta, *const S) {
         self.as_view().as_ptrs()
     }
 
@@ -378,14 +387,15 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta> {
+    pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta, S> {
         self.as_view().into_component_id_ordered_iter()
     }
 }
 
-impl<Meta> Debug for ErasedArchetype<Meta>
+impl<Meta, S> Debug for ErasedArchetype<Meta, S>
 where
     Meta: Debug,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let components = &self.iter();
@@ -395,20 +405,27 @@ where
     }
 }
 
-impl<Meta> PartialEq for ErasedArchetype<Meta>
+impl<Meta, S> PartialEq for ErasedArchetype<Meta, S>
 where
     Meta: PartialEq,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.as_view() == other.as_view()
     }
 }
 
-impl<Meta> Eq for ErasedArchetype<Meta> where Meta: Eq {}
+impl<Meta, S> Eq for ErasedArchetype<Meta, S>
+where
+    Meta: Eq,
+    S: SparseItem<Index = u32, Epoch = ()> + Eq,
+{
+}
 
-impl<Meta> PartialOrd for ErasedArchetype<Meta>
+impl<Meta, S> PartialOrd for ErasedArchetype<Meta, S>
 where
     Meta: PartialOrd,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let other = other.as_view();
@@ -416,9 +433,10 @@ where
     }
 }
 
-impl<Meta> Ord for ErasedArchetype<Meta>
+impl<Meta, S> Ord for ErasedArchetype<Meta, S>
 where
     Meta: Ord,
+    S: SparseItem<Index = u32, Epoch = ()> + Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let other = other.as_view();
@@ -426,35 +444,43 @@ where
     }
 }
 
-impl<Meta> Hash for ErasedArchetype<Meta>
+impl<Meta, S> Hash for ErasedArchetype<Meta, S>
 where
     Meta: Hash,
+    S: SparseItem<Index = u32, Epoch = ()> + Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.as_view().hash(state);
     }
 }
 
-impl<Meta> AsRef<Self> for ErasedArchetype<Meta> {
+impl<Meta, S> AsRef<Self> for ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<Meta> AsMut<Self> for ErasedArchetype<Meta> {
+impl<Meta, S> AsMut<Self> for ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<Meta> From<ErasedArchetypeView<'_, Meta>> for ErasedArchetype<Meta>
+impl<Meta, S> From<ErasedArchetypeView<'_, Meta, S>> for ErasedArchetype<Meta, S>
 where
     Meta: Clone,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
-    fn from(archetype: ErasedArchetypeView<'_, Meta>) -> Self {
+    fn from(archetype: ErasedArchetypeView<'_, Meta, S>) -> Self {
         let (dense, _) = unsafe { archetype.into_inner().as_ref_unchecked() }.into_parts();
         let dense = dense.to_vec();
         let sparse = archetype.as_sparse().to_vec();
@@ -464,7 +490,10 @@ where
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
+impl<'a, Meta, S> IntoIterator for &'a ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
@@ -474,7 +503,10 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
     }
 }
 
-impl<Meta> IntoIterator for ErasedArchetype<Meta> {
+impl<Meta, S> IntoIterator for ErasedArchetype<Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     type Item = (ComponentId, Meta);
     type IntoIter = IntoIter<Meta>;
 
@@ -487,11 +519,12 @@ impl<Meta> IntoIterator for ErasedArchetype<Meta> {
     }
 }
 
-impl<'a, Meta> FieldLayouts<'a> for ErasedArchetype<Meta>
+impl<'a, Meta, S> FieldLayouts<'a> for ErasedArchetype<Meta, S>
 where
     Meta: WithLayout + 'a,
+    S: SparseItem<Index = u32, Epoch = ()> + 'a,
 {
-    type Output = ErasedArchetypeView<'a, Meta>;
+    type Output = ErasedArchetypeView<'a, Meta, S>;
     type OutputIter = Iter<'a, Meta>;
     type OutputItem = (ComponentId, &'a Meta);
 
@@ -501,9 +534,10 @@ where
     }
 }
 
-impl<Meta> CovariantFieldLayouts for ErasedArchetype<Meta>
+impl<Meta, S> CovariantFieldLayouts for ErasedArchetype<Meta, S>
 where
     Meta: WithLayout + 'static,
+    S: SparseItem<Index = u32, Epoch = ()> + 'static,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

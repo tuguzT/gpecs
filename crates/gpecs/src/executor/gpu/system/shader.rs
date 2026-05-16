@@ -127,7 +127,7 @@ impl GpuSystemShader {
         let with = bind_components
             .into_iter()
             .map(|(id, access)| (id.into(), access));
-        let bind_components = ErasedArchetype::new_with(components, with)?;
+        let bind_components = ErasedArchetype::<_>::new_with(components, with)?;
 
         let component_entry = |index: usize, desc: &ComponentDescriptor, binding_access| {
             let size_of_component = desc.layout().size();

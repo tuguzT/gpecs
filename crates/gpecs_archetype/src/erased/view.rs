@@ -13,7 +13,7 @@ use gpecs_component::registry::{
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueSlices},
+    item::{DefaultSparseItem, KeyValueSlices, SparseItem},
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::{AsIdentitySlice, Identity, IdentitySlice},
@@ -34,24 +34,28 @@ use crate::{
     },
 };
 
-type Inner<'a, Meta> = EpochSparseViewPtr<'a, u32, Identity<Meta>>;
+type Inner<'a, Meta, S> = EpochSparseViewPtr<'a, u32, Identity<Meta>, S>;
 
 #[repr(transparent)]
-pub struct ErasedArchetypeView<'a, Meta>
+pub struct ErasedArchetypeView<'a, Meta, S = DefaultSparseItem<u32>>
 where
     Meta: 'a,
+    S: SparseItem<Index = u32, Epoch = ()> + 'a,
 {
-    inner: Inner<'a, Meta>,
+    inner: Inner<'a, Meta, S>,
 }
 
-impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
+impl<'a, Meta, S> ErasedArchetypeView<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     const CONTEXT: &'a () = &();
 
     #[inline]
     pub fn new(
         component_ids: &'a [ComponentId],
         metas: &'a [Meta],
-        sparse: &'a [DefaultSparseItem<u32>],
+        sparse: &'a [S],
     ) -> Result<Self, FromPartsError<u32>> {
         let context = Self::CONTEXT;
         let keys = component_ids_to_u32s(component_ids);
@@ -70,7 +74,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     pub unsafe fn from_parts(
         component_ids: &'a [ComponentId],
         metas: &'a [Meta],
-        sparse: &'a [DefaultSparseItem<u32>],
+        sparse: &'a [S],
     ) -> Self {
         let context = Self::CONTEXT;
         let keys = component_ids_to_u32s(component_ids);
@@ -87,18 +91,18 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub(crate) fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub(crate) fn from_inner(inner: Inner<'a, Meta, S>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(crate) fn into_inner(self) -> Inner<'a, Meta> {
+    pub(crate) fn into_inner(self) -> Inner<'a, Meta, S> {
         let Self { inner } = self;
         inner
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [ComponentId], &'a [Meta], &'a [DefaultSparseItem<u32>]) {
+    pub fn into_parts(self) -> (&'a [ComponentId], &'a [Meta], &'a [S]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_slice_ptrs();
@@ -113,7 +117,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
+    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta, S> {
         let Self { inner } = *self;
         ErasedArchetypeView::from_inner(inner)
     }
@@ -130,18 +134,8 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[DefaultSparseItem<u32>]) {
-        let Self { inner } = self;
-
-        let (dense, sparse) = inner.as_slice_ptrs();
-        let sparse = unsafe { sparse.as_ref_unchecked() };
-
-        let context = Self::CONTEXT;
-        let (keys, values) = unsafe { dense.as_ref_unchecked(context).into_parts() };
-
-        let component_ids = unsafe { u32s_to_component_ids(keys) };
-        let metas = values.as_inner();
-        (component_ids, metas, sparse)
+    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[S]) {
+        self.as_view().into_parts()
     }
 
     #[inline]
@@ -157,19 +151,13 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<u32>] {
+    pub fn as_sparse(&self) -> &[S] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_ptrs(
-        &self,
-    ) -> (
-        *const ComponentId,
-        *const Meta,
-        *const DefaultSparseItem<u32>,
-    ) {
+    pub fn as_ptrs(&self) -> (*const ComponentId, *const Meta, *const S) {
         let (component_ids, metas, sparse) = self.as_slices();
         (component_ids.as_ptr(), metas.as_ptr(), sparse.as_ptr())
     }
@@ -185,7 +173,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn has_components(
         &self,
-        of: ErasedArchetypeView<impl Sized>,
+        of: ErasedArchetypeView<impl Sized, impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<(), MissingComponentError> {
         let of = of.component_ids();
         self.has_components_trusted(of)
@@ -206,7 +194,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn has_no_components(
         &self,
-        of: ErasedArchetypeView<impl Sized>,
+        of: ErasedArchetypeView<impl Sized, impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<(), AlreadyHasComponentError> {
         let of = of.component_ids();
         self.has_no_components_trusted(of)
@@ -255,7 +243,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
         let sparse_item = unsafe { inner.as_ref_unchecked() }
             .into_sparse_slice()
             .get(index)?;
-        let index_of = sparse_item.dense_index().copied()?;
+        let index_of = sparse_item.dense_index()?;
         index_of.try_into().ok()
     }
 
@@ -278,7 +266,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn check_compatibility(
         &self,
-        other: ErasedArchetypeView<impl Sized>,
+        other: ErasedArchetypeView<impl Sized, impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<(), MissingComponentError> {
         self.has_components(other)
     }
@@ -302,7 +290,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     #[inline]
     pub fn check_exact_compatibility(
         &self,
-        other: ErasedArchetypeView<impl Sized>,
+        other: ErasedArchetypeView<impl Sized, impl SparseItem<Index = u32, Epoch = ()>>,
     ) -> Result<(), IncompatibleArchetypeViewExactError> {
         self.check_compatibility(other)?;
 
@@ -344,7 +332,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta> {
+    pub fn component_id_ordered_iter(&self) -> ComponentIdOrderedIter<'_, Meta, S> {
         self.into_component_id_ordered_iter()
     }
 
@@ -357,15 +345,16 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     }
 
     #[inline]
-    pub fn into_component_id_ordered_iter(self) -> ComponentIdOrderedIter<'a, Meta> {
+    pub fn into_component_id_ordered_iter(self) -> ComponentIdOrderedIter<'a, Meta, S> {
         let (_, dense, sparse) = self.into_parts();
         ComponentIdOrderedIter::from_inner(dense, sparse)
     }
 }
 
-impl<Meta> Debug for ErasedArchetypeView<'_, Meta>
+impl<Meta, S> Debug for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: Debug,
+    S: SparseItem<Index = u32, Epoch = ()> + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (component_ids, metas, sparse) = self.as_slices();
@@ -377,35 +366,48 @@ where
     }
 }
 
-impl<Meta> Default for ErasedArchetypeView<'_, Meta> {
+impl<Meta, S> Default for ErasedArchetypeView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     fn default() -> Self {
         let inner = Inner::from(Self::CONTEXT);
         Self::from_inner(inner)
     }
 }
 
-impl<Meta> Clone for ErasedArchetypeView<'_, Meta> {
+impl<Meta, S> Clone for ErasedArchetypeView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<Meta> Copy for ErasedArchetypeView<'_, Meta> {}
+impl<Meta, S> Copy for ErasedArchetypeView<'_, Meta, S> where S: SparseItem<Index = u32, Epoch = ()> {}
 
-impl<Meta> PartialEq for ErasedArchetypeView<'_, Meta>
+impl<Meta, S> PartialEq for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: PartialEq,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
     }
 }
 
-impl<Meta> Eq for ErasedArchetypeView<'_, Meta> where Meta: Eq {}
+impl<Meta, S> Eq for ErasedArchetypeView<'_, Meta, S>
+where
+    Meta: Eq,
+    S: SparseItem<Index = u32, Epoch = ()> + Eq,
+{
+}
 
-impl<Meta> PartialOrd for ErasedArchetypeView<'_, Meta>
+impl<Meta, S> PartialOrd for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: PartialOrd,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let slices = self.as_slices();
@@ -414,9 +416,10 @@ where
     }
 }
 
-impl<Meta> Ord for ErasedArchetypeView<'_, Meta>
+impl<Meta, S> Ord for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: Ord,
+    S: SparseItem<Index = u32, Epoch = ()> + Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let slices = self.as_slices();
@@ -425,23 +428,30 @@ where
     }
 }
 
-impl<Meta> Hash for ErasedArchetypeView<'_, Meta>
+impl<Meta, S> Hash for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: Hash,
+    S: SparseItem<Index = u32, Epoch = ()> + Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.as_slices().hash(state);
     }
 }
 
-impl<Meta> AsRef<[ComponentId]> for ErasedArchetypeView<'_, Meta> {
+impl<Meta, S> AsRef<[ComponentId]> for ErasedArchetypeView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     #[inline]
     fn as_ref(&self) -> &[ComponentId] {
         self.as_component_ids()
     }
 }
 
-impl<Meta> Index<ComponentId> for ErasedArchetypeView<'_, Meta> {
+impl<Meta, S> Index<ComponentId> for ErasedArchetypeView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     type Output = Meta;
 
     #[inline]
@@ -450,7 +460,10 @@ impl<Meta> Index<ComponentId> for ErasedArchetypeView<'_, Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
+impl<'a, Meta, S> IntoIterator for &'a ErasedArchetypeView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
@@ -460,7 +473,10 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
+impl<'a, Meta, S> IntoIterator for ErasedArchetypeView<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = ()>,
+{
     type Item = (ComponentId, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
@@ -473,14 +489,26 @@ impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
     }
 }
 
-unsafe impl<Meta> Send for ErasedArchetypeView<'_, Meta> where Meta: Sync {}
-unsafe impl<Meta> Sync for ErasedArchetypeView<'_, Meta> where Meta: Sync {}
+unsafe impl<Meta, S> Send for ErasedArchetypeView<'_, Meta, S>
+where
+    Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = ()> + Sync,
+{
+}
 
-impl<'a, Meta> FieldLayouts<'a> for ErasedArchetypeView<'_, Meta>
+unsafe impl<Meta, S> Sync for ErasedArchetypeView<'_, Meta, S>
+where
+    Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = ()> + Sync,
+{
+}
+
+impl<'a, Meta, S> FieldLayouts<'a> for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: WithLayout + 'a,
+    S: SparseItem<Index = u32, Epoch = ()> + 'a,
 {
-    type Output = ErasedArchetypeView<'a, Meta>;
+    type Output = ErasedArchetypeView<'a, Meta, S>;
     type OutputIter = Iter<'a, Meta>;
     type OutputItem = (ComponentId, &'a Meta);
 
@@ -490,9 +518,10 @@ where
     }
 }
 
-impl<Meta> CovariantFieldLayouts for ErasedArchetypeView<'_, Meta>
+impl<Meta, S> CovariantFieldLayouts for ErasedArchetypeView<'_, Meta, S>
 where
     Meta: WithLayout + 'static,
+    S: SparseItem<Index = u32, Epoch = ()> + 'static,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

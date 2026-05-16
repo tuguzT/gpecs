@@ -5,16 +5,16 @@ use core::{
 };
 
 use gpecs_component::registry::ComponentId;
-use gpecs_sparse::item::DefaultSparseItem;
+use gpecs_sparse::item::SparseItem;
 
-pub struct ComponentIdOrderedIter<'a, Meta> {
+pub struct ComponentIdOrderedIter<'a, Meta, S> {
     dense: &'a [Meta],
-    sparse: Enumerate<Iter<'a, DefaultSparseItem<u32>>>,
+    sparse: Enumerate<Iter<'a, S>>,
 }
 
-impl<'a, Meta> ComponentIdOrderedIter<'a, Meta> {
+impl<'a, Meta, S> ComponentIdOrderedIter<'a, Meta, S> {
     #[inline]
-    pub(super) fn from_inner(dense: &'a [Meta], sparse: &'a [DefaultSparseItem<u32>]) -> Self {
+    pub(super) fn from_inner(dense: &'a [Meta], sparse: &'a [S]) -> Self {
         let sparse = sparse.iter().enumerate();
         Self { dense, sparse }
     }
@@ -34,9 +34,10 @@ impl<'a, Meta> ComponentIdOrderedIter<'a, Meta> {
     }
 }
 
-impl<Meta> Debug for ComponentIdOrderedIter<'_, Meta>
+impl<Meta, S> Debug for ComponentIdOrderedIter<'_, Meta, S>
 where
     Meta: Debug,
+    S: SparseItem<Index = u32>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.clone();
@@ -44,7 +45,7 @@ where
     }
 }
 
-impl<Meta> Clone for ComponentIdOrderedIter<'_, Meta> {
+impl<Meta, S> Clone for ComponentIdOrderedIter<'_, Meta, S> {
     fn clone(&self) -> Self {
         let Self { dense, sparse } = self;
         let sparse = sparse.clone();
@@ -52,7 +53,10 @@ impl<Meta> Clone for ComponentIdOrderedIter<'_, Meta> {
     }
 }
 
-impl<'a, Meta> Iterator for ComponentIdOrderedIter<'a, Meta> {
+impl<'a, Meta, S> Iterator for ComponentIdOrderedIter<'a, Meta, S>
+where
+    S: SparseItem<Index = u32>,
+{
     type Item = (ComponentId, &'a Meta);
 
     #[inline]
@@ -63,7 +67,7 @@ impl<'a, Meta> Iterator for ComponentIdOrderedIter<'a, Meta> {
         } = *self;
 
         let (sparse_index, dense_index) = sparse.find_map(|(index, item)| {
-            let dense_index = item.into_dense_index()?;
+            let dense_index = item.dense_index()?;
             Some((index, dense_index))
         })?;
 
@@ -80,7 +84,10 @@ impl<'a, Meta> Iterator for ComponentIdOrderedIter<'a, Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for ComponentIdOrderedIter<'_, Meta> {
+impl<Meta, S> DoubleEndedIterator for ComponentIdOrderedIter<'_, Meta, S>
+where
+    S: SparseItem<Index = u32>,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self {
@@ -89,7 +96,7 @@ impl<Meta> DoubleEndedIterator for ComponentIdOrderedIter<'_, Meta> {
         } = *self;
 
         let (sparse_index, dense_index) = sparse.rev().find_map(|(index, item)| {
-            let dense_index = item.into_dense_index()?;
+            let dense_index = item.dense_index()?;
             Some((index, dense_index))
         })?;
 
@@ -98,4 +105,4 @@ impl<Meta> DoubleEndedIterator for ComponentIdOrderedIter<'_, Meta> {
     }
 }
 
-impl<Meta> FusedIterator for ComponentIdOrderedIter<'_, Meta> {}
+impl<Meta, S> FusedIterator for ComponentIdOrderedIter<'_, Meta, S> where S: SparseItem<Index = u32> {}

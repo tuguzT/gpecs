@@ -22,7 +22,12 @@ use gpecs_soa_erased::{
     },
     storage::AlignedStorage,
 };
-use gpecs_sparse::{TryInsertAccess, error::TryReserveError, set::EpochSparseSet};
+use gpecs_sparse::{
+    TryInsertAccess,
+    error::TryReserveError,
+    item::{DefaultSparseItem, SparseItem},
+    set::EpochSparseSet,
+};
 
 use crate::{
     bundle::{
@@ -51,16 +56,18 @@ use crate::{
     },
 };
 
-pub struct ArchetypeStorage<T>
+pub struct ArchetypeStorage<T, S = DefaultSparseItem<NoEpochEntity>>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
-    sparse_set: EpochSparseSet<NoEpochEntity, T>,
+    sparse_set: EpochSparseSet<NoEpochEntity, T, S>,
 }
 
-impl<T> ArchetypeStorage<T>
+impl<T, S> ArchetypeStorage<T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     pub fn from_context(context: T::Context) -> Self {
@@ -77,7 +84,7 @@ where
     }
 
     #[inline]
-    pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, T> {
+    pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, T, S> {
         let Self { sparse_set } = self;
 
         let inner = sparse_set.as_view_ptr();
@@ -85,7 +92,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_view(&mut self) -> ArchetypeStorageViewMut<'_, '_, T> {
+    pub fn as_mut_view(&mut self) -> ArchetypeStorageViewMut<'_, '_, T, S> {
         let Self { sparse_set } = self;
 
         let inner = sparse_set.as_mut_view_ptr();
@@ -271,20 +278,20 @@ where
 
     #[inline]
     #[expect(clippy::type_complexity)]
-    pub fn insert<'a, W, D, S>(
+    pub fn insert<'a, W, D, A>(
         &'a mut self,
         entity: Entity,
-        bundle: ErasedBundleKind<W, D, S, T::Ptrs>,
+        bundle: ErasedBundleKind<W, D, A, T::Ptrs>,
     ) -> Result<
-        Option<ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>,
+        Option<ErasedBundleKind<T::Archetype<'a>, D, A, T::Ptrs>>,
         IncompatibleArchetypeExactError,
     >
     where
-        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>
-            + SoaWrite<ErasedBundleKind<W, D, S, T::Ptrs>>,
+        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, A, T::Ptrs>>
+            + SoaWrite<ErasedBundleKind<W, D, A, T::Ptrs>>,
         W: ErasedArchetypeKind<Meta = T::Meta>,
         D: ErasedBundleDrop<T::Meta>,
-        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+        A: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
     {
         self.archetype()
             .check_exact_compatibility(bundle.archetype())?;
@@ -295,14 +302,14 @@ where
     }
 
     #[inline]
-    pub fn remove<'a, D, S>(
+    pub fn remove<'a, D, A>(
         &'a mut self,
         entity: Entity,
-    ) -> Option<ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>
+    ) -> Option<ErasedBundleKind<T::Archetype<'a>, D, A, T::Ptrs>>
     where
-        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, S, T::Ptrs>>,
+        T: SoaRead<'a, ErasedBundleKind<T::Archetype<'a>, D, A, T::Ptrs>>,
         D: ErasedBundleDrop<T::Meta>,
-        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+        A: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
     {
         let Self { sparse_set } = self;
         sparse_set.swap_remove(entity.into())
@@ -328,7 +335,7 @@ where
     #[inline]
     pub fn move_into(
         &mut self,
-        other: &mut ArchetypeStorage<T>,
+        other: &mut ArchetypeStorage<T, impl SparseItem<Index = u32, Epoch = ()>>,
         entity: Entity,
     ) -> Result<(), MoveIntoError> {
         self.archetype()
@@ -344,7 +351,7 @@ where
         }
 
         let Self { sparse_set } = self;
-        let Self { sparse_set: other } = other;
+        let ArchetypeStorage { sparse_set: other } = other;
 
         sparse_set.swap_remove_into(entity.into(), |_, src| {
             let Some(src) = src else {
@@ -371,15 +378,15 @@ where
 
     #[inline]
     #[expect(clippy::type_complexity)]
-    pub fn update_with<N, D, S>(
+    pub fn update_with<N, D, A>(
         &mut self,
         entity: Entity,
-        value: ErasedBundleKind<N, D, S, T::Ptrs>,
-    ) -> Result<(), UpdateWithError<ErasedBundleKind<N, D, S, T::Ptrs>>>
+        value: ErasedBundleKind<N, D, A, T::Ptrs>,
+    ) -> Result<(), UpdateWithError<ErasedBundleKind<N, D, A, T::Ptrs>>>
     where
         N: ErasedArchetypeKind<Meta = T::Meta>,
         D: ErasedBundleDrop<T::Meta>,
-        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+        A: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
     {
         if let Err(error) = self.archetype().check_compatibility(value.archetype()) {
             let source = error.into();
@@ -401,16 +408,16 @@ where
 
     #[inline]
     #[expect(clippy::type_complexity)]
-    pub fn move_into_with_insert<N, D, S>(
+    pub fn move_into_with_insert<N, D, A>(
         &mut self,
-        other: &mut ArchetypeStorage<T>,
+        other: &mut ArchetypeStorage<T, impl SparseItem<Index = u32, Epoch = ()>>,
         entity: Entity,
-        value: ErasedBundleKind<N, D, S, T::Ptrs>,
-    ) -> Result<(), MoveIntoWithInsertError<ErasedBundleKind<N, D, S, T::Ptrs>>>
+        value: ErasedBundleKind<N, D, A, T::Ptrs>,
+    ) -> Result<(), MoveIntoWithInsertError<ErasedBundleKind<N, D, A, T::Ptrs>>>
     where
         N: ErasedArchetypeKind<Meta = T::Meta>,
         D: ErasedBundleDrop<T::Meta>,
-        S: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
+        A: AlignedStorage<Item = PtrsItem<T::Ptrs>>,
     {
         if let Err(error) = self.archetype().has_no_components(value.archetype()) {
             let source = error.into();
@@ -431,7 +438,7 @@ where
         }
 
         let Self { sparse_set } = self;
-        let Self { sparse_set: other } = other;
+        let ArchetypeStorage { sparse_set: other } = other;
 
         sparse_set.swap_remove_into(entity.into(), |_, src| {
             let Some(src) = src else {
@@ -460,13 +467,14 @@ where
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_bundles_with_archetype<B>(
         &self,
         components: &ComponentRegistryView<
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<(Bundles<'_, B>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
+    ) -> Result<(Bundles<'_, B, S>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -480,7 +488,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<Bundles<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Bundles<'_, B, S>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -488,13 +496,14 @@ where
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_mut_bundles_with_archetype<B>(
         &mut self,
         components: &ComponentRegistryView<
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<(BundlesMut<'_, B>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
+    ) -> Result<(BundlesMut<'_, B, S>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -509,7 +518,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<BundlesMut<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<BundlesMut<'_, B, S>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -650,7 +659,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-        other: &mut ArchetypeStorage<T>,
+        other: &mut ArchetypeStorage<T, impl SparseItem<Index = u32, Epoch = ()>>,
         entity: Entity,
         value: B,
     ) -> Result<(), MoveIntoWithInsertBundleError<B>>
@@ -680,7 +689,7 @@ where
         }
 
         let Self { sparse_set } = self;
-        let Self { sparse_set: other } = other;
+        let ArchetypeStorage { sparse_set: other } = other;
 
         sparse_set.swap_remove_into(entity.into(), |_, src| {
             let Some(src) = src else {
@@ -780,12 +789,13 @@ type SlicesMutWithArchetype<'a, T> = (
     ErasedArchetypeView<'a, <T as ErasedArchetypeSoa>::Meta>,
 );
 
-impl<Meta, D, S, P> ArchetypeStorage<ErasedBundle<Meta, D, S, P>>
+impl<Meta, D, A, P, S> ArchetypeStorage<ErasedBundle<Meta, D, A, P>, S>
 where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
-    S: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = S::Item>,
+    A: AlignedStorage<Item: 'static>,
+    P: SliceItemPtrs<Item = A::Item>,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     pub fn new<'a, I, T>(
@@ -845,9 +855,10 @@ where
     }
 }
 
-impl<T> Debug for ArchetypeStorage<T>
+impl<T, S> Debug for ArchetypeStorage<T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let component_ids = &self.archetype().into_component_ids();
@@ -857,9 +868,10 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a ArchetypeStorage<T>
+impl<'a, T, S> IntoIterator for &'a ArchetypeStorage<T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, ErasedBundleRefs<'a, 'a, T>);
     type IntoIter = Iter<'a, 'a, T>;
@@ -870,9 +882,10 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut ArchetypeStorage<T>
+impl<'a, T, S> IntoIterator for &'a mut ArchetypeStorage<T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, ErasedBundleRefsMut<'a, 'a, T>);
     type IntoIter = IterMut<'a, 'a, T>;

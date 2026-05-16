@@ -9,7 +9,7 @@ use bytemuck::must_cast_slice;
 use gpecs_entity::Entity;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueSlices},
+    item::{DefaultSparseItem, KeyValueSlices, SparseItem},
     soa::{
         identity::Identity,
         slice::SoaSlices,
@@ -23,24 +23,26 @@ use crate::{
     storage::{BundleIter, NoEpochEntity},
 };
 
-type Inner<'a, B> = EpochSparseView<'static, 'a, NoEpochEntity, B>;
+type Inner<'a, B, S> = EpochSparseView<'static, 'a, NoEpochEntity, B, S>;
 
-pub struct Bundles<'a, B>
+pub struct Bundles<'a, B, S = DefaultSparseItem<NoEpochEntity>>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + 'a,
 {
-    inner: Inner<'a, B>,
+    inner: Inner<'a, B, S>,
 }
 
-impl<'a, B> Bundles<'a, B>
+impl<'a, B, S> Bundles<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     pub fn new(
         entities: &'a [Entity],
         bundles: BundleSlices<'a, B>,
-        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
+        sparse: &'a [S],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice(entities);
         let slices = KeyValueSlices::new(B::CONTEXT, entities, bundles);
@@ -55,7 +57,7 @@ where
     pub unsafe fn from_parts(
         entities: &'a [Entity],
         bundles: BundleSlices<'a, B>,
-        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
+        sparse: &'a [S],
     ) -> Self {
         let entities = must_cast_slice(entities);
         let slices = KeyValueSlices::new(B::CONTEXT, entities, bundles);
@@ -66,12 +68,12 @@ where
     }
 
     #[inline]
-    pub(super) unsafe fn from_inner(inner: Inner<'a, B>) -> Self {
+    pub(super) unsafe fn from_inner(inner: Inner<'a, B, S>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn into_parts(self) -> Parts<'a, B> {
+    pub fn into_parts(self) -> Parts<'a, B, S> {
         let Self { inner } = self;
 
         let (_, dense, sparse) = inner.into_slices_with_context();
@@ -93,13 +95,13 @@ where
     }
 
     #[inline]
-    pub fn into_sparse(self) -> &'a [DefaultSparseItem<NoEpochEntity>] {
+    pub fn into_sparse(self) -> &'a [S] {
         let (_, _, sparse) = self.into_parts();
         sparse
     }
 
     #[inline]
-    pub fn as_bundles(&self) -> Bundles<'_, B> {
+    pub fn as_bundles(&self) -> Bundles<'_, B, S> {
         let Self { inner } = self;
 
         let inner = unsafe { map_view_context(inner.as_view()) };
@@ -131,7 +133,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> Parts<'_, B> {
+    pub fn as_slices(&self) -> Parts<'_, B, S> {
         self.as_bundles().into_parts()
     }
 
@@ -146,7 +148,7 @@ where
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<NoEpochEntity>] {
+    pub fn as_sparse(&self) -> &[S] {
         self.as_bundles().into_sparse()
     }
 
@@ -188,9 +190,10 @@ where
     }
 }
 
-impl<B> Debug for Bundles<'_, B>
+impl<B, S> Debug for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Debug,
     for<'a> BundleSlices<'a, B>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -203,9 +206,10 @@ where
     }
 }
 
-impl<B> Default for Bundles<'_, B>
+impl<B, S> Default for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     fn default() -> Self {
@@ -214,9 +218,10 @@ where
     }
 }
 
-impl<B> Clone for Bundles<'_, B>
+impl<B, S> Clone for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -227,16 +232,18 @@ where
     }
 }
 
-impl<B> Copy for Bundles<'_, B>
+impl<B, S> Copy for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
     for<'ctx> Ptrs<'ctx, B>: Copy,
 {
 }
 
-impl<B> PartialEq for Bundles<'_, B>
+impl<B, S> PartialEq for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialEq,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -245,16 +252,18 @@ where
     }
 }
 
-impl<B> Eq for Bundles<'_, B>
+impl<B, S> Eq for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Eq,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: Eq,
 {
 }
 
-impl<B> PartialOrd for Bundles<'_, B>
+impl<B, S> PartialOrd for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialOrd,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -263,9 +272,10 @@ where
     }
 }
 
-impl<B> Ord for Bundles<'_, B>
+impl<B, S> Ord for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Ord,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -274,9 +284,10 @@ where
     }
 }
 
-impl<B> Hash for Bundles<'_, B>
+impl<B, S> Hash for Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Hash,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -285,9 +296,10 @@ where
     }
 }
 
-impl<'a, B> IntoIterator for &'a Bundles<'_, B>
+impl<'a, B, S> IntoIterator for &'a Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, BundleRefs<'a, B>);
     type IntoIter = BundleIter<'a, B>;
@@ -298,9 +310,10 @@ where
     }
 }
 
-impl<'a, B> IntoIterator for Bundles<'a, B>
+impl<'a, B, S> IntoIterator for Bundles<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, BundleRefs<'a, B>);
     type IntoIter = BundleIter<'a, B>;
@@ -315,9 +328,10 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, B> rayon::iter::IntoParallelIterator for &'a Bundles<'_, B>
+impl<'a, B, S> rayon::iter::IntoParallelIterator for &'a Bundles<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
     B::Context: Sync,
     B::Fields: Sync,
     BundleRefs<'a, B>: Send,
@@ -332,9 +346,10 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, B> rayon::iter::IntoParallelIterator for Bundles<'a, B>
+impl<'a, B, S> rayon::iter::IntoParallelIterator for Bundles<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
     B::Context: Sync,
     B::Fields: Sync,
     BundleRefs<'a, B>: Send,
@@ -348,16 +363,15 @@ where
     }
 }
 
-type Parts<'a, B> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
-    &'a [DefaultSparseItem<NoEpochEntity>],
-);
+type Parts<'a, B, S> = (&'a [Entity], BundleSlices<'a, B>, &'a [S]);
 
 #[inline]
-unsafe fn map_view_context<'a, B>(view: EpochSparseView<'_, 'a, NoEpochEntity, B>) -> Inner<'a, B>
+unsafe fn map_view_context<'a, B, S>(
+    view: EpochSparseView<'_, 'a, NoEpochEntity, B, S>,
+) -> Inner<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     unsafe { mem::transmute(view) }
 }

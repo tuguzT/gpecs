@@ -20,7 +20,7 @@ use gpecs_soa_erased::{
 };
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueSlices},
+    item::{DefaultSparseItem, KeyValueSlices, SparseItem},
     view::{EpochSparseView, EpochSparseViewPtr},
 };
 
@@ -30,27 +30,29 @@ use crate::{
     storage::{BundleIter, Bundles, Iter, NoEpochEntity, traits::ErasedArchetypeSoa},
 };
 
-type Inner<'ctx, T> = EpochSparseViewPtr<'ctx, NoEpochEntity, T>;
+type Inner<'ctx, T, S> = EpochSparseViewPtr<'ctx, NoEpochEntity, T, S>;
 
 #[repr(transparent)]
-pub struct ArchetypeStorageView<'ctx, 'a, T>
+pub struct ArchetypeStorageView<'ctx, 'a, T, S = DefaultSparseItem<NoEpochEntity>>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()> + 'a,
 {
-    inner: Inner<'ctx, T>,
+    inner: Inner<'ctx, T, S>,
     phantom: PhantomData<&'a [PtrsItem<T::Ptrs>]>,
 }
 
-impl<'ctx, 'a, T> ArchetypeStorageView<'ctx, 'a, T>
+impl<'ctx, 'a, T, S> ArchetypeStorageView<'ctx, 'a, T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     pub fn new(
         context: &'ctx T::Context,
         entities: &'a [Entity],
         bundles: ErasedBundles<'ctx, 'a, T>,
-        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
+        sparse: &'a [S],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice(entities);
         let dense = SoaSlices::new(
@@ -68,7 +70,7 @@ where
         context: &'ctx T::Context,
         entities: &'a [Entity],
         bundles: ErasedBundles<'ctx, 'a, T>,
-        sparse: &'a [DefaultSparseItem<NoEpochEntity>],
+        sparse: &'a [S],
     ) -> Self {
         let entities = must_cast_slice(entities);
         let dense = SoaSlices::new(
@@ -81,13 +83,13 @@ where
     }
 
     #[inline]
-    pub(crate) unsafe fn from_inner(inner: Inner<'ctx, T>) -> Self {
+    pub(crate) unsafe fn from_inner(inner: Inner<'ctx, T, S>) -> Self {
         let phantom = PhantomData;
         Self { inner, phantom }
     }
 
     #[inline]
-    pub fn into_parts(self) -> SlicesWithArchetype<'ctx, 'a, T> {
+    pub fn into_parts(self) -> SlicesWithArchetype<'ctx, 'a, T, S> {
         let Self { inner, .. } = self;
 
         let (context, dense, sparse) = inner.into_slice_ptrs_with_context();
@@ -101,7 +103,7 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> Slices<'ctx, 'a, T> {
+    pub fn into_slices(self) -> Slices<'ctx, 'a, T, S> {
         let (entities, bundles, sparse, _) = self.into_parts();
         (entities, bundles, sparse)
     }
@@ -119,13 +121,13 @@ where
     }
 
     #[inline]
-    pub fn into_sparse(self) -> &'a [DefaultSparseItem<NoEpochEntity>] {
+    pub fn into_sparse(self) -> &'a [S] {
         let (_, _, sparse) = self.into_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, T> {
+    pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, T, S> {
         let Self { inner, .. } = self;
 
         let inner = inner.clone();
@@ -163,12 +165,12 @@ where
     }
 
     #[inline]
-    pub fn as_slices_with_archetype(&self) -> SlicesWithArchetype<'_, '_, T> {
+    pub fn as_slices_with_archetype(&self) -> SlicesWithArchetype<'_, '_, T, S> {
         self.as_view().into_parts()
     }
 
     #[inline]
-    pub fn as_slices(&self) -> Slices<'_, '_, T> {
+    pub fn as_slices(&self) -> Slices<'_, '_, T, S> {
         self.as_view().into_slices()
     }
 
@@ -183,7 +185,7 @@ where
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<NoEpochEntity>] {
+    pub fn as_sparse(&self) -> &[S] {
         self.as_view().into_sparse()
     }
 
@@ -213,13 +215,14 @@ where
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_bundles_with_archetype<B>(
         &self,
         components: &ComponentRegistryView<
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<(Bundles<'_, B>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
+    ) -> Result<(Bundles<'_, B, S>, ErasedArchetypeView<'_, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -227,13 +230,14 @@ where
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn into_bundles_with_archetype<B>(
         self,
         components: &ComponentRegistryView<
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<(Bundles<'a, B>, ErasedArchetypeView<'ctx, T::Meta>), IncompatibleArchetypeError>
+    ) -> Result<(Bundles<'a, B, S>, ErasedArchetypeView<'ctx, T::Meta>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -256,7 +260,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<Bundles<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Bundles<'_, B, S>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -270,7 +274,7 @@ where
             impl Sized,
             impl ComponentIdFrom<Key: FromComponentType> + ?Sized,
         >,
-    ) -> Result<Bundles<'a, B>, IncompatibleArchetypeError>
+    ) -> Result<Bundles<'a, B, S>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -380,9 +384,10 @@ where
     }
 }
 
-impl<T> Debug for ArchetypeStorageView<'_, '_, T>
+impl<T, S> Debug for ArchetypeStorageView<'_, '_, T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let component_ids = &self.archetype().into_component_ids();
@@ -392,9 +397,10 @@ where
     }
 }
 
-impl<T> Clone for ArchetypeStorageView<'_, '_, T>
+impl<T, S> Clone for ArchetypeStorageView<'_, '_, T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -405,16 +411,18 @@ where
     }
 }
 
-impl<T> Copy for ArchetypeStorageView<'_, '_, T>
+impl<T, S> Copy for ArchetypeStorageView<'_, '_, T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
     for<'a> T::Archetype<'a>: Copy,
 {
 }
 
-impl<'a, T> IntoIterator for &'a ArchetypeStorageView<'_, '_, T>
+impl<'a, T, S> IntoIterator for &'a ArchetypeStorageView<'_, '_, T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, ErasedBundleRefs<'a, 'a, T>);
     type IntoIter = Iter<'a, 'a, T>;
@@ -425,9 +433,10 @@ where
     }
 }
 
-impl<'ctx, 'a, T> IntoIterator for ArchetypeStorageView<'ctx, 'a, T>
+impl<'ctx, 'a, T, S> IntoIterator for ArchetypeStorageView<'ctx, 'a, T, S>
 where
     T: ErasedArchetypeSoa + ?Sized,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, ErasedBundleRefs<'ctx, 'a, T>);
     type IntoIter = Iter<'ctx, 'a, T>;
@@ -441,14 +450,10 @@ where
     }
 }
 
-type SlicesWithArchetype<'ctx, 'a, T> = (
+type SlicesWithArchetype<'ctx, 'a, T, S> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,
-    &'a [DefaultSparseItem<NoEpochEntity>],
+    &'a [S],
     ErasedArchetypeView<'ctx, <T as ErasedArchetypeSoa>::Meta>,
 );
-type Slices<'ctx, 'a, T> = (
-    &'a [Entity],
-    ErasedBundles<'ctx, 'a, T>,
-    &'a [DefaultSparseItem<NoEpochEntity>],
-);
+type Slices<'ctx, 'a, T, S> = (&'a [Entity], ErasedBundles<'ctx, 'a, T>, &'a [S]);

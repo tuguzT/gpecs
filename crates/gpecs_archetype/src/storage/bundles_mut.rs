@@ -9,7 +9,7 @@ use bytemuck::must_cast_slice_mut;
 use gpecs_entity::Entity;
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueMutSlices},
+    item::{DefaultSparseItem, KeyValueMutSlices, SparseItem},
     soa::{
         identity::Identity,
         slice::SoaSlicesMut,
@@ -23,24 +23,26 @@ use crate::{
     storage::{BundleIter, BundleIterMut, Bundles, NoEpochEntity},
 };
 
-type Inner<'a, B> = EpochSparseViewMut<'static, 'a, NoEpochEntity, B>;
+type Inner<'a, B, S> = EpochSparseViewMut<'static, 'a, NoEpochEntity, B, S>;
 
-pub struct BundlesMut<'a, B>
+pub struct BundlesMut<'a, B, S = DefaultSparseItem<NoEpochEntity>>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + 'a,
 {
-    inner: Inner<'a, B>,
+    inner: Inner<'a, B, S>,
 }
 
-impl<'a, B> BundlesMut<'a, B>
+impl<'a, B, S> BundlesMut<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     pub fn new(
         entities: &'a mut [Entity],
         bundles: BundleSlicesMut<'a, B>,
-        sparse: &'a mut [DefaultSparseItem<NoEpochEntity>],
+        sparse: &'a mut [S],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice_mut(entities);
         let slices = KeyValueMutSlices::new(B::CONTEXT, entities, bundles);
@@ -55,7 +57,7 @@ where
     pub unsafe fn from_parts(
         entities: &'a mut [Entity],
         bundles: BundleSlicesMut<'a, B>,
-        sparse: &'a mut [DefaultSparseItem<NoEpochEntity>],
+        sparse: &'a mut [S],
     ) -> Self {
         let entities = must_cast_slice_mut(entities);
         let slices = KeyValueMutSlices::new(B::CONTEXT, entities, bundles);
@@ -66,12 +68,12 @@ where
     }
 
     #[inline]
-    pub(super) unsafe fn from_inner(inner: Inner<'a, B>) -> Self {
+    pub(super) unsafe fn from_inner(inner: Inner<'a, B, S>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub unsafe fn into_parts(self) -> Parts<'a, B> {
+    pub unsafe fn into_parts(self) -> Parts<'a, B, S> {
         let Self { inner } = self;
 
         let (_, dense, sparse) = unsafe { inner.into_mut_slices_with_context() };
@@ -99,13 +101,13 @@ where
     }
 
     #[inline]
-    pub fn into_sparse(self) -> &'a [DefaultSparseItem<NoEpochEntity>] {
+    pub fn into_sparse(self) -> &'a [S] {
         let (_, _, sparse) = unsafe { self.into_parts() };
         sparse
     }
 
     #[inline]
-    pub fn as_bundles(&self) -> Bundles<'_, B> {
+    pub fn as_bundles(&self) -> Bundles<'_, B, S> {
         let Self { inner } = self;
 
         let inner = unsafe { map_view_context(inner.as_view()) };
@@ -113,7 +115,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_bundles(&mut self) -> BundlesMut<'_, B> {
+    pub fn as_mut_bundles(&mut self) -> BundlesMut<'_, B, S> {
         let Self { inner } = self;
 
         let inner = unsafe { map_mut_view_context(inner.as_mut_view()) };
@@ -145,7 +147,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> AsSlices<'_, B> {
+    pub fn as_slices(&self) -> AsSlices<'_, B, S> {
         self.as_bundles().into_parts()
     }
 
@@ -160,12 +162,12 @@ where
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<NoEpochEntity>] {
+    pub fn as_sparse(&self) -> &[S] {
         self.as_bundles().into_sparse()
     }
 
     #[inline]
-    pub unsafe fn as_mut_slices(&mut self) -> Parts<'_, B> {
+    pub unsafe fn as_mut_slices(&mut self) -> Parts<'_, B, S> {
         unsafe { self.as_mut_bundles().into_parts() }
     }
 
@@ -234,9 +236,10 @@ where
     }
 }
 
-impl<B> Debug for BundlesMut<'_, B>
+impl<B, S> Debug for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Debug,
     for<'a> BundleSlices<'a, B>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -249,9 +252,10 @@ where
     }
 }
 
-impl<B> Default for BundlesMut<'_, B>
+impl<B, S> Default for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]
     fn default() -> Self {
@@ -260,9 +264,10 @@ where
     }
 }
 
-impl<B> PartialEq for BundlesMut<'_, B>
+impl<B, S> PartialEq for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialEq,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -271,16 +276,18 @@ where
     }
 }
 
-impl<B> Eq for BundlesMut<'_, B>
+impl<B, S> Eq for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Eq,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: Eq,
 {
 }
 
-impl<B> PartialOrd for BundlesMut<'_, B>
+impl<B, S> PartialOrd for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + PartialOrd,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -289,9 +296,10 @@ where
     }
 }
 
-impl<B> Ord for BundlesMut<'_, B>
+impl<B, S> Ord for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Ord,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -300,9 +308,10 @@ where
     }
 }
 
-impl<B> Hash for BundlesMut<'_, B>
+impl<B, S> Hash for BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()> + Hash,
     for<'ctx, 'a> Slices<'ctx, 'a, B>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -311,9 +320,10 @@ where
     }
 }
 
-impl<'a, B> IntoIterator for &'a BundlesMut<'_, B>
+impl<'a, B, S> IntoIterator for &'a BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, BundleRefs<'a, B>);
     type IntoIter = BundleIter<'a, B>;
@@ -324,9 +334,10 @@ where
     }
 }
 
-impl<'a, B> IntoIterator for &'a mut BundlesMut<'_, B>
+impl<'a, B, S> IntoIterator for &'a mut BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, BundleRefsMut<'a, B>);
     type IntoIter = BundleIterMut<'a, B>;
@@ -337,9 +348,10 @@ where
     }
 }
 
-impl<'a, B> IntoIterator for BundlesMut<'a, B>
+impl<'a, B, S> IntoIterator for BundlesMut<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     type Item = (Entity, BundleRefsMut<'a, B>);
     type IntoIter = BundleIterMut<'a, B>;
@@ -354,9 +366,10 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, B> rayon::iter::IntoParallelIterator for &'a BundlesMut<'_, B>
+impl<'a, B, S> rayon::iter::IntoParallelIterator for &'a BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
     B::Context: Sync,
     B::Fields: Sync,
     BundleRefs<'a, B>: Send,
@@ -371,9 +384,10 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, B> rayon::iter::IntoParallelIterator for &'a mut BundlesMut<'_, B>
+impl<'a, B, S> rayon::iter::IntoParallelIterator for &'a mut BundlesMut<'_, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
     B::Context: Sync,
     B::Fields: Send,
     BundleRefsMut<'a, B>: Send,
@@ -388,9 +402,10 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, B> rayon::iter::IntoParallelIterator for BundlesMut<'a, B>
+impl<'a, B, S> rayon::iter::IntoParallelIterator for BundlesMut<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
     B::Context: Sync,
     B::Fields: Send,
     BundleRefsMut<'a, B>: Send,
@@ -404,34 +419,27 @@ where
     }
 }
 
-type Parts<'a, B> = (
-    &'a mut [Entity],
-    BundleSlicesMut<'a, B>,
-    &'a mut [DefaultSparseItem<NoEpochEntity>],
-);
-
-type AsSlices<'a, B> = (
-    &'a [Entity],
-    BundleSlices<'a, B>,
-    &'a [DefaultSparseItem<NoEpochEntity>],
-);
+type Parts<'a, B, S> = (&'a mut [Entity], BundleSlicesMut<'a, B>, &'a mut [S]);
+type AsSlices<'a, B, S> = (&'a [Entity], BundleSlices<'a, B>, &'a [S]);
 
 #[inline]
-unsafe fn map_view_context<'a, B>(
-    view: EpochSparseView<'_, 'a, NoEpochEntity, B>,
-) -> EpochSparseView<'static, 'a, NoEpochEntity, B>
+unsafe fn map_view_context<'a, B, S>(
+    view: EpochSparseView<'_, 'a, NoEpochEntity, B, S>,
+) -> EpochSparseView<'static, 'a, NoEpochEntity, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     unsafe { mem::transmute(view) }
 }
 
 #[inline]
-unsafe fn map_mut_view_context<'a, B>(
-    view: EpochSparseViewMut<'_, 'a, NoEpochEntity, B>,
-) -> Inner<'a, B>
+unsafe fn map_mut_view_context<'a, B, S>(
+    view: EpochSparseViewMut<'_, 'a, NoEpochEntity, B, S>,
+) -> Inner<'a, B, S>
 where
     B: Bundle,
+    S: SparseItem<Index = u32, Epoch = ()>,
 {
     unsafe { mem::transmute(view) }
 }

@@ -442,7 +442,7 @@ where
 impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a EntityRegistry<Meta, S>
 where
     Meta: Sync,
-    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + Sync,
 {
     type Item = (Entity, &'a Meta);
     type Iter = crate::registry::ParIter<'a, Meta, S>;
@@ -457,7 +457,7 @@ where
 impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a mut EntityRegistry<Meta, S>
 where
     Meta: Send,
-    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + Send,
 {
     type Item = (Entity, &'a mut Meta);
     type Iter = crate::registry::ParIterMut<'a, Meta, S>;

@@ -66,7 +66,7 @@ where
 impl<'a, Meta, S> ParallelIterator for ParIterMut<'a, Meta, S>
 where
     Meta: Send,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Send,
 {
     type Item = (Entity, &'a mut Meta);
 
@@ -85,7 +85,7 @@ where
 impl<Meta, S> IndexedParallelIterator for ParIterMut<'_, Meta, S>
 where
     Meta: Send,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Send,
 {
     fn len(&self) -> usize {
         let Self { view } = self;

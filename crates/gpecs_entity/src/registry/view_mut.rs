@@ -454,7 +454,7 @@ where
 impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a EntityRegistryViewMut<'_, Meta, S>
 where
     Meta: Sync,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Sync,
 {
     type Item = (Entity, &'a Meta);
     type Iter = crate::registry::ParIter<'a, Meta, S>;
@@ -469,7 +469,7 @@ where
 impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a mut EntityRegistryViewMut<'_, Meta, S>
 where
     Meta: Send,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Send,
 {
     type Item = (Entity, &'a mut Meta);
     type Iter = crate::registry::ParIterMut<'a, Meta, S>;
@@ -484,7 +484,7 @@ where
 impl<'a, Meta, S> rayon::iter::IntoParallelIterator for EntityRegistryViewMut<'a, Meta, S>
 where
     Meta: Send,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Send,
 {
     type Item = (Entity, &'a mut Meta);
     type Iter = crate::registry::ParIterMut<'a, Meta, S>;
@@ -498,13 +498,13 @@ where
 unsafe impl<Meta, S> Send for EntityRegistryViewMut<'_, Meta, S>
 where
     Meta: Send,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Send,
 {
 }
 
 unsafe impl<Meta, S> Sync for EntityRegistryViewMut<'_, Meta, S>
 where
     Meta: Sync,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Sync,
 {
 }

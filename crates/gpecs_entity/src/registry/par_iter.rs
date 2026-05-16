@@ -77,7 +77,7 @@ where
 impl<'a, Meta, S> ParallelIterator for ParIter<'a, Meta, S>
 where
     Meta: Sync,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Sync,
 {
     type Item = (Entity, &'a Meta);
 
@@ -96,7 +96,7 @@ where
 impl<Meta, S> IndexedParallelIterator for ParIter<'_, Meta, S>
 where
     Meta: Sync,
-    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Sync,
 {
     fn len(&self) -> usize {
         let Self { view } = self;

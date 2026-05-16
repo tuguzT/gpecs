@@ -259,25 +259,28 @@ where
     }
 }
 
+/// Alias for the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
+pub type Context<T> = <T as RawSoa>::Context;
+
 /// Alias for the [`Ptrs`](RawSoaContext::Ptrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type Ptrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext<T>>::Ptrs<'a>;
+pub type Ptrs<'a, T> = <Context<T> as RawSoaContext<T>>::Ptrs<'a>;
 
 /// Alias for the [`MutPtrs`](RawSoaContext::MutPtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type MutPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext<T>>::MutPtrs<'a>;
+pub type MutPtrs<'a, T> = <Context<T> as RawSoaContext<T>>::MutPtrs<'a>;
 
 /// Alias for the [`NonNullPtrs`](RawSoaContext::NonNullPtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type NonNullPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext<T>>::NonNullPtrs<'a>;
+pub type NonNullPtrs<'a, T> = <Context<T> as RawSoaContext<T>>::NonNullPtrs<'a>;
 
 /// Alias for the [`SlicePtrs`](RawSoaContext::SlicePtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type SlicePtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext<T>>::SlicePtrs<'a>;
+pub type SlicePtrs<'a, T> = <Context<T> as RawSoaContext<T>>::SlicePtrs<'a>;
 
 /// Alias for the [`SliceMutPtrs`](RawSoaContext::SliceMutPtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type SliceMutPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext<T>>::SliceMutPtrs<'a>;
+pub type SliceMutPtrs<'a, T> = <Context<T> as RawSoaContext<T>>::SliceMutPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern, or SoA.
@@ -591,19 +594,19 @@ where
 
 /// Alias for the [`Refs`](SoaContext::Refs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type Refs<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data, T>>::Refs<'a>;
+pub type Refs<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::Refs<'a>;
 
 /// Alias for the [`RefsMut`](SoaContext::RefsMut) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type RefsMut<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data, T>>::RefsMut<'a>;
+pub type RefsMut<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::RefsMut<'a>;
 
 /// Alias for the [`Slices`](SoaContext::Slices) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type Slices<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data, T>>::Slices<'a>;
+pub type Slices<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::Slices<'a>;
 
 /// Alias for the [`SlicesMut`](SoaContext::SlicesMut) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type SlicesMut<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data, T>>::SlicesMut<'a>;
+pub type SlicesMut<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::SlicesMut<'a>;
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types of specific lifetime.

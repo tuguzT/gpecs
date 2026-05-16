@@ -1,75 +1,67 @@
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::fmt::{self, Debug};
 
 use crate::{
     arena::EpochSparseArena,
     assert::unwrap_dense,
     error::TryModifyError,
+    item::{ArenaSparseItem, SparseItem},
     key::Key,
     set::EpochSparseSet,
     soa::{
         self,
         slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
         traits::{
-            AllocSoa, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned, SoaRead,
-            SoaReadOwned, SoaWrite,
+            AllocSoa, Context, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned,
+            SoaRead, SoaReadOwned, SoaWrite,
         },
     },
 };
 
 use super::assert::try_replace_key_failed;
 
-pub struct OccupiedEntry<'a, K, V, C>
+pub struct OccupiedEntry<'a, C>
 where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    V::Context: 'a,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer + ?Sized,
+    Context<C::Value>: 'a,
 {
-    key: K,
+    key: C::Key,
     dense_index: usize,
     container: &'a mut C,
-    phantom: PhantomData<fn() -> V>,
 }
 
-impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
+impl<'a, C> OccupiedEntry<'a, C>
 where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(key: K, dense_index: usize, container: &'a mut C) -> Self {
+    pub(crate) fn new(key: C::Key, dense_index: usize, container: &'a mut C) -> Self {
         Self {
             key,
             dense_index,
             container,
-            phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn context(&self) -> &V::Context {
+    pub fn context(&self) -> &Context<C::Value> {
         let Self { container, .. } = self;
         container.context()
     }
 
     #[inline]
-    pub fn key(&self) -> K {
+    pub fn key(&self) -> C::Key {
         let Self { key, .. } = self;
         *key
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> Ptrs<'_, V> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, C::Value> {
         let (_, ptrs) = self.as_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&V::Context, Ptrs<'_, V>) {
+    pub fn as_ptrs_with_context(&self) -> (&Context<C::Value>, Ptrs<'_, C::Value>) {
         let Self {
             dense_index,
             container,
@@ -82,13 +74,13 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, C::Value> {
         let (_, ptrs) = self.as_mut_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, MutPtrs<'_, V>) {
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&Context<C::Value>, MutPtrs<'_, C::Value>) {
         let Self {
             dense_index,
             container,
@@ -101,13 +93,13 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> Ptrs<'a, V> {
+    pub fn into_ptrs(self) -> Ptrs<'a, C::Value> {
         let (_, ptrs) = self.into_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn into_ptrs_with_context(self) -> (&'a V::Context, Ptrs<'a, V>) {
+    pub fn into_ptrs_with_context(self) -> (&'a Context<C::Value>, Ptrs<'a, C::Value>) {
         let Self {
             dense_index,
             container,
@@ -120,13 +112,13 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> MutPtrs<'a, V> {
+    pub fn into_mut_ptrs(self) -> MutPtrs<'a, C::Value> {
         let (_, ptrs) = self.into_mut_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn into_mut_ptrs_with_context(self) -> (&'a V::Context, MutPtrs<'a, V>) {
+    pub fn into_mut_ptrs_with_context(self) -> (&'a Context<C::Value>, MutPtrs<'a, C::Value>) {
         let Self {
             dense_index,
             container,
@@ -141,7 +133,7 @@ where
     #[inline]
     pub fn remove<R>(self) -> R
     where
-        V: SoaReadOwned<R>,
+        C::Value: SoaReadOwned<R>,
     {
         let Self { key, container, .. } = self;
 
@@ -152,7 +144,7 @@ where
     #[inline]
     pub fn swap_remove<R>(self) -> R
     where
-        V: SoaReadOwned<R>,
+        C::Value: SoaReadOwned<R>,
     {
         let Self { key, container, .. } = self;
 
@@ -163,7 +155,7 @@ where
     #[inline]
     pub fn insert<'me, R, W>(&'me mut self, value: W) -> R
     where
-        V: SoaRead<'me, R> + SoaWrite<W>,
+        C::Value: SoaRead<'me, R> + SoaWrite<W>,
     {
         let Self {
             dense_index,
@@ -173,13 +165,16 @@ where
 
         let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
         let previous = unwrap_dense(values, *dense_index);
-        unsafe { soa::ptr::replace::<V, R, W>(context, previous, value) }
+        unsafe { soa::ptr::replace::<C::Value, R, W>(context, previous, value) }
     }
 
     #[inline]
-    pub fn try_replace_key<W>(&mut self, key: K) -> Result<Option<W>, TryModifyError<K, W>>
+    pub fn try_replace_key<W>(
+        &mut self,
+        key: C::Key,
+    ) -> Result<Option<W>, TryModifyError<C::Key, W>>
     where
-        V: SoaReadOwned<W> + SoaWrite<W>,
+        C::Value: SoaReadOwned<W> + SoaWrite<W>,
     {
         let new_key = key;
         let Self { key, container, .. } = self;
@@ -193,9 +188,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn replace_key<W>(&mut self, key: K) -> Option<W>
+    pub fn replace_key<W>(&mut self, key: C::Key) -> Option<W>
     where
-        V: SoaReadOwned<W> + SoaWrite<W>,
+        C::Value: SoaReadOwned<W> + SoaWrite<W>,
     {
         self.try_replace_key(key)
             .map_err(TryModifyError::into_source)
@@ -203,65 +198,61 @@ where
     }
 }
 
-impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
+impl<'a, C> OccupiedEntry<'a, C>
 where
-    K: Key,
-    V: AllocSoa + Soa<'a> + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer<Value: Soa<'a>> + ?Sized,
 {
     #[inline]
-    pub fn into_mut(self) -> RefsMut<'a, 'a, V> {
+    pub fn into_mut(self) -> RefsMut<'a, 'a, C::Value> {
         let (_, refs) = self.into_mut_with_context();
         refs
     }
 
     #[inline]
-    pub fn into_mut_with_context(self) -> (&'a V::Context, RefsMut<'a, 'a, V>) {
+    pub fn into_mut_with_context(self) -> (&'a Context<C::Value>, RefsMut<'a, 'a, C::Value>) {
         let (context, ptrs) = self.into_mut_ptrs_with_context();
         let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         (context, refs)
     }
 }
 
-impl<'a, K, V, C> OccupiedEntry<'_, K, V, C>
+impl<'a, C> OccupiedEntry<'_, C>
 where
-    K: Key,
-    V: AllocSoa + Soa<'a> + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer<Value: Soa<'a>> + ?Sized,
 {
     #[inline]
-    pub fn get(&'a self) -> Refs<'a, 'a, V> {
+    pub fn get(&'a self) -> Refs<'a, 'a, C::Value> {
         let (_, refs) = self.get_with_context();
         refs
     }
 
     #[inline]
-    pub fn get_with_context(&'a self) -> (&'a V::Context, Refs<'a, 'a, V>) {
+    pub fn get_with_context(&'a self) -> (&'a Context<C::Value>, Refs<'a, 'a, C::Value>) {
         let (context, ptrs) = self.as_ptrs_with_context();
         let refs = unsafe { context.ptrs_to_refs(ptrs) };
         (context, refs)
     }
 
     #[inline]
-    pub fn get_mut(&'a mut self) -> RefsMut<'a, 'a, V> {
+    pub fn get_mut(&'a mut self) -> RefsMut<'a, 'a, C::Value> {
         let (_, refs) = self.get_mut_with_context();
         refs
     }
 
     #[inline]
-    pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, RefsMut<'a, 'a, V>) {
+    pub fn get_mut_with_context(
+        &'a mut self,
+    ) -> (&'a Context<C::Value>, RefsMut<'a, 'a, C::Value>) {
         let (context, ptrs) = self.as_mut_ptrs_with_context();
         let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         (context, refs)
     }
 }
 
-impl<K, V, C> Debug for OccupiedEntry<'_, K, V, C>
+impl<C> Debug for OccupiedEntry<'_, C>
 where
-    K: Key + Debug,
-    V: SoaOwned + AllocSoa + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
-    for<'ctx, 'a> Refs<'ctx, 'a, V>: Debug,
+    C: EpochSparseContainer<Key: Debug, Value: SoaOwned> + ?Sized,
+    for<'ctx, 'a> Refs<'ctx, 'a, C::Value>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -274,30 +265,21 @@ where
     }
 }
 
-pub struct VacantEntry<'a, K, V, C>
+pub struct VacantEntry<'a, C>
 where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer + ?Sized,
 {
-    key: K,
+    key: C::Key,
     container: &'a mut C,
-    phantom: PhantomData<fn() -> V>,
 }
 
-impl<'a, K, V, C> VacantEntry<'a, K, V, C>
+impl<'a, C> VacantEntry<'a, C>
 where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(key: K, container: &'a mut C) -> Self {
-        Self {
-            key,
-            container,
-            phantom: PhantomData,
-        }
+    pub(crate) fn new(key: C::Key, container: &'a mut C) -> Self {
+        Self { key, container }
     }
 
     #[inline]
@@ -307,21 +289,21 @@ where
     }
 
     #[inline]
-    pub fn context(&self) -> &V::Context {
+    pub fn context(&self) -> &Context<C::Value> {
         let Self { container, .. } = self;
         container.context()
     }
 
     #[inline]
-    pub fn key(&self) -> K {
+    pub fn key(&self) -> C::Key {
         let Self { key, .. } = self;
         *key
     }
 
     #[inline]
-    pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V, C>
+    pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, C>
     where
-        V: SoaReadOwned<W> + SoaWrite<W>,
+        C::Value: SoaReadOwned<W> + SoaWrite<W>,
     {
         let Self { key, container, .. } = self;
 
@@ -334,11 +316,9 @@ where
     }
 }
 
-impl<K, V, C> Debug for VacantEntry<'_, K, V, C>
+impl<C> Debug for VacantEntry<'_, C>
 where
-    K: Key + Debug,
-    V: AllocSoa + ?Sized,
-    C: EpochSparseContainer<K, V> + ?Sized,
+    C: EpochSparseContainer<Key: Debug> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -364,39 +344,42 @@ fn unwrap_entry_value<T>(value: Option<T>) -> T {
     value
 }
 
-pub trait EpochSparseContainer<K, V>
-where
-    K: Key,
-    V: AllocSoa + ?Sized,
-{
-    fn context(&self) -> &V::Context;
+pub trait EpochSparseContainer {
+    type Key: Key;
+    type Value: RawSoa + ?Sized;
 
-    fn slices(&self) -> SoaSlices<'_, '_, V>;
+    fn context(&self) -> &Context<Self::Value>;
 
-    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V>;
+    fn slices(&self) -> SoaSlices<'_, '_, Self::Value>;
+
+    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, Self::Value>;
 
     fn try_insert<'a, R, W>(
         &'a mut self,
-        key: K,
+        key: Self::Key,
         value: W,
-    ) -> Result<Option<R>, TryModifyError<K, W>>
+    ) -> Result<Option<R>, TryModifyError<Self::Key, W>>
     where
-        V: SoaRead<'a, R> + SoaWrite<W>;
+        Self::Value: SoaRead<'a, R> + SoaWrite<W>;
 
-    fn remove<'a, R>(&'a mut self, key: K) -> Option<R>
+    fn remove<'a, R>(&'a mut self, key: Self::Key) -> Option<R>
     where
-        V: SoaRead<'a, R>;
+        Self::Value: SoaRead<'a, R>;
 
-    fn swap_remove<'a, R>(&'a mut self, key: K) -> Option<R>
+    fn swap_remove<'a, R>(&'a mut self, key: Self::Key) -> Option<R>
     where
-        V: SoaRead<'a, R>;
+        Self::Value: SoaRead<'a, R>;
 }
 
-impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
+impl<K, V, S> EpochSparseContainer for EpochSparseSet<K, V, S>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
+    type Key = K;
+    type Value = V;
+
     #[inline]
     fn context(&self) -> &<V as RawSoa>::Context {
         Self::context(self)
@@ -449,11 +432,15 @@ where
     }
 }
 
-impl<K, V> EpochSparseContainer<K, V> for EpochSparseArena<K, V>
+impl<K, V, S> EpochSparseContainer for EpochSparseArena<K, V, S>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
+    type Key = K;
+    type Value = V;
+
     #[inline]
     fn context(&self) -> &<V as RawSoa>::Context {
         Self::context(self)
@@ -507,20 +494,22 @@ where
 }
 
 macro_rules! generate_entry_types {
-    ($container:ty) => {
-        pub enum Entry<'a, K, V>
+    ($container:ty, $sparse_item_bound:path) => {
+        pub enum Entry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
-            Occupied(OccupiedEntry<'a, K, V>),
-            Vacant(VacantEntry<'a, K, V>),
+            Occupied(OccupiedEntry<'a, K, V, S>),
+            Vacant(VacantEntry<'a, K, V, S>),
         }
 
-        impl<'a, K, V> Entry<'a, K, V>
+        impl<'a, K, V, S> Entry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             pub const fn is_occupied(&self) -> bool {
@@ -583,7 +572,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert<W>(self, default: W) -> OccupiedEntry<'a, K, V>
+            pub fn or_insert<W>(self, default: W) -> OccupiedEntry<'a, K, V, S>
             where
                 V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
@@ -594,7 +583,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert_with<W, F>(self, default: F) -> OccupiedEntry<'a, K, V>
+            pub fn or_insert_with<W, F>(self, default: F) -> OccupiedEntry<'a, K, V, S>
             where
                 V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
                 F: FnOnce() -> W,
@@ -606,7 +595,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_default<W>(self) -> OccupiedEntry<'a, K, V>
+            pub fn or_default<W>(self) -> OccupiedEntry<'a, K, V, S>
             where
                 V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
                 W: Default,
@@ -618,7 +607,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V>
+            pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V, S>
             where
                 V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
@@ -662,10 +651,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<K, V> Entry<'_, K, V>
+        impl<K, V, S> Entry<'_, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + $crate::soa::traits::SoaOwned + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             #[must_use]
@@ -684,10 +674,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> Entry<'_, K, V>
+        impl<'a, K, V, S> Entry<'_, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             pub fn get(&'a self) -> Option<$crate::soa::traits::Refs<'a, 'a, V>> {
@@ -731,10 +722,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<K, V> core::fmt::Debug for Entry<'_, K, V>
+        impl<K, V, S> core::fmt::Debug for Entry<'_, K, V, S>
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
             for<'ctx, 'a> $crate::soa::traits::Refs<'ctx, 'a, V>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -746,18 +738,20 @@ macro_rules! generate_entry_types {
         }
 
         #[repr(transparent)]
-        pub struct OccupiedEntry<'a, K, V>
+        pub struct OccupiedEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
-            inner: $crate::alloc::entry::OccupiedEntry<'a, K, V, $container>,
+            inner: $crate::alloc::entry::OccupiedEntry<'a, $container>,
         }
 
-        impl<'a, K, V> OccupiedEntry<'a, K, V>
+        impl<'a, K, V, S> OccupiedEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             fn new(key: K, dense_index: usize, container: &'a mut $container) -> Self {
@@ -872,10 +866,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> OccupiedEntry<'_, K, V>
+        impl<'a, K, V, S> OccupiedEntry<'_, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             pub fn get(&'a self) -> $crate::soa::traits::Refs<'a, 'a, V> {
@@ -906,10 +901,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> OccupiedEntry<'a, K, V>
+        impl<'a, K, V, S> OccupiedEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             pub fn into_mut(self) -> $crate::soa::traits::RefsMut<'a, 'a, V> {
@@ -926,10 +922,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<K, V> core::fmt::Debug for OccupiedEntry<'_, K, V>
+        impl<K, V, S> core::fmt::Debug for OccupiedEntry<'_, K, V, S>
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
             for<'ctx, 'a> $crate::soa::traits::Refs<'ctx, 'a, V>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -939,18 +936,20 @@ macro_rules! generate_entry_types {
         }
 
         #[repr(transparent)]
-        pub struct VacantEntry<'a, K, V>
+        pub struct VacantEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
-            inner: $crate::alloc::entry::VacantEntry<'a, K, V, $container>,
+            inner: $crate::alloc::entry::VacantEntry<'a, $container>,
         }
 
-        impl<'a, K, V> VacantEntry<'a, K, V>
+        impl<'a, K, V, S> VacantEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
             #[inline]
             fn new(key: K, container: &'a mut $container) -> Self {
@@ -977,7 +976,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V>
+            pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V, S>
             where
                 V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
@@ -987,10 +986,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> core::fmt::Debug for VacantEntry<'a, K, V>
+        impl<'a, K, V, S> core::fmt::Debug for VacantEntry<'a, K, V, S>
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::AllocSoa + ?Sized,
+            S: $sparse_item_bound,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

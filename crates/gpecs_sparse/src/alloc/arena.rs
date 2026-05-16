@@ -1300,23 +1300,16 @@ where
             Err(error) => Err(TryModifyError::new(error, value)),
         })
     }
-}
 
-// TODO: generalize entries to work with any sparse item
-impl<K, V> EpochSparseArena<K, V>
-where
-    K: Key,
-    V: AllocSoa + ?Sized,
-{
     #[inline]
     #[track_caller]
-    pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
+    pub fn entry(&mut self, key: K) -> Entry<'_, K, V, S> {
         self.try_entry(key)
             .unwrap_or_else(|error| try_entry_failed(error))
     }
 
     #[inline]
-    pub fn try_entry(&mut self, key: K) -> Result<Entry<'_, K, V>, TooLargeSparseIndexError<K>> {
+    pub fn try_entry(&mut self, key: K) -> Result<Entry<'_, K, V, S>, TooLargeSparseIndexError<K>> {
         let Self { dense, sparse, .. } = self;
 
         let sparse_index = key
@@ -1325,7 +1318,7 @@ where
             .map_err(TooLargeSparseIndexError::new)?;
         let Some(dense_index) = sparse_item_by_epoch::<K, _>(sparse, sparse_index, key.epoch())
             .copied()
-            .and_then(item::DefaultSparseItem::into_dense_index)
+            .and_then(S::dense_index)
         else {
             let entry = VacantEntry::new(key, self);
             return Ok(Entry::Vacant(entry));
@@ -1336,14 +1329,7 @@ where
         let entry = OccupiedEntry::new(key, dense_index, self);
         Ok(Entry::Occupied(entry))
     }
-}
 
-impl<K, V, S> EpochSparseArena<K, V, S>
-where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
     #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
         let (_, iter) = self.raw_keys_with_context();
@@ -2429,4 +2415,4 @@ fn remove_from_vacant_list<K, S>(
     }
 }
 
-generate_entry_types!(EpochSparseArena<K, V>);
+generate_entry_types!(EpochSparseArena<K, V, S>, ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>);

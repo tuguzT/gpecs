@@ -8,21 +8,18 @@ use core::{
 pub use error::TryReserveError;
 
 use gpecs_sparse::{
-    arena::EpochSparseArena,
-    error,
-    item::{ArenaSparseItem, DefaultSparseItem},
-    soa::identity::Identity,
+    arena::EpochSparseArena, error, item::ArenaSparseItem, soa::identity::Identity,
 };
 use gpecs_world::id::WorldId;
 
 use crate::{
-    Entity, EntityEpoch,
+    Entity, EntityEpoch, EntitySparseItem,
     registry::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut},
 };
 
 pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 
-pub struct EntityRegistry<Meta, S = DefaultSparseItem<Entity>>
+pub struct EntityRegistry<Meta, S = EntitySparseItem>
 where
     S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
 {

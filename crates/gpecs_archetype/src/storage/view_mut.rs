@@ -8,7 +8,7 @@ use gpecs_component::registry::{
     ComponentRegistryView,
     traits::{ComponentIdFrom, FromComponentType},
 };
-use gpecs_entity::{Entity, NoEpochEntity};
+use gpecs_entity::{Entity, NoEpochEntity, NoEpochEntitySparseItem};
 use gpecs_soa_erased::{
     ptr::slice::PtrsItem,
     soa::{
@@ -23,7 +23,7 @@ use gpecs_soa_erased::{
 };
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueMutSlices, SparseItem},
+    item::{KeyValueMutSlices, SparseItem},
     view::{EpochSparseViewMut, EpochSparseViewMutPtr},
 };
 
@@ -39,7 +39,7 @@ use crate::{
 type Inner<'ctx, T, S> = EpochSparseViewMutPtr<'ctx, NoEpochEntity, T, S>;
 
 #[repr(transparent)]
-pub struct ArchetypeStorageViewMut<'ctx, 'a, T, S = DefaultSparseItem<NoEpochEntity>>
+pub struct ArchetypeStorageViewMut<'ctx, 'a, T, S = NoEpochEntitySparseItem>
 where
     T: ErasedArchetypeSoa + ?Sized,
     S: SparseItem<Index = u32, Epoch = ()> + 'a,

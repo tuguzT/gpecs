@@ -6,7 +6,7 @@ use gpecs_component::registry::{
     ComponentId, ComponentRegistry, ComponentRegistryView,
     traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType, PushBackArray},
 };
-use gpecs_entity::{Entity, NoEpochEntity};
+use gpecs_entity::{Entity, NoEpochEntity, NoEpochEntitySparseItem};
 use gpecs_soa_erased::{
     ErasedSoaContext,
     ptr::slice::{PtrsItem, SliceItemPtrs},
@@ -23,10 +23,7 @@ use gpecs_soa_erased::{
     storage::AlignedStorage,
 };
 use gpecs_sparse::{
-    TryInsertAccess,
-    error::TryReserveError,
-    item::{DefaultSparseItem, SparseItem},
-    set::EpochSparseSet,
+    TryInsertAccess, error::TryReserveError, item::SparseItem, set::EpochSparseSet,
 };
 
 use crate::{
@@ -56,7 +53,7 @@ use crate::{
     },
 };
 
-pub struct ArchetypeStorage<T, S = DefaultSparseItem<NoEpochEntity>>
+pub struct ArchetypeStorage<T, S = NoEpochEntitySparseItem>
 where
     T: ErasedArchetypeSoa + ?Sized,
     S: SparseItem<Index = u32, Epoch = ()>,

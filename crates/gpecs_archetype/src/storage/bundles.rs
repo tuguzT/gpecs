@@ -6,10 +6,10 @@ use core::{
 };
 
 use bytemuck::must_cast_slice;
-use gpecs_entity::{Entity, NoEpochEntity};
+use gpecs_entity::{Entity, NoEpochEntity, NoEpochEntitySparseItem};
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueSlices, SparseItem},
+    item::{KeyValueSlices, SparseItem},
     soa::{
         identity::Identity,
         slice::SoaSlices,
@@ -25,7 +25,7 @@ use crate::{
 
 type Inner<'a, B, S> = EpochSparseView<'static, 'a, NoEpochEntity, B, S>;
 
-pub struct Bundles<'a, B, S = DefaultSparseItem<NoEpochEntity>>
+pub struct Bundles<'a, B, S = NoEpochEntitySparseItem>
 where
     B: Bundle,
     S: SparseItem<Index = u32, Epoch = ()> + 'a,

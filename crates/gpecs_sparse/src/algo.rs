@@ -12,7 +12,10 @@ use crate::{
     },
     item::{KeyValuePair, SparseItem},
     key::Key,
-    soa::{slice::SoaSlices, traits::RawSoa},
+    soa::{
+        slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices},
+        traits::{MutPtrs, Ptrs, RawSoa},
+    },
 };
 
 #[inline]
@@ -22,7 +25,7 @@ where
     S: SparseItem<Index = K::SparseIndex>,
 {
     let sparse_index = unsafe { sparse_index.try_into().unwrap_unchecked() };
-    unsafe { sparse.cast::<S>().add(sparse_index) }
+    unsafe { sparse.as_ref_unchecked().get_unchecked(sparse_index) }
 }
 
 #[inline]
@@ -104,18 +107,35 @@ where
 }
 
 pub unsafe fn sparse_get_unchecked<K, V, S>(
-    dense: impl IntoIterator<Item = V>,
+    dense: SoaSlicePtrs<'_, V>,
     sparse: *const [S],
     sparse_index: K::SparseIndex,
-) -> V
+) -> (&V::Context, Ptrs<'_, V>)
 where
     K: Key,
+    V: RawSoa + ?Sized,
     S: SparseItem<Index = K::SparseIndex>,
 {
     let sparse_item = unsafe { sparse_item_unchecked::<K, S>(sparse, sparse_index).read() };
     let dense_index = unsafe { sparse_item.dense_index().unwrap_unchecked() };
     let dense_index = unsafe { dense_index.try_into().unwrap_unchecked() };
-    unsafe { dense.into_iter().nth(dense_index).unwrap_unchecked() }
+    unsafe { dense.into_get_unchecked_with_context(dense_index) }
+}
+
+pub unsafe fn sparse_get_unchecked_mut<K, V, S>(
+    dense: SoaSliceMutPtrs<'_, V>,
+    sparse: *const [S],
+    sparse_index: K::SparseIndex,
+) -> (&V::Context, MutPtrs<'_, V>)
+where
+    K: Key,
+    V: RawSoa + ?Sized,
+    S: SparseItem<Index = K::SparseIndex>,
+{
+    let sparse_item = unsafe { sparse_item_unchecked::<K, S>(sparse, sparse_index).read() };
+    let dense_index = unsafe { sparse_item.dense_index().unwrap_unchecked() };
+    let dense_index = unsafe { dense_index.try_into().unwrap_unchecked() };
+    unsafe { dense.into_get_unchecked_mut_with_context(dense_index) }
 }
 
 pub fn sparse_get<K, V, S>(

@@ -6,10 +6,10 @@ use core::{
 };
 
 use bytemuck::must_cast_slice_mut;
-use gpecs_entity::{Entity, NoEpochEntity};
+use gpecs_entity::{Entity, NoEpochEntity, NoEpochEntitySparseItem};
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueMutSlices, SparseItem},
+    item::{KeyValueMutSlices, SparseItem},
     soa::{
         identity::Identity,
         slice::SoaSlicesMut,
@@ -25,7 +25,7 @@ use crate::{
 
 type Inner<'a, B, S> = EpochSparseViewMut<'static, 'a, NoEpochEntity, B, S>;
 
-pub struct BundlesMut<'a, B, S = DefaultSparseItem<NoEpochEntity>>
+pub struct BundlesMut<'a, B, S = NoEpochEntitySparseItem>
 where
     B: Bundle,
     S: SparseItem<Index = u32, Epoch = ()> + 'a,

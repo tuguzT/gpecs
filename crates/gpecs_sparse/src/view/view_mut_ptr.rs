@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    algo::sparse_get_unchecked,
+    algo::{sparse_get_unchecked, sparse_get_unchecked_mut},
     item::{
         DefaultSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePair, KeyValuePtrs,
         KeyValueSlicePtrs, SparseItem,
@@ -653,10 +653,12 @@ where
     pub unsafe fn get_unchecked_with_context(&self, key: K) -> (&V::Context, Ptrs<'_, V>) {
         let Self { ref dense, sparse } = *self;
 
-        let (context, dense) = dense.iter_with_context();
-        let dense = dense.map(From::from);
         let sparse_index = key.sparse_index();
-        let (_, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let dense = dense.clone().cast_const();
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+
+        let (_, value) = ptrs.into();
         (context, value)
     }
 
@@ -671,15 +673,13 @@ where
         &mut self,
         key: K,
     ) -> (&V::Context, MutPtrs<'_, V>) {
-        let Self {
-            ref mut dense,
-            sparse,
-        } = *self;
+        let Self { ref dense, sparse } = *self;
 
-        let (context, dense) = dense.iter_mut_with_context();
-        let dense = dense.map(From::from);
         let sparse_index = key.sparse_index();
-        let (_, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked_mut::<K, _, _>(dense.clone(), sparse, sparse_index) };
+
+        let (_, value) = ptrs.into();
         (context, value)
     }
 
@@ -696,10 +696,12 @@ where
     ) -> (&'ctx V::Context, Ptrs<'ctx, V>) {
         let Self { dense, sparse } = self;
 
-        let (context, dense) = dense.into_iter_with_context();
-        let dense = dense.cast_const().map(From::from);
+        let dense = dense.cast_const();
         let sparse_index = key.sparse_index();
-        let (_, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+
+        let (_, value) = ptrs.into();
         (context, value)
     }
 
@@ -716,10 +718,11 @@ where
     ) -> (&'ctx V::Context, MutPtrs<'ctx, V>) {
         let Self { dense, sparse } = self;
 
-        let (context, dense) = dense.into_iter_with_context();
-        let dense = dense.map(From::from);
         let sparse_index = key.sparse_index();
-        let (_, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked_mut::<K, _, _>(dense, sparse, sparse_index) };
+
+        let (_, value) = ptrs.into();
         (context, value)
     }
 
@@ -739,9 +742,11 @@ where
     ) -> (&V::Context, *const K, Ptrs<'_, V>) {
         let Self { ref dense, sparse } = *self;
 
-        let (context, dense) = dense.iter_with_context();
-        let dense = dense.map(From::from);
-        let (key, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let dense = dense.clone().cast_const();
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+
+        let (key, value) = ptrs.into();
         (context, key, value)
     }
 
@@ -759,14 +764,12 @@ where
         &mut self,
         sparse_index: K::SparseIndex,
     ) -> (&V::Context, *mut K, MutPtrs<'_, V>) {
-        let Self {
-            ref mut dense,
-            sparse,
-        } = *self;
+        let Self { ref dense, sparse } = *self;
 
-        let (context, dense) = dense.iter_mut_with_context();
-        let dense = dense.map(From::from);
-        let (key, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked_mut::<K, _, _>(dense.clone(), sparse, sparse_index) };
+
+        let (key, value) = ptrs.into();
         (context, key, value)
     }
 
@@ -787,9 +790,11 @@ where
     ) -> (&'ctx V::Context, *const K, Ptrs<'ctx, V>) {
         let Self { dense, sparse } = self;
 
-        let (context, dense) = dense.into_iter_with_context();
-        let dense = dense.cast_const().map(From::from);
-        let (key, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let dense = dense.cast_const();
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+
+        let (key, value) = ptrs.into();
         (context, key, value)
     }
 
@@ -810,9 +815,10 @@ where
     ) -> (&'ctx V::Context, *mut K, MutPtrs<'ctx, V>) {
         let Self { dense, sparse } = self;
 
-        let (context, dense) = dense.into_iter_with_context();
-        let dense = dense.map(From::from);
-        let (key, value) = unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
+        let (context, ptrs) =
+            unsafe { sparse_get_unchecked_mut::<K, _, _>(dense, sparse, sparse_index) };
+
+        let (key, value) = ptrs.into();
         (context, key, value)
     }
 

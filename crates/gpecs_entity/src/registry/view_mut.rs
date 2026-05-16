@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueMutSlices, SparseItem},
+    item::{KeyValueMutSlices, SparseItem},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlicesMut,
@@ -16,14 +16,14 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    Entity, EntityEpoch,
+    Entity, EntityEpoch, EntitySparseItem,
     registry::{EntityRegistryView, Iter, IterMut},
 };
 
 type Inner<'a, Meta, S> = EpochSparseViewMutPtr<'a, Entity, Identity<Meta>, S>;
 
 #[repr(transparent)]
-pub struct EntityRegistryViewMut<'a, Meta, S = DefaultSparseItem<Entity>>
+pub struct EntityRegistryViewMut<'a, Meta, S = EntitySparseItem>
 where
     Meta: 'a,
     S: SparseItem<Index = u32, Epoch = EntityEpoch> + 'a,

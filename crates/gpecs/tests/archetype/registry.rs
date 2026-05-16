@@ -137,7 +137,7 @@ fn register_archetype() {
 
 #[test]
 fn exchange_components() {
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
@@ -337,7 +337,7 @@ fn exchange_components() {
 
 #[test]
 fn exchange_components_erased() {
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
@@ -575,7 +575,7 @@ fn exchange_components_erased() {
 
 #[test]
 fn exchange_components_empty_registry() {
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
@@ -642,7 +642,7 @@ fn exchange_components_empty_registry() {
 
 #[test]
 fn exchange_components_erased_empty_registry() {
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
@@ -721,7 +721,7 @@ fn exchange_components_erased_empty_registry() {
 
 #[test]
 fn components() {
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
@@ -784,7 +784,7 @@ fn components() {
 
 #[test]
 fn components_erased() {
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 

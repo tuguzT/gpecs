@@ -22,7 +22,7 @@ fn one_item_spawn() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
 
     assert_eq!(entities.len(), 1);
@@ -40,7 +40,7 @@ fn one_item_reuse() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
 
     entities.despawn(entity);
@@ -61,7 +61,7 @@ fn one_item_invalidate() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
     entities.despawn(entity);
 

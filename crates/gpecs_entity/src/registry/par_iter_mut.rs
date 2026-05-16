@@ -1,24 +1,30 @@
 use core::fmt::{self, Debug};
 
-use gpecs_sparse::soa::identity::Identity;
+use gpecs_sparse::{item::SparseItem, soa::identity::Identity};
 use rayon::iter::{
     IndexedParallelIterator, ParallelIterator,
     plumbing::{Consumer, Producer, ProducerCallback, UnindexedConsumer, bridge},
 };
 
 use crate::{
-    Entity,
+    entity::{Entity, EntityEpoch},
     registry::{EntityRegistryViewMut, IterMut},
 };
 
 #[repr(transparent)]
-pub struct ParIterMut<'a, Meta> {
-    view: EntityRegistryViewMut<'a, Meta>,
+pub struct ParIterMut<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
+    view: EntityRegistryViewMut<'a, Meta, S>,
 }
 
-impl<'a, Meta> ParIterMut<'a, Meta> {
+impl<'a, Meta, S> ParIterMut<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
-    pub(super) fn new(view: EntityRegistryViewMut<'a, Meta>) -> Self {
+    pub(super) fn new(view: EntityRegistryViewMut<'a, Meta, S>) -> Self {
         Self { view }
     }
 
@@ -43,9 +49,10 @@ impl<'a, Meta> ParIterMut<'a, Meta> {
     }
 }
 
-impl<Meta> Debug for ParIterMut<'_, Meta>
+impl<Meta, S> Debug for ParIterMut<'_, Meta, S>
 where
     Meta: Debug,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (entities, metas) = &self.as_slices();
@@ -56,9 +63,10 @@ where
     }
 }
 
-impl<'a, Meta> ParallelIterator for ParIterMut<'a, Meta>
+impl<'a, Meta, S> ParallelIterator for ParIterMut<'a, Meta, S>
 where
     Meta: Send,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     type Item = (Entity, &'a mut Meta);
 
@@ -74,9 +82,10 @@ where
     }
 }
 
-impl<Meta> IndexedParallelIterator for ParIterMut<'_, Meta>
+impl<Meta, S> IndexedParallelIterator for ParIterMut<'_, Meta, S>
 where
     Meta: Send,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     fn len(&self) -> usize {
         let Self { view } = self;

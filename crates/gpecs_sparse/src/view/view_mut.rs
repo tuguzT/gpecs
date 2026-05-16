@@ -19,8 +19,8 @@ use crate::{
     },
     error::FromPartsError,
     item::{
-        self, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair, KeyValuePtrs,
-        KeyValueSlicePtrs, KeyValueSlices, SparseItem,
+        DefaultSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair,
+        KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem,
     },
     iter::{
         Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut, Values,
@@ -37,10 +37,10 @@ use crate::{
     view::{EpochSparseView, EpochSparseViewMutPtr, EpochSparseViewPtr},
 };
 
-pub type SparseViewMut<'ctx, 'a, T, S = item::DefaultSparseItem<usize>> =
+pub type SparseViewMut<'ctx, 'a, T, S = DefaultSparseItem<usize>> =
     EpochSparseViewMut<'ctx, 'a, usize, T, S>;
 
-pub struct EpochSparseViewMut<'ctx, 'a, K, V, S = item::DefaultSparseItem<K>>
+pub struct EpochSparseViewMut<'ctx, 'a, K, V, S = DefaultSparseItem<K>>
 where
     K: Key + 'a,
     V: RawSoa<Context: 'ctx> + ?Sized,

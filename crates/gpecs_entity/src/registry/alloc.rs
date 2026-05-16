@@ -8,7 +8,10 @@ use core::{
 pub use error::TryReserveError;
 
 use gpecs_sparse::{
-    arena::EpochSparseArena, error, item::DefaultSparseItem, soa::identity::Identity,
+    arena::EpochSparseArena,
+    error,
+    item::{ArenaSparseItem, DefaultSparseItem},
+    soa::identity::Identity,
 };
 use gpecs_world::id::WorldId;
 
@@ -18,11 +21,17 @@ use super::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut};
 
 pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 
-pub struct EntityRegistry<Meta = ()> {
-    inner: EpochSparseArena<Entity, Identity<Meta>>,
+pub struct EntityRegistry<Meta = (), S = DefaultSparseItem<Entity>>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
+    inner: EpochSparseArena<Entity, Identity<Meta>, S>,
 }
 
-impl<Meta> EntityRegistry<Meta> {
+impl<Meta, S> EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     pub fn new() -> Self {
         let inner = EpochSparseArena::new();
@@ -97,7 +106,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_view(&self) -> EntityRegistryView<'_, Meta> {
+    pub fn as_view(&self) -> EntityRegistryView<'_, Meta, S> {
         let Self { inner } = self;
 
         let inner = inner.as_view_ptr();
@@ -105,7 +114,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_mut_view(&mut self) -> EntityRegistryViewMut<'_, Meta> {
+    pub fn as_mut_view(&mut self) -> EntityRegistryViewMut<'_, Meta, S> {
         let Self { inner } = self;
 
         let inner = inner.as_mut_view_ptr();
@@ -113,7 +122,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[DefaultSparseItem<Entity>]) {
+    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[S]) {
         let (entities, metas, sparse) = self.as_view().into_parts();
         (entities, metas, sparse)
     }
@@ -131,15 +140,13 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<Entity>] {
+    pub fn as_sparse(&self) -> &[S] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub unsafe fn as_mut_slices(
-        &mut self,
-    ) -> (&mut [Entity], &mut [Meta], &mut [DefaultSparseItem<Entity>]) {
+    pub unsafe fn as_mut_slices(&mut self) -> (&mut [Entity], &mut [Meta], &mut [S]) {
         let (entities, metas, sparse) = unsafe { self.as_mut_view().into_parts() };
         (entities, metas, sparse)
     }
@@ -151,12 +158,12 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const DefaultSparseItem<Entity>) {
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const S) {
         self.as_view().as_ptrs()
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut DefaultSparseItem<Entity>) {
+    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut S) {
         self.as_mut_view().as_mut_ptrs()
     }
 
@@ -244,22 +251,23 @@ impl<Meta> EntityRegistry<Meta> {
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta> {
+    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta, S> {
         let view = self.as_view();
         crate::registry::ParIter::new(view)
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_mut(&mut self) -> crate::registry::ParIterMut<'_, Meta> {
+    pub fn par_iter_mut(&mut self) -> crate::registry::ParIterMut<'_, Meta, S> {
         let view = self.as_mut_view();
         crate::registry::ParIterMut::new(view)
     }
 }
 
-impl<Meta> Debug for EntityRegistry<Meta>
+impl<Meta, S> Debug for EntityRegistry<Meta, S>
 where
     Meta: Debug,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (entities, metas, sparse) = self.as_slices();
@@ -271,27 +279,37 @@ where
     }
 }
 
-impl<Meta> Default for EntityRegistry<Meta> {
+impl<Meta, S> Default for EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     fn default() -> Self {
         let inner = EpochSparseArena::default();
         Self { inner }
     }
 }
 
-impl<Meta> PartialEq for EntityRegistry<Meta>
+impl<Meta, S> PartialEq for EntityRegistry<Meta, S>
 where
     Meta: PartialEq,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.as_view() == other.as_view()
     }
 }
 
-impl<Meta> Eq for EntityRegistry<Meta> where Meta: Eq {}
+impl<Meta, S> Eq for EntityRegistry<Meta, S>
+where
+    Meta: Eq,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + Eq,
+{
+}
 
-impl<Meta> PartialOrd for EntityRegistry<Meta>
+impl<Meta, S> PartialOrd for EntityRegistry<Meta, S>
 where
     Meta: PartialOrd,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let other = other.as_view();
@@ -299,9 +317,10 @@ where
     }
 }
 
-impl<Meta> Ord for EntityRegistry<Meta>
+impl<Meta, S> Ord for EntityRegistry<Meta, S>
 where
     Meta: Ord,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let other = other.as_view();
@@ -309,18 +328,20 @@ where
     }
 }
 
-impl<Meta> Hash for EntityRegistry<Meta>
+impl<Meta, S> Hash for EntityRegistry<Meta, S>
 where
     Meta: Hash,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch> + Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.as_view().hash(state);
     }
 }
 
-impl<Meta> Clone for EntityRegistry<Meta>
+impl<Meta, S> Clone for EntityRegistry<Meta, S>
 where
     Meta: Clone,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -339,28 +360,40 @@ where
     }
 }
 
-impl<Meta> AsRef<Self> for EntityRegistry<Meta> {
+impl<Meta, S> AsRef<Self> for EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<Meta> AsRef<[Entity]> for EntityRegistry<Meta> {
+impl<Meta, S> AsRef<[Entity]> for EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     fn as_ref(&self) -> &[Entity] {
         self.as_entities()
     }
 }
 
-impl<Meta> AsMut<Self> for EntityRegistry<Meta> {
+impl<Meta, S> AsMut<Self> for EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<Meta> Index<Entity> for EntityRegistry<Meta> {
+impl<Meta, S> Index<Entity> for EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     type Output = Meta;
 
     #[inline]
@@ -369,14 +402,20 @@ impl<Meta> Index<Entity> for EntityRegistry<Meta> {
     }
 }
 
-impl<Meta> IndexMut<Entity> for EntityRegistry<Meta> {
+impl<Meta, S> IndexMut<Entity> for EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     fn index_mut(&mut self, index: Entity) -> &mut Self::Output {
         self.as_mut_view().into_index_mut(index)
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a EntityRegistry<Meta> {
+impl<'a, Meta, S> IntoIterator for &'a EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     type Item = (Entity, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
@@ -386,7 +425,10 @@ impl<'a, Meta> IntoIterator for &'a EntityRegistry<Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a mut EntityRegistry<Meta> {
+impl<'a, Meta, S> IntoIterator for &'a mut EntityRegistry<Meta, S>
+where
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     type Item = (Entity, &'a mut Meta);
     type IntoIter = IterMut<'a, Meta>;
 
@@ -397,12 +439,13 @@ impl<'a, Meta> IntoIterator for &'a mut EntityRegistry<Meta> {
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a EntityRegistry<Meta>
+impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a EntityRegistry<Meta, S>
 where
     Meta: Sync,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     type Item = (Entity, &'a Meta);
-    type Iter = crate::registry::ParIter<'a, Meta>;
+    type Iter = crate::registry::ParIter<'a, Meta, S>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -411,12 +454,13 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a mut EntityRegistry<Meta>
+impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a mut EntityRegistry<Meta, S>
 where
     Meta: Send,
+    S: ArenaSparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     type Item = (Entity, &'a mut Meta);
-    type Iter = crate::registry::ParIterMut<'a, Meta>;
+    type Iter = crate::registry::ParIterMut<'a, Meta, S>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {

@@ -1,24 +1,30 @@
 use core::fmt::{self, Debug};
 
-use gpecs_sparse::soa::identity::Identity;
+use gpecs_sparse::{item::SparseItem, soa::identity::Identity};
 use rayon::iter::{
     IndexedParallelIterator, ParallelIterator,
     plumbing::{Consumer, Producer, ProducerCallback, UnindexedConsumer, bridge},
 };
 
 use crate::{
-    Entity,
+    entity::{Entity, EntityEpoch},
     registry::{EntityRegistryView, Iter},
 };
 
 #[repr(transparent)]
-pub struct ParIter<'a, Meta> {
-    view: EntityRegistryView<'a, Meta>,
+pub struct ParIter<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
+    view: EntityRegistryView<'a, Meta, S>,
 }
 
-impl<'a, Meta> ParIter<'a, Meta> {
+impl<'a, Meta, S> ParIter<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
-    pub(super) fn new(view: EntityRegistryView<'a, Meta>) -> Self {
+    pub(super) fn new(view: EntityRegistryView<'a, Meta, S>) -> Self {
         Self { view }
     }
 
@@ -43,9 +49,10 @@ impl<'a, Meta> ParIter<'a, Meta> {
     }
 }
 
-impl<Meta> Debug for ParIter<'_, Meta>
+impl<Meta, S> Debug for ParIter<'_, Meta, S>
 where
     Meta: Debug,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (entities, metas) = &self.as_slices();
@@ -56,7 +63,10 @@ where
     }
 }
 
-impl<Meta> Clone for ParIter<'_, Meta> {
+impl<Meta, S> Clone for ParIter<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     fn clone(&self) -> Self {
         let Self { view } = *self;
@@ -64,9 +74,10 @@ impl<Meta> Clone for ParIter<'_, Meta> {
     }
 }
 
-impl<'a, Meta> ParallelIterator for ParIter<'a, Meta>
+impl<'a, Meta, S> ParallelIterator for ParIter<'a, Meta, S>
 where
     Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     type Item = (Entity, &'a Meta);
 
@@ -82,9 +93,10 @@ where
     }
 }
 
-impl<Meta> IndexedParallelIterator for ParIter<'_, Meta>
+impl<Meta, S> IndexedParallelIterator for ParIter<'_, Meta, S>
 where
     Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     fn len(&self) -> usize {
         let Self { view } = self;

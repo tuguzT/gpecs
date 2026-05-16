@@ -43,7 +43,7 @@ fn storage_tag() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
 
     let value = storage
@@ -86,7 +86,7 @@ fn storage_tag_erased() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
 
     {
@@ -144,7 +144,7 @@ fn storage_tuple() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
 
     let (positions,) = storage
@@ -381,7 +381,7 @@ fn storage_tuple_erased() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    let mut entities = EntityRegistry::new();
+    let mut entities = EntityRegistry::<_>::new();
     let entity = entities.spawn(world, ());
 
     let (positions,) = storage

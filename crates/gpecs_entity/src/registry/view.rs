@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_sparse::{
     error::FromPartsError,
-    item::{DefaultSparseItem, KeyValueSlices},
+    item::{DefaultSparseItem, KeyValueSlices, SparseItem},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         slice::SoaSlices,
@@ -20,24 +20,28 @@ use crate::{
     registry::Iter,
 };
 
-type Inner<'a, Meta> = EpochSparseViewPtr<'a, Entity, Identity<Meta>>;
+type Inner<'a, Meta, S> = EpochSparseViewPtr<'a, Entity, Identity<Meta>, S>;
 
 #[repr(transparent)]
-pub struct EntityRegistryView<'a, Meta>
+pub struct EntityRegistryView<'a, Meta, S = DefaultSparseItem<Entity>>
 where
     Meta: 'a,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + 'a,
 {
-    inner: Inner<'a, Meta>,
+    inner: Inner<'a, Meta, S>,
 }
 
-impl<'a, Meta> EntityRegistryView<'a, Meta> {
+impl<'a, Meta, S> EntityRegistryView<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     const CONTEXT: &'a () = &();
 
     #[inline]
     pub fn new(
         entities: &'a [Entity],
         metas: &'a [Meta],
-        sparse: &'a [DefaultSparseItem<Entity>],
+        sparse: &'a [S],
     ) -> Result<Self, FromPartsError<Entity>> {
         let context = Self::CONTEXT;
         let dense = SoaSlices::new(
@@ -51,11 +55,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub unsafe fn from_parts(
-        entities: &'a [Entity],
-        metas: &'a [Meta],
-        sparse: &'a [DefaultSparseItem<Entity>],
-    ) -> Self {
+    pub unsafe fn from_parts(entities: &'a [Entity], metas: &'a [Meta], sparse: &'a [S]) -> Self {
         let context = Self::CONTEXT;
         let dense = unsafe {
             SoaSlices::new(
@@ -69,19 +69,19 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub(super) fn from_inner(inner: Inner<'a, Meta, S>) -> Self {
         Self { inner }
     }
 
     #[inline]
     #[allow(unused)]
-    pub(super) fn into_inner(self) -> Inner<'a, Meta> {
+    pub(super) fn into_inner(self) -> Inner<'a, Meta, S> {
         let Self { inner } = self;
         inner
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [Entity], &'a [Meta], &'a [DefaultSparseItem<Entity>]) {
+    pub fn into_parts(self) -> (&'a [Entity], &'a [Meta], &'a [S]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.into_slice_ptrs();
@@ -95,7 +95,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_view(&self) -> EntityRegistryView<'_, Meta> {
+    pub fn as_view(&self) -> EntityRegistryView<'_, Meta, S> {
         let Self { inner } = *self;
         EntityRegistryView::from_inner(inner)
     }
@@ -112,7 +112,7 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[DefaultSparseItem<Entity>]) {
+    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[S]) {
         let Self { inner } = self;
 
         let (dense, sparse) = inner.as_slice_ptrs();
@@ -138,13 +138,13 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_sparse(&self) -> &[DefaultSparseItem<Entity>] {
+    pub fn as_sparse(&self) -> &[S] {
         let (_, _, sparse) = self.as_slices();
         sparse
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const DefaultSparseItem<Entity>) {
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const S) {
         let (entities, metas, sparse) = self.as_slices();
         (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
     }
@@ -190,14 +190,15 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta> {
+    pub fn par_iter(&self) -> crate::registry::ParIter<'_, Meta, S> {
         crate::registry::ParIter::new(*self)
     }
 }
 
-impl<Meta> Debug for EntityRegistryView<'_, Meta>
+impl<Meta, S> Debug for EntityRegistryView<'_, Meta, S>
 where
     Meta: Debug,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (entities, metas, sparse) = self.as_slices();
@@ -209,35 +210,51 @@ where
     }
 }
 
-impl<Meta> Default for EntityRegistryView<'_, Meta> {
+impl<Meta, S> Default for EntityRegistryView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     fn default() -> Self {
         let inner = Inner::from(Self::CONTEXT);
         Self::from_inner(inner)
     }
 }
 
-impl<Meta> Clone for EntityRegistryView<'_, Meta> {
+impl<Meta, S> Clone for EntityRegistryView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<Meta> Copy for EntityRegistryView<'_, Meta> {}
+impl<Meta, S> Copy for EntityRegistryView<'_, Meta, S> where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>
+{
+}
 
-impl<Meta> PartialEq for EntityRegistryView<'_, Meta>
+impl<Meta, S> PartialEq for EntityRegistryView<'_, Meta, S>
 where
     Meta: PartialEq,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
     }
 }
 
-impl<Meta> Eq for EntityRegistryView<'_, Meta> where Meta: Eq {}
+impl<Meta, S> Eq for EntityRegistryView<'_, Meta, S>
+where
+    Meta: Eq,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Eq,
+{
+}
 
-impl<Meta> PartialOrd for EntityRegistryView<'_, Meta>
+impl<Meta, S> PartialOrd for EntityRegistryView<'_, Meta, S>
 where
     Meta: PartialOrd,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let slices = self.as_slices();
@@ -246,9 +263,10 @@ where
     }
 }
 
-impl<Meta> Ord for EntityRegistryView<'_, Meta>
+impl<Meta, S> Ord for EntityRegistryView<'_, Meta, S>
 where
     Meta: Ord,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let slices = self.as_slices();
@@ -257,23 +275,30 @@ where
     }
 }
 
-impl<Meta> Hash for EntityRegistryView<'_, Meta>
+impl<Meta, S> Hash for EntityRegistryView<'_, Meta, S>
 where
     Meta: Hash,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch> + Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.as_slices().hash(state);
     }
 }
 
-impl<Meta> AsRef<[Entity]> for EntityRegistryView<'_, Meta> {
+impl<Meta, S> AsRef<[Entity]> for EntityRegistryView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     #[inline]
     fn as_ref(&self) -> &[Entity] {
         self.as_entities()
     }
 }
 
-impl<Meta> Index<Entity> for EntityRegistryView<'_, Meta> {
+impl<Meta, S> Index<Entity> for EntityRegistryView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     type Output = Meta;
 
     #[inline]
@@ -282,7 +307,10 @@ impl<Meta> Index<Entity> for EntityRegistryView<'_, Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a EntityRegistryView<'_, Meta> {
+impl<'a, Meta, S> IntoIterator for &'a EntityRegistryView<'_, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     type Item = (Entity, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
@@ -292,7 +320,10 @@ impl<'a, Meta> IntoIterator for &'a EntityRegistryView<'_, Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for EntityRegistryView<'a, Meta> {
+impl<'a, Meta, S> IntoIterator for EntityRegistryView<'a, Meta, S>
+where
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
     type Item = (Entity, &'a Meta);
     type IntoIter = Iter<'a, Meta>;
 
@@ -306,12 +337,13 @@ impl<'a, Meta> IntoIterator for EntityRegistryView<'a, Meta> {
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, Meta> rayon::iter::IntoParallelIterator for &'a EntityRegistryView<'_, Meta>
+impl<'a, Meta, S> rayon::iter::IntoParallelIterator for &'a EntityRegistryView<'_, Meta, S>
 where
     Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     type Item = (Entity, &'a Meta);
-    type Iter = crate::registry::ParIter<'a, Meta>;
+    type Iter = crate::registry::ParIter<'a, Meta, S>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -320,12 +352,13 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, Meta> rayon::iter::IntoParallelIterator for EntityRegistryView<'a, Meta>
+impl<'a, Meta, S> rayon::iter::IntoParallelIterator for EntityRegistryView<'a, Meta, S>
 where
     Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     type Item = (Entity, &'a Meta);
-    type Iter = crate::registry::ParIter<'a, Meta>;
+    type Iter = crate::registry::ParIter<'a, Meta, S>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -333,5 +366,16 @@ where
     }
 }
 
-unsafe impl<Meta> Send for EntityRegistryView<'_, Meta> where Meta: Sync {}
-unsafe impl<Meta> Sync for EntityRegistryView<'_, Meta> where Meta: Sync {}
+unsafe impl<Meta, S> Send for EntityRegistryView<'_, Meta, S>
+where
+    Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
+}
+
+unsafe impl<Meta, S> Sync for EntityRegistryView<'_, Meta, S>
+where
+    Meta: Sync,
+    S: SparseItem<Index = u32, Epoch = EntityEpoch>,
+{
+}

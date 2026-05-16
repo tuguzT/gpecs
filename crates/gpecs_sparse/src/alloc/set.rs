@@ -18,8 +18,9 @@ use crate::{
         TryModifyErrorKind, TryReserveError,
     },
     item::{
-        self, ArenaSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices,
-        KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem,
+        ArenaSparseItem, DefaultSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs,
+        KeyValueMutSlices, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
+        SparseItem,
     },
     iter::{
         Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
@@ -45,9 +46,9 @@ use super::{
     entry::generate_entry_types,
 };
 
-pub type SparseSet<T, S = item::DefaultSparseItem<usize>> = EpochSparseSet<usize, T, S>;
+pub type SparseSet<T, S = DefaultSparseItem<usize>> = EpochSparseSet<usize, T, S>;
 
-pub struct EpochSparseSet<K, V, S = item::DefaultSparseItem<K>>
+pub struct EpochSparseSet<K, V, S = DefaultSparseItem<K>>
 where
     K: Key,
     V: AllocSoa + ?Sized,

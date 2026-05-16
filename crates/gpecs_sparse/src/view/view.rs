@@ -14,7 +14,10 @@ use crate::{
         sparse_index,
     },
     error::FromPartsError,
-    item::{self, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem},
+    item::{
+        DefaultSparseItem, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
+        SparseItem,
+    },
     iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
     key::Key,
     soa::{
@@ -24,10 +27,10 @@ use crate::{
     view::EpochSparseViewPtr,
 };
 
-pub type SparseView<'ctx, 'a, T, S = item::DefaultSparseItem<usize>> =
+pub type SparseView<'ctx, 'a, T, S = DefaultSparseItem<usize>> =
     EpochSparseView<'ctx, 'a, usize, T, S>;
 
-pub struct EpochSparseView<'ctx, 'a, K, V, S = item::DefaultSparseItem<K>>
+pub struct EpochSparseView<'ctx, 'a, K, V, S = DefaultSparseItem<K>>
 where
     K: Key + 'a,
     V: RawSoa<Context: 'ctx> + ?Sized,

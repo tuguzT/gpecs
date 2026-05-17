@@ -11,13 +11,14 @@ use gpecs_ecs_benchmark_types::framebuffer::{Framebuffer, FramebufferDesc};
 
 pub fn dump_framebuffer_into_file<B>(
     framebuffer: &Framebuffer<B>,
-    group: &str,
+    group: impl AsRef<str>,
     i: u128,
     entity_count: u32,
 ) -> io::Result<()>
 where
     B: AsRef<[u32]>,
 {
+    let group = group.as_ref();
     let FramebufferDesc { width, height } = framebuffer.desc();
     let path = format!("./dump/{group}-{entity_count}-framebuffer-{width}x{height}-i{i}.txt");
     let path = Path::new(&path);
@@ -68,7 +69,11 @@ impl CsvRecord {
     }
 }
 
-pub fn create_csv_writer(group: &str, entity_count: u32) -> csv::Result<csv::Writer<impl Write>> {
+pub fn create_csv_writer(
+    group: impl AsRef<str>,
+    entity_count: u32,
+) -> csv::Result<csv::Writer<impl Write>> {
+    let group = group.as_ref();
     let path = format!("./dump/{group}-{entity_count}-statistics.csv");
     let path = Path::new(&path);
 

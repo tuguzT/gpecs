@@ -56,6 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .execute(terminal::DisableLineWrap)?;
 
     let context = &mut Context::new();
+    let (device, queue) = gpu::init_wgpu();
     let render = |_, _, _, framebuffer: &Framebuffer<Vec<_>>| -> Result<(), Option<io::Error>> {
         stdout
             .queue(cursor::MoveTo(0, 0))?
@@ -80,6 +81,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(())
     };
     let result = gpu::run(
+        &device,
+        &queue,
         context,
         entity_count,
         None,

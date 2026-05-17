@@ -1,4 +1,4 @@
-use std::{env, error::Error, str::FromStr};
+use std::{env, error::Error, ffi::OsStr, str::FromStr};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark::{dump::*, logs::log_statistics};
@@ -46,13 +46,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     context.destroy_all();
 
+    let (device, queue) = gpu::init_wgpu();
+    let device_name = device.adapter_info().name;
+
     let gpu_repeat_count = parse_env("GPU_REPEAT_COUNT")?;
-    let mut csv_writer = create_csv_writer("gpu", entity_count)?;
+    let group = &format!("gpu-{}", device_name.to_lowercase().replace(' ', "-"));
+    let mut csv_writer = create_csv_writer(group, entity_count)?;
+
+    let log_group = &format!("GPU `{device_name}`");
     let f = |i, elapsed, statistics: Vec<_>, framebuffer: &Framebuffer<_>| -> csv::Result<()> {
-        log_statistics("GPU", statistics.as_slice(), i, elapsed);
+        log_statistics(log_group, statistics.as_slice(), i, elapsed);
 
         log::info!(">>> Saving framebuffer state {i} to file...");
-        dump_framebuffer_into_file(framebuffer, "gpu", i, entity_count)?;
+        dump_framebuffer_into_file(framebuffer, group, i, entity_count)?;
 
         let csv_record = CsvRecord::new(elapsed, statistics);
         dump_csv_record(csv_record, i == 0, &mut csv_writer)?;
@@ -61,6 +67,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(())
     };
     let context = gpu::run(
+        &device,
+        &queue,
         context,
         entity_count,
         gpu_repeat_count,
@@ -73,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn parse_env<T>(key: &str) -> Result<Option<T>, T::Err>
+fn parse_env<T>(key: impl AsRef<OsStr>) -> Result<Option<T>, T::Err>
 where
     T: FromStr,
 {

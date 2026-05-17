@@ -2,10 +2,11 @@ use std::{borrow::Borrow, time::Duration};
 
 use gpecs_simple_core::statistics::StatisticsRecord;
 
-pub fn log_statistics<I>(group: &str, statistics: I, i: u128, elapsed: Duration)
+pub fn log_statistics<I>(group: impl AsRef<str>, statistics: I, i: u128, elapsed: Duration)
 where
     I: IntoIterator<Item: Borrow<StatisticsRecord>>,
 {
+    let group = group.as_ref();
     for record in statistics {
         let StatisticsRecord {
             system,

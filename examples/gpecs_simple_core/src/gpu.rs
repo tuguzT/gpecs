@@ -12,15 +12,16 @@ use rayon::prelude::*;
 
 use crate::{setup, statistics::StatisticsRecord};
 
-pub fn run<E>(
-    context: &mut Context,
+pub fn run<'context, E>(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    context: &'context mut Context,
     entity_count: u32,
     repeat_count: Option<usize>,
     mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>) -> Result<(), E>,
-) -> Result<&mut Context, E> {
+) -> Result<&'context mut Context, E> {
     setup::setup(context, entity_count);
 
-    let (device, queue) = init_wgpu();
     let mut executor = GpuExecutor::new(context, device.clone());
 
     // Move all the archetypes to GPU-accessible memory
@@ -43,7 +44,7 @@ pub fn run<E>(
 
         let timestamp = Instant::now();
 
-        let mut command_encoder = init_wgpu_command_encoder(&device);
+        let mut command_encoder = init_wgpu_command_encoder(device);
         executor.execute(&mut command_encoder);
 
         // let mut context_mapper = executor.context_mapper();
@@ -76,12 +77,12 @@ pub fn run<E>(
         //     .expect("archetype should contain `Position` components");
         // check_positions(positions);
 
-        let statistics = collect_statistics(&executor, &queue);
+        let statistics = collect_statistics(&executor, queue);
         f(i, elapsed, statistics)?;
     }
 
     // Return context from the executor to the caller
-    Ok(executor.into_context(&queue))
+    Ok(executor.into_context(queue))
 }
 
 fn register_gpu_systems(executor: &mut GpuExecutor) {
@@ -168,7 +169,7 @@ fn _check_positions(positions: storage::Bundles<(Position,)>) {
     });
 }
 
-fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
+pub fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     let instance_desc = wgpu::InstanceDescriptor::new_without_display_handle();
     let instance = wgpu::Instance::new(instance_desc);
 

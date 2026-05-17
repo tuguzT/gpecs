@@ -19,14 +19,17 @@ use crate::{
     statistics::StatisticsRecord,
 };
 
-pub fn run<B, E>(
-    context: &mut Context,
+#[expect(clippy::too_many_arguments)]
+pub fn run<'context, B, E>(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    context: &'context mut Context,
     entity_count: u32,
     repeat_count: Option<usize>,
     mut framebuffer: Framebuffer<B>,
     spawn_area_margin: u32,
     mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>, &Framebuffer<B>) -> Result<(), E>,
-) -> Result<&mut Context, E>
+) -> Result<&'context mut Context, E>
 where
     B: AsRef<[u32]> + AsMut<[u32]> + 'static,
 {
@@ -47,15 +50,14 @@ where
     );
 
     log::info!(">> Initializing GPU resources...");
-    let (device, queue) = init_wgpu();
-
     let mut executor = GpuExecutor::new(context, device.clone());
+
     executor
         .register_archetype_of::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
         .expect("all the components should be unique");
 
     let mut time_delta = TimeDelta::default();
-    let gpu_system_resources = create_gpu_system_resources(&device, time_delta, &framebuffer);
+    let gpu_system_resources = create_gpu_system_resources(device, time_delta, &framebuffer);
     let gpu_system_additional_entries =
         create_gpu_systems_additional_entries(&gpu_system_resources);
 
@@ -89,7 +91,7 @@ where
 
         let timestamp = Instant::now();
 
-        let mut command_encoder = init_wgpu_command_encoder(&device);
+        let mut command_encoder = init_wgpu_command_encoder(device);
         command_encoder.copy_buffer_to_buffer(
             &framebuffer_clear_buffer,
             0,
@@ -133,16 +135,16 @@ where
         }
 
         time_delta = TimeDelta(elapsed.as_secs_f32());
-        write_time_delta(time_delta, &queue, &gpu_system_resources);
+        write_time_delta(time_delta, queue, &gpu_system_resources);
 
         download_framebuffer(&mut framebuffer, &framebuffer_download_buffer);
         framebuffer_download_buffer.unmap();
 
-        let statistics = collect_statistics(&executor, &queue);
+        let statistics = collect_statistics(&executor, queue);
         f(i, elapsed, statistics, &framebuffer)?;
     }
 
-    Ok(executor.into_context(&queue))
+    Ok(executor.into_context(queue))
 }
 
 #[derive(Debug)]
@@ -491,7 +493,7 @@ where
     dst.copy_from_slice(src);
 }
 
-fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
+pub fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     let instance_desc = wgpu::InstanceDescriptor::new_without_display_handle();
     let instance = wgpu::Instance::new(instance_desc);
 

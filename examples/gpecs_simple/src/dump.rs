@@ -26,7 +26,11 @@ impl CsvRecord {
     }
 }
 
-pub fn create_csv_writer(group: &str, entity_count: u32) -> csv::Result<csv::Writer<impl Write>> {
+pub fn create_csv_writer(
+    group: impl AsRef<str>,
+    entity_count: u32,
+) -> csv::Result<csv::Writer<impl Write>> {
+    let group = group.as_ref();
     let path = format!("./dump/{group}-{entity_count}-statistics.csv");
     let path = Path::new(&path);
 

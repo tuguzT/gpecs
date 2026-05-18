@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_soa"
-description = "Structure of Arrays (SoA) implementation for (probably) ECS on GPU"
+description = "Structure of Arrays (SoA) implementation for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

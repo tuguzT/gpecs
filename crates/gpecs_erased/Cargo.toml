@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_erased"
-description = "Erased data manipulation for (probably) ECS on GPU"
+description = "Erased data manipulation for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

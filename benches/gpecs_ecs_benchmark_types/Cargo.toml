@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_ecs_benchmark_types"
-description = "Basics of `ecs_benchmark` implementation for (probably) ECS on GPU"
+description = "Basics of `ecs_benchmark` implementation for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

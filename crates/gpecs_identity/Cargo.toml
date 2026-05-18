@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_identity"
-description = "Identity type wrapper for (probably) ECS on GPU"
+description = "Identity type wrapper for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

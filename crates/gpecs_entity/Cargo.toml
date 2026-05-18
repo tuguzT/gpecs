@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_entity"
-description = "Entity definitions for (probably) ECS on GPU"
+description = "Entity definitions for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_soa_pair"
-description = "Key-value SoA pair for (probably) ECS on GPU"
+description = "Key-value SoA pair for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

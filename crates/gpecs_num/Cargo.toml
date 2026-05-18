@@ -1,6 +1,6 @@
 [package]
 name = "gpecs_num"
-description = "Numeric utilities for (probably) ECS on GPU"
+description = "Numeric utilities for ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

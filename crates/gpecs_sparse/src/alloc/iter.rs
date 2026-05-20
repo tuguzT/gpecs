@@ -468,7 +468,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|KeyValuePair { value, .. }| value)
+        inner.next().map(KeyValuePair::into_value)
     }
 
     #[inline]
@@ -493,7 +493,7 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, KeyValuePair { value, .. }| f(acc, value))
+        inner.fold(init, |acc, pair| f(acc, pair.into_value()))
     }
 }
 
@@ -504,7 +504,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|KeyValuePair { value, .. }| value)
+        inner.next_back().map(KeyValuePair::into_value)
     }
 }
 

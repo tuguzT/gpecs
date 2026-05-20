@@ -7,8 +7,8 @@ pub struct KeyValuePair<K, V>
 where
     V: ?Sized,
 {
-    pub key: K,
-    pub value: V,
+    key: K,
+    value: V,
 }
 
 impl<K, V> KeyValuePair<K, V> {

@@ -323,8 +323,8 @@ where
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
-        let KeyValueRefs { key, value } = from;
-        let value = V::Context::upcast_refs(value.into_inner());
+        let (key, value) = from.into_parts();
+        let value = V::Context::upcast_refs(value);
         KeyValueRefs::new(key, value)
     }
 
@@ -342,8 +342,8 @@ where
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
-        let KeyValueMutRefs { key, value } = from;
-        let value = V::Context::upcast_mut_refs(value.into_inner());
+        let (key, value) = from.into_parts();
+        let value = V::Context::upcast_mut_refs(value);
         KeyValueMutRefs::new(key, value)
     }
 

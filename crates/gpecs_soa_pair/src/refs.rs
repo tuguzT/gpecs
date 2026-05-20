@@ -16,8 +16,8 @@ pub struct KeyValueRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
-    pub key: &'a K,
-    pub value: wrapper::Refs<'ctx, 'a, V>,
+    key: &'a K,
+    value: wrapper::Refs<'ctx, 'a, V>,
 }
 
 impl<'ctx, 'a, K, V> KeyValueRefs<'ctx, 'a, K, V>
@@ -38,10 +38,10 @@ where
 
     #[inline]
     pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = ptr::from_ref(key);
-        let value = context.refs_as_ptrs(value.into_inner());
+        let value = context.refs_as_ptrs(value);
         KeyValuePtrs::new(key, value)
     }
 }

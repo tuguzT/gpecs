@@ -19,8 +19,8 @@ pub struct KeyValuePtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
-    pub key: *const K,
-    pub value: wrapper::Ptrs<'ctx, V>,
+    key: *const K,
+    value: wrapper::Ptrs<'ctx, V>,
 }
 
 impl<'ctx, K, V> KeyValuePtrs<'ctx, K, V>
@@ -48,33 +48,27 @@ where
 
     #[inline]
     pub fn cast_mut(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = key.cast_mut();
-        let value = context.ptrs_cast_mut(value.into_inner());
+        let value = context.ptrs_cast_mut(value);
         KeyValueMutPtrs::new(key, value)
     }
 
     #[inline]
     #[must_use]
     pub unsafe fn add(self, context: &'ctx V::Context, offset: usize) -> Self {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = unsafe { key.add(offset) };
-        let value = unsafe { context.ptrs_add(value.into_inner(), offset) };
+        let value = unsafe { context.ptrs_add(value, offset) };
         Self::new(key, value)
     }
 
     #[inline]
     pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
-        let Self { key, value } = self;
-        let KeyValuePtrs {
-            key: origin_key,
-            value: origin_value,
-        } = origin;
-
-        let value = value.into_inner();
-        let origin_value = origin_value.into_inner();
+        let (key, value) = self.into_parts();
+        let (origin_key, origin_value) = origin.into_parts();
 
         let key_offset = unsafe { key.offset_from(origin_key) };
         let values_offset = unsafe { context.ptrs_offset_from(value, origin_value) };
@@ -88,10 +82,10 @@ where
     where
         V: SoaRead<'ctx, R>,
     {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = unsafe { ptr::read(key) };
-        let value = unsafe { context.read(value.into_inner()) };
+        let value = unsafe { context.read(value) };
         KeyValuePair::new(key, value)
     }
 }
@@ -103,14 +97,8 @@ where
 {
     #[inline]
     pub unsafe fn clone_to_uninit(self, context: &V::Context, dst: KeyValueMutPtrs<'_, K, V>) {
-        let Self { key, value } = self;
-        let value = value.into_inner();
-
-        let KeyValueMutPtrs {
-            key: dst_key,
-            value: dst_value,
-        } = dst;
-        let dst_value = dst_value.into_inner();
+        let (key, value) = self.into_parts();
+        let (dst_key, dst_value) = dst.into_parts();
 
         unsafe {
             dst_key.write(key.as_ref_unchecked().clone());
@@ -128,10 +116,10 @@ where
         self,
         context: &'ctx V::Context,
     ) -> KeyValueRefs<'ctx, 'a, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = unsafe { key.as_ref_unchecked() };
-        let value = unsafe { context.ptrs_to_refs(value.into_inner()) };
+        let value = unsafe { context.ptrs_to_refs(value) };
         KeyValueRefs::new(key, value)
     }
 }

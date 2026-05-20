@@ -787,9 +787,10 @@ where
 
         let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
         let result = dense.swap_remove_into(dense_index_usize, |context, src| {
-            let &dense_key = unsafe { src.key.as_ref_unchecked() };
+            let (src_key, src_value) = src.into_parts();
+            let &dense_key = unsafe { src_key.as_ref_unchecked() };
             assert_equal_key(key, dense_key);
-            f(context, Some(src.value.into_inner()))
+            f(context, Some(src_value))
         });
 
         // SAFETY: `remove_into()` neither shrinks nor enlarges the dense buffer
@@ -839,9 +840,10 @@ where
 
         let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
         let result = dense.remove_into(dense_index, |context, src| {
-            let dense_key = unsafe { ptr::read(src.key) };
+            let (src_key, src_value) = src.into_parts();
+            let dense_key = unsafe { ptr::read(src_key) };
             assert_equal_key(key, dense_key);
-            f(context, Some(src.value.into_inner()))
+            f(context, Some(src_value))
         });
 
         // SAFETY: `remove_into()` neither shrinks nor enlarges the dense buffer
@@ -878,15 +880,16 @@ where
         let Self { dense, sparse } = self;
 
         dense.pop_into(|context, src| {
-            let Some(KeyValueMutPtrs { key, value }) = src else {
+            let Some(src) = src else {
                 return f(context, None);
             };
-            let key = unsafe { ptr::read(key) };
+            let (key, value) = src.into_parts();
 
+            let key = unsafe { ptr::read(key) };
             let sparse_index = unwrap_into_usize(key.sparse_index());
             assert_key_bounds(sparse_index, sparse.len());
 
-            let result = f(context, Some((key, value.into_inner())));
+            let result = f(context, Some((key, value)));
             sparse[sparse_index] = S::vacant(key.epoch().next());
             result
         })
@@ -1222,8 +1225,10 @@ where
     {
         let Self { dense, sparse } = self;
 
-        for KeyValuePtrs { key, .. } in dense.slice_ptrs() {
+        for ptrs in dense.slice_ptrs() {
+            let (key, _) = ptrs.into_parts();
             let key = unsafe { key.as_ref_unchecked() };
+
             let sparse_index = unwrap_into_usize(key.sparse_index());
             sparse[sparse_index] = S::vacant(key.epoch().next());
         }
@@ -1966,14 +1971,14 @@ where
     }
 }
 
-impl<K, V, S, W> FromIterator<KeyValuePair<K, W>> for EpochSparseSet<K, V, S>
+impl<K, V, S, W> FromIterator<(K, W)> for EpochSparseSet<K, V, S>
 where
     K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Default,
 {
-    fn from_iter<I: IntoIterator<Item = KeyValuePair<K, W>>>(iter: I) -> Self {
+    fn from_iter<T: IntoIterator<Item = (K, W)>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -1981,7 +1986,7 @@ where
         };
 
         let mut me = Self::with_capacity(iter_len, iter_len);
-        for KeyValuePair { key, value } in iter {
+        for (key, value) in iter {
             me.insert_from(key, |context, dst| {
                 let Some(dst) = dst else { return };
                 unsafe { dst.drop_in_place_then_write(context, value) }
@@ -1992,27 +1997,15 @@ where
     }
 }
 
-impl<K, V, S, W> FromIterator<(K, W)> for EpochSparseSet<K, V, S>
-where
-    K: Key,
-    V: AllocSoa + SoaWrite<W> + ?Sized,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    V::Context: Default,
-{
-    fn from_iter<T: IntoIterator<Item = (K, W)>>(iter: T) -> Self {
-        iter.into_iter().map(KeyValuePair::from).collect()
-    }
-}
-
-impl<K, V, S, W> Extend<KeyValuePair<K, W>> for EpochSparseSet<K, V, S>
+impl<K, V, S, W> Extend<(K, W)> for EpochSparseSet<K, V, S>
 where
     K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
-    fn extend<I: IntoIterator<Item = KeyValuePair<K, W>>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = (K, W)>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
-        while let Some(KeyValuePair { key, value }) = iter.next() {
+        while let Some((key, value)) = iter.next() {
             if self.len() == self.capacity() {
                 let (lower, _) = iter.size_hint();
                 self.reserve(lower.saturating_add(1), 0);
@@ -2022,17 +2015,6 @@ where
                 unsafe { dst.drop_in_place_then_write(context, value) }
             });
         }
-    }
-}
-
-impl<K, V, S, W> Extend<(K, W)> for EpochSparseSet<K, V, S>
-where
-    K: Key,
-    V: AllocSoa + SoaWrite<W> + ?Sized,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    fn extend<I: IntoIterator<Item = (K, W)>>(&mut self, iter: I) {
-        self.extend(iter.into_iter().map(KeyValuePair::from));
     }
 }
 

@@ -16,8 +16,8 @@ pub struct KeyValueMutPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
-    pub key: *mut K,
-    pub value: wrapper::MutPtrs<'ctx, V>,
+    key: *mut K,
+    value: wrapper::MutPtrs<'ctx, V>,
 }
 
 impl<'ctx, K, V> KeyValueMutPtrs<'ctx, K, V>
@@ -45,33 +45,27 @@ where
 
     #[inline]
     pub fn cast_const(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = key.cast_const();
-        let value = context.ptrs_cast_const(value.into_inner());
+        let value = context.ptrs_cast_const(value);
         KeyValuePtrs::new(key, value)
     }
 
     #[inline]
     #[must_use]
     pub unsafe fn add(self, context: &'ctx V::Context, offset: usize) -> Self {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = unsafe { key.add(offset) };
-        let value = unsafe { context.ptrs_add_mut(value.into_inner(), offset) };
+        let value = unsafe { context.ptrs_add_mut(value, offset) };
         Self::new(key, value)
     }
 
     #[inline]
     pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
-        let Self { key, value } = self;
-        let KeyValuePtrs {
-            key: origin_key,
-            value: origin_value,
-        } = origin;
-
-        let value = value.into_inner();
-        let origin_value = origin_value.into_inner();
+        let (key, value) = self.into_parts();
+        let (origin_key, origin_value) = origin.into_parts();
 
         let key_offset = unsafe { key.offset_from(origin_key) };
         let values_offset = unsafe { context.ptrs_offset_from_mut(value, origin_value) };
@@ -82,18 +76,12 @@ where
 
     #[inline]
     pub unsafe fn swap(self, context: &V::Context, with: KeyValueMutPtrs<'_, K, V>) {
-        let Self {
-            key: this_key,
-            value: this_value,
-        } = self;
-        let KeyValueMutPtrs {
-            key: with_key,
-            value: with_value,
-        } = with;
+        let (key, value) = self.into_parts();
+        let (with_key, with_value) = with.into_parts();
 
         unsafe {
-            ptr::swap(this_key, with_key);
-            context.ptrs_swap(this_value.into_inner(), with_value.into_inner());
+            ptr::swap(key, with_key);
+            context.ptrs_swap(value, with_value);
         }
     }
 
@@ -104,18 +92,12 @@ where
         from: KeyValuePtrs<'_, K, V>,
         len: usize,
     ) {
-        let Self {
-            key: dst_key,
-            value: dst_value,
-        } = self;
-        let KeyValuePtrs {
-            key: src_key,
-            value: src_value,
-        } = from;
+        let (dst_key, dst_value) = self.into_parts();
+        let (src_key, src_value) = from.into_parts();
 
         unsafe {
             ptr::copy(src_key, dst_key, len);
-            context.ptrs_copy_forward(src_value.into_inner(), dst_value.into_inner(), len);
+            context.ptrs_copy_forward(src_value, dst_value, len);
         }
     }
 
@@ -126,17 +108,11 @@ where
         from: KeyValuePtrs<'_, K, V>,
         len: usize,
     ) {
-        let Self {
-            key: dst_key,
-            value: dst_value,
-        } = self;
-        let KeyValuePtrs {
-            key: src_key,
-            value: src_value,
-        } = from;
+        let (dst_key, dst_value) = self.into_parts();
+        let (src_key, src_value) = from.into_parts();
 
         unsafe {
-            context.ptrs_copy_backward(src_value.into_inner(), dst_value.into_inner(), len);
+            context.ptrs_copy_backward(src_value, dst_value, len);
             ptr::copy(src_key, dst_key, len);
         }
     }
@@ -148,17 +124,9 @@ where
         from: KeyValuePtrs<'_, K, V>,
         len: usize,
     ) {
-        let Self {
-            key: dst_key,
-            value: dst_value,
-        } = self;
-        let KeyValuePtrs {
-            key: src_key,
-            value: src_value,
-        } = from;
+        let (dst_key, dst_value) = self.into_parts();
+        let (src_key, src_value) = from.into_parts();
 
-        let src_value = src_value.into_inner();
-        let dst_value = dst_value.into_inner();
         unsafe {
             ptr::copy_nonoverlapping(src_key, dst_key, len);
             context.ptrs_copy_nonoverlapping(src_value, dst_value, len);
@@ -167,11 +135,11 @@ where
 
     #[inline]
     pub unsafe fn drop_in_place(self, context: &V::Context) {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         unsafe {
             ptr::drop_in_place(key);
-            context.ptrs_drop_in_place(value.into_inner());
+            context.ptrs_drop_in_place(value);
         }
     }
 
@@ -180,15 +148,12 @@ where
     where
         V: SoaWrite<W>,
     {
-        let Self {
-            key: key_ptr,
-            value: value_ptr,
-        } = self;
-        let KeyValuePair { key, value } = value;
+        let (key_ptr, value_ptr) = self.into_parts();
+        let (key, value) = value.into_parts();
 
         unsafe {
             ptr::write(key_ptr, key);
-            context.write(value_ptr.into_inner(), value);
+            context.write(value_ptr, value);
         }
     }
 }
@@ -210,10 +175,10 @@ where
         self,
         context: &'ctx V::Context,
     ) -> KeyValueMutRefs<'ctx, 'a, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = unsafe { key.as_mut_unchecked() };
-        let value = unsafe { context.mut_ptrs_to_mut_refs(value.into_inner()) };
+        let value = unsafe { context.mut_ptrs_to_mut_refs(value) };
         KeyValueMutRefs::new(key, value)
     }
 }

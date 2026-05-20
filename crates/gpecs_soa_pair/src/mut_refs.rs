@@ -16,8 +16,8 @@ pub struct KeyValueMutRefs<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
-    pub key: &'a mut K,
-    pub value: wrapper::RefsMut<'ctx, 'a, V>,
+    key: &'a mut K,
+    value: wrapper::RefsMut<'ctx, 'a, V>,
 }
 
 impl<'ctx, 'a, K, V> KeyValueMutRefs<'ctx, 'a, K, V>
@@ -38,19 +38,19 @@ where
 
     #[inline]
     pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = ptr::from_mut(key);
-        let value = context.mut_refs_as_mut_ptrs(value.into_inner());
+        let value = context.mut_refs_as_mut_ptrs(value);
         KeyValueMutPtrs::new(key, value)
     }
 
     #[inline]
     pub fn into_refs(self, context: &'ctx V::Context) -> KeyValueRefs<'ctx, 'a, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = &*key;
-        let value = context.mut_refs_as_refs(value.into_inner());
+        let value = context.mut_refs_as_refs(value);
         KeyValueRefs::new(key, value)
     }
 }

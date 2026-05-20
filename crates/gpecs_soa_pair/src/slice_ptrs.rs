@@ -47,10 +47,10 @@ where
         ptrs: KeyValuePtrs<'ctx, K, V>,
         len: usize,
     ) -> Self {
-        let KeyValuePtrs { key, value } = ptrs;
+        let (key, value) = ptrs.into_parts();
 
         let keys = ptr::slice_from_raw_parts(key, len);
-        let values = context.slice_ptrs_from_raw_parts(value.into_inner(), len);
+        let values = context.slice_ptrs_from_raw_parts(value, len);
         unsafe { Self::new_unchecked(keys, values) }
     }
 

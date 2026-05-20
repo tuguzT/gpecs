@@ -16,8 +16,8 @@ pub struct KeyValueNonNullPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
-    pub key: NonNull<K>,
-    pub value: wrapper::NonNullPtrs<'ctx, V>,
+    key: NonNull<K>,
+    value: wrapper::NonNullPtrs<'ctx, V>,
 }
 
 impl<'ctx, K, V> KeyValueNonNullPtrs<'ctx, K, V>
@@ -49,20 +49,20 @@ where
 
     #[inline]
     pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = key.as_ptr().cast_const();
-        let value = context.nonnull_to_ptrs(value.into_inner());
+        let value = context.nonnull_to_ptrs(value);
         let value = context.ptrs_cast_const(value);
         KeyValuePtrs::new(key, value)
     }
 
     #[inline]
     pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V> {
-        let Self { key, value } = self;
+        let (key, value) = self.into_parts();
 
         let key = key.as_ptr();
-        let value = context.nonnull_to_ptrs(value.into_inner());
+        let value = context.nonnull_to_ptrs(value);
         KeyValueMutPtrs::new(key, value)
     }
 }

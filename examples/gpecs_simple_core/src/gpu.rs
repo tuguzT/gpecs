@@ -20,6 +20,10 @@ pub fn run<'context, E>(
     repeat_count: Option<usize>,
     mut f: impl FnMut(u128, Duration, Vec<StatisticsRecord>) -> Result<(), E>,
 ) -> Result<&'context mut Context, E> {
+    if entity_count == 0 || repeat_count == Some(0) {
+        return Ok(context);
+    }
+
     setup::setup(context, entity_count);
 
     let mut executor = GpuExecutor::new(context, device.clone());

@@ -37,6 +37,10 @@ pub fn run<B, E>(
 where
     B: AsRef<[u32]> + AsMut<[u32]> + 'static,
 {
+    if entity_count == 0 || repeat_count == Some(0) {
+        return Ok(context);
+    }
+
     log::info!("> Running on CPU...");
 
     let mut rng = RandomXoshiro128::new(DEFAULT_SEED);

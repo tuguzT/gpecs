@@ -5,12 +5,21 @@ use gpecs_ecs_benchmark::{dump::*, logs::log_statistics};
 use gpecs_ecs_benchmark_core::{cpu, gpu};
 use gpecs_ecs_benchmark_types::{components::NONE_SPRITE, framebuffer::Framebuffer};
 
+#[cfg(feature = "dhat")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 fn main() -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
     env_logger::builder().init();
 
     let context = &mut Context::new();
     let entity_count = parse_env("ENTITY_COUNT")?.unwrap_or(1_000_000);
+
+    #[cfg(feature = "dhat")]
+    let _profiler = dhat::Profiler::builder()
+        .file_name(format!("dump/_dhat-{entity_count}.json"))
+        .build();
 
     let framebuffer_width = parse_env("FRAMEBUFFER_WIDTH")?.unwrap_or(320);
     let framebuffer_height = parse_env("FRAMEBUFFER_HEIGHT")?.unwrap_or(240);

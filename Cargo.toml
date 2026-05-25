@@ -87,6 +87,7 @@ env_logger = { version = "0.11" }
 csv = { version = "1.4" }
 dotenvy = { version = "0.15" }
 crossterm = { version = "0.29" }
+dhat = { version = "0.3.3" }
 
 [patch.crates-io]
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "66b7eb3922f042becb223cfa83f088e7be42d608" }

@@ -2,9 +2,10 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ptr,
+    mem, ptr, slice,
 };
 
+use gpecs_ptr::slice::{CastConst, MutSliceItemPtr};
 use gpecs_soa::{
     traits::{RawSoa, RawSoaContext, SliceMutPtrs, Soa, SoaContext},
     wrapper,
@@ -12,17 +13,20 @@ use gpecs_soa::{
 
 use crate::{KeyValueMutPtrs, KeyValueMutSlices, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices};
 
-pub struct KeyValueMutSlicePtrs<'ctx, K, V>
+pub struct KeyValueMutSlicePtrs<'ctx, K, V, P = *mut K>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
 {
-    keys: *mut [K],
+    key: P,
+    len: usize,
     values: wrapper::SliceMutPtrs<'ctx, V>,
 }
 
-impl<'ctx, K, V> KeyValueMutSlicePtrs<'ctx, K, V>
+impl<'ctx, K, V, P> KeyValueMutSlicePtrs<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -37,83 +41,98 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'ctx, V>) -> Self {
+        let key = unsafe { P::from_slice(keys, 0) };
+        let len = keys.len();
         let values = wrapper::SliceMutPtrs::new(values);
-        Self { keys, values }
+        Self { key, len, values }
     }
 
     #[inline]
-    pub fn from_raw_parts(
+    pub fn from_parts(
         context: &'ctx V::Context,
-        ptrs: KeyValueMutPtrs<'ctx, K, V>,
+        ptrs: KeyValueMutPtrs<'ctx, K, V, P>,
         len: usize,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
 
-        let keys = ptr::slice_from_raw_parts_mut(key, len);
         let values = context.mut_slice_ptrs_from_raw_parts(value, len);
-        unsafe { Self::new_unchecked(keys, values) }
+        let values = wrapper::SliceMutPtrs::new(values);
+        Self { key, len, values }
     }
 
     #[inline]
     pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'ctx, V>) {
-        let Self { keys, values } = self;
+        let Self { key, len, values } = self;
+
+        let keys = ptr::slice_from_raw_parts_mut(key.as_mut_raw_ptr(), len);
         (keys, values.into_inner())
     }
 
     #[inline]
-    pub fn len(&self, context: &V::Context) -> usize {
-        let Self { values, .. } = self;
-        context.mut_slice_ptrs_len(values.as_inner())
+    pub fn len(&self) -> usize {
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]
-    pub fn cast_const(self, context: &'ctx V::Context) -> KeyValueSlicePtrs<'ctx, K, V> {
-        let Self { keys, values } = self;
-
-        let keys = keys.cast_const();
-        let values = context.slice_ptrs_cast_const(values.into_inner());
-        unsafe { KeyValueSlicePtrs::new_unchecked(keys, values) }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V> {
-        let Self { keys, values } = self;
+    pub fn cast_const(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValueSlicePtrs<'ctx, K, V, CastConst<P>> {
+        let Self { key, len, values } = self;
 
-        let key = keys.cast_const().cast(); // should be `keys.as_ptr()` but it's unstable
+        let value = context.mut_slice_ptrs_as_ptrs(values.into_inner());
+        let value = context.ptrs_cast_const(value);
+        let ptrs = KeyValuePtrs::new(key.cast_const(), value);
+        KeyValueSlicePtrs::from_parts(context, ptrs, len)
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+        let Self { key, values, .. } = self;
+
+        let key = key.cast_const();
         let values = context.slice_ptrs_cast_const(values.into_inner());
         let value = context.slice_ptrs_as_ptrs(values);
         KeyValuePtrs::new(key, value)
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V> {
-        let Self { keys, values } = self;
+    pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, P> {
+        let Self { key, values, .. } = self;
 
-        let key = keys.cast(); // should be `keys.as_ptr()` but it's unstable
         let value = context.mut_slice_ptrs_as_ptrs(values.into_inner());
         KeyValueMutPtrs::new(key, value)
     }
 
     #[inline]
     pub unsafe fn drop_in_place(self, context: &V::Context) {
-        let Self { keys, values } = self;
+        let Self { key, len, values } = self;
 
-        unsafe {
-            ptr::drop_in_place(keys);
-            context.slices_drop_in_place(values.into_inner());
+        if mem::needs_drop::<K>() {
+            for i in 0..len {
+                unsafe { key.add(i).drop_in_place() }
+            }
         }
+        unsafe { context.slices_drop_in_place(values.into_inner()) }
     }
 }
 
-impl<'ctx, 'a, K, V> KeyValueMutSlicePtrs<'ctx, K, V>
+impl<'ctx, 'a, K, V, P> KeyValueMutSlicePtrs<'ctx, K, V, P>
 where
     V: Soa<'a> + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
 {
     #[inline]
     pub unsafe fn as_ref_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueSlices<'ctx, 'a, K, V> {
+    ) -> KeyValueSlices<'ctx, 'a, K, V, CastConst<P>> {
         unsafe { self.cast_const(context).as_ref_unchecked(context) }
     }
 
@@ -121,113 +140,131 @@ where
     pub unsafe fn as_mut_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutSlices<'ctx, 'a, K, V> {
-        let Self { keys, values } = self;
+    ) -> KeyValueMutSlices<'ctx, 'a, K, V, P> {
+        let Self { key, len, values } = self;
 
-        let keys = unsafe { keys.as_mut_unchecked() };
+        let keys = unsafe { slice::from_raw_parts_mut(key.as_mut_raw_ptr(), len) };
         let values = unsafe { context.mut_slice_ptrs_to_mut_slices(values.into_inner()) };
         unsafe { KeyValueMutSlices::new_unchecked(keys, values) }
     }
 }
 
-impl<'ctx, K, V> From<KeyValueMutSlicePtrs<'ctx, K, V>> for (*mut [K], SliceMutPtrs<'ctx, V>)
+impl<'ctx, K, V, P> From<KeyValueMutSlicePtrs<'ctx, K, V, P>> for (*mut [K], SliceMutPtrs<'ctx, V>)
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
 {
     #[inline]
-    fn from(value: KeyValueMutSlicePtrs<'ctx, K, V>) -> Self {
+    fn from(value: KeyValueMutSlicePtrs<'ctx, K, V, P>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> Debug for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
     for<'ctx> SliceMutPtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { keys, values } = self;
+        let Self {
+            key,
+            len,
+            ref values,
+        } = *self;
 
+        let keys = ptr::slice_from_raw_parts_mut(key.as_mut_raw_ptr(), len);
         f.debug_struct("KeyValueMutSlicePtrs")
-            .field("keys", keys)
+            .field("keys", &keys)
             .field("values", values)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> PartialEq for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K> + PartialEq,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { keys, values } = self;
+        let Self { key, len, values } = self;
 
-        let other = (&other.keys, &other.values);
-        (keys, values) == other
+        let other = (&other.key, &other.len, &other.values);
+        (key, len, values) == other
     }
 }
 
-impl<K, V> Eq for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> Eq for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K> + Eq,
     for<'ctx> SliceMutPtrs<'ctx, V>: Eq,
 {
 }
 
-impl<K, V> PartialOrd for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> PartialOrd for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K> + PartialOrd,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { keys, values } = self;
+        let Self { key, len, values } = self;
 
-        let other = (&other.keys, &other.values);
-        (keys, values).partial_cmp(&other)
+        let other = (&other.key, &other.len, &other.values);
+        (key, len, values).partial_cmp(&other)
     }
 }
 
-impl<K, V> Ord for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> Ord for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K> + Ord,
     for<'ctx> SliceMutPtrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { keys, values } = self;
+        let Self { key, len, values } = self;
 
-        let other = (&other.keys, &other.values);
-        (keys, values).cmp(&other)
+        let other = (&other.key, &other.len, &other.values);
+        (key, len, values).cmp(&other)
     }
 }
 
-impl<K, V> Hash for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> Hash for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K> + Hash,
     for<'ctx> SliceMutPtrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { keys, values } = self;
-        (keys, values).hash(state);
+        let Self { key, len, values } = self;
+        (key, len, values).hash(state);
     }
 }
 
-impl<K, V> Clone for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> Clone for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { keys, ref values } = *self;
+        let Self {
+            key,
+            len,
+            ref values,
+        } = *self;
 
         let values = values.clone();
-        Self { keys, values }
+        Self { key, len, values }
     }
 }
 
-impl<K, V> Copy for KeyValueMutSlicePtrs<'_, K, V>
+impl<K, V, P> Copy for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
     for<'ctx> SliceMutPtrs<'ctx, V>: Copy,
 {
 }

@@ -1031,6 +1031,7 @@ dependencies = [
 name = "gpecs_soa_pair"
 version = "0.0.0"
 dependencies = [
+ "gpecs_ptr",
  "gpecs_soa",
 ]
 

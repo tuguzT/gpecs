@@ -79,7 +79,7 @@ where
 
     #[inline]
     unsafe fn read(self) -> T {
-        unsafe { *self.as_item() }
+        unsafe { *self.as_ref_unchecked() }
     }
 }
 
@@ -100,7 +100,7 @@ where
     }
 
     #[inline]
-    fn as_item_ptr(self) -> *const Self::Item {
+    fn as_raw_ptr(self) -> *const Self::Item {
         let Self { index, slice } = self;
         let item = unsafe { (*slice).index_unchecked(index) };
         ptr::from_ref(item)
@@ -130,7 +130,7 @@ where
 
     #[inline]
     unsafe fn read(self) -> T {
-        unsafe { *self.as_mut_item() }
+        unsafe { *self.as_mut_unchecked() }
     }
 }
 
@@ -151,7 +151,7 @@ where
     }
 
     #[inline]
-    fn as_mut_item_ptr(self) -> *mut T {
+    fn as_mut_raw_ptr(self) -> *mut T {
         let Self { index, slice } = self;
         let item = unsafe { (*slice).index_unchecked_mut(index) };
         ptr::from_mut(item)
@@ -159,7 +159,7 @@ where
 
     #[inline]
     unsafe fn write(self, value: T) {
-        let dst = unsafe { self.as_mut_item() };
+        let dst = unsafe { self.as_mut_unchecked() };
         *dst = value;
     }
 
@@ -227,7 +227,7 @@ where
 
     #[inline]
     unsafe fn read(self) -> T {
-        unsafe { *self.as_ptr().as_mut_item() }
+        unsafe { *self.as_ptr().as_mut_unchecked() }
     }
 }
 
@@ -248,7 +248,7 @@ where
     }
 
     #[inline]
-    fn as_item_ptr(self) -> NonNull<Self::Item> {
+    fn as_raw_ptr(self) -> NonNull<Self::Item> {
         let Self { index, slice } = self;
         let item = unsafe { slice.as_ref().index_unchecked(index) };
         NonNull::from_ref(item)

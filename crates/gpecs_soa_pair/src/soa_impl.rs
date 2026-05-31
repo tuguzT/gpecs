@@ -1,8 +1,10 @@
 use core::{
     alloc::{Layout, LayoutError},
     iter::{Chain, Once},
+    ptr,
 };
 
+use gpecs_ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs};
 use gpecs_soa::{
     field::{FieldLayouts, IntoFieldLayouts},
     identity::Identity,
@@ -18,11 +20,12 @@ use crate::{
     KeyValueSlicePtrs, KeyValueSlices,
 };
 
-unsafe impl<K, V> RawSoaContext<KeyValuePair<K, V>> for Identity<V::Context>
+unsafe impl<K, V, P> RawSoaContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
-    type Ptrs<'a> = KeyValuePtrs<'a, K, V>;
+    type Ptrs<'a> = KeyValuePtrs<'a, K, V, P::Const>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -45,7 +48,7 @@ where
         unsafe { ptrs.offset_from(self, origin) }
     }
 
-    type MutPtrs<'a> = KeyValueMutPtrs<'a, K, V>;
+    type MutPtrs<'a> = KeyValueMutPtrs<'a, K, V, P::Mut>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -116,7 +119,7 @@ where
         unsafe { ptrs.drop_in_place(self) }
     }
 
-    type NonNullPtrs<'a> = KeyValueNonNullPtrs<'a, K, V>;
+    type NonNullPtrs<'a> = KeyValueNonNullPtrs<'a, K, V, P::NonNull>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -137,7 +140,7 @@ where
         ptrs.into_mut_ptrs(self)
     }
 
-    type SlicePtrs<'a> = KeyValueSlicePtrs<'a, K, V>;
+    type SlicePtrs<'a> = KeyValueSlicePtrs<'a, K, V, P::Const>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -153,13 +156,13 @@ where
         len: usize,
     ) -> Self::SlicePtrs<'a> {
         let context = self.as_inner();
-        KeyValueSlicePtrs::from_raw_parts(context, ptrs, len)
+        KeyValueSlicePtrs::from_parts(context, ptrs, len)
     }
 
     #[inline]
     #[track_caller]
     fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize {
-        slices.len(self)
+        slices.len()
     }
 
     #[inline]
@@ -167,7 +170,7 @@ where
         slices.into_ptrs(self)
     }
 
-    type SliceMutPtrs<'a> = KeyValueMutSlicePtrs<'a, K, V>;
+    type SliceMutPtrs<'a> = KeyValueMutSlicePtrs<'a, K, V, P::Mut>;
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
@@ -183,13 +186,13 @@ where
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
         let context = self.as_inner();
-        KeyValueMutSlicePtrs::from_raw_parts(context, ptrs, len)
+        KeyValueMutSlicePtrs::from_parts(context, ptrs, len)
     }
 
     #[inline]
     #[track_caller]
     fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
-        slices.len(self)
+        slices.len()
     }
 
     #[inline]
@@ -213,18 +216,20 @@ where
     }
 }
 
-unsafe impl<K, V> RawSoa for KeyValuePair<K, V>
+unsafe impl<K, V, P> RawSoa for KeyValuePair<K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     type Context = Identity<V::Context>;
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V> CloneToUninitSoaContext<KeyValuePair<K, V>> for Identity<V::Context>
+unsafe impl<K, V, P> CloneToUninitSoaContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
@@ -232,31 +237,34 @@ where
     }
 }
 
-unsafe impl<'a, K, V, R> ReadSoaContext<'a, KeyValuePair<K, R>, KeyValuePair<K, V>>
+unsafe impl<'a, K, V, P, R> ReadSoaContext<'a, KeyValuePair<K, R, P>, KeyValuePair<K, V, P>>
     for Identity<V::Context>
 where
     V: SoaRead<'a, R> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> KeyValuePair<K, R> {
+    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> KeyValuePair<K, R, P> {
         unsafe { src.read(self) }
     }
 }
 
-unsafe impl<K, V, W> WriteSoaContext<KeyValuePair<K, W>, KeyValuePair<K, V>>
+unsafe impl<K, V, P, W> WriteSoaContext<KeyValuePair<K, W, P>, KeyValuePair<K, V, P>>
     for Identity<V::Context>
 where
     V: SoaWrite<W>,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: KeyValuePair<K, W>) {
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: KeyValuePair<K, W, P>) {
         unsafe { dst.write(self, value) }
     }
 }
 
-impl<'a, K, V, C> FieldLayouts<'a, KeyValuePair<K, V>> for Identity<C>
+impl<'a, K, V, P, C> FieldLayouts<'a, KeyValuePair<K, V, P>> for Identity<C>
 where
     V: RawSoa<Context = C> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     C: FieldLayouts<'a, V>,
 {
     type Output = KeyValueFieldLayouts<C::Output>;
@@ -270,10 +278,10 @@ where
     }
 }
 
-unsafe impl<K, V> AllocSoaContext<KeyValuePair<K, V>> for Identity<V::Context>
+unsafe impl<K, V, P> AllocSoaContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
-    V: RawSoa + ?Sized,
-    V::Context: AllocSoaContext<V>,
+    V: RawSoa<Context: AllocSoaContext<V>> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
@@ -291,7 +299,10 @@ where
         let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
         let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
 
-        let key = buffer.cast();
+        let key = unsafe {
+            let slice = ptr::slice_from_raw_parts(buffer.cast(), capacity);
+            P::Const::from_slice(slice, 0)
+        };
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.ptrs_from_buffer(buffer, capacity) };
         KeyValuePtrs::new(key, value)
@@ -305,21 +316,30 @@ where
         let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
         let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
 
-        let key = buffer.cast();
+        let key = unsafe {
+            let slice = ptr::slice_from_raw_parts_mut(buffer.cast(), capacity);
+            P::Mut::from_slice(slice, 0)
+        };
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
         KeyValueMutPtrs::new(key, value)
     }
 }
 
-unsafe impl<K, V> AllocSoaTrusted for KeyValuePair<K, V> where V: AllocSoaTrusted {}
+unsafe impl<K, V, P> AllocSoaTrusted for KeyValuePair<K, V, P>
+where
+    V: AllocSoaTrusted,
+    P: SliceItemPtrs<Item = K>,
+{
+}
 
-unsafe impl<'data, K, V> SoaContext<'data, KeyValuePair<K, V>> for Identity<V::Context>
+unsafe impl<'data, K, V, P> SoaContext<'data, KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     K: 'data,
     V: RawSoa<Context: SoaContext<'data, V>> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
-    type Refs<'a> = KeyValueRefs<'a, 'data, K, V>;
+    type Refs<'a> = KeyValueRefs<'a, 'data, K, V, P::Const>;
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -338,7 +358,7 @@ where
         refs.into_ptrs(self)
     }
 
-    type RefsMut<'a> = KeyValueMutRefs<'a, 'data, K, V>;
+    type RefsMut<'a> = KeyValueMutRefs<'a, 'data, K, V, P::Mut>;
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -362,7 +382,7 @@ where
         refs.into_refs(self)
     }
 
-    type Slices<'a> = KeyValueSlices<'a, 'data, K, V>;
+    type Slices<'a> = KeyValueSlices<'a, 'data, K, V, P::Const>;
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -383,10 +403,10 @@ where
 
     #[inline]
     fn slices_len(&self, slices: &Self::Slices<'_>) -> usize {
-        slices.len(self)
+        slices.len()
     }
 
-    type SlicesMut<'a> = KeyValueMutSlices<'a, 'data, K, V>;
+    type SlicesMut<'a> = KeyValueMutSlices<'a, 'data, K, V, P::Mut>;
 
     #[inline]
     fn upcast_mut_slices<'short, 'long: 'short>(
@@ -415,7 +435,7 @@ where
 
     #[inline]
     fn mut_slices_len(&self, slices: &Self::SlicesMut<'_>) -> usize {
-        slices.len(self)
+        slices.len()
     }
 
     #[inline]

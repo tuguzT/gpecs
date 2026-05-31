@@ -2,9 +2,9 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ptr,
 };
 
+use gpecs_ptr::slice::{CastMut, ConstSliceItemPtr, MutSliceItemPtr};
 use gpecs_soa::{
     traits::{
         CloneToUninitSoaContext, Ptrs, RawSoa, RawSoaContext, ReadSoaContext, Soa,
@@ -15,39 +15,41 @@ use gpecs_soa::{
 
 use crate::{KeyValueMutPtrs, KeyValuePair, KeyValueRefs};
 
-pub struct KeyValuePtrs<'ctx, K, V>
+pub struct KeyValuePtrs<'ctx, K, V, P = *const K>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
-    key: *const K,
+    key: P,
     value: wrapper::Ptrs<'ctx, V>,
 }
 
-impl<'ctx, K, V> KeyValuePtrs<'ctx, K, V>
+impl<'ctx, K, V, P> KeyValuePtrs<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
-    pub fn new(key: *const K, value: Ptrs<'ctx, V>) -> Self {
+    pub fn new(key: P, value: Ptrs<'ctx, V>) -> Self {
         let value = wrapper::Ptrs::new(value);
         Self { key, value }
     }
 
     #[inline]
     pub fn dangling(context: &'ctx V::Context) -> Self {
-        let key = ptr::dangling();
+        let key = P::dangling();
         let value = context.ptrs_dangling();
         Self::new(key, value)
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*const K, Ptrs<'ctx, V>) {
+    pub fn into_parts(self) -> (P, Ptrs<'ctx, V>) {
         let Self { key, value } = self;
         (key, value.into_inner())
     }
 
     #[inline]
-    pub fn cast_mut(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V> {
+    pub fn cast_mut(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, CastMut<P>> {
         let (key, value) = self.into_parts();
 
         let key = key.cast_mut();
@@ -66,7 +68,11 @@ where
     }
 
     #[inline]
-    pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
+    pub unsafe fn offset_from(
+        self,
+        context: &V::Context,
+        origin: KeyValuePtrs<'_, K, V, P>,
+    ) -> isize {
         let (key, value) = self.into_parts();
         let (origin_key, origin_value) = origin.into_parts();
 
@@ -78,25 +84,30 @@ where
     }
 
     #[inline]
-    pub unsafe fn read<R>(self, context: &'ctx V::Context) -> KeyValuePair<K, R>
+    pub unsafe fn read<R>(self, context: &'ctx V::Context) -> KeyValuePair<K, R, P::Ptrs>
     where
         V: SoaRead<'ctx, R>,
     {
         let (key, value) = self.into_parts();
 
-        let key = unsafe { ptr::read(key) };
+        let key = unsafe { key.read() };
         let value = unsafe { context.read(value) };
         KeyValuePair::new(key, value)
     }
 }
 
-impl<K, V> KeyValuePtrs<'_, K, V>
+impl<K, V, P> KeyValuePtrs<'_, K, V, P>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
-    pub unsafe fn clone_to_uninit(self, context: &V::Context, dst: KeyValueMutPtrs<'_, K, V>) {
+    pub unsafe fn clone_to_uninit(
+        self,
+        context: &V::Context,
+        dst: KeyValueMutPtrs<'_, K, V, CastMut<P>>,
+    ) {
         let (key, value) = self.into_parts();
         let (dst_key, dst_value) = dst.into_parts();
 
@@ -107,47 +118,50 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> KeyValuePtrs<'ctx, K, V>
+impl<'ctx, 'a, K, V, P> KeyValuePtrs<'ctx, K, V, P>
 where
     V: Soa<'a> + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
     pub unsafe fn as_ref_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueRefs<'ctx, 'a, K, V> {
+    ) -> KeyValueRefs<'ctx, 'a, K, V, P> {
         let (key, value) = self.into_parts();
 
-        let key = unsafe { key.as_ref_unchecked() };
         let value = unsafe { context.ptrs_to_refs(value) };
-        KeyValueRefs::new(key, value)
+        unsafe { KeyValueRefs::from_parts(key, value) }
     }
 }
 
-impl<'ctx, K, V> From<(*const K, Ptrs<'ctx, V>)> for KeyValuePtrs<'ctx, K, V>
+impl<'ctx, K, V, P> From<(P, Ptrs<'ctx, V>)> for KeyValuePtrs<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
-    fn from(value: (*const K, Ptrs<'ctx, V>)) -> Self {
+    fn from(value: (P, Ptrs<'ctx, V>)) -> Self {
         let (key, value) = value;
         Self::new(key, value)
     }
 }
 
-impl<'ctx, K, V> From<KeyValuePtrs<'ctx, K, V>> for (*const K, Ptrs<'ctx, V>)
+impl<'ctx, K, V, P> From<KeyValuePtrs<'ctx, K, V, P>> for (P, Ptrs<'ctx, V>)
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
-    fn from(value: KeyValuePtrs<'ctx, K, V>) -> Self {
+    fn from(value: KeyValuePtrs<'ctx, K, V, P>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValuePtrs<'_, K, V>
+impl<K, V, P> Debug for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K> + Debug,
     for<'ctx> Ptrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -160,9 +174,10 @@ where
     }
 }
 
-impl<K, V> PartialEq for KeyValuePtrs<'_, K, V>
+impl<K, V, P> PartialEq for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K> + PartialEq,
     for<'ctx> Ptrs<'ctx, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -173,16 +188,18 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValuePtrs<'_, K, V>
+impl<K, V, P> Eq for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K> + Eq,
     for<'ctx> Ptrs<'ctx, V>: Eq,
 {
 }
 
-impl<K, V> PartialOrd for KeyValuePtrs<'_, K, V>
+impl<K, V, P> PartialOrd for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K> + PartialOrd,
     for<'ctx> Ptrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -193,9 +210,10 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValuePtrs<'_, K, V>
+impl<K, V, P> Ord for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K> + Ord,
     for<'ctx> Ptrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -206,9 +224,10 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValuePtrs<'_, K, V>
+impl<K, V, P> Hash for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K> + Hash,
     for<'ctx> Ptrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -217,9 +236,10 @@ where
     }
 }
 
-impl<K, V> Clone for KeyValuePtrs<'_, K, V>
+impl<K, V, P> Clone for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
 {
     fn clone(&self) -> Self {
         let Self { key, ref value } = *self;
@@ -229,9 +249,10 @@ where
     }
 }
 
-impl<K, V> Copy for KeyValuePtrs<'_, K, V>
+impl<K, V, P> Copy for KeyValuePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: ConstSliceItemPtr<Item = K>,
     for<'ctx> Ptrs<'ctx, V>: Copy,
 {
 }

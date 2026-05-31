@@ -80,7 +80,7 @@ where
         let Self { layout, .. } = self;
         let Self { ptr, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let ptr = ptr.as_item_ptr().cast();
+        let ptr = ptr.as_raw_ptr().cast();
         Ok(ptr)
     }
 
@@ -123,7 +123,7 @@ where
     pub fn as_buffer(self) -> *const [T::Item] {
         let Self { layout, ptr } = self;
 
-        let data = ptr.as_item_ptr();
+        let data = ptr.as_raw_ptr();
         let len = bytes_to_items::<T::Item>(layout.size());
         ptr::slice_from_raw_parts(data, len)
     }
@@ -131,7 +131,7 @@ where
     #[inline]
     pub fn as_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
-        ptr.as_item_ptr()
+        ptr.as_raw_ptr()
     }
 }
 

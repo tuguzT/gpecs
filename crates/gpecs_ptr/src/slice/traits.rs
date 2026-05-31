@@ -37,13 +37,18 @@ pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
 
     fn slice(self) -> *const [Self::Item];
 
-    fn as_item_ptr(self) -> *const Self::Item {
+    fn dangling() -> Self {
+        let slice = &[];
+        unsafe { Self::from_slice(slice, 0) }
+    }
+
+    fn as_raw_ptr(self) -> *const Self::Item {
         let count = self.index();
         unsafe { self.slice().cast::<Self::Item>().add(count) }
     }
 
-    unsafe fn as_item<'a>(self) -> &'a Self::Item {
-        unsafe { self.as_item_ptr().as_ref_unchecked() }
+    unsafe fn as_ref_unchecked<'a>(self) -> &'a Self::Item {
+        unsafe { self.as_raw_ptr().as_ref_unchecked() }
     }
 
     fn cast_mut(self) -> CastMut<Self> {
@@ -60,19 +65,28 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
 
     fn slice(self) -> *mut [Self::Item];
 
-    fn as_mut_item_ptr(self) -> *mut Self::Item {
+    fn dangling() -> Self {
+        let slice = &mut [];
+        unsafe { Self::from_slice(slice, 0) }
+    }
+
+    fn as_mut_raw_ptr(self) -> *mut Self::Item {
         let count = self.index();
         unsafe { self.slice().cast::<Self::Item>().add(count) }
     }
 
-    unsafe fn as_mut_item<'a>(self) -> &'a mut Self::Item {
-        unsafe { self.as_mut_item_ptr().as_mut_unchecked() }
+    unsafe fn as_mut_unchecked<'a>(self) -> &'a mut Self::Item {
+        unsafe { self.as_mut_raw_ptr().as_mut_unchecked() }
     }
 
     fn cast_const(self) -> CastConst<Self> {
         let slice = self.slice().cast_const();
         let index = self.index();
         unsafe { ConstSliceItemPtr::from_slice(slice, index) }
+    }
+
+    unsafe fn drop_in_place(self) {
+        unsafe { self.as_mut_raw_ptr().drop_in_place() }
     }
 
     unsafe fn write(self, value: Self::Item);
@@ -89,9 +103,14 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
 
     unsafe fn from_slice(slice: NonNull<[Self::Item]>, index: usize) -> Self;
 
+    fn dangling() -> Self {
+        let slice = NonNull::from_ref(&[]);
+        unsafe { Self::from_slice(slice, 0) }
+    }
+
     fn slice(self) -> NonNull<[Self::Item]>;
 
-    fn as_item_ptr(self) -> NonNull<Self::Item> {
+    fn as_raw_ptr(self) -> NonNull<Self::Item> {
         let count = self.index();
         unsafe { self.slice().cast::<Self::Item>().add(count) }
     }

@@ -538,7 +538,10 @@ pub fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
             | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
         experimental_features: wgpu::ExperimentalFeatures::disabled(),
         required_limits: adapter.limits(),
-        memory_hints: wgpu::MemoryHints::Performance,
+        memory_hints: wgpu::MemoryHints::Manual {
+            // just use the minimal possible one
+            suballocated_device_memory_block_size: 0..0,
+        },
         trace: wgpu::Trace::Off,
     };
     let (device, queue) = pollster::block_on(adapter.request_device(&device_desc))

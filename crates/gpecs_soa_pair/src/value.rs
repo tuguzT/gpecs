@@ -34,7 +34,10 @@ where
     }
 
     #[inline]
-    pub fn map_key<N>(self, f: impl FnOnce(K) -> N) -> KeyValuePair<N, V> {
+    pub fn map_key<N, NP>(self, f: impl FnOnce(K) -> N) -> KeyValuePair<N, V, NP>
+    where
+        NP: SliceItemPtrs<Item = N>,
+    {
         let Self { key, value, .. } = self;
 
         let key = f(key);
@@ -42,7 +45,7 @@ where
     }
 
     #[inline]
-    pub fn map_value<N>(self, f: impl FnOnce(V) -> N) -> KeyValuePair<K, N> {
+    pub fn map_value<N>(self, f: impl FnOnce(V) -> N) -> KeyValuePair<K, N, P> {
         let Self { key, value, .. } = self;
 
         let value = f(value);

@@ -97,35 +97,64 @@ pub type SparseStorage = TypedBuffer<[EntitySparseItem]>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Pod, Zeroable)]
 #[repr(C)]
 pub struct SparseGetDesc {
-    len: u32,
+    pub lhs_len: u32,
+    pub lhs_capacity: u32,
+    pub rhs_len: u32,
+    pub rhs_capacity: u32,
 }
 
-#[cfg(test)]
 #[spirv(compute(threads(64)))]
+#[expect(clippy::too_many_arguments, reason = "entry point")]
 pub fn sparse_get(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(uniform, descriptor_set = 0, binding = 0)] desc: &SparseGetDescUniform,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] layouts: &LayoutsStorage,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] entities: &mut EntityStorage,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] dense: &mut DenseStorage,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] sparse: &mut SparseStorage,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] lhs_entities: &mut EntityStorage,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] lhs_dense: &mut DenseStorage,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] lhs_sparse: &mut SparseStorage,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] rhs_entities: &mut EntityStorage,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 6)] rhs_dense: &mut DenseStorage,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] rhs_sparse: &mut SparseStorage,
 ) {
     let invocation_id = id.x;
-    let SparseGetDesc { len } = **desc;
+    let SparseGetDesc {
+        lhs_len,
+        lhs_capacity,
+        rhs_len,
+        rhs_capacity,
+    } = **desc;
 
     let layouts = GpuFieldLayouts::from(&**layouts);
     let context = unsafe { ErasedSoaContext::from_inner(layouts) };
     let context = Identity::from_inner(context);
 
-    let values = unsafe {
-        let len = u32_to_usize(len);
-        ErasedSoaMutSlices::new_unchecked(layouts, dense, len, 0, len)
+    let lhs_values = unsafe {
+        let len = u32_to_usize(lhs_len);
+        let capacity = u32_to_usize(lhs_capacity);
+        ErasedSoaMutSlices::new_unchecked(layouts, lhs_dense, capacity, 0, len)
     };
-    let dense = unsafe { KeyValueMutSlices::<_, GpuErasedSoa<_>>::new_unchecked(entities, values) };
-    let dense = SoaSlicesMut::<KeyValuePair<_, _>>::new(&context, dense);
+    let lhs_dense = unsafe {
+        KeyValueMutSlices::<_, GpuErasedSoa<_>, _>::new_unchecked(lhs_entities, lhs_values)
+    };
+    let lhs_dense =
+        SoaSlicesMut::<KeyValuePair<_, _, GpuSliceItemPtrs<_>>>::new(&context, lhs_dense);
+    let mut lhs_view = unsafe { EpochSparseViewMut::from_parts(lhs_dense, lhs_sparse) };
 
-    let mut view = unsafe { EpochSparseViewMut::from_parts(dense, sparse) };
+    let rhs_values = unsafe {
+        let len = u32_to_usize(rhs_len);
+        let capacity = u32_to_usize(rhs_capacity);
+        ErasedSoaMutSlices::new_unchecked(layouts, rhs_dense, capacity, 0, len)
+    };
+    let rhs_dense = unsafe {
+        KeyValueMutSlices::<_, GpuErasedSoa<_>, _>::new_unchecked(rhs_entities, rhs_values)
+    };
+    let rhs_dense =
+        SoaSlicesMut::<KeyValuePair<_, _, GpuSliceItemPtrs<_>>>::new(&context, rhs_dense);
+    let mut rhs_view = unsafe { EpochSparseViewMut::from_parts(rhs_dense, rhs_sparse) };
+
     let entity = Entity::new(invocation_id, EntityEpoch::default(), WorldId::default());
+    let mut lhs = unsafe { lhs_view.get_unchecked_mut(entity) };
+    let mut rhs = unsafe { rhs_view.get_unchecked_mut(entity) };
 
-    let _ = unsafe { view.get_unchecked_mut(entity) };
+    unsafe { lhs.swap(&mut rhs) }
 }

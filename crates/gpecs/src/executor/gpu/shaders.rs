@@ -40,6 +40,23 @@ mod tests {
         (device, queue)
     }
 
+    #[must_use]
+    fn init_pipeline(
+        device: &wgpu::Device,
+        module: &wgpu::ShaderModule,
+        entry_point: &str,
+    ) -> wgpu::ComputePipeline {
+        let swap_erased_desc = wgpu::ComputePipelineDescriptor {
+            label: Some(entry_point),
+            layout: None,
+            module,
+            entry_point: Some(entry_point),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        };
+        device.create_compute_pipeline(&swap_erased_desc)
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn spirv_to_shader_module() {
@@ -56,5 +73,8 @@ mod tests {
 
         let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
         println!("Shader compilation info: {shader_compilation_info:#?}");
+
+        let _swap_erased = init_pipeline(&device, &shader_module, "swap_erased");
+        let _sparse_get = init_pipeline(&device, &shader_module, "sparse_get");
     }
 }

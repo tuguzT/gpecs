@@ -8,6 +8,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+gpecs_ptr = { workspace = true }
 gpecs_soa = { workspace = true }
 gpecs_soa_pair = { workspace = true }
 gpecs_itertools = { workspace = true }

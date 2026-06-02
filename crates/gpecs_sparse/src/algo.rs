@@ -1,5 +1,7 @@
 use core::{borrow::Borrow, fmt::Debug};
 
+use gpecs_ptr::slice::SliceItemPtrs;
+
 use crate::{
     assert::{
         assert_compatible_key, assert_dense_index_bounds, assert_equal_key, unwrap_dense,
@@ -242,20 +244,22 @@ where
 }
 
 #[inline]
-pub fn dense_keys<'a, K, V>(dense: SoaSlices<'_, 'a, KeyValuePair<K, V>>) -> &'a [K]
+pub fn dense_keys<'a, K, V, P>(dense: SoaSlices<'_, 'a, KeyValuePair<K, V, P>>) -> &'a [K]
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     let (_, keys) = dense_keys_with_context(dense);
     keys
 }
 
 #[inline]
-pub fn dense_keys_with_context<'ctx, 'a, K, V>(
-    dense: SoaSlices<'ctx, 'a, KeyValuePair<K, V>>,
+pub fn dense_keys_with_context<'ctx, 'a, K, V, P>(
+    dense: SoaSlices<'ctx, 'a, KeyValuePair<K, V, P>>,
 ) -> (&'ctx V::Context, &'a [K])
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     let (context, slices) = dense.into_slice_ptrs_with_context();
 
@@ -265,13 +269,14 @@ where
     (context, keys)
 }
 
-pub fn check_parts<'a, K, V, S>(
-    dense: SoaSlices<'_, 'a, KeyValuePair<K, V>>,
+pub fn check_parts<'a, K, V, P, S>(
+    dense: SoaSlices<'_, 'a, KeyValuePair<K, V, P>>,
     sparse: &[S],
 ) -> Result<(), FromPartsError<K>>
 where
     K: Key + 'a,
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     let dense = dense_keys(dense);

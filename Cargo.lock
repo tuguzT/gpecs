@@ -1040,6 +1040,7 @@ name = "gpecs_sparse"
 version = "0.0.0"
 dependencies = [
  "gpecs_itertools",
+ "gpecs_ptr",
  "gpecs_soa",
  "gpecs_soa_pair",
  "rayon",

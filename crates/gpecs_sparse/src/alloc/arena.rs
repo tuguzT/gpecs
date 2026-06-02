@@ -7,6 +7,8 @@ use core::{
 };
 use core_alloc::vec::Vec;
 
+use gpecs_ptr::slice::{CoreSliceItemPtrs, MutSliceItemPtr, SliceItemPtr, SliceItemPtrs};
+
 use crate::{
     algo::{check_parts, dense_keys, sparse_item_by_epoch},
     assert::{
@@ -47,23 +49,26 @@ use super::{
     set,
 };
 
-pub type SparseArena<T, S = DefaultSparseItem<usize>> = EpochSparseArena<usize, T, S>;
+pub type SparseArena<T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
+    EpochSparseArena<usize, T, S, P>;
 
-pub struct EpochSparseArena<K, V, S = DefaultSparseItem<K>>
+pub struct EpochSparseArena<K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
-    dense: SoaVec<KeyValuePair<K, V>>,
+    dense: SoaVec<KeyValuePair<K, V, P>>,
     sparse: Vec<S>,
     sparse_vacant_head: usize,
 }
 
-impl<K, V, S> EpochSparseArena<K, V, S>
+impl<K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -135,7 +140,7 @@ where
 
     #[inline]
     pub fn from_parts(
-        dense: SoaVec<KeyValuePair<K, V>>,
+        dense: SoaVec<KeyValuePair<K, V, P>>,
         mut sparse: Vec<S>,
     ) -> Result<Self, FromPartsError<K>> {
         check_parts(dense.slices(), sparse.as_slice())?;
@@ -178,7 +183,7 @@ where
 
     #[inline]
     pub unsafe fn from_parts_unchecked(
-        dense: SoaVec<KeyValuePair<K, V>>,
+        dense: SoaVec<KeyValuePair<K, V, P>>,
         sparse: Vec<S>,
         sparse_vacant_head: usize,
     ) -> Self {
@@ -191,7 +196,7 @@ where
 
     #[inline]
     #[must_use]
-    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<S>, usize) {
+    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V, P>>, Vec<S>, usize) {
         let Self {
             dense,
             sparse,
@@ -328,35 +333,37 @@ where
     }
 
     #[inline]
-    pub fn as_view_ptr(&self) -> EpochSparseViewPtr<'_, K, V, S> {
+    pub fn as_view_ptr(&self) -> EpochSparseViewPtr<'_, K, V, S, P> {
         let Self { dense, sparse, .. } = self;
         unsafe { EpochSparseViewPtr::from_parts(dense.slice_ptrs(), sparse.as_slice()) }
     }
 
     #[inline]
-    pub fn as_mut_view_ptr(&mut self) -> EpochSparseViewMutPtr<'_, K, V, S> {
+    pub fn as_mut_view_ptr(&mut self) -> EpochSparseViewMutPtr<'_, K, V, S, P> {
         let Self { dense, sparse, .. } = self;
         unsafe { EpochSparseViewMutPtr::from_parts(dense.mut_slice_ptrs(), sparse.as_mut_slice()) }
     }
 
     #[inline]
-    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V, S> {
+    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V, S, P> {
         unsafe { self.as_view_ptr().as_ref_unchecked() }
     }
 
     #[inline]
-    pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V, S> {
+    pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V, S, P> {
         unsafe { self.as_mut_view_ptr().as_mut_unchecked() }
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V>, *const S) {
+    pub fn as_ptrs(&self) -> (KeyValuePtrs<'_, K, V, P::Const>, *const S) {
         let (_, dense, sparse) = self.as_ptrs_with_context();
         (dense, sparse)
     }
 
     #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&V::Context, KeyValuePtrs<'_, K, V>, *const S) {
+    pub fn as_ptrs_with_context(
+        &self,
+    ) -> (&V::Context, KeyValuePtrs<'_, K, V, P::Const>, *const S) {
         let Self { dense, sparse, .. } = self;
 
         let (context, dense) = dense.as_ptrs_with_context();
@@ -365,13 +372,15 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (KeyValueMutPtrs<'_, K, V>, *mut S) {
+    pub fn as_mut_ptrs(&mut self) -> (KeyValueMutPtrs<'_, K, V, P::Mut>, *mut S) {
         let (_, dense, sparse) = self.as_mut_ptrs_with_context();
         (dense, sparse)
     }
 
     #[inline]
-    pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, KeyValueMutPtrs<'_, K, V>, *mut S) {
+    pub fn as_mut_ptrs_with_context(
+        &mut self,
+    ) -> (&V::Context, KeyValueMutPtrs<'_, K, V, P::Mut>, *mut S) {
         let Self { dense, sparse, .. } = self;
 
         let (context, dense) = dense.as_mut_ptrs_with_context();
@@ -380,26 +389,26 @@ where
     }
 
     #[inline]
-    pub fn as_key_ptr(&self) -> *const K {
+    pub fn as_key_ptr(&self) -> P::Const {
         let (_, key) = self.as_key_ptr_with_context();
         key
     }
 
     #[inline]
-    pub fn as_key_ptr_with_context(&self) -> (&V::Context, *const K) {
+    pub fn as_key_ptr_with_context(&self) -> (&V::Context, P::Const) {
         let (context, dense) = self.as_dense_ptrs_with_context();
         let (key, _) = dense.into_parts();
         (context, key)
     }
 
     #[inline]
-    pub fn as_mut_key_ptr(&mut self) -> *mut K {
+    pub fn as_mut_key_ptr(&mut self) -> P::Mut {
         let (_, key) = self.as_mut_key_ptr_with_context();
         key
     }
 
     #[inline]
-    pub fn as_mut_key_ptr_with_context(&mut self) -> (&V::Context, *mut K) {
+    pub fn as_mut_key_ptr_with_context(&mut self) -> (&V::Context, P::Mut) {
         let (context, dense) = self.as_mut_dense_ptrs_with_context();
         let (key, _) = dense.into_parts();
         (context, key)
@@ -432,25 +441,27 @@ where
     }
 
     #[inline]
-    pub fn as_dense_ptrs(&self) -> KeyValuePtrs<'_, K, V> {
+    pub fn as_dense_ptrs(&self) -> KeyValuePtrs<'_, K, V, P::Const> {
         let (_, dense) = self.as_dense_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_dense_ptrs_with_context(&self) -> (&V::Context, KeyValuePtrs<'_, K, V>) {
+    pub fn as_dense_ptrs_with_context(&self) -> (&V::Context, KeyValuePtrs<'_, K, V, P::Const>) {
         let (context, dense, _) = self.as_ptrs_with_context();
         (context, dense)
     }
 
     #[inline]
-    pub fn as_mut_dense_ptrs(&mut self) -> KeyValueMutPtrs<'_, K, V> {
+    pub fn as_mut_dense_ptrs(&mut self) -> KeyValueMutPtrs<'_, K, V, P::Mut> {
         let (_, dense) = self.as_mut_dense_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_mut_dense_ptrs_with_context(&mut self) -> (&V::Context, KeyValueMutPtrs<'_, K, V>) {
+    pub fn as_mut_dense_ptrs_with_context(
+        &mut self,
+    ) -> (&V::Context, KeyValueMutPtrs<'_, K, V, P::Mut>) {
         let (context, dense, _) = self.as_mut_ptrs_with_context();
         (context, dense)
     }
@@ -480,15 +491,20 @@ where
     }
 
     #[inline]
-    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V>, *const [S]) {
+    pub fn as_slice_ptrs(&self) -> (KeyValueSlicePtrs<'_, K, V, P::Const>, *const [S]) {
         let (_, dense, sparse) = self.as_slice_ptrs_with_context();
         (dense, sparse)
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_slice_ptrs_with_context(
         &self,
-    ) -> (&V::Context, KeyValueSlicePtrs<'_, K, V>, *const [S]) {
+    ) -> (
+        &V::Context,
+        KeyValueSlicePtrs<'_, K, V, P::Const>,
+        *const [S],
+    ) {
         let Self { dense, sparse, .. } = self;
 
         let (context, dense) = dense.as_slice_ptrs_with_context();
@@ -497,15 +513,20 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slice_ptrs(&mut self) -> (KeyValueMutSlicePtrs<'_, K, V>, *mut [S]) {
+    pub fn as_mut_slice_ptrs(&mut self) -> (KeyValueMutSlicePtrs<'_, K, V, P::Mut>, *mut [S]) {
         let (_, dense, sparse) = self.as_mut_slice_ptrs_with_context();
         (dense, sparse)
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_mut_slice_ptrs_with_context(
         &mut self,
-    ) -> (&V::Context, KeyValueMutSlicePtrs<'_, K, V>, *mut [S]) {
+    ) -> (
+        &V::Context,
+        KeyValueMutSlicePtrs<'_, K, V, P::Mut>,
+        *mut [S],
+    ) {
         let Self { dense, sparse, .. } = self;
 
         let (context, dense) = dense.as_mut_slice_ptrs_with_context();
@@ -566,19 +587,21 @@ where
     }
 
     #[inline]
-    pub fn as_dense_slice_ptrs(&self) -> KeyValueSlicePtrs<'_, K, V> {
+    pub fn as_dense_slice_ptrs(&self) -> KeyValueSlicePtrs<'_, K, V, P::Const> {
         let (_, dense) = self.as_dense_slice_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_dense_slice_ptrs_with_context(&self) -> (&V::Context, KeyValueSlicePtrs<'_, K, V>) {
+    pub fn as_dense_slice_ptrs_with_context(
+        &self,
+    ) -> (&V::Context, KeyValueSlicePtrs<'_, K, V, P::Const>) {
         let (context, dense, _) = self.as_slice_ptrs_with_context();
         (context, dense)
     }
 
     #[inline]
-    pub fn as_mut_dense_slice_ptrs(&mut self) -> KeyValueMutSlicePtrs<'_, K, V> {
+    pub fn as_mut_dense_slice_ptrs(&mut self) -> KeyValueMutSlicePtrs<'_, K, V, P::Mut> {
         let (_, dense) = self.as_mut_dense_slice_ptrs_with_context();
         dense
     }
@@ -586,7 +609,7 @@ where
     #[inline]
     pub fn as_mut_dense_slice_ptrs_with_context(
         &mut self,
-    ) -> (&V::Context, KeyValueMutSlicePtrs<'_, K, V>) {
+    ) -> (&V::Context, KeyValueMutSlicePtrs<'_, K, V, P::Mut>) {
         let (context, dense, _) = self.as_mut_slice_ptrs_with_context();
         (context, dense)
     }
@@ -698,7 +721,7 @@ where
     pub unsafe fn get_with_key_unchecked(
         &self,
         sparse_index: K::SparseIndex,
-    ) -> (*const K, Ptrs<'_, V>) {
+    ) -> (P::Const, Ptrs<'_, V>) {
         let (_, key, value) = unsafe { self.get_with_key_unchecked_with_context(sparse_index) };
         (key, value)
     }
@@ -707,7 +730,7 @@ where
     pub unsafe fn get_with_key_unchecked_with_context(
         &self,
         sparse_index: K::SparseIndex,
-    ) -> (&V::Context, *const K, Ptrs<'_, V>) {
+    ) -> (&V::Context, P::Const, Ptrs<'_, V>) {
         let view_ptr = self.as_view_ptr();
         unsafe { view_ptr.into_get_with_key_unchecked_with_context(sparse_index) }
     }
@@ -716,7 +739,7 @@ where
     pub unsafe fn get_mut_with_key_unchecked(
         &mut self,
         sparse_index: K::SparseIndex,
-    ) -> (*mut K, MutPtrs<'_, V>) {
+    ) -> (P::Mut, MutPtrs<'_, V>) {
         let (_, key, value) = unsafe { self.get_mut_with_key_unchecked_with_context(sparse_index) };
         (key, value)
     }
@@ -725,7 +748,7 @@ where
     pub unsafe fn get_mut_with_key_unchecked_with_context(
         &mut self,
         sparse_index: K::SparseIndex,
-    ) -> (&V::Context, *mut K, MutPtrs<'_, V>) {
+    ) -> (&V::Context, P::Mut, MutPtrs<'_, V>) {
         let view_ptr = self.as_mut_view_ptr();
         unsafe { view_ptr.into_get_mut_with_key_unchecked_with_context(sparse_index) }
     }
@@ -853,7 +876,7 @@ where
         let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
         let result = dense.swap_remove_into(dense_index_usize, |context, src| {
             let (src_key, src_value) = src.into_parts();
-            let dense_key = unsafe { ptr::read(src_key) };
+            let dense_key = unsafe { src_key.read() };
             assert_equal_key(key, dense_key);
             f(context, Some(src_value))
         });
@@ -921,7 +944,7 @@ where
         let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
         let result = dense.remove_into(dense_index, |context, src| {
             let (src_key, src_value) = src.into_parts();
-            let dense_key = unsafe { ptr::read(src_key) };
+            let dense_key = unsafe { src_key.read() };
             assert_equal_key(key, dense_key);
             f(context, Some(src_value))
         });
@@ -971,7 +994,7 @@ where
             };
             let (key, value) = src.into_parts();
 
-            let key = unsafe { ptr::read(key) };
+            let key = unsafe { key.read() };
             let sparse_index = unwrap_into_usize(key.sparse_index());
             assert_key_bounds(sparse_index, sparse.len());
 
@@ -1078,7 +1101,7 @@ where
                                 f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
                             sparse[sparse_index] = S::occupied(key.epoch(), dense_index);
-                            unsafe { ptr::write(key_ptr, key) }
+                            unsafe { key_ptr.write(key) }
 
                             result
                         })
@@ -1095,7 +1118,7 @@ where
                         let result = f(context, Ok(Some(access)));
 
                         *sparse_item = S::occupied(key.epoch(), index);
-                        unsafe { ptr::replace(dense_key, key) };
+                        unsafe { ptr::replace(dense_key.as_mut_raw_ptr(), key) };
 
                         result
                     }
@@ -1135,7 +1158,7 @@ where
                     let result = f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
                     sparse[sparse_index] = S::occupied(key.epoch(), dense_index);
-                    unsafe { ptr::write(key_ptr, key) }
+                    unsafe { key_ptr.write(key) }
 
                     result
                 })
@@ -1241,7 +1264,7 @@ where
 
                 *sparse_item = S::occupied(sparse_item.epoch(), dense_index);
                 *sparse_vacant_head = next_vacant;
-                unsafe { ptr::write(key_ptr, key) }
+                unsafe { key_ptr.write(key) }
 
                 result
             });
@@ -1285,7 +1308,7 @@ where
 
             sparse.push(sparse_item);
             *sparse_vacant_head = new_sparse_vacant_head;
-            unsafe { ptr::write(key_ptr, key) }
+            unsafe { key_ptr.write(key) }
 
             result
         })
@@ -1304,7 +1327,14 @@ where
             Err(error) => Err(TryModifyError::new(error, value)),
         })
     }
+}
 
+impl<K, V, S> EpochSparseArena<K, V, S>
+where
+    K: Key,
+    V: AllocSoa + ?Sized,
+    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
+{
     #[inline]
     #[track_caller]
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V, S> {
@@ -1333,7 +1363,15 @@ where
         let entry = OccupiedEntry::new(key, dense_index, self);
         Ok(Entry::Occupied(entry))
     }
+}
 
+impl<K, V, S, P> EpochSparseArena<K, V, S, P>
+where
+    K: Key,
+    V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
+    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
+{
     #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
         let (_, iter) = self.raw_keys_with_context();
@@ -1347,49 +1385,49 @@ where
     }
 
     #[inline]
-    pub fn raw_values(&self) -> RawValues<'_, K, V> {
+    pub fn raw_values(&self) -> RawValues<'_, K, V, P> {
         let (_, iter) = self.raw_values_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V>) {
+    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V, P>) {
         let view = self.as_view();
         view.into_raw_values_with_context()
     }
 
     #[inline]
-    pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
+    pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V, P> {
         let (_, iter) = self.raw_values_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V>) {
+    pub fn raw_values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V, P>) {
         let view_mut = self.as_mut_view();
         view_mut.into_raw_values_mut_with_context()
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, K, V> {
+    pub fn raw_iter(&self) -> RawIter<'_, K, V, P> {
         let (_, iter) = self.raw_iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V>) {
+    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V, P>) {
         let view = self.as_view();
         view.into_raw_iter_with_context()
     }
 
     #[inline]
-    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V, P> {
         let (_, iter) = self.raw_iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V>) {
+    pub fn raw_iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V, P>) {
         let view_mut = self.as_mut_view();
         view_mut.into_raw_iter_mut_with_context()
     }
@@ -1429,7 +1467,7 @@ where
     }
 
     #[inline]
-    pub fn drain<'a, R>(&'a mut self) -> Drain<'a, K, V, R>
+    pub fn drain<'a, R>(&'a mut self) -> Drain<'a, K, V, R, P>
     where
         V: SoaRead<'a, R>,
     {
@@ -1452,7 +1490,7 @@ where
 
     #[inline]
     #[must_use]
-    pub fn into_values<R>(self) -> IntoValues<K, V, R>
+    pub fn into_values<R>(self) -> IntoValues<K, V, R, P>
     where
         V: SoaReadOwned<R>,
     {
@@ -1462,7 +1500,7 @@ where
     }
 
     #[inline]
-    pub fn into_items<R>(self) -> IntoIter<K, V, R>
+    pub fn into_items<R>(self) -> IntoIter<K, V, R, P>
     where
         V: SoaReadOwned<R>,
     {
@@ -1472,22 +1510,28 @@ where
     }
 }
 
-impl<'a, K, V, S> EpochSparseArena<K, V, S>
+impl<'a, K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V>, &'a [S]) {
+    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V, P::Const>, &'a [S]) {
         let (_, dense, sparse) = self.as_slices_with_context();
         (dense, sparse)
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub fn as_slices_with_context(
         &'a self,
-    ) -> (&'a V::Context, KeyValueSlices<'a, 'a, K, V>, &'a [S]) {
+    ) -> (
+        &'a V::Context,
+        KeyValueSlices<'a, 'a, K, V, P::Const>,
+        &'a [S],
+    ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
         let dense = unsafe { dense.as_ref_unchecked(context) };
         let sparse = unsafe { sparse.as_ref_unchecked() };
@@ -1495,15 +1539,22 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_mut_slices(&'a mut self) -> (KeyValueMutSlices<'a, 'a, K, V>, &'a mut [S]) {
+    pub unsafe fn as_mut_slices(
+        &'a mut self,
+    ) -> (KeyValueMutSlices<'a, 'a, K, V, P::Mut>, &'a mut [S]) {
         let (_, dense, sparse) = unsafe { self.as_mut_slices_with_context() };
         (dense, sparse)
     }
 
     #[inline]
+    #[expect(clippy::type_complexity)]
     pub unsafe fn as_mut_slices_with_context(
         &'a mut self,
-    ) -> (&'a V::Context, KeyValueMutSlices<'a, 'a, K, V>, &'a mut [S]) {
+    ) -> (
+        &'a V::Context,
+        KeyValueMutSlices<'a, 'a, K, V, P::Mut>,
+        &'a mut [S],
+    ) {
         let (context, dense, sparse) = self.as_mut_slice_ptrs_with_context();
         let dense = unsafe { dense.as_mut_unchecked(context) };
         let sparse = unsafe { sparse.as_mut_unchecked() };
@@ -1539,7 +1590,7 @@ where
     }
 
     #[inline]
-    pub fn as_dense_slices(&'a self) -> KeyValueSlices<'a, 'a, K, V> {
+    pub fn as_dense_slices(&'a self) -> KeyValueSlices<'a, 'a, K, V, P::Const> {
         let (_, dense) = self.as_dense_slices_with_context();
         dense
     }
@@ -1547,13 +1598,13 @@ where
     #[inline]
     pub fn as_dense_slices_with_context(
         &'a self,
-    ) -> (&'a V::Context, KeyValueSlices<'a, 'a, K, V>) {
+    ) -> (&'a V::Context, KeyValueSlices<'a, 'a, K, V, P::Const>) {
         let (context, dense, _) = self.as_slices_with_context();
         (context, dense)
     }
 
     #[inline]
-    pub unsafe fn as_mut_dense_slices(&'a mut self) -> KeyValueMutSlices<'a, 'a, K, V> {
+    pub unsafe fn as_mut_dense_slices(&'a mut self) -> KeyValueMutSlices<'a, 'a, K, V, P::Mut> {
         let (_, dense) = unsafe { self.as_mut_dense_slices_with_context() };
         dense
     }
@@ -1561,7 +1612,7 @@ where
     #[inline]
     pub unsafe fn as_mut_dense_slices_with_context(
         &'a mut self,
-    ) -> (&'a V::Context, KeyValueMutSlices<'a, 'a, K, V>) {
+    ) -> (&'a V::Context, KeyValueMutSlices<'a, 'a, K, V, P::Mut>) {
         let (context, dense, _) = unsafe { self.as_mut_slices_with_context() };
         (context, dense)
     }
@@ -1667,63 +1718,65 @@ where
     }
 
     #[inline]
-    pub fn values(&'a self) -> Values<'a, 'a, K, V> {
+    pub fn values(&'a self) -> Values<'a, 'a, K, V, P> {
         let (_, iter) = self.values_with_context();
         iter
     }
 
     #[inline]
-    pub fn values_with_context(&'a self) -> (&'a V::Context, Values<'a, 'a, K, V>) {
+    pub fn values_with_context(&'a self) -> (&'a V::Context, Values<'a, 'a, K, V, P>) {
         let view = self.as_view();
         view.into_values_with_context()
     }
 
     #[inline]
-    pub fn values_mut(&'a mut self) -> ValuesMut<'a, 'a, K, V> {
+    pub fn values_mut(&'a mut self) -> ValuesMut<'a, 'a, K, V, P> {
         let (_, iter) = self.values_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn values_mut_with_context(&'a mut self) -> (&'a V::Context, ValuesMut<'a, 'a, K, V>) {
+    pub fn values_mut_with_context(&'a mut self) -> (&'a V::Context, ValuesMut<'a, 'a, K, V, P>) {
         let view_mut = self.as_mut_view();
         view_mut.into_values_mut_with_context()
     }
 
     #[inline]
-    pub fn iter(&'a self) -> Iter<'a, 'a, K, V> {
+    pub fn iter(&'a self) -> Iter<'a, 'a, K, V, P> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&'a self) -> (&'a V::Context, Iter<'a, 'a, K, V>) {
+    pub fn iter_with_context(&'a self) -> (&'a V::Context, Iter<'a, 'a, K, V, P>) {
         let view = self.as_view();
         view.into_iter_with_context()
     }
 
     #[inline]
-    pub fn iter_mut(&'a mut self) -> IterMut<'a, 'a, K, V> {
+    pub fn iter_mut(&'a mut self) -> IterMut<'a, 'a, K, V, P> {
         let (_, iter) = self.iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&'a mut self) -> (&'a V::Context, IterMut<'a, 'a, K, V>) {
+    pub fn iter_mut_with_context(&'a mut self) -> (&'a V::Context, IterMut<'a, 'a, K, V, P>) {
         let view_mut = self.as_mut_view();
         view_mut.into_iter_with_context()
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter(&'a self) -> crate::iter::ParIter<'a, 'a, K, V> {
+    pub fn par_iter(&'a self) -> crate::iter::ParIter<'a, 'a, K, V, P> {
         let (_, iter) = self.par_iter_with_context();
         iter
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_with_context(&'a self) -> (&'a V::Context, crate::iter::ParIter<'a, 'a, K, V>) {
+    pub fn par_iter_with_context(
+        &'a self,
+    ) -> (&'a V::Context, crate::iter::ParIter<'a, 'a, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.slices_with_context();
@@ -1733,7 +1786,7 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_mut(&'a mut self) -> crate::iter::ParIterMut<'a, 'a, K, V> {
+    pub fn par_iter_mut(&'a mut self) -> crate::iter::ParIterMut<'a, 'a, K, V, P> {
         let (_, iter) = self.par_iter_mut_with_context();
         iter
     }
@@ -1742,7 +1795,7 @@ where
     #[cfg(feature = "rayon")]
     pub fn par_iter_mut_with_context(
         &'a mut self,
-    ) -> (&'a V::Context, crate::iter::ParIterMut<'a, 'a, K, V>) {
+    ) -> (&'a V::Context, crate::iter::ParIterMut<'a, 'a, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.mut_slices_with_context();
@@ -1752,7 +1805,7 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_values(&'a self) -> crate::iter::ParValues<'a, 'a, K, V> {
+    pub fn par_values(&'a self) -> crate::iter::ParValues<'a, 'a, K, V, P> {
         let (_, iter) = self.par_values_with_context();
         iter
     }
@@ -1761,7 +1814,7 @@ where
     #[cfg(feature = "rayon")]
     pub fn par_values_with_context(
         &'a self,
-    ) -> (&'a V::Context, crate::iter::ParValues<'a, 'a, K, V>) {
+    ) -> (&'a V::Context, crate::iter::ParValues<'a, 'a, K, V, P>) {
         let (context, inner) = self.par_iter_with_context();
         let values = crate::iter::ParValues::new(inner);
         (context, values)
@@ -1769,7 +1822,7 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_values_mut(&'a mut self) -> crate::iter::ParValuesMut<'a, 'a, K, V> {
+    pub fn par_values_mut(&'a mut self) -> crate::iter::ParValuesMut<'a, 'a, K, V, P> {
         let (_, iter) = self.par_values_mut_with_context();
         iter
     }
@@ -1778,17 +1831,18 @@ where
     #[cfg(feature = "rayon")]
     pub fn par_values_mut_with_context(
         &'a mut self,
-    ) -> (&'a V::Context, crate::iter::ParValuesMut<'a, 'a, K, V>) {
+    ) -> (&'a V::Context, crate::iter::ParValuesMut<'a, 'a, K, V, P>) {
         let (context, inner) = self.par_iter_mut_with_context();
         let values = crate::iter::ParValuesMut::new(inner);
         (context, values)
     }
 }
 
-impl<K, V, S> EpochSparseArena<K, V, S>
+impl<K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: SoaOwned + AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     pub fn retain<F>(&mut self, mut f: F)
@@ -1908,12 +1962,13 @@ where
     }
 }
 
-impl<K, V, S> Debug for EpochSparseArena<K, V, S>
+impl<K, V, S, P> Debug for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Debug,
-    SoaVec<KeyValuePair<K, V>>: Debug,
+    SoaVec<KeyValuePair<K, V, P>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -1930,10 +1985,11 @@ where
     }
 }
 
-impl<K, V, S> Default for EpochSparseArena<K, V, S>
+impl<K, V, S, P> Default for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Default,
 {
@@ -1943,12 +1999,13 @@ where
     }
 }
 
-impl<K, V, S> PartialEq for EpochSparseArena<K, V, S>
+impl<K, V, S, P> PartialEq for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + PartialEq,
-    SoaVec<KeyValuePair<K, V>>: PartialEq,
+    SoaVec<KeyValuePair<K, V, P>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -1962,21 +2019,23 @@ where
     }
 }
 
-impl<K, V, S> Eq for EpochSparseArena<K, V, S>
+impl<K, V, S, P> Eq for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Eq,
-    SoaVec<KeyValuePair<K, V>>: Eq,
+    SoaVec<KeyValuePair<K, V, P>>: Eq,
 {
 }
 
-impl<K, V, S> PartialOrd for EpochSparseArena<K, V, S>
+impl<K, V, S, P> PartialOrd for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + PartialOrd,
-    SoaVec<KeyValuePair<K, V>>: PartialOrd,
+    SoaVec<KeyValuePair<K, V, P>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self {
@@ -1990,12 +2049,13 @@ where
     }
 }
 
-impl<K, V, S> Ord for EpochSparseArena<K, V, S>
+impl<K, V, S, P> Ord for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Ord,
-    SoaVec<KeyValuePair<K, V>>: Ord,
+    SoaVec<KeyValuePair<K, V, P>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self {
@@ -2009,12 +2069,13 @@ where
     }
 }
 
-impl<K, V, S> Hash for EpochSparseArena<K, V, S>
+impl<K, V, S, P> Hash for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Hash,
-    SoaVec<KeyValuePair<K, V>>: Hash,
+    SoaVec<KeyValuePair<K, V, P>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self {
@@ -2026,12 +2087,13 @@ where
     }
 }
 
-impl<K, V, S> Clone for EpochSparseArena<K, V, S>
+impl<K, V, S, P> Clone for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    SoaVec<KeyValuePair<K, V>>: Clone,
+    SoaVec<KeyValuePair<K, V, P>>: Clone,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -2065,10 +2127,11 @@ where
     }
 }
 
-impl<T, K, V, S> Index<K> for EpochSparseArena<K, V, S>
+impl<T, K, V, S, P> Index<K> for EpochSparseArena<K, V, S, P>
 where
     K: Key + Debug,
     V: SoaOwned + AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T>,
 {
@@ -2080,10 +2143,11 @@ where
     }
 }
 
-impl<T, K, V, S> IndexMut<K> for EpochSparseArena<K, V, S>
+impl<T, K, V, S, P> IndexMut<K> for EpochSparseArena<K, V, S, P>
 where
     K: Key + Debug,
     V: SoaOwned + AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>,
 {
@@ -2093,10 +2157,11 @@ where
     }
 }
 
-impl<T, K, V, S> AsRef<[T]> for EpochSparseArena<K, V, S>
+impl<T, K, V, S, P> AsRef<[T]> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: SoaOwned + AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
@@ -2106,10 +2171,11 @@ where
     }
 }
 
-impl<T, K, V, S> AsMut<[T]> for EpochSparseArena<K, V, S>
+impl<T, K, V, S, P> AsMut<[T]> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: SoaOwned + AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
 {
@@ -2119,10 +2185,11 @@ where
     }
 }
 
-impl<K, V, S> AsRef<Self> for EpochSparseArena<K, V, S>
+impl<K, V, S, P> AsRef<Self> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -2131,10 +2198,11 @@ where
     }
 }
 
-impl<K, V, S> AsMut<Self> for EpochSparseArena<K, V, S>
+impl<K, V, S, P> AsMut<Self> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -2143,14 +2211,15 @@ where
     }
 }
 
-impl<'a, K, V, S> IntoIterator for &'a EpochSparseArena<K, V, S>
+impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (&'a K, Refs<'a, 'a, V>);
-    type IntoIter = Iter<'a, 'a, K, V>;
+    type IntoIter = Iter<'a, 'a, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -2158,14 +2227,15 @@ where
     }
 }
 
-impl<'a, K, V, S> IntoIterator for &'a mut EpochSparseArena<K, V, S>
+impl<'a, K, V, S, P> IntoIterator for &'a mut EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (&'a K, RefsMut<'a, 'a, V>);
-    type IntoIter = IterMut<'a, 'a, K, V>;
+    type IntoIter = IterMut<'a, 'a, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -2173,14 +2243,15 @@ where
     }
 }
 
-impl<K, V, S> IntoIterator for EpochSparseArena<K, V, S>
+impl<K, V, S, P> IntoIterator for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + SoaReadOwned<V>,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (K, V);
-    type IntoIter = IntoIter<K, V, V>;
+    type IntoIter = IntoIter<K, V, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -2189,17 +2260,18 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, K, V, S> rayon::iter::IntoParallelIterator for &'a EpochSparseArena<K, V, S>
+impl<'a, K, V, S, P> rayon::iter::IntoParallelIterator for &'a EpochSparseArena<K, V, S, P>
 where
     K: Key + Sync,
     V: AllocSoa + Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'a, 'a, V>: Send,
 {
     type Item = (&'a K, Refs<'a, 'a, V>);
-    type Iter = crate::iter::ParIter<'a, 'a, K, V>;
+    type Iter = crate::iter::ParIter<'a, 'a, K, V, P>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -2208,17 +2280,18 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, K, V, S> rayon::iter::IntoParallelIterator for &'a mut EpochSparseArena<K, V, S>
+impl<'a, K, V, S, P> rayon::iter::IntoParallelIterator for &'a mut EpochSparseArena<K, V, S, P>
 where
     K: Key + Send + Sync,
     V: AllocSoa + Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Sync,
     V::Fields: Send,
     RefsMut<'a, 'a, V>: Send,
 {
     type Item = (&'a K, RefsMut<'a, 'a, V>);
-    type Iter = crate::iter::ParIterMut<'a, 'a, K, V>;
+    type Iter = crate::iter::ParIterMut<'a, 'a, K, V, P>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -2226,10 +2299,11 @@ where
     }
 }
 
-impl<K, V, S, W> FromIterator<(K, W)> for EpochSparseArena<K, V, S>
+impl<K, V, S, P, W> FromIterator<(K, W)> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Default,
 {
@@ -2252,10 +2326,11 @@ where
     }
 }
 
-impl<K, V, S, W> Extend<(K, W)> for EpochSparseArena<K, V, S>
+impl<K, V, S, P, W> Extend<(K, W)> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     fn extend<I: IntoIterator<Item = (K, W)>>(&mut self, iter: I) {
@@ -2273,14 +2348,15 @@ where
     }
 }
 
-impl<K, V, S> From<set::EpochSparseSet<K, V, S>> for EpochSparseArena<K, V, S>
+impl<K, V, S, P> From<set::EpochSparseSet<K, V, S, P>> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
     V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
-    fn from(value: set::EpochSparseSet<K, V, S>) -> Self {
+    fn from(value: set::EpochSparseSet<K, V, S, P>) -> Self {
         let (dense, sparse) = value.into_parts();
         Self::from_parts(dense, sparse).unwrap_or_else(|_| {
             unreachable!("creation of sparse arena from valid parts should not fail")

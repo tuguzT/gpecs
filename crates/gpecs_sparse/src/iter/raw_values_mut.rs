@@ -3,6 +3,8 @@ use core::{
     iter::FusedIterator,
 };
 
+use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+
 use crate::{
     item::KeyValuePair,
     iter::{IterMut, RawIterMut, RawValues, Values, ValuesMut},
@@ -12,28 +14,30 @@ use crate::{
     },
 };
 
-type Inner<'ctx, K, V> = soa::slice::RawIterMut<'ctx, KeyValuePair<K, V>>;
+type Inner<'ctx, K, V, P> = soa::slice::RawIterMut<'ctx, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct RawValuesMut<'ctx, K, V>
+pub struct RawValuesMut<'ctx, K, V, P = CoreSliceItemPtrs<K>>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
-    inner: RawIterMut<'ctx, K, V>,
+    inner: RawIterMut<'ctx, K, V, P>,
 }
 
-impl<'ctx, K, V> RawValuesMut<'ctx, K, V>
+impl<'ctx, K, V, P> RawValuesMut<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    pub(crate) fn from_inner(inner: Inner<'ctx, K, V>) -> Self {
+    pub(crate) fn from_inner(inner: Inner<'ctx, K, V, P>) -> Self {
         let inner = RawIterMut::from_inner(inner);
         Self { inner }
     }
 
     #[inline]
-    fn into_inner(self) -> Inner<'ctx, K, V> {
+    fn into_inner(self) -> Inner<'ctx, K, V, P> {
         let Self { inner } = self;
         inner.into_inner()
     }
@@ -168,27 +172,28 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> RawValues<'ctx, K, V> {
+    pub fn cast_const(self) -> RawValues<'ctx, K, V, P> {
         let inner = self.into_inner().cast_const();
         RawValues::from_inner(inner)
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> Values<'ctx, 'a, K, V> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> Values<'ctx, 'a, K, V, P> {
         unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ValuesMut<'ctx, 'a, K, V> {
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ValuesMut<'ctx, 'a, K, V, P> {
         let inner = unsafe { self.into_inner().as_mut_unchecked() };
         let inner = IterMut::from_inner(inner);
         unsafe { ValuesMut::from_inner(inner) }
     }
 }
 
-impl<K, V> Debug for RawValuesMut<'_, K, V>
+impl<K, V, P> Debug for RawValuesMut<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -197,9 +202,10 @@ where
     }
 }
 
-impl<K, V> Clone for RawValuesMut<'_, K, V>
+impl<K, V, P> Clone for RawValuesMut<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -210,9 +216,10 @@ where
     }
 }
 
-impl<'ctx, K, V> Iterator for RawValuesMut<'ctx, K, V>
+impl<'ctx, K, V, P> Iterator for RawValuesMut<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     type Item = MutPtrs<'ctx, V>;
 
@@ -229,9 +236,10 @@ where
     }
 }
 
-impl<K, V> DoubleEndedIterator for RawValuesMut<'_, K, V>
+impl<K, V, P> DoubleEndedIterator for RawValuesMut<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -240,9 +248,10 @@ where
     }
 }
 
-impl<K, V> ExactSizeIterator for RawValuesMut<'_, K, V>
+impl<K, V, P> ExactSizeIterator for RawValuesMut<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -250,4 +259,9 @@ where
     }
 }
 
-impl<K, V> FusedIterator for RawValuesMut<'_, K, V> where V: RawSoa + ?Sized {}
+impl<K, V, P> FusedIterator for RawValuesMut<'_, K, V, P>
+where
+    V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
+{
+}

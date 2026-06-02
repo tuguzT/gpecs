@@ -1,5 +1,6 @@
 use core::fmt::{self, Debug};
 
+use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 use rayon::iter::{
     IndexedParallelIterator, ParallelIterator,
     plumbing::{Consumer, Producer, ProducerCallback, UnindexedConsumer, bridge},
@@ -14,30 +15,32 @@ use crate::{
     },
 };
 
-type Inner<'ctx, 'a, K, V> = slice::ParIter<'ctx, 'a, KeyValuePair<K, V>>;
+type Inner<'ctx, 'a, K, V, P> = slice::ParIter<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct ParIter<'ctx, 'a, K, V>
+pub struct ParIter<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where
-    V: RawSoa + ?Sized,
-    V::Context: 'ctx,
+    V: RawSoa<Context: 'ctx> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
-    inner: Inner<'ctx, 'a, K, V>,
+    inner: Inner<'ctx, 'a, K, V, P>,
 }
 
-impl<'ctx, 'a, K, V> ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V, P> ParIter<'ctx, 'a, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    pub(crate) fn new(inner: Inner<'ctx, 'a, K, V>) -> Self {
+    pub(crate) fn new(inner: Inner<'ctx, 'a, K, V, P>) -> Self {
         Self { inner }
     }
 }
 
-impl<'a, K, V> ParIter<'_, '_, K, V>
+impl<'a, K, V, P> ParIter<'_, '_, K, V, P>
 where
     V: Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
@@ -55,10 +58,11 @@ where
     }
 }
 
-impl<K, V> Debug for ParIter<'_, '_, K, V>
+impl<K, V, P> Debug for ParIter<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -70,9 +74,10 @@ where
     }
 }
 
-impl<K, V> Clone for ParIter<'_, '_, K, V>
+impl<K, V, P> Clone for ParIter<'_, '_, K, V, P>
 where
     V: RawSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -83,10 +88,11 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> ParallelIterator for ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V, P> ParallelIterator for ParIter<'ctx, 'a, K, V, P>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
@@ -105,10 +111,11 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> IndexedParallelIterator for ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V, P> IndexedParallelIterator for ParIter<'ctx, 'a, K, V, P>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
@@ -133,16 +140,17 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> Producer for ParIter<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V, P> Producer for ParIter<'ctx, 'a, K, V, P>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
+    P: SliceItemPtrs<Item = K>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
 {
     type Item = (&'a K, Refs<'ctx, 'a, V>);
-    type IntoIter = Iter<'ctx, 'a, K, V>;
+    type IntoIter = Iter<'ctx, 'a, K, V, P>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;

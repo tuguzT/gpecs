@@ -203,4 +203,4 @@ where
     }
 }
 
-impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: RawSoa {}
+impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: RawSoa + ?Sized {}

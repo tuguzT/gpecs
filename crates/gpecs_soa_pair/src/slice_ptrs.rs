@@ -2,7 +2,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ptr, slice,
+    ptr,
 };
 
 use gpecs_ptr::slice::{CastMut, ConstSliceItemPtr};
@@ -11,7 +11,7 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::{KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePtrs, KeyValueSlices};
+use crate::{KeyValueMutSlicePtrs, KeyValuePtrs, KeyValueSlices};
 
 pub struct KeyValueSlicePtrs<'ctx, K, V, P = *const K>
 where
@@ -43,19 +43,22 @@ where
     pub unsafe fn new_unchecked(keys: *const [K], values: SlicePtrs<'ctx, V>) -> Self {
         let key = unsafe { P::from_slice(keys, 0) };
         let len = keys.len();
-        let values = wrapper::SlicePtrs::new(values);
-        Self { key, len, values }
+        unsafe { Self::from_parts(key, len, values) }
     }
 
     #[inline]
-    pub fn from_parts(
+    pub fn from_ptrs(
         context: &'ctx V::Context,
         ptrs: KeyValuePtrs<'ctx, K, V, P>,
         len: usize,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
-
         let values = context.slice_ptrs_from_raw_parts(value, len);
+        unsafe { Self::from_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(key: P, len: usize, values: SlicePtrs<'ctx, V>) -> Self {
         let values = wrapper::SlicePtrs::new(values);
         Self { key, len, values }
     }
@@ -86,10 +89,9 @@ where
     ) -> KeyValueMutSlicePtrs<'ctx, K, V, CastMut<P>> {
         let Self { key, len, values } = self;
 
-        let value = context.slice_ptrs_as_ptrs(values.into_inner());
-        let value = context.ptrs_cast_mut(value);
-        let ptrs = KeyValueMutPtrs::new(key.cast_mut(), value);
-        KeyValueMutSlicePtrs::from_parts(context, ptrs, len)
+        let key = key.cast_mut();
+        let values = context.slice_ptrs_cast_mut(values.into_inner());
+        unsafe { KeyValueMutSlicePtrs::from_parts(key, len, values) }
     }
 
     #[inline]
@@ -113,9 +115,8 @@ where
     ) -> KeyValueSlices<'ctx, 'a, K, V, P> {
         let Self { key, len, values } = self;
 
-        let keys = unsafe { slice::from_raw_parts(key.as_raw_ptr(), len) };
         let values = unsafe { context.slice_ptrs_to_slices(values.into_inner()) };
-        unsafe { KeyValueSlices::new_unchecked(keys, values) }
+        unsafe { KeyValueSlices::from_parts(key, len, values) }
     }
 }
 

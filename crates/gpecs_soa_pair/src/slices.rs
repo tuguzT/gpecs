@@ -2,7 +2,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ptr, slice,
+    slice,
 };
 
 use gpecs_ptr::slice::ConstSliceItemPtr;
@@ -43,6 +43,11 @@ where
     pub unsafe fn new_unchecked(keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
         let key = unsafe { P::from_slice(keys, 0) };
         let len = keys.len();
+        unsafe { Self::from_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(key: P, len: usize, values: Slices<'ctx, 'a, V>) -> Self {
         let values = wrapper::Slices::new(values);
         Self { key, len, values }
     }
@@ -70,9 +75,8 @@ where
     pub fn into_slice_ptrs(self, context: &'ctx V::Context) -> KeyValueSlicePtrs<'ctx, K, V, P> {
         let Self { key, len, values } = self;
 
-        let keys = ptr::slice_from_raw_parts(key.as_raw_ptr(), len);
         let values = context.slices_as_slice_ptrs(values.into_inner());
-        unsafe { KeyValueSlicePtrs::new_unchecked(keys, values) }
+        unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
     }
 }
 

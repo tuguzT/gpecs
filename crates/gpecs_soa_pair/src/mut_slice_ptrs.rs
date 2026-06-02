@@ -2,7 +2,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem, ptr, slice,
+    mem, ptr,
 };
 
 use gpecs_ptr::slice::{CastConst, MutSliceItemPtr};
@@ -43,19 +43,22 @@ where
     pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'ctx, V>) -> Self {
         let key = unsafe { P::from_slice(keys, 0) };
         let len = keys.len();
-        let values = wrapper::SliceMutPtrs::new(values);
-        Self { key, len, values }
+        unsafe { Self::from_parts(key, len, values) }
     }
 
     #[inline]
-    pub fn from_parts(
+    pub fn from_ptrs(
         context: &'ctx V::Context,
         ptrs: KeyValueMutPtrs<'ctx, K, V, P>,
         len: usize,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
-
         let values = context.mut_slice_ptrs_from_raw_parts(value, len);
+        unsafe { Self::from_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(key: P, len: usize, values: SliceMutPtrs<'ctx, V>) -> Self {
         let values = wrapper::SliceMutPtrs::new(values);
         Self { key, len, values }
     }
@@ -86,10 +89,9 @@ where
     ) -> KeyValueSlicePtrs<'ctx, K, V, CastConst<P>> {
         let Self { key, len, values } = self;
 
-        let value = context.mut_slice_ptrs_as_ptrs(values.into_inner());
-        let value = context.ptrs_cast_const(value);
-        let ptrs = KeyValuePtrs::new(key.cast_const(), value);
-        KeyValueSlicePtrs::from_parts(context, ptrs, len)
+        let key = key.cast_const();
+        let values = context.slice_ptrs_cast_const(values.into_inner());
+        unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
     }
 
     #[inline]
@@ -143,9 +145,8 @@ where
     ) -> KeyValueMutSlices<'ctx, 'a, K, V, P> {
         let Self { key, len, values } = self;
 
-        let keys = unsafe { slice::from_raw_parts_mut(key.as_mut_raw_ptr(), len) };
         let values = unsafe { context.mut_slice_ptrs_to_mut_slices(values.into_inner()) };
-        unsafe { KeyValueMutSlices::new_unchecked(keys, values) }
+        unsafe { KeyValueMutSlices::from_parts(key, len, values) }
     }
 }
 

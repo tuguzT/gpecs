@@ -156,7 +156,7 @@ where
         len: usize,
     ) -> Self::SlicePtrs<'a> {
         let context = self.as_inner();
-        KeyValueSlicePtrs::from_parts(context, ptrs, len)
+        KeyValueSlicePtrs::from_ptrs(context, ptrs, len)
     }
 
     #[inline]
@@ -186,7 +186,7 @@ where
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
         let context = self.as_inner();
-        KeyValueMutSlicePtrs::from_parts(context, ptrs, len)
+        KeyValueMutSlicePtrs::from_ptrs(context, ptrs, len)
     }
 
     #[inline]

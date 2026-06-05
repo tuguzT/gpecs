@@ -24,6 +24,7 @@ members = [
     "examples/gpecs_simple_core",
     "examples/gpecs_simple_types",
     "examples/gpecs_simple_shader",
+    "examples/gpecs_nbody",
     # standalone benchmarks
     "benches/gpecs_soa_bench",
     "benches/gpecs_ecs_benchmark",
@@ -88,6 +89,10 @@ csv = { version = "1.4" }
 dotenvy = { version = "0.15" }
 crossterm = { version = "0.29" }
 dhat = { version = "0.3" }
+winit = { version = "0.30" }
+egui = { version = "0.34" }
+egui-winit = { version = "0.34" }
+egui-wgpu = { version = "0.34" }
 
 [patch.crates-io]
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "36e3348cdc2f824afec64b3b5af5d369d98a4c0d" }

@@ -1,0 +1,16 @@
+[package]
+name = "gpecs_nbody_types"
+description = "Common types for n-body simulation example of ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+bytemuck = { workspace = true, features = ["derive"] }
+glam = { workspace = true, features = ["bytemuck"] }
+
+[lints]
+workspace = true

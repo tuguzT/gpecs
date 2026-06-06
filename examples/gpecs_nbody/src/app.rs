@@ -175,10 +175,15 @@ impl ApplicationHandler<Graphics<'static>> for App {
             return;
         };
 
+        let device = graphics.device();
+        let format = graphics.surface_config().format;
+
         let start_time = Instant::now();
-        let ui_renderer = UiRenderer::new(graphics.device(), graphics.surface_config().format);
+        let other_state = State::new(device, format, start_time);
+
+        let ui_renderer = UiRenderer::new(device, format);
         *state = GraphicsState::Ready {
-            state: State::new(start_time),
+            state: other_state,
             graphics: Box::new(graphics),
             ui_renderer: Box::new(ui_renderer),
         };

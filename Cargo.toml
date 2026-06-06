@@ -25,6 +25,8 @@ members = [
     "examples/gpecs_simple_types",
     "examples/gpecs_simple_shader",
     "examples/gpecs_nbody",
+    "examples/gpecs_nbody_types",
+    "examples/gpecs_nbody_shader",
     # standalone benchmarks
     "benches/gpecs_soa_bench",
     "benches/gpecs_ecs_benchmark",
@@ -62,6 +64,7 @@ gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
 # standalone examples
 gpecs_simple_core = { path = "examples/gpecs_simple_core" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
+gpecs_nbody_types = { path = "examples/gpecs_nbody_types" }
 # standalone benchmarks
 gpecs_ecs_benchmark_core = { path = "benches/gpecs_ecs_benchmark_core" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }

@@ -1,0 +1,19 @@
+[package]
+name = "gpecs_nbody_shader"
+description = "Shaders for n-body simulation example of ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpecs_nbody_types = { workspace = true }
+spirv-std = { workspace = true }
+
+[features]
+nightly = []
+
+[lints]
+workspace = true

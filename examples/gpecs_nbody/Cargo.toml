@@ -8,15 +8,22 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+gpecs_nbody_types = { workspace = true }
+bytemuck = { workspace = true, features = ["must_cast"] }
+glam = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 dotenvy = { workspace = true }
 pollster = { workspace = true }
-wgpu = { workspace = true }
+wgpu = { workspace = true, features = ["spirv"] }
 winit = { workspace = true }
 egui = { workspace = true }
 egui-winit = { workspace = true }
 egui-wgpu = { workspace = true }
+
+[build-dependencies]
+cargo-gpu-install = { workspace = true }
+const_format = { workspace = true }
 
 [lints]
 workspace = true

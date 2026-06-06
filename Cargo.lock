@@ -1433,15 +1433,36 @@ version = "0.0.0"
 name = "gpecs_nbody"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
+ "cargo-gpu-install",
+ "const_format",
  "dotenvy",
  "egui",
  "egui-wgpu",
  "egui-winit",
  "env_logger",
+ "glam",
+ "gpecs_nbody_types",
  "log",
  "pollster",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "gpecs_nbody_shader"
+version = "0.0.0"
+dependencies = [
+ "gpecs_nbody_types",
+ "spirv-std",
+]
+
+[[package]]
+name = "gpecs_nbody_types"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "glam",
 ]
 
 [[package]]

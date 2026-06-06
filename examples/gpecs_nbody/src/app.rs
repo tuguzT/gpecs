@@ -3,7 +3,7 @@ use std::{error::Error, mem, sync::Arc, time::Instant};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
-    event::WindowEvent,
+    event::{DeviceEvent, DeviceId, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
     window::{Window, WindowId},
 };
@@ -33,7 +33,7 @@ enum AppState {
 enum GraphicsState {
     WaitForEvent,
     Ready {
-        state: State,
+        state: Box<State>,
         graphics: Box<Graphics<'static>>,
         ui_renderer: Box<UiRenderer>,
     },
@@ -46,7 +46,7 @@ impl App {
         Self { state }
     }
 
-    fn handle_ui_input(&mut self, event: &WindowEvent) {
+    fn handle_window_event_ui(&mut self, event: &WindowEvent) {
         let Self { state } = self;
 
         let AppState::Ready {
@@ -58,6 +58,37 @@ impl App {
             return;
         };
         let _ = ui.handle_input(window, event);
+    }
+
+    fn handle_window_event_state(&mut self, event: &WindowEvent) {
+        let Self { state } = self;
+
+        let AppState::Ready {
+            ref window,
+            ref mut graphics,
+            ..
+        } = *state
+        else {
+            return;
+        };
+        let GraphicsState::Ready { state, .. } = graphics else {
+            return;
+        };
+
+        state.handle_window_event(window, event);
+    }
+
+    fn handle_device_event_state(&mut self, event: &DeviceEvent) {
+        let Self { state } = self;
+
+        let AppState::Ready { graphics, .. } = state else {
+            return;
+        };
+        let GraphicsState::Ready { state, .. } = graphics else {
+            return;
+        };
+
+        state.handle_device_event(event);
     }
 
     fn resized(&mut self, new_size: PhysicalSize<u32>) {
@@ -96,13 +127,13 @@ impl App {
 
         let ui_output = ui.run(window, |ui| state.update(ui));
 
-        graphics.draw(|device, queue, view| {
+        graphics.draw(|device, queue, render_target| {
             let command_encoder_desc = wgpu::CommandEncoderDescriptor {
                 label: Some("`gpecs` n-body simulation example command encoder"),
             };
             let mut encoder = device.create_command_encoder(&command_encoder_desc);
 
-            state.draw(device, queue, view, &mut encoder);
+            state.draw(device, queue, render_target, &mut encoder);
 
             let surface_config = graphics.surface_config();
             ui_renderer.draw(
@@ -113,7 +144,7 @@ impl App {
                 device,
                 queue,
                 &mut encoder,
-                view,
+                render_target,
             );
 
             let command_buffer = encoder.finish();
@@ -167,10 +198,10 @@ impl ApplicationHandler<Graphics<'static>> for App {
         let Self { state } = self;
 
         let AppState::Ready {
-            window,
-            graphics: state,
+            ref window,
+            graphics: ref mut state,
             ..
-        } = state
+        } = *state
         else {
             return;
         };
@@ -179,11 +210,12 @@ impl ApplicationHandler<Graphics<'static>> for App {
         let format = graphics.surface_config().format;
 
         let start_time = Instant::now();
-        let other_state = State::new(device, format, start_time);
+        let PhysicalSize { width, height } = window.inner_size();
+        let other_state = State::new(device, width, height, format, start_time);
 
         let ui_renderer = UiRenderer::new(device, format);
         *state = GraphicsState::Ready {
-            state: other_state,
+            state: Box::new(other_state),
             graphics: Box::new(graphics),
             ui_renderer: Box::new(ui_renderer),
         };
@@ -198,7 +230,8 @@ impl ApplicationHandler<Graphics<'static>> for App {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        self.handle_ui_input(&event);
+        self.handle_window_event_ui(&event);
+        self.handle_window_event_state(&event);
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -206,6 +239,15 @@ impl ApplicationHandler<Graphics<'static>> for App {
             WindowEvent::RedrawRequested => self.redraw_requested(),
             _ => (),
         }
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        self.handle_device_event_state(&event);
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {

@@ -11,6 +11,7 @@ publish = false
 gpecs_nbody_types = { workspace = true }
 bytemuck = { workspace = true, features = ["must_cast"] }
 glam = { workspace = true }
+num-traits = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 dotenvy = { workspace = true }

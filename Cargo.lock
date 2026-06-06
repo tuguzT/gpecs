@@ -1444,6 +1444,7 @@ dependencies = [
  "glam",
  "gpecs_nbody_types",
  "log",
+ "num-traits",
  "pollster",
  "wgpu",
  "winit",

@@ -1,13 +1,16 @@
 use std::{
     f32::consts::{FRAC_PI_2, FRAC_PI_3},
+    fmt::{self, Debug},
     fs,
     time::{Duration, Instant},
 };
 
 use egui::{Rgba, RichText, Ui};
 use glam::{EulerRot, Mat4, Quat, Vec2, Vec3, dvec2, vec3};
+use gpecs::{context::Context, executor::gpu::GpuExecutor};
 use gpecs_nbody_types::{CameraBuffer, Vertex};
 use num_traits::ToPrimitive;
+use ouroboros::self_referencing;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, BlendState, Buffer, BufferAddress, BufferBindingType,
@@ -50,6 +53,7 @@ pub struct State {
     staging: StagingBelt,
     camera_bind_group: BindGroup,
     render_pipeline: RenderPipeline,
+    ecs: EcsState,
 }
 
 impl State {
@@ -73,6 +77,8 @@ impl State {
         let render_pipeline =
             init_pipeline(device, format, &shader_module, &render_pipeline_layout);
 
+        let ecs = init_ecs_state(device.clone());
+
         Self {
             start_time,
             last_update_time: None,
@@ -95,6 +101,7 @@ impl State {
             staging,
             camera_bind_group,
             render_pipeline,
+            ecs,
         }
     }
 
@@ -227,6 +234,7 @@ impl State {
             ref camera_bind_group,
             ref render_pipeline,
             ref mut staging,
+            ref mut ecs,
             ..
         } = *self;
 
@@ -246,6 +254,8 @@ impl State {
         staging
             .write_buffer(encoder, camera_buffer, 0, camera_buffer_size)
             .copy_from_slice(bytemuck::bytes_of(&data));
+
+        ecs.with_executor_mut(|executor| executor.execute(encoder));
 
         let gray = total_time.as_secs_f64().fract();
         let clear_color = Color {
@@ -423,4 +433,30 @@ fn aspect_ratio(width: u32, height: u32) -> f32 {
 
 fn bool_to_f32(bool: bool) -> f32 {
     if bool { 1.0 } else { 0.0 }
+}
+
+#[self_referencing]
+pub struct EcsState {
+    context: Context,
+    #[borrows(mut context)]
+    #[covariant]
+    executor: GpuExecutor<'this, 'static>,
+}
+
+impl Debug for EcsState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.with_executor(|executor| {
+            f.debug_struct("EcsState")
+                .field("executor", executor)
+                .finish_non_exhaustive()
+        })
+    }
+}
+
+fn init_ecs_state(device: Device) -> EcsState {
+    let builder = EcsStateBuilder {
+        context: Context::new(),
+        executor_builder: |context| GpuExecutor::new(context, device),
+    };
+    builder.build()
 }

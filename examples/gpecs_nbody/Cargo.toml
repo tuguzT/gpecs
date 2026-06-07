@@ -8,6 +8,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+gpecs = { workspace = true }
 gpecs_nbody_types = { workspace = true }
 bytemuck = { workspace = true, features = ["must_cast"] }
 glam = { workspace = true }
@@ -21,6 +22,7 @@ winit = { workspace = true }
 egui = { workspace = true }
 egui-winit = { workspace = true }
 egui-wgpu = { workspace = true }
+ouroboros = { workspace = true }
 
 [build-dependencies]
 cargo-gpu-install = { workspace = true }

@@ -96,6 +96,7 @@ winit = { version = "0.30" }
 egui = { version = "0.34" }
 egui-winit = { version = "0.34" }
 egui-wgpu = { version = "0.34" }
+ouroboros = { version = "0.18" }
 
 [patch.crates-io]
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "36e3348cdc2f824afec64b3b5af5d369d98a4c0d" }

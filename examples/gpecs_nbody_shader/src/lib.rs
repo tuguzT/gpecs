@@ -23,3 +23,6 @@ pub fn vertex(
 pub fn fragment(in_color: Vec3, out_color: &mut Vec4) {
     *out_color = in_color.extend(1.0);
 }
+
+#[spirv(compute(threads(64)))]
+pub fn system() {}

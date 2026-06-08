@@ -1,16 +1,13 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![cfg_attr(not(test), no_std)]
 
+use glam::{USizeVec3, Vec2, Vec3, Vec4, vec2};
 use gpecs_nbody_types::{
     components::{Color, Force, Mass, Position, Radius, Velocity},
     render::{UniformBuffer, Vertex},
     systems::{TimeDelta, accelerate, color_from, r#move, nbody_force, vertex_from},
 };
-use spirv_std::{
-    arch::kill,
-    glam::{USizeVec3, Vec2, Vec3, Vec4, vec2},
-    spirv,
-};
+use spirv_std::{arch::kill, spirv};
 
 #[spirv(vertex)]
 #[expect(clippy::too_many_arguments, reason = "entry point")]

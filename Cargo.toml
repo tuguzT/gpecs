@@ -70,7 +70,9 @@ gpecs_ecs_benchmark_core = { path = "benches/gpecs_ecs_benchmark_core" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
 cargo-gpu-install = { version = "0.10.0-alpha.1", default-features = false }
-spirv-std = { version = "0.10.0-alpha.1", default-features = false }
+spirv-std = { version = "0.10.0-alpha.1", default-features = false, features = [
+    "glam_0_33",
+] }
 indexmap = { version = "2.14", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
@@ -80,7 +82,7 @@ itertools = { version = "0.14", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 polonius-the-crab = { version = "0.5", default-features = false }
 bytemuck = { version = "1.25", default-features = false }
-glam = { version = "0.32", default-features = false, features = ["nostd-libm"] }
+glam = { version = "0.33", default-features = false, features = ["nostd-libm"] }
 wgpu = { version = "29" }
 rayon = { version = "1.12" }
 const_format = { version = "0.2", default-features = false }
@@ -99,8 +101,8 @@ egui-wgpu = { version = "0.34" }
 ouroboros = { version = "0.18" }
 
 [patch.crates-io]
-cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "36e3348cdc2f824afec64b3b5af5d369d98a4c0d" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "36e3348cdc2f824afec64b3b5af5d369d98a4c0d" }
+cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a27c0363d391a54de1feb9ee6864ad9dff72d243" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a27c0363d391a54de1feb9ee6864ad9dff72d243" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

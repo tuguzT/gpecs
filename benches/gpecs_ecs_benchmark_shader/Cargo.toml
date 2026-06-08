@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 gpecs_ecs_benchmark_types = { workspace = true }
 spirv-std = { workspace = true }
+glam = { workspace = true, features = ["usize"] }
 
 [features]
 nightly = []

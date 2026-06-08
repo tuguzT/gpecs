@@ -3,13 +3,10 @@
 #![allow(unused_imports)]
 
 use core::convert::Infallible;
-use spirv_std::{
-    TypedBuffer,
-    glam::{USizeVec3, UVec3},
-    spirv,
-};
+use spirv_std::{TypedBuffer, spirv};
 
 use bytemuck::{Pod, Zeroable};
+use glam::{USizeVec3, UVec3};
 use gpecs_entity::{Entity, EntityEpoch, EntitySparseItem};
 use gpecs_soa_erased::{
     ErasedSoa, ErasedSoaContext, ErasedSoaMutSlices,

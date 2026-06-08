@@ -12,6 +12,7 @@ publish = false
 gpecs_entity = { workspace = true }
 gpecs_simple_types = { workspace = true }
 spirv-std = { workspace = true }
+glam = { workspace = true, features = ["usize"] }
 
 [features]
 nightly = []

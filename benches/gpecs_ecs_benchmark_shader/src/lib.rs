@@ -1,12 +1,13 @@
 #![cfg_attr(not(test), no_std)]
 
+use glam::USizeVec3;
 use gpecs_ecs_benchmark_types::{
     components::{Damage, Data, Health, Player, Position, Sprite, Velocity},
     framebuffer::{Framebuffer, FramebufferDesc},
     systems,
     utils::TimeDelta,
 };
-use spirv_std::{glam::USizeVec3, spirv};
+use spirv_std::spirv;
 
 #[spirv(compute(threads(64)))]
 pub fn update_damage(

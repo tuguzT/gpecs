@@ -12,6 +12,7 @@ gpecs_sparse = { workspace = true }
 gpecs_world = { workspace = true }
 gpecs_entity = { workspace = true }
 gpecs_soa_erased = { workspace = true }
+glam = { workspace = true, features = ["usize"] }
 bytemuck = { workspace = true, features = ["derive"] }
 spirv-std = { workspace = true }
 

@@ -1,13 +1,10 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![cfg_attr(not(test), no_std)]
 
+use glam::{USizeVec3, Vec3};
 use gpecs_entity::Entity;
 use gpecs_simple_types::{Mass, Position};
-use spirv_std::{
-    glam::{USizeVec3, Vec3},
-    num_traits::ToPrimitive,
-    spirv,
-};
+use spirv_std::{num_traits::ToPrimitive, spirv};
 
 #[spirv(compute(threads(64)))]
 pub fn update_entity_position(

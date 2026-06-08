@@ -6,16 +6,16 @@ use std::{
 };
 
 use egui::{Rgba, RichText, Ui};
-use glam::{EulerRot, Mat4, Quat, Vec2, Vec3, dvec2, vec3};
+use glam::{EulerRot, Mat4, Quat, Vec2, Vec3, dvec2, uvec4, vec3, vec4};
 use gpecs::{context::Context, executor::gpu::GpuExecutor};
-use gpecs_nbody_types::{CameraBuffer, Vertex};
+use gpecs_nbody_types::render::{UniformBuffer, Vertex};
 use num_traits::ToPrimitive;
 use ouroboros::self_referencing;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, BlendState, Buffer, BufferAddress, BufferBindingType,
-    BufferUsages, Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState,
-    FrontFace, LoadOp, MultisampleState, Operations, PipelineCompilationOptions, PipelineLayout,
+    BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace,
+    LoadOp, MultisampleState, Operations, PipelineCompilationOptions, PipelineLayout,
     PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, Queue,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
     ShaderModule, ShaderModuleDescriptor, ShaderStages, StoreOp, TextureFormat, TextureView,
@@ -49,9 +49,9 @@ pub struct State {
     camera_position: Vec3,
     camera_rotation: Quat,
     vertex_buffer: Buffer,
-    camera_buffer: Buffer,
+    uniform_buffer: Buffer,
     staging: StagingBelt,
-    camera_bind_group: BindGroup,
+    bind_group: BindGroup,
     render_pipeline: RenderPipeline,
     ecs: EcsState,
 }
@@ -67,13 +67,13 @@ impl State {
         let shader_module = init_shader(device);
 
         let vertex_buffer = init_vertex_buffer(device);
-        let camera_buffer = init_camera_buffer(device);
-        let staging = StagingBelt::new(device.clone(), camera_buffer.size() * 4);
+        let uniform_buffer = init_uniform_buffer(device);
+        let staging = StagingBelt::new(device.clone(), uniform_buffer.size() * 4);
 
-        let camera_layout = init_camera_bind_group_layout(device);
-        let camera_bind_group = init_camera_bind_group(device, &camera_layout, &camera_buffer);
+        let bind_group_layout = init_bind_group_layout(device);
+        let bind_group = init_bind_group(device, &bind_group_layout, &uniform_buffer);
 
-        let render_pipeline_layout = init_pipeline_layout(device, &camera_layout);
+        let render_pipeline_layout = init_pipeline_layout(device, &bind_group_layout);
         let render_pipeline =
             init_pipeline(device, format, &shader_module, &render_pipeline_layout);
 
@@ -97,9 +97,9 @@ impl State {
             camera_position: Vec3::NEG_Z,
             camera_rotation: Quat::from_axis_angle(Vec3::Z, 0.0),
             vertex_buffer,
-            camera_buffer,
+            uniform_buffer,
             staging,
-            camera_bind_group,
+            bind_group,
             render_pipeline,
             ecs,
         }
@@ -210,10 +210,9 @@ impl State {
         *camera_position += bool_to_f32(space_pressed) * dt_raw * up;
         *camera_position += bool_to_f32(shift_pressed) * dt_raw * -up;
 
-        let fps = 1.0 / dt_raw;
-        let text = format!("Total time: {total_time:?}, delta time: {dt_raw}, FPS: {fps}");
-        let color = Rgba::from_gray(1.0 - total_time.as_secs_f32().fract());
-        ui.label(RichText::new(text).color(color));
+        ui.label(RichText::new(format!("Total time: {total_time:?}")).color(Rgba::WHITE));
+        ui.label(RichText::new(format!("Delta time: {dt_raw}")).color(Rgba::WHITE));
+        ui.label(RichText::new(format!("FPS: {}", 1.0 / dt_raw)).color(Rgba::WHITE));
     }
 
     pub fn draw(
@@ -224,14 +223,13 @@ impl State {
         encoder: &mut CommandEncoder,
     ) {
         let Self {
-            total_time,
             width,
             height,
             camera_position,
             camera_rotation,
             ref vertex_buffer,
-            ref camera_buffer,
-            ref camera_bind_group,
+            ref uniform_buffer,
+            ref bind_group,
             ref render_pipeline,
             ref mut staging,
             ref mut ecs,
@@ -242,28 +240,25 @@ impl State {
 
         let model = Mat4::from_translation(camera_position);
         let view = Mat4::from_quat(camera_rotation).inverse();
-        let projection = Mat4::perspective_rh(FRAC_PI_3, aspect_ratio(width, height), 0.1, 1000.0);
-        let data = CameraBuffer {
+        let z_near = 0.001;
+        let z_far = 1000.0;
+        let projection =
+            Mat4::perspective_rh(FRAC_PI_3, aspect_ratio(width, height), z_near, z_far);
+        let data = UniformBuffer {
             model_view_projection: projection * view * model,
+            resolution: uvec4(width, height, 0, 0).as_vec4(),
         };
 
-        let camera_buffer_size = camera_buffer
+        let uniform_buffer_size = uniform_buffer
             .size()
             .try_into()
-            .expect("camera buffer can't be zero-sized");
+            .expect("uniform buffer can't be zero-sized");
         staging
-            .write_buffer(encoder, camera_buffer, 0, camera_buffer_size)
+            .write_buffer(encoder, uniform_buffer, 0, uniform_buffer_size)
             .copy_from_slice(bytemuck::bytes_of(&data));
 
         ecs.with_executor_mut(|executor| executor.execute(encoder));
 
-        let gray = total_time.as_secs_f64().fract();
-        let clear_color = Color {
-            r: gray,
-            g: gray,
-            b: gray,
-            a: 1.0,
-        };
         let render_pass_desc = RenderPassDescriptor {
             label: Some("`gpecs` n-body simulation example clear render pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
@@ -271,7 +266,7 @@ impl State {
                 depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(clear_color),
+                    load: LoadOp::default(),
                     store: StoreOp::Store,
                 },
             })],
@@ -283,9 +278,9 @@ impl State {
         let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
 
         render_pass.set_pipeline(render_pipeline);
-        render_pass.set_bind_group(0, camera_bind_group, &[]);
+        render_pass.set_bind_group(0, bind_group, &[]);
         render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        render_pass.draw(0..3, 0..1);
+        render_pass.draw(0..6, 0..3);
 
         staging.finish();
     }
@@ -303,9 +298,9 @@ fn init_shader(device: &Device) -> ShaderModule {
     device.create_shader_module(shader_desc)
 }
 
-fn init_camera_bind_group_layout(device: &Device) -> BindGroupLayout {
+fn init_bind_group_layout(device: &Device) -> BindGroupLayout {
     let bind_group_layout_desc = BindGroupLayoutDescriptor {
-        label: Some("`gpecs` n-body simulation example render camera bind group layout"),
+        label: Some("`gpecs` n-body simulation example render bind group layout"),
         entries: &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStages::VERTEX,
@@ -320,26 +315,22 @@ fn init_camera_bind_group_layout(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&bind_group_layout_desc)
 }
 
-fn init_pipeline_layout(device: &Device, camera_layout: &BindGroupLayout) -> PipelineLayout {
+fn init_pipeline_layout(device: &Device, layout: &BindGroupLayout) -> PipelineLayout {
     let pipeline_layout_desc = PipelineLayoutDescriptor {
         label: Some("`gpecs` n-body simulation example render pipeline layout"),
-        bind_group_layouts: &[Some(camera_layout)],
+        bind_group_layouts: &[Some(layout)],
         immediate_size: 0,
     };
     device.create_pipeline_layout(&pipeline_layout_desc)
 }
 
-fn init_camera_bind_group(
-    device: &Device,
-    camera_layout: &BindGroupLayout,
-    camera_buffer: &Buffer,
-) -> BindGroup {
+fn init_bind_group(device: &Device, layout: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
     let bind_group_desc = BindGroupDescriptor {
-        label: Some("`gpecs` n-body simulation example render camera bind group"),
-        layout: camera_layout,
+        label: Some("`gpecs` n-body simulation example render bind group"),
+        layout,
         entries: &[BindGroupEntry {
             binding: 0,
-            resource: camera_buffer.as_entire_binding(),
+            resource: buffer.as_entire_binding(),
         }],
     };
     device.create_bind_group(&bind_group_desc)
@@ -360,8 +351,8 @@ fn init_pipeline(
             compilation_options: PipelineCompilationOptions::default(),
             buffers: &[VertexBufferLayout {
                 array_stride: size_of::<Vertex>() as BufferAddress,
-                step_mode: VertexStepMode::Vertex,
-                attributes: &vertex_attr_array![0 => Float32x3, 1 => Float32x3],
+                step_mode: VertexStepMode::Instance,
+                attributes: &vertex_attr_array![0 => Float32x3, 1 => Float32, 2 => Float32x3],
             }],
         },
         primitive: PrimitiveState {
@@ -394,15 +385,21 @@ fn init_pipeline(
 const TRIANGLE_VERTICES: [Vertex; 3] = [
     Vertex {
         position: vec3(0.0, 0.5, 0.0),
+        size: 5.0,
         color: vec3(1.0, 0.0, 0.0),
+        padding: 0,
     },
     Vertex {
         position: vec3(-0.5, -0.5, 0.0),
+        size: 10.0,
         color: vec3(0.0, 1.0, 0.0),
+        padding: 0,
     },
     Vertex {
         position: vec3(0.5, -0.5, 0.0),
+        size: 15.0,
         color: vec3(0.0, 0.0, 1.0),
+        padding: 0,
     },
 ];
 
@@ -415,12 +412,13 @@ fn init_vertex_buffer(device: &Device) -> Buffer {
     device.create_buffer_init(&buffer_init_desc)
 }
 
-fn init_camera_buffer(device: &Device) -> Buffer {
-    let data = CameraBuffer {
+fn init_uniform_buffer(device: &Device) -> Buffer {
+    let data = UniformBuffer {
         model_view_projection: Mat4::IDENTITY,
+        resolution: vec4(1.0, 1.0, 0.0, 0.0),
     };
     let buffer_init_desc = BufferInitDescriptor {
-        label: Some("`gpecs` n-body simulation example camera buffer"),
+        label: Some("`gpecs` n-body simulation example uniform buffer"),
         contents: bytemuck::bytes_of(&data),
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
     };

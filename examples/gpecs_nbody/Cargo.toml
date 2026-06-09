@@ -11,7 +11,7 @@ publish = false
 gpecs = { workspace = true }
 gpecs_nbody_types = { workspace = true }
 bytemuck = { workspace = true, features = ["must_cast"] }
-glam = { workspace = true }
+glam = { workspace = true, features = ["f64", "u32", "rand"] }
 num-traits = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
@@ -23,6 +23,7 @@ egui = { workspace = true }
 egui-winit = { workspace = true }
 egui-wgpu = { workspace = true }
 ouroboros = { workspace = true }
+rand = { workspace = true }
 
 [build-dependencies]
 cargo-gpu-install = { workspace = true }

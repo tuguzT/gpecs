@@ -9,6 +9,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+gpecs_component = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 glam = { workspace = true, features = ["bytemuck"] }
 

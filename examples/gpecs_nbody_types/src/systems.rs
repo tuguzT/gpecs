@@ -1,3 +1,5 @@
+use core::time::Duration;
+
 use bytemuck::{Pod, Zeroable};
 use glam::vec3;
 
@@ -8,7 +10,19 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Pod, Zeroable)]
 #[repr(transparent)]
-pub struct TimeDelta(pub f32);
+pub struct TimeDelta(f32);
+
+impl TimeDelta {
+    pub fn new(duration: Duration) -> Self {
+        let seconds = duration.as_secs_f32();
+        Self(seconds)
+    }
+
+    pub fn as_f32(self) -> f32 {
+        let Self(value) = self;
+        value
+    }
+}
 
 pub fn nbody_force(index: usize, positions: &[Position], masses: &[Mass]) -> Force {
     let position = positions[index];
@@ -21,18 +35,22 @@ pub fn nbody_force(index: usize, positions: &[Position], masses: &[Mass]) -> For
         let other_position = positions[other_index];
         let other_mass = masses[other_index];
 
-        let diff = other_position.data - position.data;
-        force.data += diff * (other_mass.0 / diff.length());
+        let diff = position.data - other_position.data;
+
+        let inv_dist = (diff.length() + 10.0).recip();
+        let inv_dist3 = inv_dist * inv_dist * inv_dist;
+
+        force.data += diff * (other_mass.as_f32() * inv_dist3);
     }
     force
 }
 
 pub fn accelerate(force: Force, mass: Mass, velocity: &mut Velocity, delta_time: TimeDelta) {
-    velocity.data += force.data / mass.0 * delta_time.0;
+    velocity.data += force.data / mass.as_f32() * delta_time.as_f32();
 }
 
 pub fn r#move(velocity: Velocity, position: &mut Position, delta_time: TimeDelta) {
-    position.data -= velocity.data * delta_time.0;
+    position.data -= velocity.data * delta_time.as_f32();
 }
 
 pub fn color_from(velocity: Velocity) -> Color {
@@ -49,7 +67,7 @@ pub fn color_from(velocity: Velocity) -> Color {
 pub fn vertex_from(position: Position, color: Color, radius: Radius) -> Vertex {
     Vertex {
         position: position.data,
-        size: radius.0,
+        size: radius.as_f32(),
         color: color.rgb_unorm,
         padding: 0,
     }

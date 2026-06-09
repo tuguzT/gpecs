@@ -7,19 +7,33 @@ use std::{
 
 use egui::{Rgba, RichText, Ui};
 use glam::{EulerRot, Mat4, Quat, Vec2, Vec3, dvec2, uvec4, vec3, vec4};
-use gpecs::{context::Context, executor::gpu::GpuExecutor};
-use gpecs_nbody_types::render::{UniformBuffer, Vertex};
+use gpecs::{
+    context::Context,
+    executor::gpu::{
+        GpuExecutor,
+        system::{
+            registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
+            shader::DispatchStrategy,
+        },
+    },
+};
+use gpecs_nbody_types::{
+    components::{Color, Force, Mass, Position, Radius, Velocity},
+    render::{UniformBuffer, Vertex},
+    systems::TimeDelta,
+};
 use num_traits::ToPrimitive;
 use ouroboros::self_referencing;
+use rand::{Rng, RngExt};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, BlendState, Buffer, BufferAddress, BufferBindingType,
-    BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace,
-    LoadOp, MultisampleState, Operations, PipelineCompilationOptions, PipelineLayout,
-    PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, Queue,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModule, ShaderModuleDescriptor, ShaderStages, StoreOp, TextureFormat, TextureView,
-    VertexBufferLayout, VertexState, VertexStepMode,
+    BufferDescriptor, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device,
+    FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineCompilationOptions,
+    PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
+    Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StoreOp,
+    TextureFormat, TextureView, VertexBufferLayout, VertexState, VertexStepMode,
     util::{self, BufferInitDescriptor, DeviceExt, StagingBelt},
     vertex_attr_array,
 };
@@ -29,6 +43,8 @@ use winit::{
     window::Window,
 };
 
+pub const MAX_PARTICLE_COUNT: u32 = 10_000;
+
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct State {
@@ -36,6 +52,7 @@ pub struct State {
     last_update_time: Option<Instant>,
     total_time: Duration,
     delta_time: Duration,
+    particle_count: u32,
     width: u32,
     height: u32,
     w_pressed: bool,
@@ -48,7 +65,6 @@ pub struct State {
     mouse_move_delta: Vec2,
     camera_position: Vec3,
     camera_rotation: Quat,
-    vertex_buffer: Buffer,
     uniform_buffer: Buffer,
     staging: StagingBelt,
     bind_group: BindGroup,
@@ -66,7 +82,6 @@ impl State {
     ) -> Self {
         let shader_module = init_shader(device);
 
-        let vertex_buffer = init_vertex_buffer(device);
         let uniform_buffer = init_uniform_buffer(device);
         let staging = StagingBelt::new(device.clone(), uniform_buffer.size() * 4);
 
@@ -77,13 +92,15 @@ impl State {
         let render_pipeline =
             init_pipeline(device, format, &shader_module, &render_pipeline_layout);
 
-        let ecs = init_ecs_state(device.clone());
+        let particle_count = MAX_PARTICLE_COUNT;
+        let ecs = init_ecs_state(device.clone(), &shader_module, particle_count);
 
         Self {
             start_time,
             last_update_time: None,
             total_time: Duration::ZERO,
             delta_time: Duration::ZERO,
+            particle_count,
             width,
             height,
             w_pressed: false,
@@ -94,9 +111,8 @@ impl State {
             shift_pressed: false,
             mouse_left_pressed: false,
             mouse_move_delta: Vec2::ZERO,
-            camera_position: Vec3::NEG_Z,
+            camera_position: Vec3::NEG_Z * 5.0,
             camera_rotation: Quat::from_axis_angle(Vec3::Z, 0.0),
-            vertex_buffer,
             uniform_buffer,
             staging,
             bind_group,
@@ -189,8 +205,8 @@ impl State {
         if mouse_left_pressed {
             let (mut yaw, mut pitch, _) = camera_rotation.to_euler(EulerRot::YXZ);
 
-            yaw -= mouse_move_delta.x * dt_raw;
-            pitch -= mouse_move_delta.y * dt_raw;
+            yaw -= mouse_move_delta.x * 0.0025;
+            pitch -= mouse_move_delta.y * 0.0025;
 
             let max_pitch = FRAC_PI_2 - f32::EPSILON;
             let min_pitch = -max_pitch;
@@ -225,9 +241,10 @@ impl State {
         let Self {
             width,
             height,
+            delta_time,
             camera_position,
             camera_rotation,
-            ref vertex_buffer,
+            particle_count,
             ref uniform_buffer,
             ref bind_group,
             ref render_pipeline,
@@ -257,6 +274,16 @@ impl State {
             .write_buffer(encoder, uniform_buffer, 0, uniform_buffer_size)
             .copy_from_slice(bytemuck::bytes_of(&data));
 
+        let data = TimeDelta::new(delta_time);
+        let delta_time_buffer = ecs.borrow_delta_time_buffer();
+        let delta_time_buffer_size = delta_time_buffer
+            .size()
+            .try_into()
+            .expect("delta time buffer can't be zero sized");
+        staging
+            .write_buffer(encoder, delta_time_buffer, 0, delta_time_buffer_size)
+            .copy_from_slice(bytemuck::bytes_of(&data));
+
         ecs.with_executor_mut(|executor| executor.execute(encoder));
 
         let render_pass_desc = RenderPassDescriptor {
@@ -279,8 +306,8 @@ impl State {
 
         render_pass.set_pipeline(render_pipeline);
         render_pass.set_bind_group(0, bind_group, &[]);
-        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        render_pass.draw(0..6, 0..3);
+        render_pass.set_vertex_buffer(0, ecs.borrow_vertex_buffer().slice(..));
+        render_pass.draw(0..6, 0..particle_count);
 
         staging.finish();
     }
@@ -382,34 +409,15 @@ fn init_pipeline(
     device.create_render_pipeline(&render_pipeline_desc)
 }
 
-const TRIANGLE_VERTICES: [Vertex; 3] = [
-    Vertex {
-        position: vec3(0.0, 0.5, 0.0),
-        size: 5.0,
-        color: vec3(1.0, 0.0, 0.0),
-        padding: 0,
-    },
-    Vertex {
-        position: vec3(-0.5, -0.5, 0.0),
-        size: 10.0,
-        color: vec3(0.0, 1.0, 0.0),
-        padding: 0,
-    },
-    Vertex {
-        position: vec3(0.5, -0.5, 0.0),
-        size: 15.0,
-        color: vec3(0.0, 0.0, 1.0),
-        padding: 0,
-    },
-];
-
 fn init_vertex_buffer(device: &Device) -> Buffer {
-    let buffer_init_desc = BufferInitDescriptor {
+    let vertex_size = size_of::<Vertex>() as BufferAddress;
+    let buffer_desc = BufferDescriptor {
         label: Some("`gpecs` n-body simulation example vertex buffer"),
-        contents: bytemuck::must_cast_slice(&TRIANGLE_VERTICES),
-        usage: BufferUsages::VERTEX,
+        mapped_at_creation: false,
+        size: BufferAddress::from(MAX_PARTICLE_COUNT).strict_mul(vertex_size),
+        usage: BufferUsages::VERTEX | BufferUsages::STORAGE,
     };
-    device.create_buffer_init(&buffer_init_desc)
+    device.create_buffer(&buffer_desc)
 }
 
 fn init_uniform_buffer(device: &Device) -> Buffer {
@@ -436,9 +444,14 @@ fn bool_to_f32(bool: bool) -> f32 {
 #[self_referencing]
 pub struct EcsState {
     context: Context,
-    #[borrows(mut context)]
-    #[covariant]
-    executor: GpuExecutor<'this, 'static>,
+    vertex_buffer: Buffer,
+    delta_time_buffer: Buffer,
+    #[borrows(vertex_buffer, delta_time_buffer)]
+    #[not_covariant]
+    additional_entries: GpuSystemAdditionalEntries<'this>,
+    #[borrows(mut context, additional_entries)]
+    #[not_covariant]
+    executor: GpuExecutor<'this, 'this>,
 }
 
 impl Debug for EcsState {
@@ -451,10 +464,275 @@ impl Debug for EcsState {
     }
 }
 
-fn init_ecs_state(device: Device) -> EcsState {
+fn init_delta_time_buffer(device: &Device) -> Buffer {
+    let buffer_desc = BufferDescriptor {
+        label: Some("`gpecs` n-body simulation example delta time buffer"),
+        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+        size: size_of::<TimeDelta>() as BufferAddress,
+    };
+    device.create_buffer(&buffer_desc)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[expect(clippy::struct_field_names)]
+struct GpuSystems {
+    update_force: GpuSystemId,
+    update_velocity_and_position: GpuSystemId,
+    update_color: GpuSystemId,
+    update_vertex: GpuSystemId,
+}
+
+#[expect(clippy::too_many_lines)]
+fn register_gpu_systems(
+    executor: &mut GpuExecutor<'_, '_>,
+    shader_module: &ShaderModule,
+) -> GpuSystems {
+    let position_id = executor.register_component::<Position>();
+    let velocity_id = executor.register_component::<Velocity>();
+    let force_id = executor.register_component::<Force>();
+    let mass_id = executor.register_component::<Mass>();
+    let radius_id = executor.register_component::<Radius>();
+    let color_id = executor.register_component::<Color>();
+
+    let update_force_descriptor = GpuSystemDescriptor {
+        label: Some("update_force"),
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_force"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadOnly),
+            (mass_id, GpuComponentAccess::ReadOnly),
+            (force_id, GpuComponentAccess::ReadWrite),
+        ],
+        additional_bindings: [],
+    };
+    let update_force = executor
+        .register_system(update_force_descriptor)
+        .expect("archetype components should be unique");
+    executor.add_system(update_force);
+
+    let delta_time_buffer_entry = BindGroupLayoutEntry {
+        binding: 4,
+        visibility: ShaderStages::COMPUTE,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: Some(
+                u64::try_from(size_of::<TimeDelta>())
+                    .expect("size of `TimeDelta` should fit in `u64`")
+                    .try_into()
+                    .expect("size of `TimeDelta` cannot be zero"),
+            ),
+        },
+        count: None,
+    };
+    let update_velocity_and_position_descriptor = GpuSystemDescriptor {
+        label: Some("update_velocity_and_position"),
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_velocity_and_position"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (force_id, GpuComponentAccess::ReadOnly),
+            (mass_id, GpuComponentAccess::ReadOnly),
+            (velocity_id, GpuComponentAccess::ReadWrite),
+            (position_id, GpuComponentAccess::ReadWrite),
+        ],
+        additional_bindings: [delta_time_buffer_entry],
+    };
+    let update_velocity_and_position = executor
+        .register_system(update_velocity_and_position_descriptor)
+        .expect("archetype components should be unique");
+    executor.add_system(update_velocity_and_position);
+
+    let update_color_descriptor = GpuSystemDescriptor {
+        label: Some("update_color"),
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_color"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (velocity_id, GpuComponentAccess::ReadOnly),
+            (color_id, GpuComponentAccess::ReadWrite),
+        ],
+        additional_bindings: [],
+    };
+    let update_color = executor
+        .register_system(update_color_descriptor)
+        .expect("archetype components should be unique");
+    executor.add_system(update_color);
+
+    let vertex_buffer_entry = BindGroupLayoutEntry {
+        binding: 3,
+        visibility: ShaderStages::COMPUTE,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only: false },
+            has_dynamic_offset: false,
+            min_binding_size: Some(
+                u64::try_from(size_of::<Vertex>())
+                    .expect("size of `Vertex` should fit in `u64`")
+                    .try_into()
+                    .expect("size of `Vertex` cannot be zero"),
+            ),
+        },
+        count: None,
+    };
+    let update_vertex_descriptor = GpuSystemDescriptor {
+        label: Some("update_vertex"),
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_vertex"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadOnly),
+            (color_id, GpuComponentAccess::ReadOnly),
+            (radius_id, GpuComponentAccess::ReadOnly),
+        ],
+        additional_bindings: [vertex_buffer_entry],
+    };
+    let update_vertex = executor
+        .register_system(update_vertex_descriptor)
+        .expect("archetype components should be unique");
+    executor.add_system(update_vertex);
+
+    GpuSystems {
+        update_force,
+        update_velocity_and_position,
+        update_color,
+        update_vertex,
+    }
+}
+
+#[derive(Debug, Clone)]
+struct GpuSystemAdditionalEntries<'a> {
+    update_velocity_and_position: [BindGroupEntry<'a>; 1],
+    update_vertex: [BindGroupEntry<'a>; 1],
+}
+
+fn init_gpu_system_additional_entries<'a>(
+    delta_time_buffer: &'a Buffer,
+    vertex_buffer: &'a Buffer,
+) -> GpuSystemAdditionalEntries<'a> {
+    let update_velocity_and_position = [BindGroupEntry {
+        binding: 4,
+        resource: delta_time_buffer.as_entire_binding(),
+    }];
+    let update_vertex = [BindGroupEntry {
+        binding: 3,
+        resource: vertex_buffer.as_entire_binding(),
+    }];
+    GpuSystemAdditionalEntries {
+        update_velocity_and_position,
+        update_vertex,
+    }
+}
+
+fn setup_gpu_systems<'entries>(
+    executor: &mut GpuExecutor<'_, 'entries>,
+    systems: GpuSystems,
+    entries: &'entries GpuSystemAdditionalEntries<'_>,
+) {
+    let system_id = systems.update_velocity_and_position;
+    let additional_entries = &entries.update_velocity_and_position;
+    executor.set_additional_entries(system_id, additional_entries);
+
+    let system_id = systems.update_vertex;
+    let additional_entries = &entries.update_vertex;
+    executor.set_additional_entries(system_id, additional_entries);
+}
+
+fn random_direction(mut rng: impl Rng) -> Vec3 {
+    let x = rng.random_range(-1.0..1.0);
+    let y = rng.random_range(-1.0..1.0);
+    let z = rng.random_range(-1.0..1.0);
+    vec3(x, y, z).normalize_or_zero()
+}
+
+fn random_in_sphere(mut rng: impl Rng, radius: f32) -> Vec3 {
+    let length = rng.random_range(0.0f32..=1.0).powf(1.0 / 3.0);
+    random_direction(rng) * length * radius
+}
+
+fn make_velocity(position: Position, mass: Mass) -> Velocity {
+    let length = position.data.length();
+    if length == 0.0 {
+        return Velocity::default();
+    }
+
+    let normal = position.data / length;
+    let tangent = normal.cross(Vec3::Y);
+
+    let speed = (10.0 / length / mass.as_f32()).sqrt();
+    Velocity {
+        data: tangent * speed,
+        ..Default::default()
+    }
+}
+
+const BASE_MASS: f32 = 0.1;
+const VAR_MASS: f32 = 0.8;
+
+fn random_mass(mut rng: impl Rng) -> Mass {
+    let value = BASE_MASS + rng.random_range(0.0..=VAR_MASS);
+    Mass::new(value).expect("random mass should be greater than zero")
+}
+
+fn make_radius(mass: Mass) -> Radius {
+    let value = 10.0 * (mass.as_f32() / (BASE_MASS + VAR_MASS)) + 5.0;
+    Radius::new(value).expect("random radius should be greater than zero")
+}
+
+fn init_ecs_context(particle_count: u32) -> Context {
+    assert!(particle_count <= MAX_PARTICLE_COUNT);
+
+    let mut context = Context::new();
+    context
+        .register_archetype_of::<(Position, Velocity, Force, Mass, Radius, Color)>()
+        .expect("archetype components should be unique");
+
+    let mut rng = rand::rng();
+    for _ in 0..particle_count {
+        let position = Position {
+            data: random_in_sphere(&mut rng, 2.0),
+            ..Default::default()
+        };
+        let mass = random_mass(&mut rng);
+        let velocity = make_velocity(position, mass);
+        let radius = make_radius(mass);
+        let force = Force::default();
+        let color = Color::default();
+        let bundle = (position, velocity, force, mass, radius, color);
+
+        let entity = context.spawn();
+        context
+            .insert_bundle_exact(entity, bundle)
+            .expect("new entity bundle should be inserted successfully");
+    }
+
+    context
+}
+
+fn init_ecs_state(device: Device, shader_module: &ShaderModule, particle_count: u32) -> EcsState {
     let builder = EcsStateBuilder {
-        context: Context::new(),
-        executor_builder: |context| GpuExecutor::new(context, device),
+        context: init_ecs_context(particle_count),
+        vertex_buffer: init_vertex_buffer(&device),
+        delta_time_buffer: init_delta_time_buffer(&device),
+        additional_entries_builder: |vertex_buffer, delta_time_buffer| {
+            init_gpu_system_additional_entries(delta_time_buffer, vertex_buffer)
+        },
+        executor_builder: |context, additional_entries| {
+            let mut executor = GpuExecutor::new(context, device);
+            executor
+                .register_archetype_of::<(Position, Velocity, Force, Mass, Radius, Color)>()
+                .expect("archetype components should be unique");
+
+            let systems = register_gpu_systems(&mut executor, shader_module);
+            setup_gpu_systems(&mut executor, systems, additional_entries);
+
+            executor
+        },
     };
     builder.build()
 }

@@ -84,7 +84,9 @@ pub fn update_color(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] colors: &mut [Color],
 ) {
     let index = id.x;
-    colors[index] = color_from(velocities[index]);
+    let velocity = velocities[index];
+
+    colors[index] = color_from(velocity);
 }
 
 #[spirv(compute(threads(64)))]

@@ -2,6 +2,7 @@ use std::{
     f32::consts::{FRAC_PI_2, FRAC_PI_3},
     fmt::{self, Debug},
     fs,
+    num::NonZeroU32,
     time::{Duration, Instant},
 };
 
@@ -43,7 +44,7 @@ use winit::{
     window::Window,
 };
 
-pub const MAX_PARTICLE_COUNT: u32 = 10_000;
+pub const MAX_PARTICLE_COUNT: u32 = 30_000;
 
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
@@ -483,6 +484,8 @@ struct GpuSystems {
     update_vertex: GpuSystemId,
 }
 
+const UPDATE_FORCE_WORKGROUP_SIZE: NonZeroU32 = NonZeroU32::new(256).expect("cannot be non-zero");
+
 #[expect(clippy::too_many_lines)]
 fn register_gpu_systems(
     executor: &mut GpuExecutor<'_, '_>,
@@ -499,7 +502,9 @@ fn register_gpu_systems(
         label: Some("update_force"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_force"),
-        dispatch_strategy: DispatchStrategy::default(),
+        dispatch_strategy: DispatchStrategy::Linear {
+            workgroup_size: UPDATE_FORCE_WORKGROUP_SIZE,
+        },
         bind_entities: false,
         bind_components: [
             (position_id, GpuComponentAccess::ReadOnly),

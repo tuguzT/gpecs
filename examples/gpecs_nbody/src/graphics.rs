@@ -43,7 +43,9 @@ impl<'window> Graphics<'window> {
             required_features: Features::empty(),
             required_limits: adapter.limits(),
             experimental_features: ExperimentalFeatures::disabled(),
-            memory_hints: MemoryHints::Performance,
+            memory_hints: MemoryHints::Manual {
+                suballocated_device_memory_block_size: 0..0,
+            },
             trace: Trace::Off,
         };
         let (device, queue) = adapter.request_device(&device_desc).await?;

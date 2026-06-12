@@ -5,7 +5,7 @@ use glam::{USizeVec3, Vec2, Vec3, Vec4, vec2};
 use gpecs_nbody_types::{
     components::{Color, Force, Mass, Position, Radius, Velocity},
     render::{UniformBuffer, Vertex},
-    systems::{TimeDelta, accelerate, color_from, r#move, nbody_force, vertex_from},
+    systems::{TimeDelta, accelerate, color_from, r#move, nbody_force_from, vertex_from},
 };
 use spirv_std::{arch::kill, spirv};
 
@@ -47,7 +47,7 @@ pub fn fragment(in_color: Vec3, in_uv: Vec2, out_color: &mut Vec4) {
     *out_color = in_color.extend(1.0);
 }
 
-#[spirv(compute(threads(64)))]
+#[spirv(compute(threads(256)))]
 pub fn update_force(
     #[spirv(global_invocation_id)] id: USizeVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] positions: &[Position],
@@ -55,7 +55,20 @@ pub fn update_force(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] forces: &mut [Force],
 ) {
     let index = id.x;
-    forces[index] = nbody_force(index, positions, masses);
+    let position = positions[index];
+
+    let mut force = Force::default();
+    for other_index in 0..positions.len() {
+        if index == other_index {
+            continue;
+        }
+
+        let other_position = positions[other_index];
+        let other_mass = masses[other_index];
+        force.data += nbody_force_from(position, other_position, other_mass).data;
+    }
+
+    forces[index] = force;
 }
 
 #[spirv(compute(threads(64)))]

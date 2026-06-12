@@ -24,25 +24,14 @@ impl TimeDelta {
     }
 }
 
-pub fn nbody_force(index: usize, positions: &[Position], masses: &[Mass]) -> Force {
-    let position = positions[index];
+pub fn nbody_force_from(position: Position, other_position: Position, other_mass: Mass) -> Force {
+    let diff = other_position.data - position.data;
 
-    let mut force = Force::default();
-    for other_index in 0..positions.len() {
-        if index == other_index {
-            continue;
-        }
-        let other_position = positions[other_index];
-        let other_mass = masses[other_index];
+    let inv_dist = (diff.length() + 10.0).recip();
+    let inv_dist3 = inv_dist * inv_dist * inv_dist;
 
-        let diff = position.data - other_position.data;
-
-        let inv_dist = (diff.length() + 10.0).recip();
-        let inv_dist3 = inv_dist * inv_dist * inv_dist;
-
-        force.data += diff * (other_mass.as_f32() * inv_dist3);
-    }
-    force
+    let data = diff * (other_mass.as_f32() * inv_dist3);
+    Force { data, padding: 0 }
 }
 
 pub fn accelerate(force: Force, mass: Mass, velocity: &mut Velocity, delta_time: TimeDelta) {
@@ -50,7 +39,7 @@ pub fn accelerate(force: Force, mass: Mass, velocity: &mut Velocity, delta_time:
 }
 
 pub fn r#move(velocity: Velocity, position: &mut Position, delta_time: TimeDelta) {
-    position.data -= velocity.data * delta_time.as_f32();
+    position.data += velocity.data * delta_time.as_f32();
 }
 
 pub fn color_from(velocity: Velocity) -> Color {

@@ -89,7 +89,10 @@ pub fn run<'context, E>(
     Ok(executor.into_context(queue))
 }
 
-fn register_gpu_systems(executor: &mut GpuExecutor) {
+fn register_gpu_systems<T>(executor: &mut GpuExecutor<T>)
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
     let shader_module = init_wgpu_shader(executor.device());
 
     let position_gpu_id = executor.register_component::<Position>();
@@ -124,7 +127,10 @@ fn register_gpu_systems(executor: &mut GpuExecutor) {
     executor.add_system(mass_gpu_system_id);
 }
 
-fn collect_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) -> Vec<StatisticsRecord> {
+fn collect_statistics(
+    executor: &GpuExecutor<impl ?Sized>,
+    queue: &wgpu::Queue,
+) -> Vec<StatisticsRecord> {
     let statistics = executor
         .timestamp_query_statistics(queue)
         .expect("timestamp queries should be enabled")

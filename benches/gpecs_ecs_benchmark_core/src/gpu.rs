@@ -257,7 +257,10 @@ struct GpuSystems {
 }
 
 #[expect(clippy::too_many_lines)]
-fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
+fn register_gpu_systems<T>(executor: &mut GpuExecutor<T>) -> GpuSystems
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
     let shader_module = init_wgpu_shader(executor.device());
 
     let position_id = executor.register_component::<Position>();
@@ -443,17 +446,22 @@ fn register_gpu_systems(executor: &mut GpuExecutor) -> GpuSystems {
     }
 }
 
-fn setup_gpu_systems<'entries>(
-    executor: &mut GpuExecutor<'_, 'entries>,
+fn setup_gpu_systems<'entries, T>(
+    executor: &mut GpuExecutor<'entries, T>,
     systems: &GpuSystems,
     additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
-) {
+) where
+    T: AsRef<Context> + ?Sized,
+{
     executor.set_additional_entries(systems.update_position, &additional_entries.update_position);
     executor.set_additional_entries(systems.update_data, &additional_entries.update_data);
     executor.set_additional_entries(systems.render_sprite, &additional_entries.render_sprite);
 }
 
-fn collect_statistics(executor: &GpuExecutor, queue: &wgpu::Queue) -> Vec<StatisticsRecord> {
+fn collect_statistics(
+    executor: &GpuExecutor<impl ?Sized>,
+    queue: &wgpu::Queue,
+) -> Vec<StatisticsRecord> {
     let statistics = executor
         .timestamp_query_statistics(queue)
         .expect("timestamp queries should be enabled")

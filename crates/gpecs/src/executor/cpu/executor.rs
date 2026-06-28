@@ -7,15 +7,18 @@ use super::system::{
 };
 
 #[derive(Debug)]
-pub struct CpuExecutor<'ctx> {
-    context: &'ctx mut Context,
+pub struct CpuExecutor<T>
+where
+    T: ?Sized,
+{
     systems: SystemRegistry,
     schedule: SystemSchedule,
+    context: T,
 }
 
-impl<'ctx> CpuExecutor<'ctx> {
+impl<T> CpuExecutor<T> {
     #[inline]
-    pub fn new(context: &'ctx mut Context) -> Self {
+    pub fn new(context: T) -> Self {
         Self {
             context,
             systems: SystemRegistry::new(),
@@ -24,23 +27,16 @@ impl<'ctx> CpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn context(&self) -> &Context {
+    pub fn into_context(self) -> T {
         let Self { context, .. } = self;
         context
     }
+}
 
-    #[inline]
-    pub fn context_mut(&mut self) -> &mut Context {
-        let Self { context, .. } = self;
-        context
-    }
-
-    #[inline]
-    pub fn into_context(self) -> &'ctx mut Context {
-        let Self { context, .. } = self;
-        context
-    }
-
+impl<T> CpuExecutor<T>
+where
+    T: ?Sized,
+{
     #[inline]
     pub fn register_system<In, S>(&mut self, system: S) -> SystemId
     where
@@ -61,6 +57,28 @@ impl<'ctx> CpuExecutor<'ctx> {
         let Self { schedule, .. } = self;
         schedule.remove_system(system)
     }
+}
+
+impl<T> CpuExecutor<T>
+where
+    T: AsRef<Context> + ?Sized,
+{
+    #[inline]
+    pub fn context(&self) -> &Context {
+        let Self { context, .. } = self;
+        context.as_ref()
+    }
+}
+
+impl<T> CpuExecutor<T>
+where
+    T: AsMut<Context> + ?Sized,
+{
+    #[inline]
+    pub fn context_mut(&mut self) -> &mut Context {
+        let Self { context, .. } = self;
+        context.as_mut()
+    }
 
     #[inline]
     pub fn execute(&mut self) {
@@ -70,6 +88,7 @@ impl<'ctx> CpuExecutor<'ctx> {
             ref schedule,
         } = *self;
 
+        let context = context.as_mut();
         schedule.iter().for_each(|system_id| {
             let Some(system) = systems.get_mut_system(system_id) else {
                 unreachable!("{system_id} should be present");

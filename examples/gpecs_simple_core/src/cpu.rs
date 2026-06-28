@@ -46,7 +46,7 @@ pub fn run<E>(
 }
 
 fn register_cpu_systems(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) {
     let update_positions_system = register_update_positions_system(executor, statistics.clone());
@@ -59,7 +59,7 @@ fn register_cpu_systems(
 }
 
 fn register_update_positions_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, positions: BundlesMut<(Position,)>| {
@@ -101,7 +101,7 @@ fn register_update_positions_system(
 }
 
 fn register_update_masses_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, masses: BundlesMut<(Mass,)>| {
@@ -137,7 +137,7 @@ fn register_update_masses_system(
 }
 
 fn register_check_tags_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, tags: Bundles<(Tag,)>| {

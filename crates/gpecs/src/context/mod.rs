@@ -459,3 +459,17 @@ impl Context {
         Ok(value)
     }
 }
+
+impl AsRef<Self> for Context {
+    #[inline]
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl AsMut<Self> for Context {
+    #[inline]
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}

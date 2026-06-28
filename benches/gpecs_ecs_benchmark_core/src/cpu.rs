@@ -95,7 +95,7 @@ where
 }
 
 fn register_cpu_systems<B>(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     time_delta: Rc<RefCell<TimeDelta>>,
     framebuffer: Rc<RefCell<Framebuffer<B>>>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
@@ -125,7 +125,7 @@ fn register_cpu_systems<B>(
 }
 
 fn register_update_position_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
     time_delta: Rc<RefCell<TimeDelta>>,
 ) -> SystemId {
@@ -161,7 +161,7 @@ fn register_update_position_system(
 }
 
 fn register_update_data_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
     time_delta: Rc<RefCell<TimeDelta>>,
 ) -> SystemId {
@@ -197,7 +197,7 @@ fn register_update_data_system(
 }
 
 fn register_update_components_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, bundles: BundlesMut<(Position, Velocity, Data)>| {
@@ -231,7 +231,7 @@ fn register_update_components_system(
 }
 
 fn register_update_health_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, bundles: BundlesMut<(Health,)>| {
@@ -264,7 +264,7 @@ fn register_update_health_system(
 }
 
 fn register_update_damage_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, bundles: BundlesMut<(Health, Damage)>| {
@@ -297,7 +297,7 @@ fn register_update_damage_system(
 }
 
 fn register_update_sprite_system(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
 ) -> SystemId {
     let system = move |system: SystemId, bundles: BundlesMut<(Sprite, Player, Health)>| {
@@ -331,7 +331,7 @@ fn register_update_sprite_system(
 }
 
 fn register_render_sprite_system<B>(
-    executor: &mut CpuExecutor,
+    executor: &mut CpuExecutor<impl ?Sized>,
     statistics: Rc<RefCell<Vec<StatisticsRecord>>>,
     framebuffer: Rc<RefCell<Framebuffer<B>>>,
 ) -> SystemId

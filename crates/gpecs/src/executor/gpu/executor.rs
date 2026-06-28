@@ -30,8 +30,10 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct GpuExecutor<'ctx, 'entries> {
-    context: &'ctx mut Context,
+pub struct GpuExecutor<'entries, T>
+where
+    T: ?Sized,
+{
     device: Device,
     components: GpuComponentRegistry,
     archetypes: GpuArchetypeRegistry,
@@ -40,11 +42,12 @@ pub struct GpuExecutor<'ctx, 'entries> {
     schedule_cache: ScheduleCache<'entries>,
     transfer_cache: TransferCache,
     timestamp_query_resources: Option<TimestampQueryResources>,
+    context: T,
 }
 
-impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
+impl<T> GpuExecutor<'_, T> {
     #[inline]
-    pub fn new(context: &'ctx mut Context, device: Device) -> Self {
+    pub fn new(context: T, device: Device) -> Self {
         Self {
             context,
             device,
@@ -57,7 +60,12 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
             timestamp_query_resources: None,
         }
     }
+}
 
+impl<T> GpuExecutor<'_, T>
+where
+    T: ?Sized,
+{
     #[inline]
     pub fn device(&self) -> &Device {
         let Self { device, .. } = self;
@@ -98,126 +106,12 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
     }
 
     #[inline]
-    pub fn register_component<C>(&mut self) -> GpuComponentId
-    where
-        C: GpuComponent,
-    {
-        let Self {
-            context,
-            components,
-            ..
-        } = self;
-
-        components.register_component::<C>(context.components_mut())
-    }
-
-    #[inline]
-    pub fn get_component_descriptor(
-        &self,
-        component_id: GpuComponentId,
-    ) -> Option<&ComponentDescriptor> {
-        let Self { context, .. } = self;
-        context.get_component_descriptor(component_id.into())
-    }
-
-    #[inline]
-    pub fn component_id_from(&self, type_id: TypeId) -> Option<GpuComponentId> {
-        let Self {
-            context,
-            components,
-            ..
-        } = self;
-
-        let component_id = context.component_id_from(type_id)?;
-        components.map_component_id(component_id)
-    }
-
-    #[inline]
-    pub fn component_id<C>(&self) -> Option<GpuComponentId>
-    where
-        C: GpuComponent,
-    {
-        let Self {
-            context,
-            components,
-            ..
-        } = self;
-
-        let component_id = context.component_id::<C>()?;
-        components.map_component_id(component_id)
-    }
-
-    #[inline]
-    pub fn register_archetype_of<B>(&mut self) -> Result<GpuArchetypeId, DuplicateComponentError>
-    where
-        B: GpuBundle,
-    {
-        let Self {
-            ref device,
-            ref mut context,
-            ref mut schedule_cache,
-            components: ref mut gpu_components,
-            archetypes: ref mut gpu_archetypes,
-            ..
-        } = *self;
-
-        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
-        let archetype_id = gpu_archetypes.register_archetype_of::<B>(
-            components,
-            archetypes,
-            gpu_components,
-            device,
-        )?;
-
-        schedule_cache.request_archetype_resync(archetype_id);
-        Ok(archetype_id)
-    }
-
-    #[inline]
     pub fn get_archetype_storage(
         &self,
         archetype_id: GpuArchetypeId,
     ) -> Option<&GpuArchetypeStorage> {
         let Self { archetypes, .. } = self;
         archetypes.get_archetype_storage(archetype_id)
-    }
-
-    #[inline]
-    pub fn archetype_id_of<B>(&self) -> Result<Option<GpuArchetypeId>, ArchetypeError>
-    where
-        B: GpuBundle,
-    {
-        let Self {
-            context,
-            archetypes,
-            ..
-        } = self;
-
-        let Some(archetype_id) = context.archetype_id_of::<B>()? else {
-            return Ok(None);
-        };
-        let archetype_id = archetypes.map_archetype_id(archetype_id);
-        Ok(archetype_id)
-    }
-
-    #[inline]
-    pub fn register_system<C, B>(
-        &mut self,
-        descriptor: GpuSystemDescriptor<C, B>,
-    ) -> Result<GpuSystemId, ArchetypeError>
-    where
-        C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
-        B: IntoIterator<Item = BindGroupLayoutEntry>,
-    {
-        let Self {
-            ref context,
-            ref device,
-            ref mut systems,
-            ..
-        } = *self;
-
-        let components = context.components();
-        systems.register_system(components, device, descriptor)
     }
 
     #[inline]
@@ -248,6 +142,112 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
         schedule.remove_system(system_id)
     }
 
+    pub fn timestamp_query_statistics(
+        &self,
+        queue: &Queue,
+    ) -> Option<Result<TimestampQueryStatistics, TimestampQueryError>> {
+        let Self {
+            schedule,
+            schedule_cache,
+            timestamp_query_resources,
+            ..
+        } = self;
+
+        let timestamp_query_resources = timestamp_query_resources.as_ref()?;
+        let raw = match timestamp_query_resources.raw_statistics() {
+            Ok(raw) => raw,
+            Err(error) => return Some(Err(error)),
+        };
+
+        let statistics = TimestampQueryStatistics::new(&raw, schedule, schedule_cache, queue);
+        Some(Ok(statistics))
+    }
+}
+
+impl<'entries, T> GpuExecutor<'entries, T>
+where
+    T: AsRef<Context> + ?Sized,
+{
+    #[inline]
+    pub fn get_component_descriptor(
+        &self,
+        component_id: GpuComponentId,
+    ) -> Option<&ComponentDescriptor> {
+        let Self { context, .. } = self;
+
+        let context = context.as_ref();
+        context.get_component_descriptor(component_id.into())
+    }
+
+    #[inline]
+    pub fn component_id_from(&self, type_id: TypeId) -> Option<GpuComponentId> {
+        let Self {
+            context,
+            components,
+            ..
+        } = self;
+
+        let context = context.as_ref();
+        let component_id = context.component_id_from(type_id)?;
+        components.map_component_id(component_id)
+    }
+
+    #[inline]
+    pub fn component_id<C>(&self) -> Option<GpuComponentId>
+    where
+        C: GpuComponent,
+    {
+        let Self {
+            context,
+            components,
+            ..
+        } = self;
+
+        let context = context.as_ref();
+        let component_id = context.component_id::<C>()?;
+        components.map_component_id(component_id)
+    }
+
+    #[inline]
+    pub fn archetype_id_of<B>(&self) -> Result<Option<GpuArchetypeId>, ArchetypeError>
+    where
+        B: GpuBundle,
+    {
+        let Self {
+            context,
+            archetypes,
+            ..
+        } = self;
+
+        let context = context.as_ref();
+        let Some(archetype_id) = context.archetype_id_of::<B>()? else {
+            return Ok(None);
+        };
+        let archetype_id = archetypes.map_archetype_id(archetype_id);
+        Ok(archetype_id)
+    }
+
+    #[inline]
+    pub fn register_system<C, B>(
+        &mut self,
+        descriptor: GpuSystemDescriptor<C, B>,
+    ) -> Result<GpuSystemId, ArchetypeError>
+    where
+        C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
+        B: IntoIterator<Item = BindGroupLayoutEntry>,
+    {
+        let Self {
+            ref context,
+            ref device,
+            ref mut systems,
+            ..
+        } = *self;
+
+        let context = context.as_ref();
+        let components = context.components();
+        systems.register_system(components, device, descriptor)
+    }
+
     #[inline]
     pub fn set_additional_entries(
         &mut self,
@@ -264,7 +264,7 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
         } = *self;
 
         schedule_cache.set_additional_entries(
-            context,
+            context.as_ref(),
             device,
             archetypes,
             systems,
@@ -286,6 +286,7 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
             ..
         } = *self;
 
+        let context = context.as_ref();
         let cpu_archetypes = context.archetypes();
         transfer_cache.resync(
             device,
@@ -355,26 +356,52 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
             timestamp_query_resources.resolve(command_encoder);
         }
     }
+}
 
-    pub fn timestamp_query_statistics(
-        &self,
-        queue: &Queue,
-    ) -> Option<Result<TimestampQueryStatistics, TimestampQueryError>> {
+impl<T> GpuExecutor<'_, T>
+where
+    T: AsMut<Context> + ?Sized,
+{
+    #[inline]
+    pub fn register_component<C>(&mut self) -> GpuComponentId
+    where
+        C: GpuComponent,
+    {
         let Self {
-            schedule,
-            schedule_cache,
-            timestamp_query_resources,
+            context,
+            components,
             ..
         } = self;
 
-        let timestamp_query_resources = timestamp_query_resources.as_ref()?;
-        let raw = match timestamp_query_resources.raw_statistics() {
-            Ok(raw) => raw,
-            Err(error) => return Some(Err(error)),
-        };
+        let context = context.as_mut();
+        components.register_component::<C>(context.components_mut())
+    }
 
-        let statistics = TimestampQueryStatistics::new(&raw, schedule, schedule_cache, queue);
-        Some(Ok(statistics))
+    #[inline]
+    pub fn register_archetype_of<B>(&mut self) -> Result<GpuArchetypeId, DuplicateComponentError>
+    where
+        B: GpuBundle,
+    {
+        let Self {
+            ref device,
+            ref mut context,
+            ref mut schedule_cache,
+            components: ref mut gpu_components,
+            archetypes: ref mut gpu_archetypes,
+            ..
+        } = *self;
+
+        let context = context.as_mut();
+        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
+        let archetype_id = gpu_archetypes.register_archetype_of::<B>(
+            components,
+            archetypes,
+            gpu_components,
+            device,
+        )?;
+
+        schedule_cache.request_archetype_resync(archetype_id);
+        Ok(archetype_id)
     }
 
     #[inline]
@@ -387,11 +414,18 @@ impl<'ctx, 'entries> GpuExecutor<'ctx, 'entries> {
             transfer_cache,
             ..
         } = self;
+
+        let context = context.as_mut();
         ContextMapper::new(context, device, transfer_cache, schedule_cache, archetypes)
     }
+}
 
+impl<T> GpuExecutor<'_, T>
+where
+    T: AsMut<Context>,
+{
     #[inline]
-    pub fn into_context(mut self, queue: &Queue) -> &'ctx mut Context {
+    pub fn into_context(mut self, queue: &Queue) -> T {
         let Self { ref device, .. } = self;
         let device = device.clone();
 

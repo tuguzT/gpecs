@@ -443,15 +443,14 @@ fn bool_to_f32(bool: bool) -> f32 {
 
 #[self_referencing]
 pub struct EcsState {
-    context: Context,
     vertex_buffer: Buffer,
     delta_time_buffer: Buffer,
     #[borrows(vertex_buffer, delta_time_buffer)]
     #[not_covariant]
     additional_entries: GpuSystemAdditionalEntries<'this>,
-    #[borrows(mut context, additional_entries)]
+    #[borrows(additional_entries)]
     #[not_covariant]
-    executor: GpuExecutor<'this, 'this>,
+    executor: GpuExecutor<'this, Context>,
 }
 
 impl Debug for EcsState {
@@ -486,10 +485,13 @@ struct GpuSystems {
 const UPDATE_FORCE_WORKGROUP_SIZE: NonZeroU32 = NonZeroU32::new(256).expect("cannot be non-zero");
 
 #[expect(clippy::too_many_lines)]
-fn register_gpu_systems(
-    executor: &mut GpuExecutor<'_, '_>,
+fn register_gpu_systems<T>(
+    executor: &mut GpuExecutor<'_, T>,
     shader_module: &ShaderModule,
-) -> GpuSystems {
+) -> GpuSystems
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
     let position_id = executor.register_component::<Position>();
     let velocity_id = executor.register_component::<Velocity>();
     let force_id = executor.register_component::<Force>();
@@ -616,8 +618,8 @@ struct GpuSystemAdditionalEntries<'a> {
 }
 
 fn init_gpu_system_additional_entries<'a>(
-    delta_time_buffer: &'a Buffer,
     vertex_buffer: &'a Buffer,
+    delta_time_buffer: &'a Buffer,
 ) -> GpuSystemAdditionalEntries<'a> {
     let update_velocity_and_position = [BindGroupEntry {
         binding: 4,
@@ -633,11 +635,13 @@ fn init_gpu_system_additional_entries<'a>(
     }
 }
 
-fn setup_gpu_systems<'entries>(
-    executor: &mut GpuExecutor<'_, 'entries>,
+fn setup_gpu_systems<'entries, T>(
+    executor: &mut GpuExecutor<'entries, T>,
     systems: GpuSystems,
     entries: &'entries GpuSystemAdditionalEntries<'_>,
-) {
+) where
+    T: AsRef<Context> + ?Sized,
+{
     let system_id = systems.update_velocity_and_position;
     let additional_entries = &entries.update_velocity_and_position;
     executor.set_additional_entries(system_id, additional_entries);
@@ -718,24 +722,31 @@ fn init_ecs_context(particle_count: u32) -> Context {
     context
 }
 
+fn init_ecs_gpu_executor<'entries>(
+    device: Device,
+    shader_module: &ShaderModule,
+    particle_count: u32,
+    additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
+) -> GpuExecutor<'entries, Context> {
+    let context = init_ecs_context(particle_count);
+    let mut executor = GpuExecutor::new(context, device);
+    executor
+        .register_archetype_of::<(Position, Velocity, Force, Mass, Radius, Color)>()
+        .expect("archetype components should be unique");
+
+    let systems = register_gpu_systems(&mut executor, shader_module);
+    setup_gpu_systems(&mut executor, systems, additional_entries);
+
+    executor
+}
+
 fn init_ecs_state(device: Device, shader_module: &ShaderModule, particle_count: u32) -> EcsState {
     let builder = EcsStateBuilder {
-        context: init_ecs_context(particle_count),
         vertex_buffer: init_vertex_buffer(&device),
         delta_time_buffer: init_delta_time_buffer(&device),
-        additional_entries_builder: |vertex_buffer, delta_time_buffer| {
-            init_gpu_system_additional_entries(delta_time_buffer, vertex_buffer)
-        },
-        executor_builder: |context, additional_entries| {
-            let mut executor = GpuExecutor::new(context, device);
-            executor
-                .register_archetype_of::<(Position, Velocity, Force, Mass, Radius, Color)>()
-                .expect("archetype components should be unique");
-
-            let systems = register_gpu_systems(&mut executor, shader_module);
-            setup_gpu_systems(&mut executor, systems, additional_entries);
-
-            executor
+        additional_entries_builder: init_gpu_system_additional_entries,
+        executor_builder: |additional_entries| {
+            init_ecs_gpu_executor(device, shader_module, particle_count, additional_entries)
         },
     };
     builder.build()

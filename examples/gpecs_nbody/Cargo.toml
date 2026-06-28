@@ -17,7 +17,7 @@ log = { workspace = true }
 env_logger = { workspace = true }
 dotenvy = { workspace = true }
 pollster = { workspace = true }
-wgpu = { workspace = true, features = ["spirv"] }
+wgpu = { workspace = true, features = ["vulkan", "dx12", "metal", "spirv"] }
 winit = { workspace = true }
 egui = { workspace = true }
 egui-winit = { workspace = true }

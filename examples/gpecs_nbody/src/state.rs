@@ -7,7 +7,7 @@ use std::{
 };
 
 use egui::{Rgba, RichText, Ui};
-use glam::{EulerRot, Mat4, Quat, Vec2, Vec3, dvec2, uvec4, vec3, vec4};
+use glam::{camera::rh::proj::directx::perspective, prelude::*};
 use gpecs::{
     context::Context,
     executor::gpu::{
@@ -260,8 +260,7 @@ impl State {
         let view = Mat4::from_quat(camera_rotation).inverse();
         let z_near = 0.001;
         let z_far = 1000.0;
-        let projection =
-            Mat4::perspective_rh(FRAC_PI_3, aspect_ratio(width, height), z_near, z_far);
+        let projection = perspective(FRAC_PI_3, aspect_ratio(width, height), z_near, z_far);
         let data = UniformBuffer {
             model_view_projection: projection * view * model,
             resolution: uvec4(width, height, 0, 0).as_vec4(),

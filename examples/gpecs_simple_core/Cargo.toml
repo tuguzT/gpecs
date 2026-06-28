@@ -17,7 +17,7 @@ num-traits = { workspace = true }
 glam = { workspace = true }
 pollster = { workspace = true }
 log = { workspace = true }
-wgpu = { workspace = true, features = ["spirv"] }
+wgpu = { workspace = true, features = ["vulkan", "dx12", "metal", "spirv"] }
 rayon = { workspace = true }
 
 [build-dependencies]

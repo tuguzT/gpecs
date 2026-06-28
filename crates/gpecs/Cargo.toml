@@ -28,6 +28,7 @@ cargo-gpu-install = { workspace = true }
 const_format = { workspace = true }
 
 [dev-dependencies]
+wgpu = { workspace = true, features = ["vulkan", "dx12", "metal"] }
 pollster = { workspace = true }
 
 [features]

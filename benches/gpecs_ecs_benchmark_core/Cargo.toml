@@ -14,7 +14,7 @@ bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 num-traits = { workspace = true }
 glam = { workspace = true, features = ["u32"] }
 log = { workspace = true }
-wgpu = { workspace = true, features = ["spirv"] }
+wgpu = { workspace = true, features = ["vulkan", "dx12", "metal", "spirv"] }
 pollster = { workspace = true }
 itertools = { workspace = true }
 rayon = { workspace = true }

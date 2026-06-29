@@ -450,7 +450,7 @@ pub struct EcsState {
     additional_entries: GpuSystemAdditionalEntries<'this>,
     #[borrows(additional_entries)]
     #[not_covariant]
-    executor: GpuExecutor<'this, Context>,
+    executor: GpuExecutor<Context, &'this [BindGroupEntry<'this>]>,
 }
 
 impl Debug for EcsState {
@@ -486,7 +486,7 @@ const UPDATE_FORCE_WORKGROUP_SIZE: NonZeroU32 = NonZeroU32::new(256).expect("can
 
 #[expect(clippy::too_many_lines)]
 fn register_gpu_systems<T>(
-    executor: &mut GpuExecutor<'_, T>,
+    executor: &mut GpuExecutor<T, impl Sized>,
     shader_module: &ShaderModule,
 ) -> GpuSystems
 where
@@ -636,7 +636,7 @@ fn init_gpu_system_additional_entries<'a>(
 }
 
 fn setup_gpu_systems<'entries, T>(
-    executor: &mut GpuExecutor<'entries, T>,
+    executor: &mut GpuExecutor<T, &'entries [BindGroupEntry<'entries>]>,
     systems: GpuSystems,
     entries: &'entries GpuSystemAdditionalEntries<'_>,
 ) where
@@ -727,7 +727,7 @@ fn init_ecs_gpu_executor<'entries>(
     shader_module: &ShaderModule,
     particle_count: u32,
     additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
-) -> GpuExecutor<'entries, Context> {
+) -> GpuExecutor<Context, &'entries [BindGroupEntry<'entries>]> {
     let context = init_ecs_context(particle_count);
     let mut executor = GpuExecutor::new(context, device);
     executor

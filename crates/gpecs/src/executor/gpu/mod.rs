@@ -1,4 +1,4 @@
-pub use self::executor::GpuExecutor;
+pub use self::{cache::entries::AdditionalEntries, executor::GpuExecutor};
 
 pub mod archetype;
 pub mod bundle;

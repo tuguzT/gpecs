@@ -257,7 +257,7 @@ struct GpuSystems {
 }
 
 #[expect(clippy::too_many_lines)]
-fn register_gpu_systems<T>(executor: &mut GpuExecutor<T>) -> GpuSystems
+fn register_gpu_systems<T>(executor: &mut GpuExecutor<T, impl Sized>) -> GpuSystems
 where
     T: AsRef<Context> + AsMut<Context> + ?Sized,
 {
@@ -447,7 +447,7 @@ where
 }
 
 fn setup_gpu_systems<'entries, T>(
-    executor: &mut GpuExecutor<'entries, T>,
+    executor: &mut GpuExecutor<T, &'entries [wgpu::BindGroupEntry<'entries>]>,
     systems: &GpuSystems,
     additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
 ) where
@@ -459,7 +459,7 @@ fn setup_gpu_systems<'entries, T>(
 }
 
 fn collect_statistics(
-    executor: &GpuExecutor<impl ?Sized>,
+    executor: &GpuExecutor<impl ?Sized, impl Sized>,
     queue: &wgpu::Queue,
 ) -> Vec<StatisticsRecord> {
     let statistics = executor

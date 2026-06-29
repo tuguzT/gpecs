@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
 use wgpu::{
-    BindGroupEntry, BindGroupLayoutEntry, CommandEncoder, CommandEncoderDescriptor, ComputePass,
+    BindGroupLayoutEntry, CommandEncoder, CommandEncoderDescriptor, ComputePass,
     ComputePassDescriptor, Device, PollType, Queue, util::DispatchIndirectArgs,
 };
 
@@ -9,6 +9,7 @@ use crate::{
     archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     context::{ComponentDescriptor, Context},
     executor::gpu::{
+        AdditionalEntries,
         archetype::{
             registry::{GpuArchetypeId, GpuArchetypeRegistry},
             storage::GpuArchetypeStorage,
@@ -30,7 +31,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct GpuExecutor<'entries, T>
+pub struct GpuExecutor<T, E = ()>
 where
     T: ?Sized,
 {
@@ -39,13 +40,13 @@ where
     archetypes: GpuArchetypeRegistry,
     systems: GpuSystemRegistry,
     schedule: GpuSystemSchedule,
-    schedule_cache: ScheduleCache<'entries>,
+    schedule_cache: ScheduleCache<E>,
     transfer_cache: TransferCache,
     timestamp_query_resources: Option<TimestampQueryResources>,
     context: T,
 }
 
-impl<T> GpuExecutor<'_, T> {
+impl<T, E> GpuExecutor<T, E> {
     #[inline]
     pub fn new(context: T, device: Device) -> Self {
         Self {
@@ -62,7 +63,7 @@ impl<T> GpuExecutor<'_, T> {
     }
 }
 
-impl<T> GpuExecutor<'_, T>
+impl<T, E> GpuExecutor<T, E>
 where
     T: ?Sized,
 {
@@ -164,7 +165,7 @@ where
     }
 }
 
-impl<'entries, T> GpuExecutor<'entries, T>
+impl<T, E> GpuExecutor<T, E>
 where
     T: AsRef<Context> + ?Sized,
 {
@@ -247,13 +248,15 @@ where
         let components = context.components();
         systems.register_system(components, device, descriptor)
     }
+}
 
+impl<T, E> GpuExecutor<T, E>
+where
+    T: AsRef<Context> + ?Sized,
+    E: AdditionalEntries,
+{
     #[inline]
-    pub fn set_additional_entries(
-        &mut self,
-        system_id: GpuSystemId,
-        additional_entries: &'entries [BindGroupEntry<'_>],
-    ) {
+    pub fn set_additional_entries(&mut self, system_id: GpuSystemId, additional_entries: E) {
         let Self {
             ref context,
             ref device,
@@ -358,7 +361,7 @@ where
     }
 }
 
-impl<T> GpuExecutor<'_, T>
+impl<T, E> GpuExecutor<T, E>
 where
     T: AsMut<Context> + ?Sized,
 {
@@ -405,7 +408,7 @@ where
     }
 
     #[inline]
-    pub fn context_mapper(&mut self) -> ContextMapper<'_> {
+    pub fn context_mapper(&mut self) -> ContextMapper<'_, E> {
         let Self {
             context,
             device,
@@ -420,7 +423,7 @@ where
     }
 }
 
-impl<T> GpuExecutor<'_, T>
+impl<T, E> GpuExecutor<T, E>
 where
     T: AsMut<Context>,
 {

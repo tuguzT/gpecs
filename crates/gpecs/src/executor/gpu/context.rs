@@ -15,21 +15,21 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct ContextMapper<'a> {
+pub struct ContextMapper<'a, E> {
     context: &'a mut Context,
     device: &'a Device,
-    schedule_cache: &'a ScheduleCache<'a>,
+    schedule_cache: &'a ScheduleCache<E>,
     transfer_cache: &'a mut TransferCache,
     archetypes: &'a mut GpuArchetypeRegistry,
 }
 
-impl<'a> ContextMapper<'a> {
+impl<'a, E> ContextMapper<'a, E> {
     #[inline]
     pub(super) fn new(
         context: &'a mut Context,
         device: &'a Device,
         transfer_cache: &'a mut TransferCache,
-        schedule_cache: &'a ScheduleCache<'a>,
+        schedule_cache: &'a ScheduleCache<E>,
         archetypes: &'a mut GpuArchetypeRegistry,
     ) -> Self {
         Self {

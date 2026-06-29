@@ -35,7 +35,7 @@ impl TransferCache {
         &mut self,
         device: &Device,
         command_encoder: &mut CommandEncoder,
-        schedule_cache: &ScheduleCache,
+        schedule_cache: &ScheduleCache<impl Sized>,
         gpu_archetypes: &GpuArchetypeRegistry,
     ) {
         for (archetype_id, _) in schedule_cache
@@ -56,7 +56,7 @@ impl TransferCache {
         device: &Device,
         command_encoder: &mut CommandEncoder,
         archetype_id: GpuArchetypeId,
-        schedule_cache: &ScheduleCache,
+        schedule_cache: &ScheduleCache<impl Sized>,
         gpu_archetypes: &GpuArchetypeRegistry,
     ) {
         let should_download = schedule_cache
@@ -268,7 +268,7 @@ impl TransferCache {
         &mut self,
         device: &Device,
         command_encoder: &mut CommandEncoder,
-        schedule_cache: &mut ScheduleCache,
+        schedule_cache: &mut ScheduleCache<impl Sized>,
         cpu_archetypes: &ArchetypeRegistry,
         gpu_archetypes: &mut GpuArchetypeRegistry,
     ) {

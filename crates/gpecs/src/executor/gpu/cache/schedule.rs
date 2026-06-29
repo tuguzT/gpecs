@@ -5,6 +5,7 @@ use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, Device};
 use crate::{
     context::Context,
     executor::gpu::{
+        AdditionalEntries,
         archetype::{
             registry::{GpuArchetypeId, GpuArchetypeRegistry},
             storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
@@ -19,12 +20,12 @@ use crate::{
     hash::IndexMap,
 };
 
-#[derive(Debug, Default)]
-pub struct ScheduleCache<'a> {
-    systems: IndexMap<GpuSystemId, SystemCache<'a>>,
+#[derive(Debug)]
+pub struct ScheduleCache<E> {
+    systems: IndexMap<GpuSystemId, SystemCache<E>>,
 }
 
-impl<'a> ScheduleCache<'a> {
+impl<E> ScheduleCache<E> {
     #[inline]
     pub fn request_system_resync(&mut self, system_id: GpuSystemId) {
         let Self { systems } = self;
@@ -43,6 +44,23 @@ impl<'a> ScheduleCache<'a> {
         }
     }
 
+    #[inline]
+    pub fn system(&self, system_id: GpuSystemId) -> Option<&SystemCache<E>> {
+        let Self { systems } = self;
+        systems.get(&system_id)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (GpuSystemId, &SystemCache<E>)> {
+        let Self { systems } = self;
+        systems.iter().map(|(&id, cache)| (id, cache))
+    }
+}
+
+impl<E> ScheduleCache<E>
+where
+    E: AdditionalEntries,
+{
     pub fn resync(
         &mut self,
         context: &Context,
@@ -57,7 +75,7 @@ impl<'a> ScheduleCache<'a> {
         for system_id in schedule {
             let system_cache = systems.entry(system_id).or_insert_with(|| {
                 update_count += 1;
-                SystemCache::new(context, device, archetypes, gpu_systems, system_id, &[])
+                SystemCache::new(context, device, archetypes, gpu_systems, system_id, None)
             });
 
             let updated = system_cache.resync(device, archetypes, gpu_systems, system_id);
@@ -74,7 +92,7 @@ impl<'a> ScheduleCache<'a> {
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         system_id: GpuSystemId,
-        additional_entries: &'a [BindGroupEntry<'_>],
+        additional_entries: E,
     ) {
         let system_cache = SystemCache::new(
             context,
@@ -82,83 +100,29 @@ impl<'a> ScheduleCache<'a> {
             archetypes,
             systems,
             system_id,
-            additional_entries,
+            Some(additional_entries),
         );
 
         let Self { systems } = self;
         systems.insert(system_id, system_cache);
     }
+}
 
+impl<E> Default for ScheduleCache<E> {
     #[inline]
-    pub fn system(&self, system_id: GpuSystemId) -> Option<&SystemCache<'a>> {
-        let Self { systems } = self;
-        systems.get(&system_id)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (GpuSystemId, &SystemCache<'a>)> {
-        let Self { systems } = self;
-        systems.iter().map(|(&id, cache)| (id, cache))
+    fn default() -> Self {
+        let systems = IndexMap::default();
+        Self { systems }
     }
 }
 
-#[derive(Debug, Default)]
-pub struct SystemCache<'a> {
-    additional_entries: &'a [BindGroupEntry<'a>],
+#[derive(Debug)]
+pub struct SystemCache<E> {
+    additional_entries: Option<E>,
     archetypes: IndexMap<GpuArchetypeId, ArchetypeCache>,
 }
 
-impl<'a> SystemCache<'a> {
-    fn new(
-        context: &Context,
-        device: &Device,
-        archetypes: &GpuArchetypeRegistry,
-        systems: &GpuSystemRegistry,
-        system_id: GpuSystemId,
-        additional_entries: &'a [BindGroupEntry<'_>],
-    ) -> Self {
-        let Some(system_shader) = systems.get_system_shader(system_id) else {
-            unreachable!("{system_id} should exist");
-        };
-
-        let components = &context.components().as_view();
-        let component_ids = system_shader
-            .bind_group_layout_entries()
-            .components
-            .map(|(component_id, _)| component_id.into());
-        let Ok(compatible_archetypes) = context
-            .archetypes()
-            .compatible_archetypes_from(components, component_ids)
-        else {
-            unreachable!("{system_id} should have compatible archetypes");
-        };
-
-        let into_archetype_cache = |(archetype_id, _)| {
-            let archetype_id = archetypes.map_archetype_id(archetype_id)?;
-            let Some(archetype_storage) = archetypes.get_archetype_storage(archetype_id) else {
-                unreachable!("{archetype_id} should exist");
-            };
-
-            let archetype_cache = ArchetypeCache::new(
-                device,
-                system_id,
-                system_shader,
-                archetype_id,
-                archetype_storage,
-                additional_entries,
-            )?;
-            Some((archetype_id, archetype_cache))
-        };
-
-        let archetypes = compatible_archetypes
-            .filter_map(into_archetype_cache)
-            .collect();
-        Self {
-            additional_entries,
-            archetypes,
-        }
-    }
-
+impl<E> SystemCache<E> {
     #[inline]
     fn request_archetype_resync(&mut self, archetype_id: GpuArchetypeId) {
         let Self { archetypes, .. } = self;
@@ -177,6 +141,89 @@ impl<'a> SystemCache<'a> {
         }
     }
 
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { archetypes, .. } = self;
+        archetypes.len()
+    }
+
+    #[inline]
+    pub fn archetype(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeCache> {
+        let Self { archetypes, .. } = self;
+        archetypes.get(&archetype_id)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (GpuArchetypeId, &ArchetypeCache)> {
+        let Self { archetypes, .. } = self;
+        archetypes.iter().map(|(&id, cache)| (id, cache))
+    }
+}
+
+impl<E> SystemCache<E>
+where
+    E: AdditionalEntries,
+{
+    fn new(
+        context: &Context,
+        device: &Device,
+        archetypes: &GpuArchetypeRegistry,
+        systems: &GpuSystemRegistry,
+        system_id: GpuSystemId,
+        additional_entries: Option<E>,
+    ) -> Self {
+        let Some(system_shader) = systems.get_system_shader(system_id) else {
+            unreachable!("{system_id} should exist");
+        };
+
+        let components = &context.components().as_view();
+        let component_ids = system_shader
+            .bind_group_layout_entries()
+            .components
+            .map(|(component_id, _)| component_id.into());
+        let Ok(compatible_archetypes) = context
+            .archetypes()
+            .compatible_archetypes_from(components, component_ids)
+        else {
+            unreachable!("{system_id} should have compatible archetypes");
+        };
+
+        let archetypes = {
+            let additional_entries = additional_entries
+                .as_ref()
+                .map(AdditionalEntries::additional_entries);
+            let additional_entries = additional_entries
+                .as_ref()
+                .map(AsRef::as_ref)
+                .unwrap_or_default();
+
+            let into_archetype_cache = |(archetype_id, _)| {
+                let archetype_id = archetypes.map_archetype_id(archetype_id)?;
+                let Some(archetype_storage) = archetypes.get_archetype_storage(archetype_id) else {
+                    unreachable!("{archetype_id} should exist");
+                };
+                let archetype_cache = ArchetypeCache::new(
+                    device,
+                    system_id,
+                    system_shader,
+                    archetype_id,
+                    archetype_storage,
+                    additional_entries,
+                )?;
+                Some((archetype_id, archetype_cache))
+            };
+
+            compatible_archetypes
+                .filter_map(into_archetype_cache)
+                .collect()
+        };
+
+        Self {
+            additional_entries,
+            archetypes,
+        }
+    }
+
     fn resync(
         &mut self,
         device: &Device,
@@ -186,8 +233,16 @@ impl<'a> SystemCache<'a> {
     ) -> bool {
         let Self {
             ref mut archetypes,
-            additional_entries,
+            ref additional_entries,
         } = *self;
+
+        let additional_entries = additional_entries
+            .as_ref()
+            .map(AdditionalEntries::additional_entries);
+        let additional_entries = additional_entries
+            .as_ref()
+            .map(AsRef::as_ref)
+            .unwrap_or_default();
 
         let mut update_count = 0_usize;
         archetypes.retain(|&archetype_id, archetype_cache| {
@@ -216,23 +271,15 @@ impl<'a> SystemCache<'a> {
 
         update_count > 0
     }
+}
 
+impl<E> Default for SystemCache<E> {
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { archetypes, .. } = self;
-        archetypes.len()
-    }
-
-    #[inline]
-    pub fn archetype(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeCache> {
-        let Self { archetypes, .. } = self;
-        archetypes.get(&archetype_id)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (GpuArchetypeId, &ArchetypeCache)> {
-        let Self { archetypes, .. } = self;
-        archetypes.iter().map(|(&id, cache)| (id, cache))
+    fn default() -> Self {
+        Self {
+            additional_entries: None,
+            archetypes: IndexMap::default(),
+        }
     }
 }
 

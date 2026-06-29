@@ -6,7 +6,7 @@ fn execute_simple() {
     let mut context = Context::new();
 
     let (device, queue) = init_wgpu();
-    let executor = GpuExecutor::new(&mut context, device);
+    let executor = GpuExecutor::<_>::new(&mut context, device);
 
     // TODO: execute GPU systems
 

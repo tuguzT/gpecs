@@ -38,7 +38,10 @@ pub struct TimestampQueryResources {
 
 impl TimestampQueryResources {
     #[inline]
-    pub(super) fn new(gpu_device: &Device, schedule_cache: &ScheduleCache) -> Option<Self> {
+    pub(super) fn new(
+        gpu_device: &Device,
+        schedule_cache: &ScheduleCache<impl Sized>,
+    ) -> Option<Self> {
         let can_write_timestamps = gpu_device
             .features()
             .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
@@ -207,7 +210,7 @@ impl TimestampQueryStatistics {
     pub(super) fn new(
         raw: &TimestampQueryRawStatistics,
         schedule: &GpuSystemSchedule,
-        cache: &ScheduleCache,
+        cache: &ScheduleCache<impl Sized>,
         queue: &Queue,
     ) -> Self {
         let mut pairs = raw.as_slice().iter().copied().tuple_windows();
@@ -322,7 +325,7 @@ pub struct TimestampQuerySystemStatistics {
 impl TimestampQuerySystemStatistics {
     fn new(
         system_id: GpuSystemId,
-        system_cache: &SystemCache,
+        system_cache: &SystemCache<impl Sized>,
         queue: &Queue,
         pairs: impl IntoIterator<Item = (u64, u64)>,
     ) -> Self {
@@ -458,7 +461,7 @@ impl Display for TimestampQueryError {
 impl Error for TimestampQueryError {}
 
 #[inline]
-fn timestamp_count_for_system_cache(system_cache: &SystemCache) -> usize {
+fn timestamp_count_for_system_cache(system_cache: &SystemCache<impl Sized>) -> usize {
     let count = system_cache.len();
     if count == 0 {
         return 0;

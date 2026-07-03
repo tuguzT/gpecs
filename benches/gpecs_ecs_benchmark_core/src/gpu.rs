@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gpecs::prelude::*;
+use gpecs::{executor::gpu::AdditionalEntries, prelude::*};
 use gpecs_ecs_benchmark_types::{
     components::{
         DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, Position, Sprite, Velocity,
@@ -61,13 +61,11 @@ where
         .expect("all the components should be unique");
 
     let mut time_delta = TimeDelta::default();
-    let gpu_system_resources = create_gpu_system_resources(device, time_delta, &framebuffer);
-    let gpu_system_additional_entries =
-        create_gpu_systems_additional_entries(&gpu_system_resources);
+    let gpu_system_resources = GpuSystemsResources::new(device, time_delta, &framebuffer);
 
     let framebuffer_download_buffer_desc = wgpu::BufferDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer download buffer"),
-        size: gpu_system_resources.framebuffer_data_storage.size(),
+        size: gpu_system_resources.framebuffer_data.size(),
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     };
@@ -82,7 +80,7 @@ where
 
     log::info!(">> Registering GPU systems...");
     let gpu_systems = register_gpu_systems(&mut executor);
-    setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_additional_entries);
+    setup_gpu_systems(&mut executor, &gpu_systems, &gpu_system_resources);
 
     log::info!(">> Running GPU systems...");
     for i in (0..).maybe_take(repeat_count) {
@@ -99,7 +97,7 @@ where
         command_encoder.copy_buffer_to_buffer(
             &framebuffer_clear_buffer,
             0,
-            &gpu_system_resources.framebuffer_data_storage,
+            &gpu_system_resources.framebuffer_data,
             0,
             framebuffer_clear_buffer.size(),
         );
@@ -107,7 +105,7 @@ where
         executor.execute(&mut command_encoder);
 
         command_encoder.copy_buffer_to_buffer(
-            &gpu_system_resources.framebuffer_data_storage,
+            &gpu_system_resources.framebuffer_data,
             0,
             &framebuffer_download_buffer,
             0,
@@ -152,96 +150,444 @@ where
 }
 
 #[derive(Debug)]
-struct GpuSystemResources {
-    time_delta_uniform: wgpu::Buffer,
-    framebuffer_desc_uniform: wgpu::Buffer,
-    framebuffer_data_storage: wgpu::Buffer,
+struct GpuSystemsResources {
+    time_delta: wgpu::Buffer,
+    framebuffer_data: wgpu::Buffer,
+    framebuffer_desc: wgpu::Buffer,
 }
 
-fn create_gpu_system_resources(
-    device: &wgpu::Device,
-    time_delta: TimeDelta,
-    framebuffer: &Framebuffer<impl AsRef<[u32]>>,
-) -> GpuSystemResources {
-    let time_delta_slice = [time_delta.0];
-    let time_delta_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
+impl GpuSystemsResources {
+    fn new(
+        device: &wgpu::Device,
+        time_delta: TimeDelta,
+        framebuffer: &Framebuffer<impl AsRef<[u32]>>,
+    ) -> Self {
+        Self {
+            time_delta: create_time_delta_buffer(device, time_delta),
+            framebuffer_data: create_framebuffer_data_buffer(device, framebuffer),
+            framebuffer_desc: create_framebuffer_desc_buffer(device, framebuffer.desc()),
+        }
+    }
+}
+
+fn create_time_delta_buffer(device: &wgpu::Device, time_delta: TimeDelta) -> wgpu::Buffer {
+    let desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` time delta uniform buffer"),
-        contents: bytemuck::must_cast_slice(&time_delta_slice),
+        contents: bytemuck::bytes_of(&time_delta),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     };
-    let time_delta_uniform = device.create_buffer_init(&time_delta_uniform_buffer_desc);
+    device.create_buffer_init(&desc)
+}
 
-    let framebuffer_data_storage_buffer_desc = wgpu::util::BufferInitDescriptor {
+fn create_framebuffer_data_buffer(
+    device: &wgpu::Device,
+    framebuffer: &Framebuffer<impl AsRef<[u32]>>,
+) -> wgpu::Buffer {
+    let desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer data storage buffer"),
         contents: bytemuck::must_cast_slice(framebuffer.buffer().as_ref()),
         usage: wgpu::BufferUsages::STORAGE
             | wgpu::BufferUsages::COPY_SRC
             | wgpu::BufferUsages::COPY_DST,
     };
-    let framebuffer_data_storage = device.create_buffer_init(&framebuffer_data_storage_buffer_desc);
+    device.create_buffer_init(&desc)
+}
 
-    let framebuffer_desc = [framebuffer.desc()];
-    let framebuffer_desc_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
+fn create_framebuffer_desc_buffer(
+    device: &wgpu::Device,
+    framebuffer_desc: FramebufferDesc,
+) -> wgpu::Buffer {
+    let desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` framebuffer desc uniform buffer"),
-        contents: bytemuck::must_cast_slice(&framebuffer_desc),
+        contents: bytemuck::bytes_of(&framebuffer_desc),
         usage: wgpu::BufferUsages::UNIFORM,
     };
-    let framebuffer_desc_uniform = device.create_buffer_init(&framebuffer_desc_uniform_buffer_desc);
+    device.create_buffer_init(&desc)
+}
 
-    GpuSystemResources {
-        time_delta_uniform,
-        framebuffer_desc_uniform,
-        framebuffer_data_storage,
+#[derive(Debug)]
+enum GpuSystemsAdditionalEntries {
+    UpdatePosition {
+        time_delta: wgpu::Buffer,
+    },
+    UpdateData {
+        time_delta: wgpu::Buffer,
+    },
+    RenderSprite {
+        framebuffer_data: wgpu::Buffer,
+        framebuffer_desc: wgpu::Buffer,
+    },
+}
+
+impl GpuSystemsAdditionalEntries {
+    fn update_position(resources: &GpuSystemsResources) -> Self {
+        let GpuSystemsResources { time_delta, .. } = resources;
+
+        let time_delta = time_delta.clone();
+        Self::UpdatePosition { time_delta }
+    }
+
+    fn update_data(resources: &GpuSystemsResources) -> Self {
+        let GpuSystemsResources { time_delta, .. } = resources;
+
+        let time_delta = time_delta.clone();
+        Self::UpdateData { time_delta }
+    }
+
+    fn render_sprite(resources: &GpuSystemsResources) -> Self {
+        let GpuSystemsResources {
+            framebuffer_data,
+            framebuffer_desc,
+            ..
+        } = resources;
+
+        Self::RenderSprite {
+            framebuffer_data: framebuffer_data.clone(),
+            framebuffer_desc: framebuffer_desc.clone(),
+        }
+    }
+}
+
+impl AdditionalEntries for GpuSystemsAdditionalEntries {
+    type Output<'a>
+        = GpuSystemsAdditionalEntriesOutput<'a>
+    where
+        Self: 'a;
+
+    fn additional_entries(&self) -> Self::Output<'_> {
+        match self {
+            Self::UpdatePosition { time_delta } => {
+                let time_delta_entry = update_position_time_delta_entry(time_delta);
+                let entries = [time_delta_entry];
+                GpuSystemsAdditionalEntriesOutput::UpdatePosition { entries }
+            }
+            Self::UpdateData { time_delta } => {
+                let time_delta_entry = update_data_time_delta_entry(time_delta);
+                let entries = [time_delta_entry];
+                GpuSystemsAdditionalEntriesOutput::UpdateData { entries }
+            }
+            Self::RenderSprite {
+                framebuffer_data,
+                framebuffer_desc,
+            } => {
+                let framebuffer_data_entry = render_sprite_framebuffer_data_entry(framebuffer_data);
+                let framebuffer_desc_entry = render_sprite_framebuffer_desc_entry(framebuffer_desc);
+                let entries = [framebuffer_data_entry, framebuffer_desc_entry];
+                GpuSystemsAdditionalEntriesOutput::RenderSprite { entries }
+            }
+        }
     }
 }
 
 #[derive(Debug)]
-struct GpuSystemAdditionalEntries<'a> {
-    update_position: [wgpu::BindGroupEntry<'a>; 1],
-    update_data: [wgpu::BindGroupEntry<'a>; 1],
-    render_sprite: [wgpu::BindGroupEntry<'a>; 2],
+enum GpuSystemsAdditionalEntriesOutput<'a> {
+    UpdatePosition {
+        entries: [wgpu::BindGroupEntry<'a>; 1],
+    },
+    UpdateData {
+        entries: [wgpu::BindGroupEntry<'a>; 1],
+    },
+    RenderSprite {
+        entries: [wgpu::BindGroupEntry<'a>; 2],
+    },
 }
 
-fn create_gpu_systems_additional_entries(
-    resources: &GpuSystemResources,
-) -> GpuSystemAdditionalEntries<'_> {
-    let time_delta_uniform_buffer_entry = wgpu::BindGroupEntry {
-        binding: 2,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: &resources.time_delta_uniform,
-            offset: 0,
-            size: None,
-        }),
-    };
-    let framebuffer_data_entry = wgpu::BindGroupEntry {
-        binding: 2,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: &resources.framebuffer_data_storage,
-            offset: 0,
-            size: None,
-        }),
-    };
-    let framebuffer_desc_entry = wgpu::BindGroupEntry {
-        binding: 3,
-        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer: &resources.framebuffer_desc_uniform,
-            offset: 0,
-            size: None,
-        }),
-    };
-
-    let update_position = [time_delta_uniform_buffer_entry.clone()];
-    let update_data = [wgpu::BindGroupEntry {
-        binding: 1,
-        ..time_delta_uniform_buffer_entry
-    }];
-    let render_sprite = [framebuffer_data_entry, framebuffer_desc_entry];
-
-    GpuSystemAdditionalEntries {
-        update_position,
-        update_data,
-        render_sprite,
+impl<'a> AsRef<[wgpu::BindGroupEntry<'a>]> for GpuSystemsAdditionalEntriesOutput<'a> {
+    fn as_ref(&self) -> &[wgpu::BindGroupEntry<'a>] {
+        match self {
+            Self::UpdatePosition { entries } | Self::UpdateData { entries } => entries,
+            Self::RenderSprite { entries } => entries,
+        }
     }
+}
+
+const UPDATE_POSITION_TIME_DELTA_BINDING: u32 = 2;
+const UPDATE_DATA_TIME_DELTA_BINDING: u32 = 1;
+const RENDER_SPRITE_FRAMEBUFFER_DATA_BINDING: u32 = 2;
+const RENDER_SPRITE_FRAMEBUFFER_DESC_BINDING: u32 = 3;
+
+fn update_position_time_delta_entry(time_delta: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
+    wgpu::BindGroupEntry {
+        binding: UPDATE_POSITION_TIME_DELTA_BINDING,
+        resource: time_delta.as_entire_binding(),
+    }
+}
+
+fn update_data_time_delta_entry(time_delta: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
+    wgpu::BindGroupEntry {
+        binding: UPDATE_DATA_TIME_DELTA_BINDING,
+        resource: time_delta.as_entire_binding(),
+    }
+}
+
+fn render_sprite_framebuffer_data_entry(
+    framebuffer_data: &wgpu::Buffer,
+) -> wgpu::BindGroupEntry<'_> {
+    wgpu::BindGroupEntry {
+        binding: RENDER_SPRITE_FRAMEBUFFER_DATA_BINDING,
+        resource: framebuffer_data.as_entire_binding(),
+    }
+}
+
+fn render_sprite_framebuffer_desc_entry(
+    framebuffer_desc: &wgpu::Buffer,
+) -> wgpu::BindGroupEntry<'_> {
+    wgpu::BindGroupEntry {
+        binding: RENDER_SPRITE_FRAMEBUFFER_DESC_BINDING,
+        resource: framebuffer_desc.as_entire_binding(),
+    }
+}
+
+fn time_delta_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    let size_of_as_u64 = size_of::<TimeDelta>()
+        .try_into()
+        .expect("size of `TimeDelta` should fit in `u64`");
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: wgpu::BufferSize::new(size_of_as_u64),
+        },
+        count: None,
+    }
+}
+
+fn update_position_time_delta_layout_entry() -> wgpu::BindGroupLayoutEntry {
+    time_delta_layout_entry(UPDATE_POSITION_TIME_DELTA_BINDING)
+}
+
+fn update_data_time_delta_layout_entry() -> wgpu::BindGroupLayoutEntry {
+    time_delta_layout_entry(UPDATE_DATA_TIME_DELTA_BINDING)
+}
+
+fn framebuffer_data_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    let size_of_as_u64 = size_of::<u32>()
+        .try_into()
+        .expect("size of `u32` should fit in `u64`");
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only: false },
+            has_dynamic_offset: false,
+            min_binding_size: wgpu::BufferSize::new(size_of_as_u64),
+        },
+        count: None,
+    }
+}
+
+fn render_sprite_framebuffer_data_layout_entry() -> wgpu::BindGroupLayoutEntry {
+    framebuffer_data_layout_entry(RENDER_SPRITE_FRAMEBUFFER_DATA_BINDING)
+}
+
+fn framebuffer_desc_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    let size_of_as_u64 = size_of::<FramebufferDesc>()
+        .try_into()
+        .expect("size of `FramebufferDesc` should fit in `u64`");
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: wgpu::BufferSize::new(size_of_as_u64),
+        },
+        count: None,
+    }
+}
+
+fn render_sprite_framebuffer_desc_layout_entry() -> wgpu::BindGroupLayoutEntry {
+    framebuffer_desc_layout_entry(RENDER_SPRITE_FRAMEBUFFER_DESC_BINDING)
+}
+
+fn register_update_position_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let position_id = executor.register_component::<Position>();
+    let velocity_id = executor.register_component::<Velocity>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("update_position"),
+        shader_module,
+        entry_point: Some("update_position"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadWrite),
+            (velocity_id, GpuComponentAccess::ReadOnly),
+        ],
+        additional_bindings: [update_position_time_delta_layout_entry()],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+fn register_update_data_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let data_id = executor.register_component::<Data>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("update_data"),
+        shader_module,
+        entry_point: Some("update_data"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [(data_id, GpuComponentAccess::ReadWrite)],
+        additional_bindings: [update_data_time_delta_layout_entry()],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+fn register_update_components_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let position_id = executor.register_component::<Position>();
+    let velocity_id = executor.register_component::<Velocity>();
+    let data_id = executor.register_component::<Data>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("update_components"),
+        shader_module,
+        entry_point: Some("update_components"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadOnly),
+            (velocity_id, GpuComponentAccess::ReadWrite),
+            (data_id, GpuComponentAccess::ReadWrite),
+        ],
+        additional_bindings: [],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+fn register_update_health_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let health_id = executor.register_component::<Health>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("update_health"),
+        shader_module,
+        entry_point: Some("update_health"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [(health_id, GpuComponentAccess::ReadWrite)],
+        additional_bindings: [],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+fn register_update_damage_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let health_id = executor.register_component::<Health>();
+    let damage_id = executor.register_component::<Damage>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("update_damage"),
+        shader_module,
+        entry_point: Some("update_damage"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (health_id, GpuComponentAccess::ReadWrite),
+            (damage_id, GpuComponentAccess::ReadOnly),
+        ],
+        additional_bindings: [],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+fn register_update_sprite_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let sprite_id = executor.register_component::<Sprite>();
+    let player_id = executor.register_component::<Player>();
+    let health_id = executor.register_component::<Health>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("update_sprite"),
+        shader_module,
+        entry_point: Some("update_sprite"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (sprite_id, GpuComponentAccess::ReadWrite),
+            (player_id, GpuComponentAccess::ReadOnly),
+            (health_id, GpuComponentAccess::ReadOnly),
+        ],
+        additional_bindings: [],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+fn register_render_sprite_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: wgpu::ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let position_id = executor.register_component::<Position>();
+    let sprite_id = executor.register_component::<Sprite>();
+
+    let descriptor = GpuSystemDescriptor {
+        label: Some("render_sprite"),
+        shader_module,
+        entry_point: Some("render_sprite"),
+        dispatch_strategy: DispatchStrategy::default(),
+        bind_entities: false,
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadOnly),
+            (sprite_id, GpuComponentAccess::ReadOnly),
+        ],
+        additional_bindings: [
+            render_sprite_framebuffer_data_layout_entry(),
+            render_sprite_framebuffer_desc_layout_entry(),
+        ],
+    };
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -256,206 +602,63 @@ struct GpuSystems {
     render_sprite: GpuSystemId,
 }
 
-#[expect(clippy::too_many_lines)]
 fn register_gpu_systems<T>(executor: &mut GpuExecutor<T, impl Sized>) -> GpuSystems
 where
     T: AsRef<Context> + AsMut<Context> + ?Sized,
 {
     let shader_module = init_wgpu_shader(executor.device());
 
-    let position_id = executor.register_component::<Position>();
-    let velocity_id = executor.register_component::<Velocity>();
-    let data_id = executor.register_component::<Data>();
-    let health_id = executor.register_component::<Health>();
-    let damage_id = executor.register_component::<Damage>();
-    let sprite_id = executor.register_component::<Sprite>();
-    let player_id = executor.register_component::<Player>();
+    let update_position = register_update_position_system(executor, shader_module.clone());
+    executor.add_system(update_position);
 
-    let time_delta_uniform_buffer_entry = wgpu::BindGroupLayoutEntry {
-        binding: 2,
-        visibility: wgpu::ShaderStages::COMPUTE,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: Some(
-                u64::try_from(size_of::<TimeDelta>())
-                    .expect("size of `TimeDelta` should fit in `u64`")
-                    .try_into()
-                    .expect("size of `TimeDelta` cannot be zero"),
-            ),
-        },
-        count: None,
-    };
-    let update_position_system_descriptor = GpuSystemDescriptor {
-        label: Some("update_position"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_position"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [
-            (position_id, GpuComponentAccess::ReadWrite),
-            (velocity_id, GpuComponentAccess::ReadOnly),
-        ],
-        additional_bindings: [time_delta_uniform_buffer_entry],
-    };
-    let update_position_system = executor
-        .register_system(update_position_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_position_system);
+    let update_data = register_update_data_system(executor, shader_module.clone());
+    executor.add_system(update_data);
 
-    let time_delta_uniform_buffer_entry = wgpu::BindGroupLayoutEntry {
-        binding: 1,
-        ..time_delta_uniform_buffer_entry
-    };
-    let update_data_system_descriptor = GpuSystemDescriptor {
-        label: Some("update_data"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_data"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [(data_id, GpuComponentAccess::ReadWrite)],
-        additional_bindings: [time_delta_uniform_buffer_entry],
-    };
-    let update_data_system = executor
-        .register_system(update_data_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_data_system);
+    let update_components = register_update_components_system(executor, shader_module.clone());
+    executor.add_system(update_components);
 
-    let update_components_system_descriptor = GpuSystemDescriptor {
-        label: Some("update_components"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_components"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [
-            (position_id, GpuComponentAccess::ReadOnly),
-            (velocity_id, GpuComponentAccess::ReadWrite),
-            (data_id, GpuComponentAccess::ReadWrite),
-        ],
-        additional_bindings: [],
-    };
-    let update_components_system = executor
-        .register_system(update_components_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_components_system);
+    let update_health = register_update_health_system(executor, shader_module.clone());
+    executor.add_system(update_health);
 
-    let update_health_system_descriptor = GpuSystemDescriptor {
-        label: Some("update_health"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_health"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [(health_id, GpuComponentAccess::ReadWrite)],
-        additional_bindings: [],
-    };
-    let update_health_system = executor
-        .register_system(update_health_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_health_system);
+    let update_damage = register_update_damage_system(executor, shader_module.clone());
+    executor.add_system(update_damage);
 
-    let update_damage_system_descriptor = GpuSystemDescriptor {
-        label: Some("update_damage"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_damage"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [
-            (health_id, GpuComponentAccess::ReadWrite),
-            (damage_id, GpuComponentAccess::ReadOnly),
-        ],
-        additional_bindings: [],
-    };
-    let update_damage_system = executor
-        .register_system(update_damage_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_damage_system);
+    let update_sprite = register_update_sprite_system(executor, shader_module.clone());
+    executor.add_system(update_sprite);
 
-    let update_sprite_system_descriptor = GpuSystemDescriptor {
-        label: Some("update_sprite"),
-        shader_module: shader_module.clone(),
-        entry_point: Some("update_sprite"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [
-            (sprite_id, GpuComponentAccess::ReadWrite),
-            (player_id, GpuComponentAccess::ReadOnly),
-            (health_id, GpuComponentAccess::ReadOnly),
-        ],
-        additional_bindings: [],
-    };
-    let update_sprite_system = executor
-        .register_system(update_sprite_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_sprite_system);
-
-    let framebuffer_data_entry = wgpu::BindGroupLayoutEntry {
-        binding: 2,
-        visibility: wgpu::ShaderStages::COMPUTE,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only: false },
-            has_dynamic_offset: false,
-            min_binding_size: Some(
-                u64::try_from(size_of::<u32>())
-                    .expect("size of `u32` should fit in `u64`")
-                    .try_into()
-                    .expect("size of `u32` cannot be zero"),
-            ),
-        },
-        count: None,
-    };
-    let framebuffer_desc_entry = wgpu::BindGroupLayoutEntry {
-        binding: 3,
-        visibility: wgpu::ShaderStages::COMPUTE,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: Some(
-                u64::try_from(size_of::<FramebufferDesc>())
-                    .expect("size of `FramebufferDesc` should fit in `u64`")
-                    .try_into()
-                    .expect("size of `FramebufferDesc` cannot be zero"),
-            ),
-        },
-        count: None,
-    };
-    let render_sprite_system_descriptor = GpuSystemDescriptor {
-        label: Some("render_sprite"),
-        shader_module,
-        entry_point: Some("render_sprite"),
-        dispatch_strategy: DispatchStrategy::default(),
-        bind_entities: false,
-        bind_components: [
-            (position_id, GpuComponentAccess::ReadOnly),
-            (sprite_id, GpuComponentAccess::ReadOnly),
-        ],
-        additional_bindings: [framebuffer_data_entry, framebuffer_desc_entry],
-    };
-    let render_sprite_system = executor
-        .register_system(render_sprite_system_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(render_sprite_system);
+    let render_sprite = register_render_sprite_system(executor, shader_module);
+    executor.add_system(render_sprite);
 
     GpuSystems {
-        update_position: update_position_system,
-        update_data: update_data_system,
-        update_components: update_components_system,
-        update_health: update_health_system,
-        update_damage: update_damage_system,
-        update_sprite: update_sprite_system,
-        render_sprite: render_sprite_system,
+        update_position,
+        update_data,
+        update_components,
+        update_health,
+        update_damage,
+        update_sprite,
+        render_sprite,
     }
 }
 
-fn setup_gpu_systems<'entries, T>(
-    executor: &mut GpuExecutor<T, &'entries [wgpu::BindGroupEntry<'entries>]>,
+fn setup_gpu_systems<T>(
+    executor: &mut GpuExecutor<T, GpuSystemsAdditionalEntries>,
     systems: &GpuSystems,
-    additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
+    resources: &GpuSystemsResources,
 ) where
     T: AsRef<Context> + ?Sized,
 {
-    executor.set_additional_entries(systems.update_position, &additional_entries.update_position);
-    executor.set_additional_entries(systems.update_data, &additional_entries.update_data);
-    executor.set_additional_entries(systems.render_sprite, &additional_entries.render_sprite);
+    executor.set_additional_entries(
+        systems.update_position,
+        GpuSystemsAdditionalEntries::update_position(resources),
+    );
+    executor.set_additional_entries(
+        systems.update_data,
+        GpuSystemsAdditionalEntries::update_data(resources),
+    );
+    executor.set_additional_entries(
+        systems.render_sprite,
+        GpuSystemsAdditionalEntries::render_sprite(resources),
+    );
 }
 
 fn collect_statistics(
@@ -490,9 +693,9 @@ fn collect_statistics(
         .collect()
 }
 
-fn write_time_delta(time_delta: TimeDelta, queue: &wgpu::Queue, resources: &GpuSystemResources) {
+fn write_time_delta(time_delta: TimeDelta, queue: &wgpu::Queue, resources: &GpuSystemsResources) {
     let data = bytemuck::bytes_of(&time_delta);
-    queue.write_buffer(&resources.time_delta_uniform, 0, data);
+    queue.write_buffer(&resources.time_delta, 0, data);
 }
 
 fn download_framebuffer<B>(framebuffer: &mut Framebuffer<B>, download_buffer: &wgpu::Buffer)

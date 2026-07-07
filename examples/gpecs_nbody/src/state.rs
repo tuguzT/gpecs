@@ -1,6 +1,5 @@
 use std::{
     f32::consts::{FRAC_PI_2, FRAC_PI_3},
-    fmt::{self, Debug},
     fs,
     num::NonZeroU32,
     time::{Duration, Instant},
@@ -11,7 +10,7 @@ use glam::{camera::rh::proj::directx::perspective, prelude::*};
 use gpecs::{
     context::Context,
     executor::gpu::{
-        GpuExecutor,
+        AdditionalEntries, GpuExecutor,
         system::{
             registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
             shader::DispatchStrategy,
@@ -24,17 +23,16 @@ use gpecs_nbody_types::{
     systems::TimeDelta,
 };
 use num_traits::ToPrimitive;
-use ouroboros::self_referencing;
 use rand::{Rng, RngExt};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, BlendState, Buffer, BufferAddress, BufferBindingType,
-    BufferDescriptor, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device,
-    FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineCompilationOptions,
-    PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
-    Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StoreOp,
-    TextureFormat, TextureView, VertexBufferLayout, VertexState, VertexStepMode,
+    BufferDescriptor, BufferSize, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder,
+    Device, FragmentState, FrontFace, LoadOp, MultisampleState, Operations,
+    PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode,
+    PrimitiveState, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages,
+    StoreOp, TextureFormat, TextureView, VertexBufferLayout, VertexState, VertexStepMode,
     util::{self, BufferInitDescriptor, DeviceExt, StagingBelt},
     vertex_attr_array,
 };
@@ -66,11 +64,13 @@ pub struct State {
     mouse_move_delta: Vec2,
     camera_position: Vec3,
     camera_rotation: Quat,
+    time_delta: Buffer,
+    vertex_buffer: Buffer,
     uniform_buffer: Buffer,
     staging: StagingBelt,
     bind_group: BindGroup,
     render_pipeline: RenderPipeline,
-    ecs: EcsState,
+    ecs_executor: GpuExecutor<Context, GpuSystemsAdditionalEntries>,
 }
 
 impl State {
@@ -83,6 +83,8 @@ impl State {
     ) -> Self {
         let shader_module = init_shader(device);
 
+        let time_delta = init_delta_time_buffer(device);
+        let vertex_buffer = init_vertex_buffer(device);
         let uniform_buffer = init_uniform_buffer(device);
         let staging = StagingBelt::new(device.clone(), uniform_buffer.size() * 4);
 
@@ -94,7 +96,13 @@ impl State {
             init_pipeline(device, format, &shader_module, &render_pipeline_layout);
 
         let particle_count = MAX_PARTICLE_COUNT;
-        let ecs = init_ecs_state(device.clone(), &shader_module, particle_count);
+        let ecs_executor = init_ecs_gpu_executor(
+            device.clone(),
+            shader_module,
+            particle_count,
+            &time_delta,
+            &vertex_buffer,
+        );
 
         Self {
             start_time,
@@ -114,11 +122,13 @@ impl State {
             mouse_move_delta: Vec2::ZERO,
             camera_position: Vec3::NEG_Z * 5.0,
             camera_rotation: Quat::from_axis_angle(Vec3::Z, 0.0),
+            time_delta,
+            vertex_buffer,
             uniform_buffer,
             staging,
             bind_group,
             render_pipeline,
-            ecs,
+            ecs_executor,
         }
     }
 
@@ -246,11 +256,13 @@ impl State {
             camera_position,
             camera_rotation,
             particle_count,
+            ref time_delta,
+            ref vertex_buffer,
             ref uniform_buffer,
             ref bind_group,
             ref render_pipeline,
             ref mut staging,
-            ref mut ecs,
+            ref mut ecs_executor,
             ..
         } = *self;
 
@@ -275,16 +287,15 @@ impl State {
             .copy_from_slice(bytemuck::bytes_of(&data));
 
         let data = TimeDelta::new(delta_time);
-        let delta_time_buffer = ecs.borrow_delta_time_buffer();
-        let delta_time_buffer_size = delta_time_buffer
+        let delta_time_buffer_size = time_delta
             .size()
             .try_into()
             .expect("delta time buffer can't be zero sized");
         staging
-            .write_buffer(encoder, delta_time_buffer, 0, delta_time_buffer_size)
+            .write_buffer(encoder, time_delta, 0, delta_time_buffer_size)
             .copy_from_slice(bytemuck::bytes_of(&data));
 
-        ecs.with_executor_mut(|executor| executor.execute(encoder));
+        ecs_executor.execute(encoder);
 
         let render_pass_desc = RenderPassDescriptor {
             label: Some("`gpecs` n-body simulation example clear render pass"),
@@ -306,7 +317,7 @@ impl State {
 
         render_pass.set_pipeline(render_pipeline);
         render_pass.set_bind_group(0, bind_group, &[]);
-        render_pass.set_vertex_buffer(0, ecs.borrow_vertex_buffer().slice(..));
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
         render_pass.draw(0..6, 0..particle_count);
 
         staging.finish();
@@ -409,17 +420,6 @@ fn init_pipeline(
     device.create_render_pipeline(&render_pipeline_desc)
 }
 
-fn init_vertex_buffer(device: &Device) -> Buffer {
-    let vertex_size = size_of::<Vertex>() as BufferAddress;
-    let buffer_desc = BufferDescriptor {
-        label: Some("`gpecs` n-body simulation example vertex buffer"),
-        mapped_at_creation: false,
-        size: BufferAddress::from(MAX_PARTICLE_COUNT).strict_mul(vertex_size),
-        usage: BufferUsages::VERTEX | BufferUsages::STORAGE,
-    };
-    device.create_buffer(&buffer_desc)
-}
-
 fn init_uniform_buffer(device: &Device) -> Buffer {
     let data = UniformBuffer {
         model_view_projection: Mat4::IDENTITY,
@@ -441,26 +441,15 @@ fn bool_to_f32(bool: bool) -> f32 {
     if bool { 1.0 } else { 0.0 }
 }
 
-#[self_referencing]
-pub struct EcsState {
-    vertex_buffer: Buffer,
-    delta_time_buffer: Buffer,
-    #[borrows(vertex_buffer, delta_time_buffer)]
-    #[not_covariant]
-    additional_entries: GpuSystemAdditionalEntries<'this>,
-    #[borrows(additional_entries)]
-    #[not_covariant]
-    executor: GpuExecutor<Context, &'this [BindGroupEntry<'this>]>,
-}
-
-impl Debug for EcsState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.with_executor(|executor| {
-            f.debug_struct("EcsState")
-                .field("executor", executor)
-                .finish_non_exhaustive()
-        })
-    }
+fn init_vertex_buffer(device: &Device) -> Buffer {
+    let vertex_size = size_of::<Vertex>() as BufferAddress;
+    let buffer_desc = BufferDescriptor {
+        label: Some("`gpecs` n-body simulation example vertex buffer"),
+        mapped_at_creation: false,
+        size: BufferAddress::from(MAX_PARTICLE_COUNT).strict_mul(vertex_size),
+        usage: BufferUsages::VERTEX | BufferUsages::STORAGE,
+    };
+    device.create_buffer(&buffer_desc)
 }
 
 fn init_delta_time_buffer(device: &Device) -> Buffer {
@@ -473,35 +462,125 @@ fn init_delta_time_buffer(device: &Device) -> Buffer {
     device.create_buffer(&buffer_desc)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[expect(clippy::struct_field_names)]
-struct GpuSystems {
-    update_force: GpuSystemId,
-    update_velocity_and_position: GpuSystemId,
-    update_color: GpuSystemId,
-    update_vertex: GpuSystemId,
+#[derive(Debug)]
+enum GpuSystemsAdditionalEntries {
+    UpdateVelocityAndPosition { time_delta: Buffer },
+    UpdateVertex { vertex_buffer: Buffer },
+}
+
+impl GpuSystemsAdditionalEntries {
+    fn update_velocity_and_position(time_delta: &Buffer) -> Self {
+        let time_delta = time_delta.clone();
+        Self::UpdateVelocityAndPosition { time_delta }
+    }
+
+    fn update_vertex(vertex_buffer: &Buffer) -> Self {
+        let vertex_buffer = vertex_buffer.clone();
+        Self::UpdateVertex { vertex_buffer }
+    }
+}
+
+impl AdditionalEntries for GpuSystemsAdditionalEntries {
+    type Output<'a>
+        = GpuSystemsAdditionalEntriesOutput<'a>
+    where
+        Self: 'a;
+
+    fn additional_entries(&self) -> Self::Output<'_> {
+        match self {
+            Self::UpdateVelocityAndPosition { time_delta } => {
+                let time_delta_entry = update_velocity_and_position_entry(time_delta);
+                let entries = [time_delta_entry];
+                GpuSystemsAdditionalEntriesOutput::UpdateVelocityAndPosition { entries }
+            }
+            Self::UpdateVertex { vertex_buffer } => {
+                let vertex_buffer_entry = update_vertex_buffer_entry(vertex_buffer);
+                let entries = [vertex_buffer_entry];
+                GpuSystemsAdditionalEntriesOutput::UpdateVertex { entries }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum GpuSystemsAdditionalEntriesOutput<'a> {
+    UpdateVelocityAndPosition { entries: [BindGroupEntry<'a>; 1] },
+    UpdateVertex { entries: [BindGroupEntry<'a>; 1] },
+}
+
+impl<'a> AsRef<[BindGroupEntry<'a>]> for GpuSystemsAdditionalEntriesOutput<'a> {
+    fn as_ref(&self) -> &[BindGroupEntry<'a>] {
+        match self {
+            Self::UpdateVelocityAndPosition { entries } | Self::UpdateVertex { entries } => entries,
+        }
+    }
 }
 
 const UPDATE_FORCE_WORKGROUP_SIZE: NonZeroU32 = NonZeroU32::new(256).expect("cannot be non-zero");
 
-#[expect(clippy::too_many_lines)]
-fn register_gpu_systems<T>(
+const UPDATE_VELOCITY_AND_POSITION_TIME_DELTA_BINDING: u32 = 4;
+const UPDATE_VERTEX_BUFFER_BINDING: u32 = 3;
+
+fn update_velocity_and_position_entry(time_delta: &Buffer) -> BindGroupEntry<'_> {
+    BindGroupEntry {
+        binding: UPDATE_VELOCITY_AND_POSITION_TIME_DELTA_BINDING,
+        resource: time_delta.as_entire_binding(),
+    }
+}
+
+fn update_vertex_buffer_entry(vertex_buffer: &Buffer) -> BindGroupEntry<'_> {
+    BindGroupEntry {
+        binding: UPDATE_VERTEX_BUFFER_BINDING,
+        resource: vertex_buffer.as_entire_binding(),
+    }
+}
+
+fn update_position_and_velocity_time_delta_layout_entry() -> BindGroupLayoutEntry {
+    let size_of_as_u64 = size_of::<TimeDelta>()
+        .try_into()
+        .expect("size of `TimeDelta` should fit in `u64`");
+    BindGroupLayoutEntry {
+        binding: UPDATE_VELOCITY_AND_POSITION_TIME_DELTA_BINDING,
+        visibility: ShaderStages::COMPUTE,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: BufferSize::new(size_of_as_u64),
+        },
+        count: None,
+    }
+}
+
+fn update_vertex_buffer_layout_entry() -> BindGroupLayoutEntry {
+    let size_of_as_u64 = size_of::<Vertex>()
+        .try_into()
+        .expect("size of `Vertex` should fit in `u64`");
+    BindGroupLayoutEntry {
+        binding: UPDATE_VERTEX_BUFFER_BINDING,
+        visibility: ShaderStages::COMPUTE,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only: false },
+            has_dynamic_offset: false,
+            min_binding_size: BufferSize::new(size_of_as_u64),
+        },
+        count: None,
+    }
+}
+
+fn register_update_force_system<T>(
     executor: &mut GpuExecutor<T, impl Sized>,
-    shader_module: &ShaderModule,
-) -> GpuSystems
+    shader_module: ShaderModule,
+) -> GpuSystemId
 where
     T: AsRef<Context> + AsMut<Context> + ?Sized,
 {
     let position_id = executor.register_component::<Position>();
-    let velocity_id = executor.register_component::<Velocity>();
-    let force_id = executor.register_component::<Force>();
     let mass_id = executor.register_component::<Mass>();
-    let radius_id = executor.register_component::<Radius>();
-    let color_id = executor.register_component::<Color>();
+    let force_id = executor.register_component::<Force>();
 
-    let update_force_descriptor = GpuSystemDescriptor {
+    let descriptor = GpuSystemDescriptor {
         label: Some("update_force"),
-        shader_module: shader_module.clone(),
+        shader_module,
         entry_point: Some("update_force"),
         dispatch_strategy: DispatchStrategy::Linear {
             workgroup_size: UPDATE_FORCE_WORKGROUP_SIZE,
@@ -514,29 +593,26 @@ where
         ],
         additional_bindings: [],
     };
-    let update_force = executor
-        .register_system(update_force_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_force);
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
 
-    let delta_time_buffer_entry = BindGroupLayoutEntry {
-        binding: 4,
-        visibility: ShaderStages::COMPUTE,
-        ty: BindingType::Buffer {
-            ty: BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: Some(
-                u64::try_from(size_of::<TimeDelta>())
-                    .expect("size of `TimeDelta` should fit in `u64`")
-                    .try_into()
-                    .expect("size of `TimeDelta` cannot be zero"),
-            ),
-        },
-        count: None,
-    };
-    let update_velocity_and_position_descriptor = GpuSystemDescriptor {
+fn register_update_velocity_and_position_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let force_id = executor.register_component::<Force>();
+    let mass_id = executor.register_component::<Mass>();
+    let velocity_id = executor.register_component::<Velocity>();
+    let position_id = executor.register_component::<Position>();
+
+    let descriptor = GpuSystemDescriptor {
         label: Some("update_velocity_and_position"),
-        shader_module: shader_module.clone(),
+        shader_module,
         entry_point: Some("update_velocity_and_position"),
         dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
@@ -546,16 +622,26 @@ where
             (velocity_id, GpuComponentAccess::ReadWrite),
             (position_id, GpuComponentAccess::ReadWrite),
         ],
-        additional_bindings: [delta_time_buffer_entry],
+        additional_bindings: [update_position_and_velocity_time_delta_layout_entry()],
     };
-    let update_velocity_and_position = executor
-        .register_system(update_velocity_and_position_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_velocity_and_position);
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
 
-    let update_color_descriptor = GpuSystemDescriptor {
+fn register_update_color_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let velocity_id = executor.register_component::<Velocity>();
+    let color_id = executor.register_component::<Color>();
+
+    let descriptor = GpuSystemDescriptor {
         label: Some("update_color"),
-        shader_module: shader_module.clone(),
+        shader_module,
         entry_point: Some("update_color"),
         dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
@@ -565,29 +651,25 @@ where
         ],
         additional_bindings: [],
     };
-    let update_color = executor
-        .register_system(update_color_descriptor)
-        .expect("archetype components should be unique");
-    executor.add_system(update_color);
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
 
-    let vertex_buffer_entry = BindGroupLayoutEntry {
-        binding: 3,
-        visibility: ShaderStages::COMPUTE,
-        ty: BindingType::Buffer {
-            ty: BufferBindingType::Storage { read_only: false },
-            has_dynamic_offset: false,
-            min_binding_size: Some(
-                u64::try_from(size_of::<Vertex>())
-                    .expect("size of `Vertex` should fit in `u64`")
-                    .try_into()
-                    .expect("size of `Vertex` cannot be zero"),
-            ),
-        },
-        count: None,
-    };
-    let update_vertex_descriptor = GpuSystemDescriptor {
+fn register_update_vertex_system<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: ShaderModule,
+) -> GpuSystemId
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let position_id = executor.register_component::<Position>();
+    let radius_id = executor.register_component::<Radius>();
+    let color_id = executor.register_component::<Color>();
+
+    let descriptor = GpuSystemDescriptor {
         label: Some("update_vertex"),
-        shader_module: shader_module.clone(),
+        shader_module,
         entry_point: Some("update_vertex"),
         dispatch_strategy: DispatchStrategy::default(),
         bind_entities: false,
@@ -596,11 +678,40 @@ where
             (color_id, GpuComponentAccess::ReadOnly),
             (radius_id, GpuComponentAccess::ReadOnly),
         ],
-        additional_bindings: [vertex_buffer_entry],
+        additional_bindings: [update_vertex_buffer_layout_entry()],
     };
-    let update_vertex = executor
-        .register_system(update_vertex_descriptor)
-        .expect("archetype components should be unique");
+    executor
+        .register_system(descriptor)
+        .expect("archetype components should be unique")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[expect(clippy::struct_field_names)]
+struct GpuSystems {
+    update_force: GpuSystemId,
+    update_velocity_and_position: GpuSystemId,
+    update_color: GpuSystemId,
+    update_vertex: GpuSystemId,
+}
+
+fn register_gpu_systems<T>(
+    executor: &mut GpuExecutor<T, impl Sized>,
+    shader_module: ShaderModule,
+) -> GpuSystems
+where
+    T: AsRef<Context> + AsMut<Context> + ?Sized,
+{
+    let update_force = register_update_force_system(executor, shader_module.clone());
+    executor.add_system(update_force);
+
+    let update_velocity_and_position =
+        register_update_velocity_and_position_system(executor, shader_module.clone());
+    executor.add_system(update_velocity_and_position);
+
+    let update_color = register_update_color_system(executor, shader_module.clone());
+    executor.add_system(update_color);
+
+    let update_vertex = register_update_vertex_system(executor, shader_module);
     executor.add_system(update_vertex);
 
     GpuSystems {
@@ -611,44 +722,22 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
-struct GpuSystemAdditionalEntries<'a> {
-    update_velocity_and_position: [BindGroupEntry<'a>; 1],
-    update_vertex: [BindGroupEntry<'a>; 1],
-}
-
-fn init_gpu_system_additional_entries<'a>(
-    vertex_buffer: &'a Buffer,
-    delta_time_buffer: &'a Buffer,
-) -> GpuSystemAdditionalEntries<'a> {
-    let update_velocity_and_position = [BindGroupEntry {
-        binding: 4,
-        resource: delta_time_buffer.as_entire_binding(),
-    }];
-    let update_vertex = [BindGroupEntry {
-        binding: 3,
-        resource: vertex_buffer.as_entire_binding(),
-    }];
-    GpuSystemAdditionalEntries {
-        update_velocity_and_position,
-        update_vertex,
-    }
-}
-
-fn setup_gpu_systems<'entries, T>(
-    executor: &mut GpuExecutor<T, &'entries [BindGroupEntry<'entries>]>,
+fn setup_gpu_systems<T>(
+    executor: &mut GpuExecutor<T, GpuSystemsAdditionalEntries>,
     systems: GpuSystems,
-    entries: &'entries GpuSystemAdditionalEntries<'_>,
+    time_delta: &Buffer,
+    vertex_buffer: &Buffer,
 ) where
     T: AsRef<Context> + ?Sized,
 {
-    let system_id = systems.update_velocity_and_position;
-    let additional_entries = &entries.update_velocity_and_position;
-    executor.set_additional_entries(system_id, additional_entries);
-
-    let system_id = systems.update_vertex;
-    let additional_entries = &entries.update_vertex;
-    executor.set_additional_entries(system_id, additional_entries);
+    executor.set_additional_entries(
+        systems.update_velocity_and_position,
+        GpuSystemsAdditionalEntries::update_velocity_and_position(time_delta),
+    );
+    executor.set_additional_entries(
+        systems.update_vertex,
+        GpuSystemsAdditionalEntries::update_vertex(vertex_buffer),
+    );
 }
 
 fn random_direction(mut rng: impl Rng) -> Vec3 {
@@ -722,12 +811,13 @@ fn init_ecs_context(particle_count: u32) -> Context {
     context
 }
 
-fn init_ecs_gpu_executor<'entries>(
+fn init_ecs_gpu_executor(
     device: Device,
-    shader_module: &ShaderModule,
+    shader_module: ShaderModule,
     particle_count: u32,
-    additional_entries: &'entries GpuSystemAdditionalEntries<'_>,
-) -> GpuExecutor<Context, &'entries [BindGroupEntry<'entries>]> {
+    time_delta: &Buffer,
+    vertex_buffer: &Buffer,
+) -> GpuExecutor<Context, GpuSystemsAdditionalEntries> {
     let context = init_ecs_context(particle_count);
     let mut executor = GpuExecutor::new(context, device);
     executor
@@ -735,19 +825,7 @@ fn init_ecs_gpu_executor<'entries>(
         .expect("archetype components should be unique");
 
     let systems = register_gpu_systems(&mut executor, shader_module);
-    setup_gpu_systems(&mut executor, systems, additional_entries);
+    setup_gpu_systems(&mut executor, systems, time_delta, vertex_buffer);
 
     executor
-}
-
-fn init_ecs_state(device: Device, shader_module: &ShaderModule, particle_count: u32) -> EcsState {
-    let builder = EcsStateBuilder {
-        vertex_buffer: init_vertex_buffer(&device),
-        delta_time_buffer: init_delta_time_buffer(&device),
-        additional_entries_builder: init_gpu_system_additional_entries,
-        executor_builder: |additional_entries| {
-            init_ecs_gpu_executor(device, shader_module, particle_count, additional_entries)
-        },
-    };
-    builder.build()
 }

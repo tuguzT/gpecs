@@ -96,7 +96,6 @@ winit = { version = "0.30" }
 egui = { version = "0.35" }
 egui-winit = { version = "0.35" }
 egui-wgpu = { version = "0.35", default-features = false }
-ouroboros = { version = "0.18" }
 rand = { version = "0.10" }
 
 [patch.crates-io]

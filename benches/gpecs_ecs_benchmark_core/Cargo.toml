@@ -20,8 +20,8 @@ itertools = { workspace = true }
 rayon = { workspace = true }
 
 [build-dependencies]
+cargo_metadata = { workspace = true }
 cargo-gpu-install = { workspace = true }
-const_format = { workspace = true }
 
 [lints]
 workspace = true

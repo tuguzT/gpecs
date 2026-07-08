@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![cfg_attr(not(test), no_std)]
 #![allow(unused_imports)]
 

@@ -1,26 +1,38 @@
-use std::error::Error;
+use std::{env, error::Error};
 
 use cargo_gpu_install::{install::Install, spirv_builder::SpirvMetadata};
-use const_format::formatcp;
+use cargo_metadata::MetadataCommand;
 
 const SHADER_CRATE_NAME: &str = "gpecs_simple_shader";
-const SHADER_CRATE_PATH: &str = formatcp!("./../{SHADER_CRATE_NAME}");
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let backend_args = Install::from_shader_crate(SHADER_CRATE_PATH.into());
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR")
+        .expect("manifest directory environment variable should be set by Cargo");
+    let metadata = MetadataCommand::new()
+        .current_dir(manifest_dir)
+        .no_deps()
+        .exec()?;
+    let shader_crate = metadata
+        .packages
+        .iter()
+        .find(|package| package.name == SHADER_CRATE_NAME)
+        .expect("target shader crate was not found");
+    let shader_crate_path = shader_crate
+        .manifest_path
+        .parent()
+        .expect("manifest path of target shader crate shoyld have a parent");
+
+    let backend_args = Install::from_shader_crate(shader_crate_path.into());
     let backend = backend_args.run()?;
 
-    let builder = backend
-        .to_spirv_builder(SHADER_CRATE_PATH, "spirv-unknown-vulkan1.2")
+    let mut builder = backend
+        .to_spirv_builder(shader_crate_path, "spirv-unknown-vulkan1.2")
         .shader_crate_default_features(false)
         .shader_crate_features(["nightly".into()])
-        // .release(std::env::var("CARGO_CFG_DEBUG_ASSERTIONS").is_err())
         .spirv_metadata(SpirvMetadata::Full);
-    let compile_result = builder.build()?;
-
-    let shader_file_path = compile_result.module.unwrap_single().display();
-    println!("cargo::rustc-env={SHADER_CRATE_NAME}.spv={shader_file_path}");
-    println!("cargo::rerun-if-changed={SHADER_CRATE_PATH}");
+    builder.build_script.defaults = true;
+    builder.build_script.env_shader_spv_path.replace(true);
+    let _ = builder.build()?;
 
     Ok(())
 }

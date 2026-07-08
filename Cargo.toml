@@ -69,6 +69,7 @@ gpecs_nbody_types = { path = "examples/gpecs_nbody_types" }
 gpecs_ecs_benchmark_core = { path = "benches/gpecs_ecs_benchmark_core" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
+cargo_metadata = { version = "0.23" }
 cargo-gpu-install = { version = "0.10.0-alpha.1" }
 spirv-std = { version = "0.10.0-alpha.1" }
 indexmap = { version = "2.14", default-features = false }
@@ -83,7 +84,6 @@ bytemuck = { version = "1.25", default-features = false }
 glam = { version = "0.33", default-features = false, features = ["nostd-libm"] }
 wgpu = { version = "29", default-features = false }
 rayon = { version = "1.12" }
-const_format = { version = "0.2", default-features = false }
 pollster = { version = "0.4", default-features = false }
 criterion = { version = "0.8", features = ["html_reports"] }
 log = { version = "0.4", default-features = false }

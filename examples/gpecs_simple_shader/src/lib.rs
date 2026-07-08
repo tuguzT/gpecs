@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![cfg_attr(not(test), no_std)]
 
 use glam::{USizeVec3, Vec3};

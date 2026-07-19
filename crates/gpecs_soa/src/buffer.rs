@@ -57,11 +57,11 @@ pub fn is_zst<T>(context: &T::Context) -> bool
 where
     T: AllocSoa + ?Sized,
 {
-    size_of::<T::Fields>() == 0 || packed_size_of_fields(context.field_layouts()) == 0
+    packed_size_of_fields(context.field_layouts()) == 0
 }
 
 #[inline]
-pub fn is_context_zst<T>() -> bool
+pub const fn is_context_zst<T>() -> bool
 where
     T: RawSoa + ?Sized,
     T::Context: Sized,
@@ -70,11 +70,19 @@ where
 }
 
 #[inline]
+pub fn is_dangling<T>(context: &T::Context, capacity: usize) -> bool
+where
+    T: AllocSoa + ?Sized,
+{
+    is_zst::<T>(context) || capacity == 0
+}
+
+#[inline]
 pub fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
 where
     T: AllocSoa + ?Sized,
 {
-    let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
+    let should_not_allocate = is_context_zst::<T>() && is_dangling::<T>(context, capacity);
     !should_not_allocate
 }
 
@@ -92,7 +100,7 @@ fn buffer_layout_inner<T>(context: &T::Context, capacity: usize) -> Result<Layou
 where
     T: AllocSoa + ?Sized,
 {
-    let (size, align) = if is_zst::<T>(context) || capacity == 0 {
+    let (size, align) = if is_dangling::<T>(context, capacity) {
         let prefix = size_of::<BufferPrefix<T>>();
         let size = if is_context_zst::<T>() { 0 } else { prefix };
         let align = align_of_fields(context.field_layouts());

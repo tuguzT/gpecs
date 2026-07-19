@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    buffer::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
+    buffer::{BufferData, BufferPrefix, buffer_layout, is_dangling, is_zst, should_allocate},
     slice::SoaSlice,
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext,
@@ -388,7 +388,7 @@ pub(crate) unsafe fn ptrs_from_buffer<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    if is_zst::<T>(context) || capacity == 0 {
+    if is_dangling::<T>(context, capacity) {
         return context.ptrs_dangling();
     }
 
@@ -405,7 +405,7 @@ pub(crate) unsafe fn ptrs_from_buffer_mut<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    if is_zst::<T>(context) || capacity == 0 {
+    if is_dangling::<T>(context, capacity) {
         return context.ptrs_dangling_mut();
     }
 

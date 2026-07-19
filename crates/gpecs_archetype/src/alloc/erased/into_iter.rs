@@ -99,8 +99,8 @@ impl<Meta> Iterator for IntoIter<Meta> {
     where
         Self: Sized,
     {
-        let Self { inner } = self;
-        inner.last().map(map_item)
+        let Self { mut inner } = self;
+        inner.next_back().map(map_item)
     }
 
     #[inline]

@@ -231,7 +231,7 @@ impl TimestampQueryStatistics {
             }
             pairs.next();
         }
-        assert!(pairs.count() == 0);
+        assert_eq!(pairs.count(), 0);
 
         Self { stats }
     }

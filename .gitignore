@@ -40,3 +40,7 @@ lcov.info
 # Obsidian workspace cache
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
+
+# Obsidian plugins
+.obsidian/plugins/*/*
+!.obsidian/plugins/*/data.json

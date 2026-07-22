@@ -32,8 +32,8 @@ use crate::{
     soa::{
         slice::{Iter as SoaIter, SoaSliceMutPtrs, SoaSlices, SoaSlicesMut},
         traits::{
-            MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-            SlicesMut, Soa, SoaContext, SoaOwned,
+            MutPtrs, Ptrs, RawSoa, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+            SoaContext, SoaOwned,
         },
     },
     view::{EpochSparseView, EpochSparseViewMutPtr, EpochSparseViewPtr},
@@ -1051,29 +1051,27 @@ where
 
         let (context, slices) = dense.as_mut_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        let dense = SoaSliceMutPtrs::<V>::new(context, values);
-
-        let first_index = unwrap_into_usize(first_key.sparse_index());
-        let second_index = unwrap_into_usize(second_key.sparse_index());
-        if first_index == second_index {
-            return;
-        }
+        let mut dense = SoaSliceMutPtrs::<V>::new(context, values);
 
         let first_index = {
+            let first_index = unwrap_into_usize(first_key.sparse_index());
             let first_item = unwrap_sparse_item(sparse, first_index);
             assert_equal_epoch(first_item.epoch(), first_key.epoch());
             let first_index = unwrap_dense_index(first_item);
             unwrap_into_usize(first_index)
         };
         let second_index = {
+            let second_index = unwrap_into_usize(second_key.sparse_index());
             let second_item = unwrap_sparse_item(sparse, second_index);
             assert_equal_epoch(second_item.epoch(), second_key.epoch());
             let second_index = unwrap_dense_index(second_item);
             unwrap_into_usize(second_index)
         };
 
-        let (first_value, second_value) = unwrap_dense_pair(dense, first_index, second_index);
-        unsafe { context.as_inner().ptrs_swap(first_value, second_value) }
+        if first_index == second_index {
+            return;
+        }
+        unsafe { dense.swap_unchecked(first_index, second_index) }
     }
 
     #[inline]

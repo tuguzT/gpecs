@@ -24,8 +24,8 @@ unsafe impl RawSoaContext<()> for () {
 
     #[inline]
     #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
-    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
-        unsafe { ptrs.add(offset) }
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a> {
+        unsafe { ptrs.add(count) }
     }
 
     #[inline]
@@ -50,9 +50,9 @@ unsafe impl RawSoaContext<()> for () {
     unsafe fn ptrs_add_mut<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
-        offset: usize,
+        count: usize,
     ) -> Self::MutPtrs<'a> {
-        unsafe { ptrs.add(offset) }
+        unsafe { ptrs.add(count) }
     }
 
     #[inline]
@@ -75,18 +75,23 @@ unsafe impl RawSoaContext<()> for () {
     }
 
     #[inline]
-    unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
-        unsafe { ptr::swap(a, b) }
+    unsafe fn ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::MutPtrs<'_>,
+        y: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { ptr::swap_nonoverlapping(x, y, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-        unsafe { ptr::copy(src, dst, len) }
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { ptr::copy(src, dst, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-        unsafe { ptr::copy(src, dst, len) }
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { ptr::copy(src, dst, count) }
     }
 
     #[inline]
@@ -94,14 +99,14 @@ unsafe impl RawSoaContext<()> for () {
         &self,
         src: Self::Ptrs<'_>,
         dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { ptr::copy_nonoverlapping(src, dst, len) }
+        unsafe { ptr::copy_nonoverlapping(src, dst, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
-        unsafe { ptr::drop_in_place(ptrs) }
+    unsafe fn ptrs_drop_in_place(&self, to_drop: Self::MutPtrs<'_>) {
+        unsafe { ptr::drop_in_place(to_drop) }
     }
 
     type NonNullPtrs<'a> = NonNull<()>;
@@ -135,10 +140,10 @@ unsafe impl RawSoaContext<()> for () {
     #[inline]
     fn slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::Ptrs<'a>,
+        data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::SlicePtrs<'a> {
-        ptr::slice_from_raw_parts(ptrs, len)
+        ptr::slice_from_raw_parts(data, len)
     }
 
     #[inline]
@@ -163,10 +168,10 @@ unsafe impl RawSoaContext<()> for () {
     #[inline]
     fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::MutPtrs<'a>,
+        data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
-        ptr::slice_from_raw_parts_mut(ptrs, len)
+        ptr::slice_from_raw_parts_mut(data, len)
     }
 
     #[inline]
@@ -190,8 +195,8 @@ unsafe impl RawSoaContext<()> for () {
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
-        unsafe { ptr::drop_in_place(slices) }
+    unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
+        unsafe { ptr::drop_in_place(slices_to_drop) }
     }
 }
 

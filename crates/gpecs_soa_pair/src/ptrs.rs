@@ -59,11 +59,11 @@ where
 
     #[inline]
     #[must_use]
-    pub unsafe fn add(self, context: &'ctx V::Context, offset: usize) -> Self {
+    pub unsafe fn add(self, context: &'ctx V::Context, count: usize) -> Self {
         let (key, value) = self.into_parts();
 
-        let key = unsafe { key.add(offset) };
-        let value = unsafe { context.ptrs_add(value, offset) };
+        let key = unsafe { key.add(count) };
+        let value = unsafe { context.ptrs_add(value, count) };
         Self::new(key, value)
     }
 

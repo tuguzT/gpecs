@@ -83,7 +83,7 @@ pub fn swap_erased(
     assert!(invocation_id < rhs_dense.len());
     let mut rhs = unsafe { rhs_dense.get_unchecked_mut(invocation_id) };
 
-    unsafe { lhs.swap(&mut rhs) }
+    unsafe { lhs.swap_nonoverlapping(&mut rhs, 1) }
 }
 
 pub type SparseGetDescUniform = TypedBuffer<SparseGetDesc>;
@@ -152,5 +152,5 @@ pub fn sparse_get(
     let mut lhs = unsafe { lhs_view.get_unchecked_mut(entity) };
     let mut rhs = unsafe { rhs_view.get_unchecked_mut(entity) };
 
-    unsafe { lhs.swap(&mut rhs) }
+    unsafe { lhs.swap_nonoverlapping(&mut rhs, 1) }
 }

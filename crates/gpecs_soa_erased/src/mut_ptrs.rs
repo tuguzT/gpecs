@@ -308,8 +308,11 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<'e, E>(&'a mut self, with: &'e mut ErasedSoaMutPtrs<E, P>)
-    where
+    pub unsafe fn swap_nonoverlapping<'e, E>(
+        &'a mut self,
+        with: &'e mut ErasedSoaMutPtrs<E, P>,
+        count: usize,
+    ) where
         E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), with.field_layouts());
@@ -319,7 +322,7 @@ where
         for i in 0..n {
             let this = unsafe { self.nth_field_ptr(this_offsets, i) };
             let with = unsafe { with.nth_field_ptr(with_offsets, i) };
-            unsafe { this.swap(with) }
+            unsafe { this.swap_nonoverlapping(with, count) }
         }
     }
 

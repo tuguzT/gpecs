@@ -93,6 +93,8 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
 
     unsafe fn swap(self, with: Self);
 
+    unsafe fn swap_nonoverlapping(self, with: Self, count: usize);
+
     unsafe fn copy_from(self, src: CastConst<Self>, count: usize);
 
     unsafe fn copy_from_nonoverlapping(self, src: CastConst<Self>, count: usize);

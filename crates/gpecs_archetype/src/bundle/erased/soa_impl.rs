@@ -48,8 +48,8 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
-        unsafe { ptrs.add(offset) }
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a> {
+        unsafe { ptrs.add(count) }
     }
 
     #[inline]
@@ -76,9 +76,9 @@ where
     unsafe fn ptrs_add_mut<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
-        offset: usize,
+        count: usize,
     ) -> Self::MutPtrs<'a> {
-        unsafe { ptrs.add(offset) }
+        unsafe { ptrs.add(count) }
     }
 
     #[inline]
@@ -101,8 +101,13 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_swap(&self, mut a: Self::MutPtrs<'_>, mut b: Self::MutPtrs<'_>) {
-        unsafe { a.swap(&mut b) }
+    unsafe fn ptrs_swap_nonoverlapping(
+        &self,
+        mut x: Self::MutPtrs<'_>,
+        mut y: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { x.swap_nonoverlapping(&mut y, count) }
     }
 
     #[inline]
@@ -110,9 +115,9 @@ where
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_forward(&src, len) }
+        unsafe { dst.copy_from_forward(&src, count) }
     }
 
     #[inline]
@@ -120,9 +125,9 @@ where
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_backward(&src, len) }
+        unsafe { dst.copy_from_backward(&src, count) }
     }
 
     #[inline]
@@ -130,15 +135,15 @@ where
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_nonoverlapping(&src, len) }
+        unsafe { dst.copy_from_nonoverlapping(&src, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_drop_in_place(&self, to_drop: Self::MutPtrs<'_>) {
         let archetype = self.as_inner();
-        for ((_, meta), to_drop) in zip_eq(archetype, ptrs) {
+        for ((_, meta), to_drop) in zip_eq(archetype, to_drop) {
             unsafe { D::drop_in_place_with(to_drop, meta) }
         }
     }
@@ -174,10 +179,10 @@ where
     #[inline]
     fn slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::Ptrs<'a>,
+        data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::SlicePtrs<'a> {
-        unsafe { ErasedBundleSlicePtrs::from_ptrs(ptrs, len) }
+        unsafe { ErasedBundleSlicePtrs::from_ptrs(data, len) }
     }
 
     #[inline]
@@ -202,10 +207,10 @@ where
     #[inline]
     fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::MutPtrs<'a>,
+        data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
-        unsafe { ErasedBundleMutSlicePtrs::from_ptrs(ptrs, len) }
+        unsafe { ErasedBundleMutSlicePtrs::from_ptrs(data, len) }
     }
 
     #[inline]
@@ -229,9 +234,9 @@ where
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
+    unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
         let archetype = self.as_inner();
-        for ((_, meta), to_drop) in zip_eq(archetype, slices) {
+        for ((_, meta), to_drop) in zip_eq(archetype, slices_to_drop) {
             unsafe { D::drop_in_place_slice_with(to_drop, meta) }
         }
     }

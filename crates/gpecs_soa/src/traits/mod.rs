@@ -32,7 +32,7 @@ where
     /// should be satisfied to be safe to call this method.
     ///
     /// [`pointer::add()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.add
-    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a>;
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a>;
 
     /// Calculates the distance between two [pointers](RawSoaContext::Ptrs)
     /// to each stored field within the same allocation.
@@ -65,7 +65,7 @@ where
     unsafe fn ptrs_add_mut<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
-        offset: usize,
+        count: usize,
     ) -> Self::MutPtrs<'a>;
 
     /// Calculates the distance between two [mutable pointers](RawSoaContext::MutPtrs)
@@ -89,17 +89,20 @@ where
     /// to the [const ones](RawSoaContext::Ptrs).
     fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a>;
 
-    /// Swaps the values at two [mutable locations](RawSoaContext::MutPtrs) of the stored fields
-    /// sequentially in the *same* order as they are stored in the buffer,
-    /// without deinitializing either.
+    /// Swaps `count * size_of::<fields[0]>() + ...` bytes between the two [mutable regions](RawSoaContext::MutPtrs)
+    /// of memory beginning at `x` and `y` for each stored field.
     ///
-    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
-    /// may not overlap with each other.
+    /// The regions, as well as all the field pointers, must not overlap.
     ///
     /// Additionally, all the safety requirements resulting from applying
-    /// [`ptr::swap()`](core::ptr::swap) method to each pointer
+    /// [`ptr::swap_nonoverlapping()`](core::ptr::swap_nonoverlapping) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>);
+    unsafe fn ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::MutPtrs<'_>,
+        y: Self::MutPtrs<'_>,
+        count: usize,
+    );
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in the *same* order as they are stored in the buffer.
@@ -111,9 +114,9 @@ where
     /// [`ptr::copy()`](core::ptr::copy) method to each pointer
     /// should be satisfied to be safe to call this method.
     ///
-    /// If the source and destination will never overlap,
+    /// If the source and destination will *never* overlap,
     /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
-    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in the *reverse* order as they are stored in the buffer.
@@ -125,12 +128,13 @@ where
     /// [`ptr::copy()`](core::ptr::copy) method to each pointer
     /// should be satisfied to be safe to call this method.
     ///
-    /// If the source and destination will never overlap,
+    /// If the source and destination will *never* overlap,
     /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
-    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in unspecified order.
+    ///
     /// The source and destination, as well as all the field pointers, must not overlap.
     ///
     /// For regions of memory which might overlap, use
@@ -143,7 +147,7 @@ where
         &self,
         src: Self::Ptrs<'_>,
         dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     );
 
     /// Executes the destructors (if any) for the each stored field located at input [pointers](RawSoaContext::Ptrs).
@@ -151,7 +155,7 @@ where
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>);
+    unsafe fn ptrs_drop_in_place(&self, to_drop: Self::MutPtrs<'_>);
 
     /// Collection of non-null pointers to each stored field.
     type NonNullPtrs<'a>: Clone;
@@ -188,7 +192,7 @@ where
     /// The len argument is the number of elements, not the number of bytes.
     fn slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::Ptrs<'a>,
+        data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::SlicePtrs<'a>;
 
@@ -218,7 +222,7 @@ where
     /// The len argument is the number of elements, not the number of bytes.
     fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::MutPtrs<'a>,
+        data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a>;
 
@@ -248,13 +252,13 @@ where
     /// should be satisfied to be safe to call this method.
     ///
     /// By default, this method just iterates by all the fields of slices and drops such fields one by one.
-    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
-        let slices = Self::upcast_mut_slice_ptrs(slices);
+    unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
+        let slices = Self::upcast_mut_slice_ptrs(slices_to_drop);
         let len = self.mut_slice_ptrs_len(&slices);
         let ptrs = self.mut_slice_ptrs_as_ptrs(slices);
         for index in 0..len {
-            let ptrs = unsafe { self.ptrs_add_mut(ptrs.clone(), index) };
-            unsafe { self.ptrs_drop_in_place(ptrs) }
+            let to_drop = unsafe { self.ptrs_add_mut(ptrs.clone(), index) };
+            unsafe { self.ptrs_drop_in_place(to_drop) }
         }
     }
 }

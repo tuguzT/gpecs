@@ -39,8 +39,8 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
-        unsafe { ptrs.add(self, offset) }
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a> {
+        unsafe { ptrs.add(self, count) }
     }
 
     #[inline]
@@ -65,9 +65,9 @@ where
     unsafe fn ptrs_add_mut<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
-        offset: usize,
+        count: usize,
     ) -> Self::MutPtrs<'a> {
-        unsafe { ptrs.add(self, offset) }
+        unsafe { ptrs.add(self, count) }
     }
 
     #[inline]
@@ -90,18 +90,23 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
-        unsafe { a.swap(self, b) }
+    unsafe fn ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::MutPtrs<'_>,
+        y: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { x.swap_nonoverlapping(self, y, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-        unsafe { dst.copy_from_forward(self, src, len) }
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { dst.copy_from_forward(self, src, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-        unsafe { dst.copy_from_backward(self, src, len) }
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { dst.copy_from_backward(self, src, count) }
     }
 
     #[inline]
@@ -109,14 +114,14 @@ where
         &self,
         src: Self::Ptrs<'_>,
         dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_nonoverlapping(self, src, len) }
+        unsafe { dst.copy_from_nonoverlapping(self, src, count) }
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
-        unsafe { ptrs.drop_in_place(self) }
+    unsafe fn ptrs_drop_in_place(&self, to_drop: Self::MutPtrs<'_>) {
+        unsafe { to_drop.drop_in_place(self) }
     }
 
     type NonNullPtrs<'a> = KeyValueNonNullPtrs<'a, K, V, P::NonNull>;
@@ -152,11 +157,11 @@ where
     #[inline]
     fn slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::Ptrs<'a>,
+        data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::SlicePtrs<'a> {
         let context = self.as_inner();
-        KeyValueSlicePtrs::from_ptrs(context, ptrs, len)
+        KeyValueSlicePtrs::from_ptrs(context, data, len)
     }
 
     #[inline]
@@ -182,11 +187,11 @@ where
     #[inline]
     fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::MutPtrs<'a>,
+        data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
         let context = self.as_inner();
-        KeyValueMutSlicePtrs::from_ptrs(context, ptrs, len)
+        KeyValueMutSlicePtrs::from_ptrs(context, data, len)
     }
 
     #[inline]
@@ -211,8 +216,8 @@ where
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
-        unsafe { slices.drop_in_place(self) }
+    unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
+        unsafe { slices_to_drop.drop_in_place(self) }
     }
 }
 

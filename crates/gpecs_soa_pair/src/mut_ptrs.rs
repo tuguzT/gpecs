@@ -56,11 +56,11 @@ where
 
     #[inline]
     #[must_use]
-    pub unsafe fn add(self, context: &'ctx V::Context, offset: usize) -> Self {
+    pub unsafe fn add(self, context: &'ctx V::Context, count: usize) -> Self {
         let (key, value) = self.into_parts();
 
-        let key = unsafe { key.add(offset) };
-        let value = unsafe { context.ptrs_add_mut(value, offset) };
+        let key = unsafe { key.add(count) };
+        let value = unsafe { context.ptrs_add_mut(value, count) };
         Self::new(key, value)
     }
 
@@ -81,13 +81,18 @@ where
     }
 
     #[inline]
-    pub unsafe fn swap(self, context: &V::Context, with: KeyValueMutPtrs<'_, K, V, P>) {
+    pub unsafe fn swap_nonoverlapping(
+        self,
+        context: &V::Context,
+        with: KeyValueMutPtrs<'_, K, V, P>,
+        count: usize,
+    ) {
         let (key, value) = self.into_parts();
         let (with_key, with_value) = with.into_parts();
 
         unsafe {
-            key.swap(with_key);
-            context.ptrs_swap(value, with_value);
+            key.swap_nonoverlapping(with_key, count);
+            context.ptrs_swap_nonoverlapping(value, with_value, count);
         }
     }
 
@@ -96,14 +101,14 @@ where
         self,
         context: &V::Context,
         from: KeyValuePtrs<'_, K, V, CastConst<P>>,
-        len: usize,
+        count: usize,
     ) {
         let (dst_key, dst_value) = self.into_parts();
         let (src_key, src_value) = from.into_parts();
 
         unsafe {
-            dst_key.copy_from(src_key, len);
-            context.ptrs_copy_forward(src_value, dst_value, len);
+            dst_key.copy_from(src_key, count);
+            context.ptrs_copy_forward(src_value, dst_value, count);
         }
     }
 
@@ -112,14 +117,14 @@ where
         self,
         context: &V::Context,
         from: KeyValuePtrs<'_, K, V, CastConst<P>>,
-        len: usize,
+        count: usize,
     ) {
         let (dst_key, dst_value) = self.into_parts();
         let (src_key, src_value) = from.into_parts();
 
         unsafe {
-            context.ptrs_copy_backward(src_value, dst_value, len);
-            dst_key.copy_from(src_key, len);
+            context.ptrs_copy_backward(src_value, dst_value, count);
+            dst_key.copy_from(src_key, count);
         }
     }
 
@@ -128,14 +133,14 @@ where
         self,
         context: &V::Context,
         from: KeyValuePtrs<'_, K, V, CastConst<P>>,
-        len: usize,
+        count: usize,
     ) {
         let (dst_key, dst_value) = self.into_parts();
         let (src_key, src_value) = from.into_parts();
 
         unsafe {
-            dst_key.copy_from_nonoverlapping(src_key, len);
-            context.ptrs_copy_nonoverlapping(src_value, dst_value, len);
+            dst_key.copy_from_nonoverlapping(src_key, count);
+            context.ptrs_copy_nonoverlapping(src_value, dst_value, count);
         }
     }
 

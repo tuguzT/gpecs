@@ -136,6 +136,17 @@ where
     }
 
     #[inline]
+    pub unsafe fn swap_nonoverlapping(self, with: Self, count: usize) {
+        let Self { layout, ptr } = self;
+
+        for i in 0..bytes_to_items::<T::Item>(layout.size()) {
+            let this = unsafe { ptr.add(i) };
+            let with = unsafe { with.ptr.add(i) };
+            unsafe { this.swap_nonoverlapping(with, count) }
+        }
+    }
+
+    #[inline]
     pub unsafe fn copy_from(self, src: ErasedPtr<CastConst<T>>, count: usize) {
         let Self { layout, ptr } = self;
 

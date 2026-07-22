@@ -333,7 +333,7 @@ where
         unsafe {
             let a = SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone());
             let b = SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices);
-            context.ptrs_swap(a, b);
+            context.ptrs_swap_nonoverlapping(a, b, 1);
         }
     }
 

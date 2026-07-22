@@ -26,5 +26,5 @@ where
 
     // SAFETY: `&mut` guarantees these are typed readable and writable
     // as well as non-overlapping.
-    unsafe { context.ptrs_swap(x, y) }
+    unsafe { context.ptrs_swap_nonoverlapping(x, y, 1) }
 }

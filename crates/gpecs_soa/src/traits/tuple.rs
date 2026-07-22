@@ -93,8 +93,8 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
-                let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
+            unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a> {
+                let ptrs = unsafe { ($(ptrs.$indices.add(count),)*) };
                 ptrs
             }
 
@@ -122,9 +122,9 @@ macro_rules! soa_tuple_impl {
             unsafe fn ptrs_add_mut<'a>(
                 &'a self,
                 ptrs: Self::MutPtrs<'a>,
-                offset: usize,
+                count: usize,
             ) -> Self::MutPtrs<'a> {
-                let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
+                let ptrs = unsafe { ($(ptrs.$indices.add(count),)*) };
                 ptrs
             }
 
@@ -152,10 +152,20 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
+            unsafe fn ptrs_swap_nonoverlapping(
+                &self,
+                x: Self::MutPtrs<'_>,
+                y: Self::MutPtrs<'_>,
+                count: usize,
+            ) {
+                unsafe { $(ptr::swap_nonoverlapping(x.$indices, y.$indices, count);)* }
+            }
+
+            #[inline]
+            unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
-                let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices) },)*);
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in 0..count_idents!($($types,)*) {
@@ -164,22 +174,10 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+            unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
-                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
-                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
-
-                for index in 0..count_idents!($($types,)*) {
-                    closures[permutation[index]]();
-                }
-            }
-
-            #[inline]
-            unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
-
-                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in (0..count_idents!($($types,)*)).rev() {
@@ -192,15 +190,15 @@ macro_rules! soa_tuple_impl {
                 &self,
                 src: Self::Ptrs<'_>,
                 dst: Self::MutPtrs<'_>,
-                len: usize,
+                count: usize,
             ) {
                 // because source and destination are non-overlapping, we can copy them in any order
-                unsafe { $(ptr::copy_nonoverlapping(src.$indices, dst.$indices, len);)* }
+                unsafe { $(ptr::copy_nonoverlapping(src.$indices, dst.$indices, count);)* }
             }
 
             #[inline]
-            unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
-                unsafe { $(ptr::drop_in_place(ptrs.$indices);)* }
+            unsafe fn ptrs_drop_in_place(&self, to_drop: Self::MutPtrs<'_>) {
+                unsafe { $(ptr::drop_in_place(to_drop.$indices);)* }
             }
 
             type NonNullPtrs<'a> = ($(NonNull<$types>,)*);
@@ -236,10 +234,10 @@ macro_rules! soa_tuple_impl {
             #[inline]
             fn slice_ptrs_from_raw_parts<'a>(
                 &'a self,
-                ptrs: Self::Ptrs<'a>,
+                data: Self::Ptrs<'a>,
                 len: usize,
             ) -> Self::SlicePtrs<'a> {
-                let slices = ($(ptr::slice_from_raw_parts(ptrs.$indices, len),)*);
+                let slices = ($(ptr::slice_from_raw_parts(data.$indices, len),)*);
                 slices
             }
 
@@ -268,10 +266,10 @@ macro_rules! soa_tuple_impl {
             #[inline]
             fn mut_slice_ptrs_from_raw_parts<'a>(
                 &'a self,
-                ptrs: Self::MutPtrs<'a>,
+                data: Self::MutPtrs<'a>,
                 len: usize,
             ) -> Self::SliceMutPtrs<'a> {
-                let slices = ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*);
+                let slices = ($(ptr::slice_from_raw_parts_mut(data.$indices, len),)*);
                 slices
             }
 
@@ -301,8 +299,8 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
-                unsafe { $(ptr::drop_in_place(slices.$indices);)* }
+            unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
+                unsafe { $(ptr::drop_in_place(slices_to_drop.$indices);)* }
             }
         }
 

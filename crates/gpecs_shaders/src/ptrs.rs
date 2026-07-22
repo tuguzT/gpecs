@@ -171,6 +171,15 @@ where
     }
 
     #[inline]
+    unsafe fn swap_nonoverlapping(self, with: Self, count: usize) {
+        for i in 0..count {
+            let this = unsafe { self.add(i) };
+            let with = unsafe { with.add(i) };
+            unsafe { this.swap(with) }
+        }
+    }
+
+    #[inline]
     unsafe fn copy_from(self, src: GpuSliceItemPtr<*const [T]>, count: usize) {
         // Assuming slices do not overlap or are pointing to the same memory region
         // because they can only be obtained from storage buffers / shared memory on Rust-GPU backend...

@@ -124,6 +124,11 @@ unsafe impl<T> MutSliceItemPtr for *mut T {
     }
 
     #[inline]
+    unsafe fn swap_nonoverlapping(self, with: Self, count: usize) {
+        unsafe { ptr::swap_nonoverlapping(self, with, count) }
+    }
+
+    #[inline]
     unsafe fn copy_from(self, src: *const T, count: usize) {
         unsafe { self.copy_from(src, count) }
     }

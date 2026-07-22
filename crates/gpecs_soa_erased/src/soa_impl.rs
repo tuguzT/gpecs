@@ -35,8 +35,8 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
-        unsafe { ptrs.add(offset) }
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a> {
+        unsafe { ptrs.add(count) }
     }
 
     #[inline]
@@ -61,9 +61,9 @@ where
     unsafe fn ptrs_add_mut<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
-        offset: usize,
+        count: usize,
     ) -> Self::MutPtrs<'a> {
-        unsafe { ptrs.add(offset) }
+        unsafe { ptrs.add(count) }
     }
 
     #[inline]
@@ -86,8 +86,13 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_swap(&self, mut a: Self::MutPtrs<'_>, mut b: Self::MutPtrs<'_>) {
-        unsafe { a.swap(&mut b) }
+    unsafe fn ptrs_swap_nonoverlapping(
+        &self,
+        mut x: Self::MutPtrs<'_>,
+        mut y: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { x.swap_nonoverlapping(&mut y, count) }
     }
 
     #[inline]
@@ -95,9 +100,9 @@ where
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_forward(&src, len) }
+        unsafe { dst.copy_from_forward(&src, count) }
     }
 
     #[inline]
@@ -105,9 +110,9 @@ where
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_backward(&src, len) }
+        unsafe { dst.copy_from_backward(&src, count) }
     }
 
     #[inline]
@@ -115,9 +120,9 @@ where
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
-        len: usize,
+        count: usize,
     ) {
-        unsafe { dst.copy_from_nonoverlapping(&src, len) }
+        unsafe { dst.copy_from_nonoverlapping(&src, count) }
     }
 
     #[inline]
@@ -156,10 +161,10 @@ where
     #[inline]
     fn slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::Ptrs<'a>,
+        data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::SlicePtrs<'a> {
-        unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
+        unsafe { ErasedSoaSlicePtrs::from_ptrs(data, len) }
     }
 
     #[inline]
@@ -184,10 +189,10 @@ where
     #[inline]
     fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
-        ptrs: Self::MutPtrs<'a>,
+        data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
-        unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
+        unsafe { ErasedSoaMutSlicePtrs::from_ptrs(data, len) }
     }
 
     #[inline]

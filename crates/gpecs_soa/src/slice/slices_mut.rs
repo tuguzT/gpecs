@@ -393,6 +393,9 @@ where
             slice_index_usize_fail(len, b);
         }
 
+        if a == b {
+            return;
+        }
         unsafe { ptrs.swap_unchecked(a, b) }
     }
 

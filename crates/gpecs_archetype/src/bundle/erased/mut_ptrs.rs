@@ -186,15 +186,18 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<'n, N>(&'a mut self, with: &'n mut ErasedBundleMutPtrs<N, P>)
-    where
+    pub unsafe fn swap_nonoverlapping<'n, N>(
+        &'a mut self,
+        with: &'n mut ErasedBundleMutPtrs<N, P>,
+        count: usize,
+    ) where
         N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
             + ?Sized,
     {
         let Self { inner } = self;
 
         let with = unsafe { with.as_mut_inner() };
-        unsafe { inner.swap(with) }
+        unsafe { inner.swap_nonoverlapping(with, count) }
     }
 
     #[inline]

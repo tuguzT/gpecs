@@ -1,0 +1,14 @@
+[package]
+name = "gpecs_soa_core"
+description = "Core Structure of Arrays (SoA) definitions for ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpecs_identity = { workspace = true }
+
+[lints]
+workspace = true

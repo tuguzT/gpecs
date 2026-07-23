@@ -6,19 +6,17 @@
 #[cfg(feature = "alloc")]
 extern crate alloc as core_alloc;
 
-pub use gpecs_identity as identity;
 pub use gpecs_layout as layout;
+pub use gpecs_soa_core::{identity, mem, wrapper};
 
 #[cfg(feature = "alloc")]
 pub use self::alloc::vec;
 
 pub mod field;
-pub mod mem;
 pub mod prelude;
 pub mod ptr;
 pub mod slice;
 pub mod traits;
-pub mod wrapper;
 
 mod buffer;
 

@@ -1601,8 +1601,8 @@ dependencies = [
 name = "gpecs_soa"
 version = "0.0.0"
 dependencies = [
- "gpecs_identity",
  "gpecs_layout",
+ "gpecs_soa_core",
  "itertools 0.15.0",
  "rayon",
  "rustc-hash 2.1.3",
@@ -1616,6 +1616,13 @@ dependencies = [
  "criterion",
  "gpecs_soa_erased",
  "num-traits",
+]
+
+[[package]]
+name = "gpecs_soa_core"
+version = "0.0.0"
+dependencies = [
+ "gpecs_identity",
 ]
 
 [[package]]

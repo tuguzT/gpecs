@@ -162,30 +162,6 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
-
-                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
-                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
-
-                for index in 0..count_idents!($($types,)*) {
-                    closures[permutation[index]]();
-                }
-            }
-
-            #[inline]
-            unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
-
-                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
-                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
-
-                for index in (0..count_idents!($($types,)*)).rev() {
-                    closures[permutation[index]]();
-                }
-            }
-
-            #[inline]
             unsafe fn ptrs_copy_nonoverlapping(
                 &self,
                 src: Self::Ptrs<'_>,
@@ -385,6 +361,30 @@ macro_rules! soa_tuple_impl {
 
                 let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
                 ptrs
+            }
+
+            #[inline]
+            unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in 0..count_idents!($($types,)*) {
+                    closures[permutation[index]]();
+                }
+            }
+
+            #[inline]
+            unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in (0..count_idents!($($types,)*)).rev() {
+                    closures[permutation[index]]();
+                }
             }
         }
 

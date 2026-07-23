@@ -111,26 +111,6 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy_forward(
-        &self,
-        src: Self::Ptrs<'_>,
-        mut dst: Self::MutPtrs<'_>,
-        count: usize,
-    ) {
-        unsafe { dst.copy_from_forward(&src, count) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_copy_backward(
-        &self,
-        src: Self::Ptrs<'_>,
-        mut dst: Self::MutPtrs<'_>,
-        count: usize,
-    ) {
-        unsafe { dst.copy_from_backward(&src, count) }
-    }
-
-    #[inline]
     unsafe fn ptrs_copy_nonoverlapping(
         &self,
         src: Self::Ptrs<'_>,
@@ -352,6 +332,26 @@ where
         let (_, buffer, capacity, offset) = inner.into_parts();
         let inner = unsafe { ErasedSoaMutPtrs::new_unchecked(archetype, buffer, capacity, offset) };
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_forward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_forward(&src, count) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_backward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_backward(&src, count) }
     }
 }
 

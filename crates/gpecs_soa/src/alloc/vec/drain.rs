@@ -10,7 +10,8 @@ use crate::{
     buffer::is_zst,
     slice::{Iter, range},
     traits::{
-        AllocSoa, Ptrs, RawSoaContext, ReadSoaContext, SlicePtrs, Slices, Soa, SoaOwned, SoaRead,
+        AllocSoa, AllocSoaContext, Ptrs, RawSoaContext, ReadSoaContext, SlicePtrs, Slices, Soa,
+        SoaOwned, SoaRead,
     },
 };
 
@@ -259,13 +260,9 @@ where
                     let src = context.ptrs_cast_const(ptrs.clone());
                     let src = unsafe { context.ptrs_add(src, tail) };
                     let dst = unsafe { context.ptrs_add_mut(ptrs, start) };
-                    unsafe {
-                        context.ptrs_copy_forward(src, dst, tail_len);
-                    }
+                    unsafe { context.ptrs_copy_forward(src, dst, tail_len) }
                 }
-                unsafe {
-                    vec.set_len(start + tail_len);
-                }
+                unsafe { vec.set_len(start + tail_len) }
             }
         }
 

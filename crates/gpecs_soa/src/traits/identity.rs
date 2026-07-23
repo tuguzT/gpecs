@@ -87,16 +87,6 @@ unsafe impl<T> RawSoaContext<Identity<T>> for () {
     }
 
     #[inline]
-    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
-        unsafe { ptr::copy(src, dst, count) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
-        unsafe { ptr::copy(src, dst, count) }
-    }
-
-    #[inline]
     unsafe fn ptrs_copy_nonoverlapping(
         &self,
         src: Self::Ptrs<'_>,
@@ -265,6 +255,16 @@ unsafe impl<T> AllocSoaContext<Identity<T>> for () {
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
         buffer.cast()
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { ptr::copy(src, dst, count) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { ptr::copy(src, dst, count) }
     }
 }
 

@@ -20,9 +20,10 @@ use crate::{
         from_raw_parts_mut, range,
     },
     traits::{
-        AllocSoa, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoaContext,
-        ReadSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
-        SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaReadOwned, SoaWrite, WriteSoaContext,
+        AllocSoa, AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs,
+        RawSoaContext, ReadSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut,
+        Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaReadOwned, SoaWrite,
+        WriteSoaContext,
     },
 };
 

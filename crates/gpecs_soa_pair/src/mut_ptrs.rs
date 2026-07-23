@@ -6,7 +6,9 @@ use core::{
 
 use gpecs_ptr::slice::{CastConst, MutSliceItemPtr, SliceItemPtr};
 use gpecs_soa::{
-    traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaContext, SoaWrite, WriteSoaContext},
+    traits::{
+        AllocSoaContext, MutPtrs, RawSoa, RawSoaContext, Soa, SoaContext, SoaWrite, WriteSoaContext,
+    },
     wrapper,
 };
 
@@ -97,38 +99,6 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from_forward(
-        self,
-        context: &V::Context,
-        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
-        count: usize,
-    ) {
-        let (dst_key, dst_value) = self.into_parts();
-        let (src_key, src_value) = from.into_parts();
-
-        unsafe {
-            dst_key.copy_from(src_key, count);
-            context.ptrs_copy_forward(src_value, dst_value, count);
-        }
-    }
-
-    #[inline]
-    pub unsafe fn copy_from_backward(
-        self,
-        context: &V::Context,
-        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
-        count: usize,
-    ) {
-        let (dst_key, dst_value) = self.into_parts();
-        let (src_key, src_value) = from.into_parts();
-
-        unsafe {
-            context.ptrs_copy_backward(src_value, dst_value, count);
-            dst_key.copy_from(src_key, count);
-        }
-    }
-
-    #[inline]
     pub unsafe fn copy_from_nonoverlapping(
         self,
         context: &V::Context,
@@ -165,6 +135,44 @@ where
         unsafe {
             key_ptr.write(key);
             context.write(value_ptr, value);
+        }
+    }
+}
+
+impl<K, V, P> KeyValueMutPtrs<'_, K, V, P>
+where
+    V: RawSoa<Context: AllocSoaContext<V>> + ?Sized,
+    P: MutSliceItemPtr<Item = K>,
+{
+    #[inline]
+    pub unsafe fn copy_from_forward(
+        self,
+        context: &V::Context,
+        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
+        count: usize,
+    ) {
+        let (dst_key, dst_value) = self.into_parts();
+        let (src_key, src_value) = from.into_parts();
+
+        unsafe {
+            dst_key.copy_from(src_key, count);
+            context.ptrs_copy_forward(src_value, dst_value, count);
+        }
+    }
+
+    #[inline]
+    pub unsafe fn copy_from_backward(
+        self,
+        context: &V::Context,
+        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
+        count: usize,
+    ) {
+        let (dst_key, dst_value) = self.into_parts();
+        let (src_key, src_value) = from.into_parts();
+
+        unsafe {
+            context.ptrs_copy_backward(src_value, dst_value, count);
+            dst_key.copy_from(src_key, count);
         }
     }
 }

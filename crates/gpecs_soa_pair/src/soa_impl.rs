@@ -100,16 +100,6 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
-        unsafe { dst.copy_from_forward(self, src, count) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
-        unsafe { dst.copy_from_backward(self, src, count) }
-    }
-
-    #[inline]
     unsafe fn ptrs_copy_nonoverlapping(
         &self,
         src: Self::Ptrs<'_>,
@@ -328,6 +318,16 @@ where
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
         KeyValueMutPtrs::new(key, value)
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { dst.copy_from_forward(self, src, count) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { dst.copy_from_backward(self, src, count) }
     }
 }
 

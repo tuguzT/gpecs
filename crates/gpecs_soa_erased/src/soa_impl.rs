@@ -96,26 +96,6 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy_forward(
-        &self,
-        src: Self::Ptrs<'_>,
-        mut dst: Self::MutPtrs<'_>,
-        count: usize,
-    ) {
-        unsafe { dst.copy_from_forward(&src, count) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_copy_backward(
-        &self,
-        src: Self::Ptrs<'_>,
-        mut dst: Self::MutPtrs<'_>,
-        count: usize,
-    ) {
-        unsafe { dst.copy_from_backward(&src, count) }
-    }
-
-    #[inline]
     unsafe fn ptrs_copy_nonoverlapping(
         &self,
         src: Self::Ptrs<'_>,
@@ -301,6 +281,26 @@ where
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         unsafe { Self::ptrs_from_buffer_mut(self, buffer, capacity) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_forward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_forward(&src, count) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_backward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_backward(&src, count) }
     }
 }
 

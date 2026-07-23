@@ -105,40 +105,9 @@ where
     );
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
-    /// for each stored field sequentially in the *same* order as they are stored in the buffer.
-    ///
-    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
-    /// may not overlap with each other.
-    ///
-    /// Additionally, all the safety requirements resulting from applying
-    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
-    /// should be satisfied to be safe to call this method.
-    ///
-    /// If the source and destination will *never* overlap,
-    /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
-    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
-
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
-    /// for each stored field sequentially in the *reverse* order as they are stored in the buffer.
-    ///
-    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
-    /// may not overlap with each other.
-    ///
-    /// Additionally, all the safety requirements resulting from applying
-    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
-    /// should be satisfied to be safe to call this method.
-    ///
-    /// If the source and destination will *never* overlap,
-    /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
-    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
-
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
-    /// for each stored field sequentially in unspecified order.
+    /// for each stored field.
     ///
     /// The source and destination, as well as all the field pointers, must not overlap.
-    ///
-    /// For regions of memory which might overlap, use
-    /// [`ptrs_copy_forward()`](RawSoaContext::ptrs_copy_forward) or [`ptrs_copy_backward()`](RawSoaContext::ptrs_copy_backward) instead.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::copy_nonoverlapping()`](core::ptr::copy_nonoverlapping) method to each pointer
@@ -455,6 +424,34 @@ where
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](AllocSoaContext::buffer_layout) method.
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
+
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
+    /// for each stored field sequentially in the *same* order as they are stored in a buffer.
+    ///
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    ///
+    /// If the source and destination will *never* overlap,
+    /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
+
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
+    /// for each stored field sequentially in the *reverse* order as they are stored in a buffer.
+    ///
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    ///
+    /// If the source and destination will *never* overlap,
+    /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
 }
 
 /// An extension of [SoA](RawSoa) type which allows to
@@ -486,8 +483,6 @@ where
     T: ?Sized,
 {
     /// Collection of references to each stored field.
-    ///
-    /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type Refs<'a>;
 
     /// Restricts [references](SoaContext::Refs) to each stored field
@@ -506,8 +501,6 @@ where
     fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a>;
 
     /// Collection of mutable references to each stored field.
-    ///
-    /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type RefsMut<'a>;
 
     /// Restricts [mutable references](SoaContext::RefsMut) to each stored field
@@ -530,8 +523,6 @@ where
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a>;
 
     /// Collection of slices of each stored field.
-    ///
-    /// Order of such slices may not resemble their order inside of a buffer in memory.
     type Slices<'a>;
 
     /// Restricts [slices](SoaContext::Slices) to each stored field
@@ -557,8 +548,6 @@ where
     fn slices_len(&self, slices: &Self::Slices<'_>) -> usize;
 
     /// Collection of mutable slices of each stored field.
-    ///
-    /// Order of such slices may not resemble their order inside of a buffer in memory.
     type SlicesMut<'a>;
 
     /// Restricts [mutable slices](SoaContext::SlicesMut) to each stored field

@@ -327,14 +327,24 @@ where
     }
 
     #[inline]
-    pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
-        // call `get_unchecked_mut` directly on slice pointers to avoid creating multiple mutable references
+    pub unsafe fn swap(&mut self, a: usize, b: usize) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        unsafe {
-            let a = SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone());
-            let b = SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices);
-            context.ptrs_swap_nonoverlapping(a, b, 1);
+
+        let x = SoaSlicePtrsIndex::<T>::index_mut_ptrs(a, context, slices.clone());
+        let y = SoaSlicePtrsIndex::<T>::index_mut_ptrs(b, context, slices);
+        if a == b {
+            return;
         }
+
+        unsafe { context.ptrs_swap_nonoverlapping(x, y, 1) }
+    }
+
+    #[inline]
+    pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
+        let x = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone()) };
+        let y = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices) };
+        unsafe { context.ptrs_swap_nonoverlapping(x, y, 1) }
     }
 
     #[inline]

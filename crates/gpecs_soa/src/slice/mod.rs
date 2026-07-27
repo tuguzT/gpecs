@@ -19,7 +19,6 @@ pub(crate) use self::index::{IndexHelper, IndexHelperMut};
 #[cfg(feature = "alloc")]
 pub(crate) use self::{partial_eq::partial_eq_impl, partial_ord::partial_ord_impl};
 
-mod assert;
 mod dst;
 mod index;
 mod iter;

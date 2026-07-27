@@ -9,7 +9,7 @@ use core::{
 use crate::{
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSliceMutPtrs,
-        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex, assert::slice_index_usize_fail,
+        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex,
     },
     traits::{
         CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
@@ -384,19 +384,7 @@ where
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
         let Self { ptrs, .. } = self;
-
-        let len = ptrs.len();
-        if a >= len {
-            slice_index_usize_fail(len, a);
-        }
-        if b >= len {
-            slice_index_usize_fail(len, b);
-        }
-
-        if a == b {
-            return;
-        }
-        unsafe { ptrs.swap_unchecked(a, b) }
+        unsafe { ptrs.swap(a, b) }
     }
 
     #[inline]

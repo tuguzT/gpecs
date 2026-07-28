@@ -1,6 +1,6 @@
 pub use self::{
     dst::{SoaSlice, from_raw_parts, from_raw_parts_mut},
-    index::{SoaSlicePtrsIndex, SoaSlicesIndex, range},
+    index::{SoaSlicePtrsIndex, SoaSlicesIndex, range, try_range},
     iter::Iter,
     iter_mut::IterMut,
     raw_iter::RawIter,

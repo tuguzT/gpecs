@@ -393,7 +393,7 @@ where
         unsafe { ptrs.swap_unchecked(a, b) }
     }
 
-    pub(crate) fn sort_impl<P, F>(&mut self, mut permutation: P, f: F)
+    fn sort_impl<P, F>(&mut self, mut permutation: P, f: F)
     where
         P: AsMut<[usize]>,
         F: FnOnce(&mut Self, &mut [usize]),
@@ -798,6 +798,151 @@ where
                 f(refs)
             });
         });
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> SoaSlicesMut<'_, '_, T>
+where
+    T: SoaOwned + ?Sized,
+{
+    #[inline]
+    pub fn sort(&mut self)
+    where
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
+    {
+        let permutation = self.permutation();
+        self.sort_with_permutation(permutation);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation<P>(&mut self, permutation: P)
+    where
+        P: AsMut<[usize]>,
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
+    {
+        self.sort_with_permutation_by(permutation, |a, b| {
+            let a = T::Context::upcast_refs(a);
+            let b = T::Context::upcast_refs(b);
+            Ord::cmp(&a, &b)
+        });
+    }
+
+    #[inline]
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
+    {
+        let permutation = self.permutation();
+        self.sort_with_permutation_by(permutation, compare);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
+    where
+        P: AsMut<[usize]>,
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
+    {
+        self.sort_impl(permutation, |me, permutation| {
+            let (context, ptrs, _) = me.slices().into_parts();
+            permutation.sort_by(|&a, &b| {
+                let a = unsafe {
+                    let ptrs = context.ptrs_add(ptrs.clone(), a);
+                    context.ptrs_to_refs(ptrs)
+                };
+                let b = unsafe {
+                    let ptrs = context.ptrs_add(ptrs.clone(), b);
+                    context.ptrs_to_refs(ptrs)
+                };
+                compare(a, b)
+            });
+        });
+    }
+
+    #[inline]
+    pub fn sort_by_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(Refs<'_, '_, T>) -> K,
+        K: Ord,
+    {
+        let permutation = self.permutation();
+        self.sort_with_permutation_by_key(permutation, f);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, mut f: F)
+    where
+        P: AsMut<[usize]>,
+        F: FnMut(Refs<'_, '_, T>) -> K,
+        K: Ord,
+    {
+        self.sort_impl(permutation, |me, permutation| {
+            let (context, ptrs, _) = me.slices().into_parts();
+            permutation.sort_by_key(|&index| unsafe {
+                let ptrs = context.ptrs_add(ptrs.clone(), index);
+                let refs = context.ptrs_to_refs(ptrs);
+                f(refs)
+            });
+        });
+    }
+
+    #[inline]
+    pub fn sort_by_cached_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(Refs<'_, '_, T>) -> K,
+        K: Ord,
+    {
+        let permutation = self.permutation();
+        self.sort_with_permutation_by_cached_key(permutation, f);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, mut f: F)
+    where
+        P: AsMut<[usize]>,
+        F: FnMut(Refs<'_, '_, T>) -> K,
+        K: Ord,
+    {
+        self.sort_impl(permutation, |me, permutation| {
+            let (context, ptrs, _) = me.slices().into_parts();
+            permutation.sort_by_cached_key(|&index| unsafe {
+                let ptrs = context.ptrs_add(ptrs.clone(), index);
+                let refs = context.ptrs_to_refs(ptrs);
+                f(refs)
+            });
+        });
+    }
+
+    #[inline]
+    pub fn sort_unstable(&mut self)
+    where
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
+    {
+        let permutation = self.permutation();
+        self.sort_unstable_with_permutation(permutation);
+    }
+
+    #[inline]
+    pub fn sort_unstable_by<F>(&mut self, compare: F)
+    where
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
+    {
+        let permutation = self.permutation();
+        self.sort_unstable_with_permutation_by(permutation, compare);
+    }
+
+    #[inline]
+    pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(Refs<'_, '_, T>) -> K,
+        K: Ord,
+    {
+        let permutation = self.permutation();
+        self.sort_unstable_with_permutation_by_key(permutation, f);
+    }
+
+    fn permutation(&self) -> alloc::boxed::Box<[usize]> {
+        (0..self.len()).collect()
     }
 }
 

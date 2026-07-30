@@ -1,38 +1,12 @@
 use crate::{
-    slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+    slice::{SoaSlice, SoaSlices, SoaSlicesMut, partial_ord_impl},
     traits::AllocSoaTrusted,
 };
 
-// Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
-macro_rules! partial_ord_impl {
-    ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
-        impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
-        where
-            $($ty: $bound,)?
-            T: $crate::traits::SoaOwned + ?Sized,
-            for<'_c, '_a> $crate::traits::Slices<'_c, '_a, T>: PartialOrd,
-        {
-            #[inline]
-            fn partial_cmp(&self, other: &$rhs) -> Option<::core::cmp::Ordering> {
-                let this = self.as_slices();
-                let other = other.as_slices();
-                PartialOrd::partial_cmp(&this, &other)
-            }
-        }
-    }
-}
-
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
-pub(crate) use partial_ord_impl;
-
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, Self }
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlicesMut<'_, '_, T> }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlice<T> where T: AllocSoaTrusted }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, &SoaSlice<T> where T: AllocSoaTrusted }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, &mut SoaSlice<T> where T: AllocSoaTrusted }
 
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, Self }
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlices<'_, '_, T> }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlice<T> where T: AllocSoaTrusted }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &SoaSlice<T> where T: AllocSoaTrusted }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &mut SoaSlice<T> where T: AllocSoaTrusted }

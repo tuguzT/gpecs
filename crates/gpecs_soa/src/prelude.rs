@@ -5,4 +5,4 @@ pub use crate::{
 };
 
 #[cfg(feature = "alloc")]
-pub use crate::vec::SoaVec;
+pub use crate::{slice::ToSoaVec, vec::SoaVec};

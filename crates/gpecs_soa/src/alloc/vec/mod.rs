@@ -16,7 +16,7 @@ use crate::{
     ptr::{BufferDataPtrMut, ptrs_from_buffer, ptrs_from_buffer_mut},
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
-        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, from_raw_parts,
+        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
         from_raw_parts_mut, range,
     },
     traits::{

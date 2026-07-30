@@ -9,6 +9,10 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_identity = { workspace = true }
+rayon = { workspace = true, optional = true }
+
+[features]
+alloc = []
 
 [lints]
 workspace = true

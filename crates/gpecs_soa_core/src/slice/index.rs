@@ -1278,6 +1278,7 @@ mod private_slice_index {
     impl Sealed for (ops::Bound<usize>, ops::Bound<usize>) {}
 }
 
+#[doc(hidden)]
 pub trait IndexHelper<'ctx, 'a, T>: SoaSlicesIndex<'a, T, Refs<'ctx> = &'a Self::Output>
 where
     T: Soa<'a> + ?Sized,
@@ -1294,6 +1295,7 @@ where
     type Output = U;
 }
 
+#[doc(hidden)]
 pub trait IndexHelperMut<'ctx, 'a, T>:
     IndexHelper<'ctx, 'a, T> + SoaSlicesIndex<'a, T, RefsMut<'ctx> = &'a mut Self::Output>
 where

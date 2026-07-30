@@ -10,7 +10,7 @@ use crate::{
     alloc::raw_vec::RawSoaVec,
     buffer::BufferData,
     ptr::BufferDataPtr,
-    slice::SoaSlices,
+    slice::{SoaSlices, ToSoaVec},
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
         SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaReadOwned,

@@ -18,7 +18,8 @@ rustc-hash = { workspace = true }
 
 [features]
 default = ["alloc"]
-alloc = []
+alloc = ["gpecs_soa_core/alloc"]
+rayon = ["dep:rayon", "gpecs_soa_core/rayon"]
 
 [lints]
 workspace = true

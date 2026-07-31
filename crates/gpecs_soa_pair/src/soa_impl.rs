@@ -232,7 +232,7 @@ where
     }
 }
 
-unsafe impl<'a, K, V, P, R> ReadSoaContext<'a, KeyValuePair<K, R, P>, KeyValuePair<K, V, P>>
+unsafe impl<'a, K, V, P, R> ReadSoaContext<'a, KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>
     for Identity<V::Context>
 where
     V: SoaRead<'a, R> + ?Sized,
@@ -244,7 +244,7 @@ where
     }
 }
 
-unsafe impl<K, V, P, W> WriteSoaContext<KeyValuePair<K, W, P>, KeyValuePair<K, V, P>>
+unsafe impl<K, V, P, W> WriteSoaContext<KeyValuePair<K, V, P>, KeyValuePair<K, W, P>>
     for Identity<V::Context>
 where
     V: SoaWrite<W>,

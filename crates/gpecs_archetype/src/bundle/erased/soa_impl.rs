@@ -236,8 +236,8 @@ where
 unsafe impl<'me, 'a, T, D, S, P>
     ReadSoaContext<
         'me,
-        ErasedBorrowedViewBundle<'a, T::Meta, D, S, P>,
         ErasedBundleKind<T, D, S, P>,
+        ErasedBorrowedViewBundle<'a, T::Meta, D, S, P>,
     > for ErasedSoaContext<ErasedArchetypeView<'a, T::Meta>, P>
 where
     T: ErasedArchetypeKind,
@@ -255,7 +255,7 @@ where
 }
 
 unsafe impl<T, W, D, N, S, U, P>
-    WriteSoaContext<ErasedBundleKind<W, N, U, P>, ErasedBundleKind<T, D, S, P>>
+    WriteSoaContext<ErasedBundleKind<T, D, S, P>, ErasedBundleKind<W, N, U, P>>
     for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,

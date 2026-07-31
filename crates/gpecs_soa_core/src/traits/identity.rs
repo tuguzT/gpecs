@@ -202,7 +202,7 @@ where
     }
 }
 
-unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>, Identity<T>> for () {
+unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>> for () {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
         unsafe { ptr::read(src) }

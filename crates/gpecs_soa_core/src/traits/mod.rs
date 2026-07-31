@@ -291,7 +291,7 @@ where
 
 /// An extension of [SoA context](RawSoaContext) type which allows to read a value borrowed from self
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait ReadSoaContext<'a, R, T>: RawSoaContext<T>
+pub unsafe trait ReadSoaContext<'a, T, R = T>: RawSoaContext<T>
 where
     T: ?Sized,
 {
@@ -306,24 +306,27 @@ where
 
 /// An extension of [SoA](RawSoa) type which allows to read a value borrowed from the context
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaRead<'a, R>: RawSoa<Context: ReadSoaContext<'a, R, Self>> {}
+pub unsafe trait SoaRead<'a, R = Self>:
+    RawSoa<Context: ReadSoaContext<'a, Self, R>>
+{
+}
 
 unsafe impl<'a, T, R> SoaRead<'a, R> for T
 where
     T: RawSoa + ?Sized,
-    T::Context: ReadSoaContext<'a, R, T>,
+    T::Context: ReadSoaContext<'a, T, R>,
 {
 }
 
 /// An extension of [SoA](RawSoa) type which allows to read a value of *any* lifetime
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaReadOwned<R>: for<'a> SoaRead<'a, R> {}
+pub unsafe trait SoaReadOwned<R = Self>: for<'a> SoaRead<'a, R> {}
 
 unsafe impl<T, R> SoaReadOwned<R> for T where T: for<'a> SoaRead<'a, R> + ?Sized {}
 
 /// An extension of [SoA context](RawSoaContext) type which allows to write a value
 /// into [mutale pointers](RawSoaContext::MutPtrs) to each stored field.
-pub unsafe trait WriteSoaContext<W, T>: RawSoaContext<T>
+pub unsafe trait WriteSoaContext<T, W = T>: RawSoaContext<T>
 where
     T: ?Sized,
 {
@@ -338,12 +341,12 @@ where
 
 /// An extension of [SoA](RawSoa) type which allows to write given value
 /// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaWrite<W>: RawSoa<Context: WriteSoaContext<W, Self>> {}
+pub unsafe trait SoaWrite<W = Self>: RawSoa<Context: WriteSoaContext<Self, W>> {}
 
 unsafe impl<T, W> SoaWrite<W> for T
 where
     T: RawSoa + ?Sized,
-    T::Context: WriteSoaContext<W, T>,
+    T::Context: WriteSoaContext<T, W>,
 {
 }
 

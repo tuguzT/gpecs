@@ -235,7 +235,7 @@ where
 }
 
 unsafe impl<'a, Meta, D, S, P>
-    ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
+    ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBorrowedBundle<'a, Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta,
@@ -249,8 +249,7 @@ where
     }
 }
 
-unsafe impl<'a, Meta, D, S, P>
-    ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBundle<Meta, D, S, P>>
+unsafe impl<'a, Meta, D, S, P> ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta + Clone,
@@ -266,7 +265,7 @@ where
 }
 
 unsafe impl<Meta, W, D, N, S, U, P>
-    WriteSoaContext<ErasedBundleKind<W, N, U, P>, ErasedBundle<Meta, D, S, P>>
+    WriteSoaContext<ErasedBundle<Meta, D, S, P>, ErasedBundleKind<W, N, U, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta + Clone,

@@ -212,7 +212,7 @@ where
 }
 
 unsafe impl<'a, T, D, P>
-    ReadSoaContext<'a, ErasedSoa<T, FieldLayoutsOutput<'a, D>, P>, ErasedSoa<T, D, P>>
+    ReadSoaContext<'a, ErasedSoa<T, D, P>, ErasedSoa<T, FieldLayoutsOutput<'a, D>, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
@@ -226,7 +226,7 @@ where
     }
 }
 
-unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
+unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, D, P>, ErasedSoa<T, N, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorage,

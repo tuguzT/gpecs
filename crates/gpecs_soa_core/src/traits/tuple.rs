@@ -227,14 +227,14 @@ macro_rules! tuple_impl {
             }
         }
 
-        unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*), ($($types,)*)> for () {
+        unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*)> for () {
             #[inline]
             unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }
 
-        unsafe impl<$($types,)*> WriteSoaContext<($($types,)*), ($($types,)*)> for () {
+        unsafe impl<$($types,)*> WriteSoaContext<($($types,)*)> for () {
             #[inline]
             unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ($($types,)*)) {
                 unsafe { $(ptr::write(dst.$indices, value.$indices);)* }

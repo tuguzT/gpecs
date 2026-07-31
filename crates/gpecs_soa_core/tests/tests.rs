@@ -1,12 +1,6 @@
 mod common;
 
-mod field;
-
 mod slice {
-    mod layout;
-}
-
-mod vec {
     mod layout;
     mod workload;
 }

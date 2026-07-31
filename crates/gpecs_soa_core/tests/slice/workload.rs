@@ -1,6 +1,6 @@
 use std::{array, cmp::Reverse, convert::identity, hash::BuildHasher};
 
-use gpecs_soa::prelude::*;
+use gpecs_soa_core::prelude::*;
 use itertools::assert_equal;
 use rustc_hash::FxBuildHasher;
 

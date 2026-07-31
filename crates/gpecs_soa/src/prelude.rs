@@ -1,7 +1,8 @@
+pub use gpecs_soa_core::prelude::*;
+
 pub use crate::{
-    identity::Identity,
-    slice::{SoaSlice, SoaSlices, SoaSlicesMut},
-    traits::{AllocSoa, AllocSoaContext, RawSoa, RawSoaContext, Soa, SoaContext, SoaOwned},
+    slice::SoaSlice,
+    traits::{AllocSoa, AllocSoaContext},
 };
 
 #[cfg(feature = "alloc")]

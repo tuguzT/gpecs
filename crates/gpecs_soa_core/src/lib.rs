@@ -8,6 +8,7 @@ extern crate alloc;
 pub use gpecs_identity as identity;
 
 pub mod mem;
+pub mod prelude;
 pub mod ptr;
 pub mod slice;
 pub mod traits;

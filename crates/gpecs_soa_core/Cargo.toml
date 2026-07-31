@@ -11,6 +11,10 @@ rust-version.workspace = true
 gpecs_identity = { workspace = true }
 rayon = { workspace = true, optional = true }
 
+[dev-dependencies]
+itertools = { workspace = true }
+rustc-hash = { workspace = true }
+
 [features]
 alloc = []
 

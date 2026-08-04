@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    buffer::is_zst,
+    buffer::fields_are_zst,
     slice::{Iter, range},
     traits::{
         AllocSoa, AllocSoaContext, Ptrs, RawSoaContext, ReadSoaContext, SlicePtrs, Slices, Soa,
@@ -275,7 +275,7 @@ where
         let drop_len = iter.len();
 
         let context = unsafe { vec.as_ref() }.context();
-        if is_zst::<T>(context) {
+        if fields_are_zst::<T>(context) {
             // ZSTs have no identity, so we don't need to move them around, we only need to drop the correct amount.
             // this can be achieved by manipulating the Vec length instead of moving values out from `iter`.
             let vec = unsafe { vec.as_mut() };

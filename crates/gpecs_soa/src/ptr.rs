@@ -1,5 +1,4 @@
 use core::{
-    alloc::{Layout, LayoutError},
     mem::offset_of,
     ptr::{self, NonNull},
 };
@@ -7,9 +6,12 @@ use core::{
 pub use gpecs_soa_core::ptr::*;
 
 use crate::{
-    buffer::{BufferData, BufferPrefix, buffer_layout, is_dangling, is_zst, should_allocate},
+    buffer::{
+        BufferData, BufferPrefix, buffer_is_dangling, buffer_layout, fields_are_zst, ptr_to_data,
+        ptr_to_data_mut,
+    },
     slice::SoaSlice,
-    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext},
+    traits::{AllocSoa, AllocSoaTrusted},
 };
 
 #[inline]
@@ -45,7 +47,7 @@ fn len_for_inner<T>(context: &T::Context, len: usize, capacity: usize) -> usize
 where
     T: AllocSoa + ?Sized,
 {
-    if !should_allocate::<T>(context, capacity) {
+    if buffer_is_dangling::<T>(context, capacity) {
         return len;
     }
 
@@ -91,25 +93,22 @@ where
 
     #[inline]
     unsafe fn len(self) -> usize {
-        let buffer_layout = slice_buffer_layout(self);
-        match buffer_layout.size() {
-            0 => self.into_inner().len(),
-            _ => unsafe { self.as_ptr().len() },
+        if slice_is_dangling(self) {
+            return self.into_inner().len();
         }
+        unsafe { self.as_ptr().len() }
     }
 
     #[inline]
     unsafe fn capacity(self) -> usize {
         let context = unsafe { self.context() };
-        if is_zst::<T>(context) {
+        if fields_are_zst::<T>(context) {
             return usize::MAX;
         }
-
-        let buffer_layout = slice_buffer_layout(self);
-        match buffer_layout.size() {
-            0 => 0,
-            _ => unsafe { self.as_ptr().capacity() },
+        if slice_is_dangling(self) {
+            return 0;
         }
+        unsafe { self.as_ptr().capacity() }
     }
 }
 
@@ -149,37 +148,30 @@ where
 
     #[inline]
     unsafe fn len(self) -> usize {
-        let buffer_layout = slice_buffer_layout(self);
-        match buffer_layout.size() {
-            0 => self.into_inner_mut().len(),
-            _ => unsafe { self.as_mut_ptr().len() },
+        if slice_is_dangling(self) {
+            return self.into_inner_mut().len();
         }
+        unsafe { self.as_mut_ptr().len() }
     }
 
     #[inline]
     unsafe fn capacity(self) -> usize {
         let context = unsafe { self.context() };
-        if is_zst::<T>(context) {
+        if fields_are_zst::<T>(context) {
             return usize::MAX;
         }
-
-        let buffer_layout = slice_buffer_layout(self);
-        match buffer_layout.size() {
-            0 => 0,
-            _ => unsafe { self.as_mut_ptr().capacity() },
+        if slice_is_dangling(self) {
+            return 0;
         }
+        unsafe { self.as_mut_ptr().capacity() }
     }
 }
 
-fn slice_buffer_layout<T>(ptr: *const SoaSlice<T>) -> Layout
+fn slice_is_dangling<T>(ptr: *const SoaSlice<T>) -> bool
 where
     T: AllocSoaTrusted + ?Sized,
 {
-    let buffer = ptr.into_inner();
-
-    let size = buffer.len().saturating_mul(size_of::<BufferData<T>>());
-    let align = align_of::<BufferData<T>>();
-    Layout::from_size_align(size, align).expect("layout size should not exceed `isize::MAX`")
+    ptr.into_inner().len() == 0 || size_of::<BufferData<T>>() == 0
 }
 
 pub trait BufferDataPtr<T>: Copy + private::Sealed
@@ -361,70 +353,4 @@ mod private {
 
     impl<T> Sealed for *const BufferData<T> where T: AllocSoa + ?Sized {}
     impl<T> Sealed for *mut BufferData<T> where T: AllocSoa + ?Sized {}
-}
-
-#[inline]
-pub(crate) unsafe fn ptrs_from_buffer<T>(
-    context: &T::Context,
-    ptr: *const BufferData<T>,
-    capacity: usize,
-) -> Ptrs<'_, T>
-where
-    T: AllocSoa + ?Sized,
-{
-    if is_dangling::<T>(context, capacity) {
-        return context.ptrs_dangling();
-    }
-
-    let buffer = unsafe { ptr_to_data(context, ptr, capacity).unwrap_unchecked() };
-    unsafe { context.ptrs_from_buffer(buffer, capacity) }
-}
-
-#[inline]
-pub(crate) unsafe fn ptrs_from_buffer_mut<T>(
-    context: &T::Context,
-    ptr: *mut BufferData<T>,
-    capacity: usize,
-) -> MutPtrs<'_, T>
-where
-    T: AllocSoa + ?Sized,
-{
-    if is_dangling::<T>(context, capacity) {
-        return context.ptrs_dangling_mut();
-    }
-
-    let buffer = unsafe { ptr_to_data_mut(context, ptr, capacity).unwrap_unchecked() };
-    unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }
-}
-
-unsafe fn ptr_to_data<T>(
-    context: &T::Context,
-    ptr: *const BufferData<T>,
-    capacity: usize,
-) -> Result<*const u8, LayoutError>
-where
-    T: AllocSoa + ?Sized,
-{
-    let layout = context.buffer_layout(capacity)?;
-    let prefix_layout = Layout::new::<BufferPrefix<T>>();
-    let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
-
-    let buffer = unsafe { ptr.cast::<u8>().add(offset_from_prefix) };
-    Ok(buffer)
-}
-
-unsafe fn ptr_to_data_mut<T>(
-    context: &T::Context,
-    ptr: *mut BufferData<T>,
-    capacity: usize,
-) -> Result<*mut u8, LayoutError>
-where
-    T: AllocSoa + ?Sized,
-{
-    let layout = context.buffer_layout(capacity)?;
-    let prefix_layout = Layout::new::<BufferPrefix<T>>();
-    let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
-
-    let buffer = unsafe { ptr.cast::<u8>().add(offset_from_prefix) };
-    Ok(buffer)
 }

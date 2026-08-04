@@ -12,8 +12,11 @@ use core_alloc::{
 };
 
 use crate::{
-    buffer::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
-    ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
+    buffer::{
+        BufferData, buffer_is_dangling, buffer_layout, capacity_from, fields_are_zst,
+        ptrs_from_buffer_mut,
+    },
+    ptr::{BufferDataPtr, BufferDataPtrMut, slice_from_raw_parts_mut},
     slice::SoaSlice,
     traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, NonNullPtrs, RawSoaContext},
 };
@@ -126,7 +129,7 @@ where
         capacity: usize,
         init: AllocInit,
     ) -> Result<Self, TryReserveError> {
-        if !should_allocate::<T>(&context, capacity) {
+        if buffer_is_dangling::<T>(&context, capacity) {
             let this = Self {
                 ptr: NonNull::dangling(),
                 capacity: 0,
@@ -162,7 +165,7 @@ where
     #[inline]
     fn set_capacity_in_buffer(&mut self, new_capacity: usize) {
         let context = self.context();
-        if !should_allocate::<T>(context, new_capacity) {
+        if buffer_is_dangling::<T>(context, new_capacity) {
             return;
         }
 
@@ -292,7 +295,7 @@ where
     #[inline]
     pub fn capacity(&self) -> usize {
         let context = self.context();
-        if is_zst::<T>(context) {
+        if fields_are_zst::<T>(context) {
             return usize::MAX;
         }
 
@@ -303,7 +306,7 @@ where
     #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
         let Self { ptr, capacity } = *self;
-        if !should_allocate::<T>(context, capacity) {
+        if buffer_is_dangling::<T>(context, capacity) {
             return None;
         }
 
@@ -396,7 +399,7 @@ where
         debug_assert!(additional > 0);
 
         let context = self.context();
-        if is_zst::<T>(context) {
+        if fields_are_zst::<T>(context) {
             return Err(CapacityOverflow.into());
         }
 
@@ -417,7 +420,7 @@ where
 
     fn grow_exact(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
         let context = self.context();
-        if is_zst::<T>(context) {
+        if fields_are_zst::<T>(context) {
             return Err(CapacityOverflow.into());
         }
 

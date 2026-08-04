@@ -7,11 +7,8 @@ use core::{
 };
 
 use crate::{
-    buffer::BufferData,
-    ptr::{
-        SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
-        slice_from_raw_parts_mut,
-    },
+    buffer::{BufferData, ptrs_from_buffer, ptrs_from_buffer_mut},
+    ptr::{SoaSlicePtr, slice_from_raw_parts, slice_from_raw_parts_mut},
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
         Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,

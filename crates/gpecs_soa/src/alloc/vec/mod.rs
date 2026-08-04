@@ -12,8 +12,11 @@ use core_alloc::boxed::Box;
 pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    buffer::{BufferData, buffer_layout, capacity_from, should_allocate},
-    ptr::{BufferDataPtrMut, ptrs_from_buffer, ptrs_from_buffer_mut},
+    buffer::{
+        BufferData, buffer_is_dangling, buffer_layout, capacity_from, ptrs_from_buffer,
+        ptrs_from_buffer_mut,
+    },
+    ptr::BufferDataPtrMut,
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
         SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
@@ -276,7 +279,7 @@ where
     unsafe fn set_len_in_buffer_raw(buffer: &RawSoaVec<T>, new_len: usize) {
         let context = buffer.context();
         let capacity = buffer.capacity();
-        if !should_allocate::<T>(context, capacity) {
+        if buffer_is_dangling::<T>(context, capacity) {
             return;
         }
 

@@ -40,7 +40,10 @@ where
 
     /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
-        let packed_size = packed_size_of_fields(self.field_layouts());
+        let Some(packed_size) = packed_size_of_fields(self.field_layouts()) else {
+            return 0;
+        };
+
         let buffer_size = buffer_layout.size();
         let Some(max_capacity) = buffer_size.checked_div(packed_size) else {
             return usize::MAX;

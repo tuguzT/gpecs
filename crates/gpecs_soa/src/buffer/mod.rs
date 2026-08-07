@@ -75,11 +75,14 @@ const _: () = {
 };
 
 #[inline]
-pub fn packed_size_of_fields<I>(fields: I) -> usize
+pub fn packed_size_of_fields<I>(fields: I) -> Option<usize>
 where
     I: IntoIterator<Item: WithLayout>,
 {
-    fields.into_iter().map(|item| item.layout().size()).sum()
+    fields
+        .into_iter()
+        .map(|item| item.layout().size())
+        .try_fold(0, usize::checked_add)
 }
 
 #[inline]
@@ -99,7 +102,7 @@ pub fn fields_are_zst<T>(context: &T::Context) -> bool
 where
     T: AllocSoa + ?Sized,
 {
-    packed_size_of_fields(context.field_layouts()) == 0
+    packed_size_of_fields(context.field_layouts()) == Some(0)
 }
 
 #[inline]

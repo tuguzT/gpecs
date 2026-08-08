@@ -3,12 +3,13 @@ use core::{
     error::Error,
     fmt::{self, Display},
     mem::{ManuallyDrop, offset_of},
+    ptr,
 };
 
 use crate::{
     field::FieldLayouts,
     layout::WithLayout,
-    traits::{AllocSoa, AllocSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext},
+    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext},
 };
 
 #[cfg(test)]
@@ -306,4 +307,263 @@ impl Error for PtrToDataError {
             Self::InvalidLayout(error) => Some(error),
         }
     }
+}
+
+#[repr(transparent)]
+pub struct DstBuffer<T>
+where
+    T: AllocSoaTrusted + ?Sized,
+{
+    inner: [BufferData<T>],
+}
+
+impl<T> DstBuffer<T>
+where
+    T: AllocSoaTrusted + ?Sized,
+{
+    #[inline]
+    pub unsafe fn ptr_from_raw_parts(
+        data: *const BufferData<T>,
+        len: usize,
+        capacity: usize,
+    ) -> *const Self {
+        let context = unsafe { data.ptr_to_context().as_ref_unchecked() };
+        let len = Self::len_of_inner(context, len, capacity);
+        let inner = ptr::slice_from_raw_parts(data, len);
+        Self::ptr_from_inner(inner)
+    }
+
+    #[inline]
+    pub unsafe fn ptr_from_raw_parts_mut(
+        data: *mut BufferData<T>,
+        len: usize,
+        capacity: usize,
+    ) -> *mut Self {
+        let context = unsafe { data.ptr_to_context().as_ref_unchecked() };
+        let len = Self::len_of_inner(context, len, capacity);
+        let inner = ptr::slice_from_raw_parts_mut(data, len);
+        Self::ptr_from_inner_mut(inner)
+    }
+
+    fn ptr_from_inner(inner: *const [BufferData<T>]) -> *const Self {
+        // Self is transparent over a slice of `BufferData<T>`
+        inner as *const Self
+    }
+
+    fn ptr_from_inner_mut(inner: *mut [BufferData<T>]) -> *mut Self {
+        // Self is transparent over a slice of `BufferData<T>`
+        inner as *mut Self
+    }
+
+    fn len_of_inner(context: &T::Context, len: usize, capacity: usize) -> usize {
+        if buffer_is_dangling::<T>(context, capacity) {
+            return len;
+        }
+
+        let capacity_in_bytes = buffer_layout::<T>(context, capacity)
+            .expect("layout size should not exceed `isize::MAX`")
+            .size();
+        capacity_in_bytes / size_of::<BufferData<T>>()
+    }
+
+    #[inline]
+    pub fn ptr_as_ptr(this: *const Self) -> *const BufferData<T> {
+        // this should be `<*const [BufferData<T>]>::as_ptr(buffer)` but it's unstable
+        Self::ptr_as_inner(this).cast::<BufferData<T>>()
+    }
+
+    #[inline]
+    pub fn ptr_as_mut_ptr(this: *mut Self) -> *mut BufferData<T> {
+        // this should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)` but it's unstable
+        Self::ptr_as_inner_mut(this).cast::<BufferData<T>>()
+    }
+
+    fn ptr_as_inner(this: *const Self) -> *const [BufferData<T>] {
+        // Self is transparent over a slice of `BufferData<T>`
+        this as *const [BufferData<T>]
+    }
+
+    fn ptr_as_inner_mut(this: *mut Self) -> *mut [BufferData<T>] {
+        // Self is transparent over a slice of `BufferData<T>`
+        this as *mut [BufferData<T>]
+    }
+
+    #[inline]
+    pub unsafe fn ptr_len(this: *const Self) -> usize {
+        if Self::ptr_is_dangling(this) {
+            return Self::ptr_as_inner(this).len();
+        }
+        unsafe { Self::ptr_as_ptr(this).ptr_to_len().read() }
+    }
+
+    #[inline]
+    pub unsafe fn ptr_capacity(this: *const Self) -> usize {
+        let context = unsafe { Self::ptr_as_ptr(this).ptr_to_context().as_ref_unchecked() };
+        if fields_are_zst::<T>(context) {
+            return usize::MAX;
+        }
+        if Self::ptr_is_dangling(this) {
+            return 0;
+        }
+        unsafe { Self::ptr_as_ptr(this).ptr_to_capacity().read() }
+    }
+
+    fn ptr_is_dangling(this: *const Self) -> bool {
+        size_of::<BufferData<T>>() == 0 || Self::ptr_as_inner(this).len() == 0
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const BufferData<T> {
+        let Self { inner } = self;
+        inner.as_ptr()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+        let Self { inner } = self;
+        inner.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn context(&self) -> &T::Context {
+        let this = ptr::from_ref(self);
+        unsafe { Self::ptr_as_ptr(this).ptr_to_context().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let this = ptr::from_ref(self);
+        unsafe { Self::ptr_len(this) }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let this = ptr::from_ref(self);
+        unsafe { Self::ptr_capacity(this) }
+    }
+}
+
+pub trait BufferDataPtr<T>: Copy + private::Sealed
+where
+    T: AllocSoa + ?Sized,
+{
+    unsafe fn ptr_to_context(self) -> *const T::Context;
+    unsafe fn ptr_to_len(self) -> *const usize;
+    unsafe fn ptr_to_capacity(self) -> *const usize;
+    unsafe fn ptr_to_data(self) -> *const u8;
+}
+
+impl<T> BufferDataPtr<T> for *const BufferData<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    #[inline]
+    unsafe fn ptr_to_context(self) -> *const T::Context {
+        let prefix = self.cast::<u8>();
+        let context = unsafe { prefix.add(offset_of!(BufferPrefix<T>, context)) };
+        context.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_len(self) -> *const usize {
+        let prefix = self.cast::<u8>();
+        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
+        len.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity(self) -> *const usize {
+        let prefix = self.cast::<u8>();
+        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
+        capacity.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_data(self) -> *const u8 {
+        let context = unsafe { self.ptr_to_context().as_ref_unchecked() };
+        let capacity = unsafe { self.ptr_to_capacity().read() };
+        unsafe { ptr_to_data(context, self, capacity).unwrap_unchecked() }
+    }
+}
+
+pub trait BufferDataPtrMut<T>: BufferDataPtr<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    unsafe fn ptr_to_context_mut(self) -> *mut T::Context;
+    unsafe fn ptr_to_len_mut(self) -> *mut usize;
+    unsafe fn ptr_to_capacity_mut(self) -> *mut usize;
+    unsafe fn ptr_to_data_mut(self) -> *mut u8;
+}
+
+impl<T> BufferDataPtr<T> for *mut BufferData<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    #[inline]
+    unsafe fn ptr_to_context(self) -> *const T::Context {
+        unsafe { self.cast_const().ptr_to_context() }
+    }
+
+    #[inline]
+    unsafe fn ptr_to_len(self) -> *const usize {
+        unsafe { self.cast_const().ptr_to_len() }
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity(self) -> *const usize {
+        unsafe { self.cast_const().ptr_to_capacity() }
+    }
+
+    #[inline]
+    unsafe fn ptr_to_data(self) -> *const u8 {
+        unsafe { self.cast_const().ptr_to_data() }
+    }
+}
+
+impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    #[inline]
+    unsafe fn ptr_to_context_mut(self) -> *mut T::Context {
+        let prefix = self.cast::<u8>();
+        let context = unsafe { prefix.add(offset_of!(BufferPrefix<T>, context)) };
+        context.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_len_mut(self) -> *mut usize {
+        let prefix = self.cast::<u8>();
+        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
+        len.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity_mut(self) -> *mut usize {
+        let prefix = self.cast::<u8>();
+        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
+        capacity.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_data_mut(self) -> *mut u8 {
+        let context = unsafe { self.ptr_to_context().as_ref_unchecked() };
+        let capacity = unsafe { self.ptr_to_capacity().read() };
+        unsafe { ptr_to_data_mut(context, self, capacity).unwrap_unchecked() }
+    }
+}
+
+mod private {
+    use crate::{buffer::BufferData, traits::AllocSoa};
+
+    pub trait Sealed {}
+
+    impl<T> Sealed for *const BufferData<T> where T: AllocSoa + ?Sized {}
+    impl<T> Sealed for *mut BufferData<T> where T: AllocSoa + ?Sized {}
 }

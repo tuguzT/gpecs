@@ -149,7 +149,7 @@ where
     #[inline]
     unsafe fn context_of<'a>(buffer: NonNull<BufferData<T>>) -> &'a T::Context {
         let buffer = buffer.as_ptr();
-        unsafe { buffer.context() }
+        unsafe { buffer.ptr_to_context().as_ref_unchecked() }
     }
 
     #[inline]

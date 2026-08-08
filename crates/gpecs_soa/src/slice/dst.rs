@@ -3,12 +3,11 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::{Index, IndexMut},
-    ptr,
 };
 
 use crate::{
-    buffer::{BufferData, ptrs_from_buffer, ptrs_from_buffer_mut},
-    ptr::{SoaSlicePtr, slice_from_raw_parts, slice_from_raw_parts_mut},
+    buffer::{BufferData, DstBuffer, ptrs_from_buffer, ptrs_from_buffer_mut},
+    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
         Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
@@ -25,31 +24,93 @@ pub struct SoaSlice<T>
 where
     T: AllocSoaTrusted + ?Sized,
 {
-    buffer: [BufferData<T>],
+    buffer: DstBuffer<T>,
 }
 
 impl<T> SoaSlice<T>
 where
     T: AllocSoaTrusted + ?Sized,
 {
+    pub(crate) unsafe fn ptr_from_raw_parts(
+        data: *const BufferData<T>,
+        len: usize,
+        capacity: usize,
+    ) -> *const Self {
+        let buffer = unsafe { DstBuffer::ptr_from_raw_parts(data, len, capacity) };
+        Self::ptr_from_inner(buffer)
+    }
+
+    pub(crate) unsafe fn ptr_from_raw_parts_mut(
+        data: *mut BufferData<T>,
+        len: usize,
+        capacity: usize,
+    ) -> *mut Self {
+        let buffer = unsafe { DstBuffer::ptr_from_raw_parts_mut(data, len, capacity) };
+        Self::ptr_from_inner_mut(buffer)
+    }
+
+    fn ptr_from_inner(buffer: *const DstBuffer<T>) -> *const Self {
+        // Self is transparent over `DstBuffer<T>`
+        buffer as _
+    }
+
+    fn ptr_from_inner_mut(buffer: *mut DstBuffer<T>) -> *mut Self {
+        // Self is transparent over `DstBuffer<T>`
+        buffer as _
+    }
+
+    pub(crate) fn ptr_as_ptr(this: *const Self) -> *const BufferData<T> {
+        let this = Self::ptr_as_inner(this);
+        DstBuffer::ptr_as_ptr(this)
+    }
+
+    pub(crate) fn ptr_as_mut_ptr(this: *mut Self) -> *mut BufferData<T> {
+        let this = Self::ptr_as_inner_mut(this);
+        DstBuffer::ptr_as_mut_ptr(this)
+    }
+
+    fn ptr_as_inner(this: *const Self) -> *const DstBuffer<T> {
+        // Self is transparent over `DstBuffer<T>`
+        this as _
+    }
+
+    fn ptr_as_inner_mut(this: *mut Self) -> *mut DstBuffer<T> {
+        // Self is transparent over `DstBuffer<T>`
+        this as _
+    }
+
+    pub(crate) unsafe fn ptr_len(this: *const Self) -> usize {
+        let this = Self::ptr_as_inner(this);
+        unsafe { DstBuffer::ptr_len(this) }
+    }
+
+    pub(crate) unsafe fn ptr_capacity(this: *const Self) -> usize {
+        let this = Self::ptr_as_inner(this);
+        unsafe { DstBuffer::ptr_capacity(this) }
+    }
+
     #[inline]
     pub fn context(&self) -> &T::Context {
-        unsafe { ptr::from_ref(self).context() }
+        let Self { buffer } = self;
+        buffer.context()
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        unsafe { ptr::from_ref(self).len() }
+        let Self { buffer } = self;
+        buffer.len()
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        let Self { buffer } = self;
+        buffer.is_empty()
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        unsafe { ptr::from_ref(self).capacity() }
+        let Self { buffer } = self;
+        buffer.capacity()
     }
 
     #[inline]

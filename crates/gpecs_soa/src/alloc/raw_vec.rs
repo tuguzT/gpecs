@@ -273,7 +273,7 @@ where
     #[inline]
     pub fn context(&self) -> &T::Context {
         let ptr = self.as_mut_ptr();
-        unsafe { ptr.context() }
+        unsafe { ptr.ptr_to_context().as_ref_unchecked() }
     }
 
     #[inline]

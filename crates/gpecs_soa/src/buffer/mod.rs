@@ -181,15 +181,15 @@ where
     }
 
     let align = align_of_fields(context.field_layouts());
-    let next = Layout::from_size_align(0, align)
-        .expect("ZST layout should be valid for any possible alignment");
-    let (_, offset) = prefix
-        .extend(next)
-        .expect("extending prefix with ZST layout should always be possible");
+    let offset_to_data = prefix
+        .align_to(align)
+        .expect("buffer layout is valid, so the alignment of prefix to the data should be")
+        .pad_to_align()
+        .size();
 
-    let size = buffer_layout.size() - offset;
+    let size = buffer_layout.size() - offset_to_data;
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
-        .expect("layout with size smaller than original should always be valid");
+        .expect("layout with size smaller than the buffer one should be valid");
     context.capacity_from(buffer_layout)
 }
 

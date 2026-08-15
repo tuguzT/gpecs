@@ -35,7 +35,7 @@ where
     /// This layout should not include self, as it is handled by the crate itself.
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         let fields = self.field_layouts();
-        self::buffer_layout(fields, capacity).map(BufferLayout::layout)
+        buffer_layout(fields, capacity).map(BufferLayout::layout)
     }
 
     /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
@@ -53,10 +53,10 @@ where
         while {
             let layout = self
                 .buffer_layout(capacity)
-                .expect("new buffer layout should be smaller than the input one");
+                .expect("new layout should be smaller than the buffer one");
             layout.size() > buffer_size
         } {
-            capacity -= 1;
+            capacity = capacity.strict_sub(1);
         }
         capacity
     }

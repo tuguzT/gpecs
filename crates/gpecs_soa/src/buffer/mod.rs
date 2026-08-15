@@ -136,8 +136,18 @@ pub fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<Layout,
 where
     T: AllocSoa + ?Sized,
 {
-    let layout = buffer_layout_inner::<T>(context, capacity)?.pad_to_align();
-    Ok(layout)
+    let layout = buffer_layout_inner::<T>(context, capacity)?;
+
+    let item_size = size_of::<BufferData<T>>();
+    if item_size == 0 {
+        return Ok(layout);
+    }
+
+    let size = layout
+        .size()
+        .checked_next_multiple_of(item_size)
+        .unwrap_or(usize::MAX);
+    Layout::from_size_align(size, layout.align())
 }
 
 #[inline]
@@ -254,9 +264,9 @@ where
         return Err(error.into());
     }
 
-    let layout = context.buffer_layout(capacity)?;
-    let prefix_layout = Layout::new::<BufferPrefix<T>>();
-    let (_, offset) = prefix_layout.extend(layout)?;
+    let buffer = context.buffer_layout(capacity)?;
+    let prefix = Layout::new::<BufferPrefix<T>>();
+    let (_, offset) = prefix.extend(buffer)?;
     Ok(offset)
 }
 

@@ -1,6 +1,5 @@
 use core::{
     alloc::{Layout, LayoutError},
-    cmp,
     error::Error,
     fmt::{self, Display},
     mem::ManuallyDrop,
@@ -13,12 +12,13 @@ use core_alloc::{
 
 use crate::{
     buffer::{
-        BufferData, buffer_dangling, buffer_is_dangling, buffer_layout, capacity_from,
-        fields_are_zst, ptrs_from_buffer_mut,
+        BufferDropCheck, buffer_align, buffer_dangling, buffer_is_dangling, buffer_layout,
+        capacity_from, fields_are_zst, ptr_to_capacity_mut, ptr_to_context, ptr_to_context_mut,
+        ptrs_from_buffer_mut,
     },
-    ptr::{BufferDataPtr, BufferDataPtrMut, slice_from_raw_parts_mut},
+    ptr::slice_from_raw_parts_mut,
     slice::SoaSlice,
-    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, NonNullPtrs, RawSoaContext},
+    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs},
 };
 
 use self::TryReserveErrorKind::{AllocError, CapacityOverflow};
@@ -98,8 +98,9 @@ pub struct RawSoaVec<T>
 where
     T: AllocSoa + ?Sized,
 {
-    ptr: NonNull<BufferData<T>>,
+    ptr: NonNull<u8>,
     capacity: usize,
+    _marker: BufferDropCheck<T>,
 }
 
 impl<T> RawSoaVec<T>
@@ -115,7 +116,7 @@ where
     pub fn min_non_zero_cap(context: &T::Context) -> usize {
         const SIZE: usize = 4096; // 4 KiB
 
-        let buffer_layout = Layout::from_size_align(SIZE, align_of::<BufferData<T>>())
+        let buffer_layout = Layout::from_size_align(SIZE, buffer_align::<T>(context))
             .expect("layout size should not exceed `isize::MAX`");
         match context.capacity_from(buffer_layout) {
             SIZE => 8,
@@ -130,8 +131,8 @@ where
         init: AllocInit,
     ) -> Result<Self, TryReserveError> {
         if buffer_is_dangling::<T>(&context, capacity) {
-            let ptr = buffer_dangling(&context);
-            let this = Self { ptr, capacity: 0 };
+            let ptr = buffer_dangling::<T>(&context);
+            let this = unsafe { Self::from_nonnull(ptr, capacity) };
             return Ok(this);
         }
 
@@ -149,13 +150,12 @@ where
             return Err(alloc_error(layout).into());
         };
 
-        let ptr: NonNull<BufferData<_>> = ptr.cast();
         unsafe {
-            let dst = ptr.as_ptr().ptr_to_context_mut();
+            let dst = ptr_to_context_mut::<T>(ptr.as_ptr());
             ptr::write(dst, context);
         }
 
-        let mut me = Self { ptr, capacity };
+        let mut me = unsafe { Self::from_nonnull(ptr, capacity) };
         me.set_capacity_in_buffer(capacity);
         Ok(me)
     }
@@ -168,7 +168,7 @@ where
         }
 
         unsafe {
-            let capacity = self.ptr.as_ptr().ptr_to_capacity_mut();
+            let capacity = ptr_to_capacity_mut::<T>(self.ptr.as_ptr());
             ptr::write(capacity, new_capacity);
         }
     }
@@ -238,56 +238,45 @@ where
         );
 
         let me = ManuallyDrop::new(self);
-        let slice = unsafe { slice_from_raw_parts_mut(me.as_mut_ptr(), len, me.capacity()) };
+        let slice = unsafe { slice_from_raw_parts_mut(me.as_ptr(), len, me.capacity()) };
         unsafe { Box::from_raw(slice) }
     }
 
     #[inline]
     #[must_use]
-    pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut u8, capacity: usize) -> Self {
         let ptr = unsafe { NonNull::new_unchecked(ptr) };
         unsafe { Self::from_nonnull(ptr, capacity) }
     }
 
     #[inline]
     #[must_use]
-    pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
-        Self { ptr, capacity }
+    pub unsafe fn from_nonnull(ptr: NonNull<u8>, capacity: usize) -> Self {
+        Self {
+            ptr,
+            capacity,
+            _marker: BufferDropCheck::default(),
+        }
     }
 
     #[inline]
-    pub fn as_mut_ptr(&self) -> *mut BufferData<T> {
+    pub fn as_ptr(&self) -> *mut u8 {
         let Self { ptr, .. } = *self;
         ptr.as_ptr()
     }
 
     #[inline]
-    #[expect(dead_code)]
-    pub fn as_nonnull_ptr(&self) -> NonNull<BufferData<T>> {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
     pub fn context(&self) -> &T::Context {
-        let ptr = self.as_mut_ptr();
-        unsafe { ptr.ptr_to_context().as_ref_unchecked() }
+        unsafe { ptr_to_context::<T>(self.as_ptr()).as_ref_unchecked() }
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&self) -> MutPtrs<'_, T> {
-        let ptr = self.as_mut_ptr();
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, MutPtrs<'_, T>) {
+        let Self { ptr, capacity, .. } = *self;
         let context = self.context();
-        let capacity = self.capacity();
-        unsafe { ptrs_from_buffer_mut::<T>(context, ptr, capacity) }
-    }
 
-    #[inline]
-    #[expect(dead_code)]
-    pub fn as_nonnull_ptrs(&self) -> NonNullPtrs<'_, T> {
-        let ptrs = self.as_mut_ptrs();
-        let context = self.context();
-        unsafe { context.ptrs_to_nonnull(ptrs) }
+        let ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr.as_ptr(), capacity) };
+        (context, ptrs)
     }
 
     #[inline]
@@ -303,7 +292,7 @@ where
 
     #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
-        let Self { ptr, capacity } = *self;
+        let Self { ptr, capacity, .. } = *self;
         if buffer_is_dangling::<T>(context, capacity) {
             return None;
         }
@@ -312,10 +301,8 @@ where
         // and could hypothetically handle differences between stride and size, but this memory
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
-        unsafe {
-            let layout = buffer_layout::<T>(context, capacity).unwrap_unchecked();
-            Some((ptr.cast(), layout))
-        }
+        let layout = unsafe { buffer_layout::<T>(context, capacity).unwrap_unchecked() };
+        Some((ptr, layout))
     }
 
     #[inline]
@@ -387,7 +374,7 @@ where
     }
 
     #[inline]
-    unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferData<T>>, capacity: usize) {
+    unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<u8>, capacity: usize) {
         self.ptr = ptr;
         self.capacity = capacity;
         self.set_capacity_in_buffer(capacity);
@@ -402,13 +389,13 @@ where
         }
 
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
-        let capacity = cmp::max(self.capacity().saturating_mul(2), required_capacity);
-        let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
+        let capacity = usize::max(self.capacity().saturating_mul(2), required_capacity);
+        let capacity = usize::max(Self::min_non_zero_cap(context), capacity);
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
         let capacity = capacity_from::<T>(context, new_layout);
 
         let current_memory = self.current_memory(context);
-        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
+        let ptr = finish_grow(new_layout, current_memory)?;
 
         unsafe {
             self.set_ptr_and_capacity(ptr, capacity);
@@ -427,7 +414,7 @@ where
         let capacity = capacity_from::<T>(context, new_layout);
 
         let current_memory = self.current_memory(context);
-        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
+        let ptr = finish_grow(new_layout, current_memory)?;
 
         unsafe {
             self.set_ptr_and_capacity(ptr, capacity);
@@ -452,7 +439,7 @@ where
         if new_layout.size() == 0 {
             unsafe {
                 dealloc(ptr.as_ptr(), old_layout);
-                self.set_ptr_and_capacity(buffer_dangling(context), 0);
+                self.set_ptr_and_capacity(buffer_dangling::<T>(context), 0);
             }
             return Ok(());
         }
@@ -462,7 +449,7 @@ where
             return Err(alloc_error(new_layout).into());
         };
         unsafe {
-            self.set_ptr_and_capacity(ptr.cast(), capacity);
+            self.set_ptr_and_capacity(ptr, capacity);
         }
         Ok(())
     }
@@ -516,7 +503,7 @@ fn finish_grow(
 
 #[inline(never)]
 fn capacity_overflow() -> ! {
-    panic!("capacity overflow");
+    panic!("capacity overflow")
 }
 
 #[inline]

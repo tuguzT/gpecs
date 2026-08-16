@@ -8,8 +8,7 @@ use core::{
 
 use crate::{
     alloc::raw_vec::RawSoaVec,
-    buffer::BufferData,
-    ptr::BufferDataPtr,
+    buffer::{BufferDropCheck, ptr_to_context},
     slice::{SoaSlices, ToSoaVec},
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
@@ -25,11 +24,12 @@ where
     R: ?Sized,
 {
     ptrs: wrapper::NonNullPtrs<'static, T>,
-    buffer: NonNull<BufferData<T>>,
+    buffer: NonNull<u8>,
     capacity: usize,
     start: usize,
     end: usize,
-    phantom: PhantomData<fn() -> R>,
+    _drop_check: BufferDropCheck<T>,
+    _phantom: PhantomData<fn() -> R>,
 }
 
 impl<T, R> IntoIter<T, R>
@@ -52,7 +52,8 @@ where
             capacity: vec.capacity(),
             start: 0,
             end: vec.len(),
-            phantom: PhantomData,
+            _drop_check: BufferDropCheck::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -147,9 +148,8 @@ where
     }
 
     #[inline]
-    unsafe fn context_of<'a>(buffer: NonNull<BufferData<T>>) -> &'a T::Context {
-        let buffer = buffer.as_ptr();
-        unsafe { buffer.ptr_to_context().as_ref_unchecked() }
+    unsafe fn context_of<'a>(buffer: NonNull<u8>) -> &'a T::Context {
+        unsafe { ptr_to_context::<T>(buffer.as_ptr()).as_ref_unchecked() }
     }
 
     #[inline]

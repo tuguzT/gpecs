@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    buffer::{BufferData, DstBuffer, ptrs_from_buffer, ptrs_from_buffer_mut},
+    buffer::{DstBuffer, ptrs_from_buffer, ptrs_from_buffer_mut},
     ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
@@ -32,7 +32,7 @@ where
     T: AllocSoaTrusted + ?Sized,
 {
     pub(crate) unsafe fn ptr_from_raw_parts(
-        data: *const BufferData<T>,
+        data: *const u8,
         len: usize,
         capacity: usize,
     ) -> *const Self {
@@ -41,7 +41,7 @@ where
     }
 
     pub(crate) unsafe fn ptr_from_raw_parts_mut(
-        data: *mut BufferData<T>,
+        data: *mut u8,
         len: usize,
         capacity: usize,
     ) -> *mut Self {
@@ -59,12 +59,12 @@ where
         buffer as _
     }
 
-    pub(crate) fn ptr_as_ptr(this: *const Self) -> *const BufferData<T> {
+    pub(crate) fn ptr_as_ptr(this: *const Self) -> *const u8 {
         let this = Self::ptr_as_inner(this);
         DstBuffer::ptr_as_ptr(this)
     }
 
-    pub(crate) fn ptr_as_mut_ptr(this: *mut Self) -> *mut BufferData<T> {
+    pub(crate) fn ptr_as_mut_ptr(this: *mut Self) -> *mut u8 {
         let this = Self::ptr_as_inner_mut(this);
         DstBuffer::ptr_as_mut_ptr(this)
     }
@@ -114,13 +114,13 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const BufferData<T> {
+    pub fn as_ptr(&self) -> *const u8 {
         let Self { buffer } = self;
         buffer.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { buffer } = self;
         buffer.as_mut_ptr()
     }
@@ -641,7 +641,7 @@ where
 
 #[inline]
 pub unsafe fn from_raw_parts<'slice, T>(
-    data: *const BufferData<T>,
+    data: *const u8,
     len: usize,
     capacity: usize,
 ) -> &'slice SoaSlice<T>
@@ -653,7 +653,7 @@ where
 
 #[inline]
 pub unsafe fn from_raw_parts_mut<'slice, T>(
-    data: *mut BufferData<T>,
+    data: *mut u8,
     len: usize,
     capacity: usize,
 ) -> &'slice mut SoaSlice<T>

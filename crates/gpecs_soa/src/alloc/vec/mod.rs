@@ -13,10 +13,9 @@ pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     buffer::{
-        BufferData, buffer_is_dangling, buffer_layout, capacity_from, ptrs_from_buffer,
+        buffer_is_dangling, buffer_layout, capacity_from, ptr_to_len_mut, ptrs_from_buffer,
         ptrs_from_buffer_mut,
     },
-    ptr::BufferDataPtrMut,
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
         SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
@@ -113,13 +112,13 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, len: usize, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut u8, len: usize, capacity: usize) -> Self {
         let buffer = unsafe { RawSoaVec::from_raw_parts(ptr, capacity) };
         Self { buffer, len }
     }
 
     #[inline]
-    pub fn into_raw_parts(self) -> (*mut BufferData<T>, usize, usize) {
+    pub fn into_raw_parts(self) -> (*mut u8, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
     }
@@ -157,15 +156,15 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const BufferData<T> {
+    pub fn as_ptr(&self) -> *const u8 {
         let Self { buffer, .. } = self;
-        buffer.as_mut_ptr().cast_const()
+        buffer.as_ptr().cast_const()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { buffer, .. } = self;
-        buffer.as_mut_ptr()
+        buffer.as_ptr()
     }
 
     #[inline]
@@ -178,8 +177,7 @@ where
     pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
         let Self { buffer, .. } = self;
 
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let ptrs = context.ptrs_cast_const(ptrs);
         (context, ptrs)
     }
@@ -193,10 +191,7 @@ where
     #[inline]
     pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
         let Self { buffer, .. } = self;
-
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
-        (context, ptrs)
+        buffer.as_ptrs_with_context()
     }
 
     #[inline]
@@ -284,7 +279,7 @@ where
         }
 
         unsafe {
-            let len = buffer.as_mut_ptr().ptr_to_len_mut();
+            let len = ptr_to_len_mut::<T>(buffer.as_ptr());
             ptr::write(len, new_len);
         }
     }
@@ -296,13 +291,11 @@ where
             return;
         }
 
-        let ptr = self.as_mut_ptr();
-        let context = self.context();
-
-        let old_ptrs = unsafe { ptrs_from_buffer::<T>(context, ptr, old_capacity) };
-        let new_ptrs = self.buffer.as_mut_ptrs();
-
         let len = self.len();
+        let ptr = self.as_mut_ptr();
+        let (context, new_ptrs) = self.as_mut_ptrs_with_context();
+        let old_ptrs = unsafe { ptrs_from_buffer::<T>(context, ptr, old_capacity) };
+
         unsafe { context.ptrs_copy_backward(old_ptrs, new_ptrs, len) }
     }
 
@@ -314,9 +307,7 @@ where
         }
 
         let ptr = self.as_mut_ptr();
-        let context = self.context();
-
-        let old_ptrs = self.as_ptrs();
+        let (context, old_ptrs) = self.as_ptrs_with_context();
         let new_ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, new_capacity) };
 
         let len = self.len();
@@ -527,8 +518,7 @@ where
         }
 
         let Self { buffer, .. } = self;
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
 
         let ptrs_into = dst.clone();
@@ -577,8 +567,7 @@ where
         }
 
         let Self { buffer, .. } = self;
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
 
         let ptrs_into = dst.clone();
@@ -620,9 +609,8 @@ where
         }
 
         let Self { buffer, .. } = self;
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
 
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let ptrs_into = unsafe { context.ptrs_add_mut(ptrs, len - 1) };
         let result = f(context, Some(ptrs_into));
 
@@ -701,9 +689,7 @@ where
                 let Self { buffer, index, len } = *self;
 
                 if index < len {
-                    let context = buffer.context();
-                    let ptrs = buffer.as_mut_ptrs();
-
+                    let (context, ptrs) = buffer.as_ptrs_with_context();
                     let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
                     let src = context.ptrs_cast_const(dst.clone());
                     let src = unsafe { context.ptrs_add(src, 1) };
@@ -715,9 +701,7 @@ where
         let Self { buffer, .. } = self;
         let guard = CopyBackGuard { buffer, index, len };
 
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
-
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, index) };
         let result = f(context, ptrs_from);
 
@@ -755,9 +739,8 @@ where
         }
 
         let Self { buffer, .. } = self;
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
 
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, len) };
         let result = f(context, ptrs_from);
 
@@ -1347,7 +1330,7 @@ where
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        let data = self.as_ptr();
+        let data = self.as_ptr().cast();
         let len = self.len();
         let capacity = self.capacity();
         unsafe { from_raw_parts(data, len, capacity) }
@@ -1360,7 +1343,7 @@ where
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let data = self.as_mut_ptr();
+        let data = self.as_mut_ptr().cast();
         let len = self.len();
         let capacity = self.capacity();
         unsafe { from_raw_parts_mut(data, len, capacity) }

@@ -1,12 +1,10 @@
 pub use gpecs_soa_core::ptr::*;
 
-pub use crate::buffer::{BufferDataPtr, BufferDataPtrMut};
-
-use crate::{buffer::BufferData, slice::SoaSlice, traits::AllocSoaTrusted};
+use crate::{slice::SoaSlice, traits::AllocSoaTrusted};
 
 #[inline]
 pub unsafe fn slice_from_raw_parts<T>(
-    data: *const BufferData<T>,
+    data: *const u8,
     len: usize,
     capacity: usize,
 ) -> *const SoaSlice<T>
@@ -18,7 +16,7 @@ where
 
 #[inline]
 pub unsafe fn slice_from_raw_parts_mut<T>(
-    data: *mut BufferData<T>,
+    data: *mut u8,
     len: usize,
     capacity: usize,
 ) -> *mut SoaSlice<T>
@@ -32,7 +30,7 @@ pub trait SoaSlicePtr<T>: Copy + private::Sealed
 where
     T: AllocSoaTrusted + ?Sized,
 {
-    fn as_ptr(self) -> *const BufferData<T>;
+    fn as_ptr(self) -> *const u8;
 
     unsafe fn len(self) -> usize;
 
@@ -49,7 +47,7 @@ where
     T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
-    fn as_ptr(self) -> *const BufferData<T> {
+    fn as_ptr(self) -> *const u8 {
         SoaSlice::ptr_as_ptr(self)
     }
 
@@ -69,7 +67,7 @@ where
     T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
-    fn as_ptr(self) -> *const BufferData<T> {
+    fn as_ptr(self) -> *const u8 {
         self.cast_const().as_ptr()
     }
 
@@ -88,7 +86,7 @@ pub trait SoaSlicePtrMut<T>: SoaSlicePtr<T>
 where
     T: AllocSoaTrusted + ?Sized,
 {
-    fn as_mut_ptr(self) -> *mut BufferData<T>;
+    fn as_mut_ptr(self) -> *mut u8;
 }
 
 impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
@@ -96,7 +94,7 @@ where
     T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
-    fn as_mut_ptr(self) -> *mut BufferData<T> {
+    fn as_mut_ptr(self) -> *mut u8 {
         SoaSlice::ptr_as_mut_ptr(self)
     }
 }

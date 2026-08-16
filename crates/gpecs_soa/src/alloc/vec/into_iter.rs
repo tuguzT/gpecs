@@ -2,13 +2,11 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    mem::{ManuallyDrop, transmute},
-    ptr::NonNull,
+    mem::transmute,
 };
 
 use crate::{
     alloc::raw_vec::RawSoaVec,
-    buffer::{BufferDropCheck, ptr_to_context},
     slice::{SoaSlices, ToSoaVec},
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
@@ -24,12 +22,10 @@ where
     R: ?Sized,
 {
     ptrs: wrapper::NonNullPtrs<'static, T>,
-    buffer: NonNull<u8>,
-    capacity: usize,
+    buffer: RawSoaVec<T>,
     start: usize,
     end: usize,
-    _drop_check: BufferDropCheck<T>,
-    _phantom: PhantomData<fn() -> R>,
+    phantom: PhantomData<fn() -> R>,
 }
 
 impl<T, R> IntoIter<T, R>
@@ -39,21 +35,18 @@ where
 {
     #[inline]
     pub(super) fn new(vec: SoaVec<T>) -> Self {
-        let mut vec = ManuallyDrop::new(vec);
+        let (buffer, len) = vec.into_parts();
 
-        let buffer = vec.as_mut_ptr();
-        let (context, ptrs) = vec.as_mut_ptrs_with_context();
-
+        let (context, ptrs) = buffer.as_ptrs_with_context();
         let ptrs = unsafe { context.ptrs_to_nonnull(ptrs) };
         let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
+
         Self {
             ptrs: wrapper::NonNullPtrs::new(ptrs),
-            buffer: unsafe { NonNull::new_unchecked(buffer) },
-            capacity: vec.capacity(),
+            buffer,
             start: 0,
-            end: vec.len(),
-            _drop_check: BufferDropCheck::default(),
-            _phantom: PhantomData,
+            end: len,
+            phantom: PhantomData,
         }
     }
 
@@ -70,8 +63,8 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        let Self { buffer, .. } = *self;
-        unsafe { Self::context_of(buffer) }
+        let Self { buffer, .. } = self;
+        buffer.context()
     }
 
     #[inline]
@@ -84,12 +77,12 @@ where
     pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
         let Self {
             ref ptrs,
-            buffer,
+            ref buffer,
             start,
             ..
         } = *self;
-        let context = unsafe { Self::context_of(buffer) };
 
+        let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_to_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
@@ -107,12 +100,12 @@ where
     pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
         let Self {
             ref ptrs,
-            buffer,
+            ref buffer,
             start,
             ..
         } = *self;
-        let context = unsafe { Self::context_of(buffer) };
 
+        let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_to_ptrs(ptrs);
         let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
@@ -145,11 +138,6 @@ where
         let (context, ptrs) = self.as_mut_ptrs_with_context();
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
-    }
-
-    #[inline]
-    unsafe fn context_of<'a>(buffer: NonNull<u8>) -> &'a T::Context {
-        unsafe { ptr_to_context::<T>(buffer.as_ptr()).as_ref_unchecked() }
     }
 
     #[inline]
@@ -286,46 +274,12 @@ where
     R: ?Sized,
 {
     fn drop(&mut self) {
-        struct DropGuard<'a, T, R>(&'a mut IntoIter<T, R>)
-        where
-            T: AllocSoa + ?Sized,
-            R: ?Sized;
-
-        impl<T, R> Drop for DropGuard<'_, T, R>
-        where
-            T: AllocSoa + ?Sized,
-            R: ?Sized,
-        {
-            fn drop(&mut self) {
-                let Self(iter) = self;
-                let IntoIter {
-                    buffer, capacity, ..
-                } = **iter;
-
-                unsafe {
-                    // `IntoIter::alloc` is not used anymore after this and will be dropped by RawVec
-                    // let alloc = ManuallyDrop::take(&mut self.0.alloc);
-
-                    // RawVec handles deallocation
-                    let _ = RawSoaVec::<T>::from_nonnull(buffer, capacity);
-                }
-            }
-        }
-
-        let mut guard = DropGuard(self);
-
-        // destroy the remaining elements
-        let DropGuard(iter) = &mut guard;
-        if iter.is_empty() {
+        if self.is_empty() {
             return;
         }
 
-        let Self { buffer, .. } = **iter;
-        let context = unsafe { Self::context_of(buffer) };
-
-        let slices = iter.as_mut_slice_ptrs();
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
         unsafe { context.slices_drop_in_place(slices) }
-        // now `guard` will be dropped and do the rest
     }
 }
 
@@ -343,13 +297,13 @@ where
         }
 
         let Self {
-            buffer,
             ref ptrs,
+            ref buffer,
             ref mut start,
             ..
         } = *self;
-        let context = unsafe { Self::context_of(buffer) };
 
+        let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_to_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
@@ -381,13 +335,13 @@ where
         }
 
         let Self {
-            buffer,
             ref ptrs,
+            ref buffer,
             ref mut start,
             ..
         } = *self;
-        let context = unsafe { Self::context_of(buffer) };
 
+        let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_to_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
@@ -565,13 +519,13 @@ where
         }
 
         let Self {
-            buffer,
             ref ptrs,
+            ref buffer,
             ref mut end,
             ..
         } = *self;
-        let context = unsafe { Self::context_of(buffer) };
 
+        let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_to_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
@@ -589,13 +543,13 @@ where
         }
 
         let Self {
-            buffer,
             ref ptrs,
+            ref buffer,
             ref mut end,
             ..
         } = *self;
-        let context = unsafe { Self::context_of(buffer) };
 
+        let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_to_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);

@@ -124,11 +124,17 @@ where
     }
 
     #[inline]
-    pub fn into_context(self) -> T::Context {
-        let mut me = ManuallyDrop::new(self);
-        unsafe { me.drop_slices_in_place() }
-
+    pub(super) fn into_parts(self) -> (RawSoaVec<T>, usize) {
+        let me = ManuallyDrop::new(self);
         let buffer = unsafe { ptr::read(&raw const me.buffer) };
+        (buffer, me.len())
+    }
+
+    #[inline]
+    pub fn into_context(mut self) -> T::Context {
+        unsafe { self.drop_slices_in_place() }
+
+        let (buffer, _) = self.into_parts();
         buffer.into_context()
     }
 

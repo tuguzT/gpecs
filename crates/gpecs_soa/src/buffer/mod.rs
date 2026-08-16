@@ -3,7 +3,7 @@ use core::{
     error::Error,
     fmt::{self, Display},
     mem::{ManuallyDrop, offset_of},
-    ptr,
+    ptr::{self, NonNull},
 };
 
 use crate::{
@@ -191,6 +191,17 @@ where
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout with size smaller than the buffer one should be valid");
     context.capacity_from(buffer_layout)
+}
+
+#[inline]
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
+pub fn buffer_dangling<T>(context: &T::Context) -> NonNull<BufferData<T>>
+where
+    T: AllocSoa + ?Sized,
+{
+    let align = align_of_fields(context.field_layouts()).max(align_of::<BufferAlign<T>>());
+    let addr = align.try_into().expect("alignment cannot be zero");
+    NonNull::without_provenance(addr)
 }
 
 #[inline]

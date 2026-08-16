@@ -13,8 +13,8 @@ use core_alloc::{
 
 use crate::{
     buffer::{
-        BufferData, buffer_is_dangling, buffer_layout, capacity_from, fields_are_zst,
-        ptrs_from_buffer_mut,
+        BufferData, buffer_dangling, buffer_is_dangling, buffer_layout, capacity_from,
+        fields_are_zst, ptrs_from_buffer_mut,
     },
     ptr::{BufferDataPtr, BufferDataPtrMut, slice_from_raw_parts_mut},
     slice::SoaSlice,
@@ -130,10 +130,8 @@ where
         init: AllocInit,
     ) -> Result<Self, TryReserveError> {
         if buffer_is_dangling::<T>(&context, capacity) {
-            let this = Self {
-                ptr: NonNull::dangling(),
-                capacity: 0,
-            };
+            let ptr = buffer_dangling(&context);
+            let this = Self { ptr, capacity: 0 };
             return Ok(this);
         }
 
@@ -454,7 +452,7 @@ where
         if new_layout.size() == 0 {
             unsafe {
                 dealloc(ptr.as_ptr(), old_layout);
-                self.set_ptr_and_capacity(NonNull::dangling(), 0);
+                self.set_ptr_and_capacity(buffer_dangling(context), 0);
             }
             return Ok(());
         }

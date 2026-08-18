@@ -27,7 +27,11 @@ cargo base package binary profile toolchain args $MIRIFLAGS:
         {{ if args == "" { "" } else { " " + args } }}
 
 [group("doc")]
-doc package="": (cargo "doc" package "" "" TOOLCHAIN_NIGHTLY "" "")
+doc package="": (cargo "doc" package "" "" TOOLCHAIN_NIGHTLY "--no-deps" "")
+
+[arg("toolchain", long)]
+[group("fmt")]
+fmt package="" toolchain="": (cargo "fmt" package "" "" toolchain "" "")
 
 [arg("profile", long)]
 [arg("toolchain", long)]

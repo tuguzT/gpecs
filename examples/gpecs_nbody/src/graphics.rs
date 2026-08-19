@@ -115,6 +115,6 @@ impl<'window> Graphics<'window> {
         let view = frame.texture.create_view(&view_desc);
 
         f(device, queue, &view);
-        frame.present();
+        queue.present(frame);
     }
 }

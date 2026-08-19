@@ -120,13 +120,13 @@ impl GpuArchetypeStorage {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GpuArchetypeStorageSlice<'a> {
-    slice: Option<BufferSlice<'a>>,
+    slice: BufferSlice<'a>,
     item_layout: Layout,
 }
 
 impl<'a> GpuArchetypeStorageSlice<'a> {
     #[inline]
-    pub unsafe fn as_slice(&self) -> Option<BufferSlice<'a>> {
+    pub unsafe fn as_slice(&self) -> BufferSlice<'a> {
         let Self { slice, .. } = *self;
         slice
     }
@@ -320,7 +320,7 @@ impl StorageBuffer {
             item_layout,
         } = *self;
 
-        let slice = (init_size != 0).then(|| buffer.slice(0..init_size));
+        let slice = buffer.slice(..init_size);
         GpuArchetypeStorageSlice { slice, item_layout }
     }
 

@@ -387,11 +387,11 @@ fn init_pipeline(
             module: shader_module,
             entry_point: Some("vertex"),
             compilation_options: PipelineCompilationOptions::default(),
-            buffers: &[VertexBufferLayout {
+            buffers: &[Some(VertexBufferLayout {
                 array_stride: size_of::<Vertex>() as BufferAddress,
                 step_mode: VertexStepMode::Instance,
                 attributes: &vertex_attr_array![0 => Float32x3, 1 => Float32, 2 => Float32x3],
-            }],
+            })],
         },
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,

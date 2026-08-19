@@ -702,7 +702,9 @@ fn download_framebuffer<B>(framebuffer: &mut Framebuffer<B>, download_buffer: &w
 where
     B: AsMut<[u32]>,
 {
-    let framebuffer_view = download_buffer.get_mapped_range(..);
+    let framebuffer_view = download_buffer
+        .get_mapped_range(..)
+        .expect("download buffer should be mapped");
     let src = bytemuck::cast_slice(&framebuffer_view);
     let dst = framebuffer.buffer_mut().as_mut();
     dst.copy_from_slice(src);

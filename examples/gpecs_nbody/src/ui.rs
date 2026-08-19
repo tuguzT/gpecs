@@ -110,8 +110,10 @@ impl UiRenderer {
             pixels_per_point,
         };
 
-        for (id, image_delta) in &textures_delta.set {
-            inner.update_texture(device, queue, *id, image_delta);
+        for (id, image_deltas) in &textures_delta.set {
+            for image_delta in image_deltas {
+                inner.update_texture(device, queue, *id, image_delta);
+            }
         }
         inner.update_buffers(device, queue, encoder, &paint_jobs, &screen_descriptor);
 

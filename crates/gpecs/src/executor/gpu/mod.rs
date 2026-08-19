@@ -10,3 +10,4 @@ pub mod timestamp;
 mod cache;
 mod executor;
 mod shaders;
+mod slice;

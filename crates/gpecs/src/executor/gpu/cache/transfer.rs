@@ -6,8 +6,8 @@ use std::sync::{
 use bytemuck::{must_cast_slice, must_cast_slice_mut};
 use indexmap::map::Entry;
 use wgpu::{
-    Buffer, BufferAddress, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, BufferView,
-    CommandEncoder, Device, MapMode,
+    Buffer, BufferAddress, BufferDescriptor, BufferSize, BufferUsages, BufferView, CommandEncoder,
+    Device, MapMode,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
@@ -21,6 +21,7 @@ use crate::{
         cache::schedule::ScheduleCache,
         component::registry::GpuComponentId,
         context::MappedArchetypeNotReadyError,
+        slice::{NonEmptyBufferSlice, NonEmptyContents},
     },
     hash::IndexMap,
 };
@@ -94,7 +95,7 @@ impl TransferCache {
         let storage_slices = storage.slices();
 
         let entities = unsafe { storage_slices.entities.as_slice() };
-        let Some(source) = entities else {
+        let Some(source) = NonEmptyBufferSlice::new(entities) else {
             return;
         };
 
@@ -113,7 +114,7 @@ impl TransferCache {
 
         for (component_id, components) in storage_slices.components {
             let components = unsafe { components.as_slice() };
-            let Some(source) = components else {
+            let Some(source) = NonEmptyBufferSlice::new(components) else {
                 continue;
             };
 
@@ -319,12 +320,16 @@ impl TransferCache {
         let gpu_slices = gpu_storage.slices();
 
         let gpu_entities = unsafe { gpu_slices.entities.as_slice() };
-        let Some(gpu_entities) = gpu_entities else {
+        let Some(gpu_entities) = NonEmptyBufferSlice::new(gpu_entities) else {
+            return;
+        };
+
+        let contents = must_cast_slice(cpu_entities);
+        let Some(contents) = NonEmptyContents::new(contents) else {
             return;
         };
 
         let staging_entities = &mut archetype_cache.entities.staging;
-        let contents = must_cast_slice(cpu_entities);
         let label = || format!("`gpecs` {archetype_id:#} entities staging buffer");
         if let Some(staging_entities) = staging_entities {
             staging_entities.copy_from_slice(device, contents, label);
@@ -340,7 +345,7 @@ impl TransferCache {
             };
 
             let gpu_components = unsafe { gpu_components.as_slice() };
-            let Some(gpu_components) = gpu_components else {
+            let Some(gpu_components) = NonEmptyBufferSlice::new(gpu_components) else {
                 continue;
             };
 
@@ -350,6 +355,10 @@ impl TransferCache {
             let staging_components = &mut entry.staging;
 
             let contents = unsafe { cpu_components.as_buffer().assume_init_ref() };
+            let Some(contents) = NonEmptyContents::new(contents) else {
+                continue;
+            };
+
             let label = || format!("`gpecs` {archetype_id:#} {component_id:#} staging buffer");
             if let Some(staging_components) = staging_components {
                 staging_components.copy_from_slice(device, contents, label);
@@ -414,7 +423,7 @@ impl DownloadBuffer {
     fn from_slice(
         device: &Device,
         command_encoder: &mut CommandEncoder,
-        source: BufferSlice<'_>,
+        source: NonEmptyBufferSlice<'_>,
         label: impl AsRef<str>,
     ) -> Self {
         let init_size = source.size();
@@ -449,7 +458,7 @@ impl DownloadBuffer {
         &mut self,
         device: &Device,
         command_encoder: &mut CommandEncoder,
-        source: BufferSlice<'_>,
+        source: NonEmptyBufferSlice<'_>,
         label: impl FnOnce() -> L,
     ) where
         L: AsRef<str>,
@@ -490,7 +499,9 @@ impl DownloadBuffer {
             return Err(DownloadBufferNotReadyError);
         }
 
-        let view = buffer.get_mapped_range(..init_size.get());
+        let view = buffer
+            .get_mapped_range(..init_size.get())
+            .expect("buffer should be mapped");
         Ok(view)
     }
 }
@@ -505,7 +516,8 @@ struct StagingBuffer {
 
 impl StagingBuffer {
     #[inline]
-    fn from_slice(device: &Device, contents: &[u8], label: impl AsRef<str>) -> Self {
+    fn from_slice(device: &Device, contents: NonEmptyContents, label: impl AsRef<str>) -> Self {
+        let contents = contents.as_slice();
         let init_size = BufferAddress::try_from(contents.len())
             .expect("staging buffer size should fit into `BufferAddress`");
 
@@ -520,13 +532,18 @@ impl StagingBuffer {
     }
 
     #[inline]
-    fn copy_from_slice<L>(&mut self, device: &Device, contents: &[u8], label: impl FnOnce() -> L)
-    where
+    fn copy_from_slice<L>(
+        &mut self,
+        device: &Device,
+        contents: NonEmptyContents,
+        label: impl FnOnce() -> L,
+    ) where
         L: AsRef<str>,
     {
         let Self { buffer, init_size } = self;
+        let contents_slice = contents.as_slice();
 
-        let new_size = BufferAddress::try_from(contents.len())
+        let new_size = BufferAddress::try_from(contents_slice.len())
             .expect("staging buffer size should fit into `BufferAddress`");
         if buffer.size() < new_size {
             *self = Self::from_slice(device, contents, label());
@@ -535,13 +552,18 @@ impl StagingBuffer {
 
         *init_size = new_size;
         buffer
-            .get_mapped_range_mut(0..*init_size)
-            .copy_from_slice(contents);
+            .get_mapped_range_mut(..new_size)
+            .expect("buffer should be mapped")
+            .copy_from_slice(contents_slice);
         buffer.unmap();
     }
 
     #[inline]
-    fn copy_into_slice(&self, command_encoder: &mut CommandEncoder, destination: BufferSlice<'_>) {
+    fn copy_into_slice(
+        &self,
+        command_encoder: &mut CommandEncoder,
+        destination: NonEmptyBufferSlice<'_>,
+    ) {
         let Self { buffer, .. } = self;
 
         command_encoder.copy_buffer_to_buffer(

@@ -144,7 +144,10 @@ impl TimestampQueryResources {
             return Err(TimestampQueryError);
         }
 
-        let timestamps = self.download_buffer_trusted().get_mapped_range(..);
+        let timestamps = self
+            .download_buffer_trusted()
+            .get_mapped_range(..)
+            .expect("buffer should be mapped");
         let statistics = TimestampQueryRawStatistics { timestamps };
         Ok(statistics)
     }

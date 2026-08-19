@@ -383,8 +383,9 @@ fn bind_group_entry<'a>(
     slice: GpuArchetypeStorageSlice<'a>,
 ) -> Option<BindGroupEntry<'a>> {
     let binding = entry?.binding_index;
-    let resource = unsafe { slice.as_slice() }?.into();
-    Some(BindGroupEntry { binding, resource })
+    let resource = unsafe { slice.as_slice() }.try_into().ok()?;
+    let bind_group_entry = BindGroupEntry { binding, resource };
+    Some(bind_group_entry)
 }
 
 type ComponentEntriesSlicesOutputItem<'a> = (

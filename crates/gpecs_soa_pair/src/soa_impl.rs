@@ -227,7 +227,7 @@ where
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
         unsafe { src.clone_to_uninit(self, dst) }
     }
 }
@@ -239,7 +239,7 @@ where
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> KeyValuePair<K, R, P> {
+    unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> KeyValuePair<K, R, P> {
         unsafe { src.read(self) }
     }
 }
@@ -251,7 +251,7 @@ where
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: KeyValuePair<K, W, P>) {
+    unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: KeyValuePair<K, W, P>) {
         unsafe { dst.write(self, value) }
     }
 }

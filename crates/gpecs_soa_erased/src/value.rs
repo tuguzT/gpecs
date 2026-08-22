@@ -184,7 +184,7 @@ where
         let Self { storage, .. } = self;
         let value = unsafe {
             let src = context.ptrs_from_buffer(storage.as_ptr().cast(), 1);
-            context.read(src)
+            context.ptrs_read(src)
         };
         Ok(value)
     }
@@ -407,7 +407,7 @@ where
         let layouts = context.field_layouts().into_iter().collect();
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
-            context.write(dst, value);
+            context.ptrs_write(dst, value);
         }
 
         let me = unsafe { Self::from_parts(storage, layouts) };
@@ -457,7 +457,7 @@ where
 
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
-            context.write(dst, value);
+            context.ptrs_write(dst, value);
         }
 
         let me = unsafe { Self::from_parts(storage, layouts) };
@@ -491,7 +491,7 @@ where
         let layouts = context.field_layouts().into_iter().collect();
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
-            context.write(dst, value);
+            context.ptrs_write(dst, value);
         }
 
         let me = unsafe { Self::from_parts(storage, layouts) };

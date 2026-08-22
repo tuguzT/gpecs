@@ -274,7 +274,7 @@ where
 {
     /// Performs copy-assignment of each stored field from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs).
     /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
-    unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>);
+    unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>);
 }
 
 /// A generalization of [`Clone`] specifically for [SoA](RawSoa) type.
@@ -301,7 +301,7 @@ where
     /// All the safety requirements resulting from applying
     /// [`ptr::read()`](core::ptr::read) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> R;
+    unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> R;
 }
 
 /// An extension of [SoA](RawSoa) type which allows to read a value borrowed from the context
@@ -336,7 +336,7 @@ where
     /// All the safety requirements resulting from applying
     /// [`ptr::write()`](core::ptr::write) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: W);
+    unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: W);
 }
 
 /// An extension of [SoA](RawSoa) type which allows to write given value

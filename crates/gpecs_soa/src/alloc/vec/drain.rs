@@ -184,7 +184,7 @@ where
 
         iter.as_raw_iter_mut()
             .next()
-            .map(|src| unsafe { iter.context().read(src) })
+            .map(|src| unsafe { iter.context().ptrs_read(src) })
     }
 
     #[inline]
@@ -204,7 +204,7 @@ where
 
         iter.as_raw_iter_mut()
             .next_back()
-            .map(|src| unsafe { iter.context().read(src) })
+            .map(|src| unsafe { iter.context().ptrs_read(src) })
     }
 }
 

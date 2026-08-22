@@ -89,7 +89,7 @@ where
             Err(error) => return Err(error.map_value(drop).map_value(|()| self)),
         };
 
-        let bundle = unsafe { B::CONTEXT.read(src) };
+        let bundle = unsafe { B::CONTEXT.ptrs_read(src) };
         let _ = self.into_inner();
         Ok(bundle)
     }

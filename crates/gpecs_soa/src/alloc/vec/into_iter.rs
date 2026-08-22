@@ -309,7 +309,7 @@ where
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
-        let item = unsafe { context.read(ptrs) };
+        let item = unsafe { context.ptrs_read(ptrs) };
         Some(item)
     }
 
@@ -391,7 +391,7 @@ where
             let ptrs = context.nonnull_to_ptrs(ptrs);
             let ptrs = context.ptrs_cast_const(ptrs);
             let ptrs = unsafe { context.ptrs_add(ptrs, i) };
-            let item = unsafe { context.read(ptrs) };
+            let item = unsafe { context.ptrs_read(ptrs) };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
@@ -531,7 +531,7 @@ where
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
-        let item = unsafe { context.read(ptrs) };
+        let item = unsafe { context.ptrs_read(ptrs) };
         Some(item)
     }
 

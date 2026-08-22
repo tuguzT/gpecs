@@ -963,7 +963,7 @@ where
             unsafe { context.ptrs_drop_in_place(dst.clone()) }
 
             let src = unsafe { src.get_unchecked(index) };
-            unsafe { context.clone_to_uninit(src, dst) }
+            unsafe { context.ptrs_clone_to_uninit(src, dst) }
         }
     }
 }

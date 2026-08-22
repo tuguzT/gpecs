@@ -587,7 +587,7 @@ where
                 let Ok(dst) = dst.into_inner().downcast::<B>(components) else {
                     unreachable!("exact archetype compatibility should be already checked")
                 };
-                unsafe { B::CONTEXT.write(dst, value) };
+                unsafe { B::CONTEXT.ptrs_write(dst, value) };
                 None
             }
         });
@@ -614,7 +614,7 @@ where
             let Ok(src) = src?.cast_const().downcast::<B>(components) else {
                 unreachable!("exact archetype compatibility should be already checked")
             };
-            let bundle = unsafe { B::CONTEXT.read(src) };
+            let bundle = unsafe { B::CONTEXT.ptrs_read(src) };
             Some(bundle)
         });
         Ok(bundle)

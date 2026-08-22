@@ -246,7 +246,7 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    unsafe fn read(
+    unsafe fn ptrs_read(
         &'me self,
         src: Self::Ptrs<'me>,
     ) -> ErasedBorrowedViewBundle<'a, T::Meta, D, S, P> {
@@ -267,7 +267,7 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
+    unsafe fn ptrs_write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
         unsafe { dst.write(bundle) }
     }
 }

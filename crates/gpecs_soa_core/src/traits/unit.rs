@@ -192,19 +192,19 @@ unsafe impl RawSoa for () {
 
 unsafe impl CloneToUninitSoaContext<()> for () {
     #[inline]
-    unsafe fn clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
+    unsafe fn ptrs_clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
 }
 
 unsafe impl<'a> ReadSoaContext<'a, ()> for () {
     #[inline]
-    unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) {
+    unsafe fn ptrs_read(&'a self, ptrs: Self::Ptrs<'a>) {
         unsafe { ptr::read(ptrs) }
     }
 }
 
 unsafe impl WriteSoaContext<(), ()> for () {
     #[inline]
-    unsafe fn write(&self, ptrs: Self::MutPtrs<'_>, value: ()) {
+    unsafe fn ptrs_write(&self, ptrs: Self::MutPtrs<'_>, value: ()) {
         unsafe { ptr::write(ptrs, value) }
     }
 }

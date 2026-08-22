@@ -244,7 +244,7 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta, D, S, P> {
+    unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta, D, S, P> {
         unsafe { src.read() }.expect("erased bundle should be created successfully")
     }
 }
@@ -258,8 +258,8 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta, D, S, P> {
-        let bundle: ErasedBorrowedBundle<Meta, D, S, P> = unsafe { self.read(src) };
+    unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta, D, S, P> {
+        let bundle: ErasedBorrowedBundle<Meta, D, S, P> = unsafe { self.ptrs_read(src) };
         bundle.into()
     }
 }
@@ -277,7 +277,7 @@ where
     P: SliceItemPtrs<Item = S::Item>,
 {
     #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
+    unsafe fn ptrs_write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
         unsafe { dst.write(bundle) }
     }
 }

@@ -555,7 +555,7 @@ where
     {
         self.swap_remove_into(index, |context, src| {
             let src = context.ptrs_cast_const(src);
-            unsafe { context.read(src) }
+            unsafe { context.ptrs_read(src) }
         })
     }
 
@@ -604,7 +604,7 @@ where
     {
         self.remove_into(index, |context, src| {
             let src = context.ptrs_cast_const(src);
-            unsafe { context.read(src) }
+            unsafe { context.ptrs_read(src) }
         })
     }
 
@@ -639,7 +639,7 @@ where
     {
         self.pop_into(|context, src| {
             let src = context.ptrs_cast_const(src?);
-            let value = unsafe { context.read(src) };
+            let value = unsafe { context.ptrs_read(src) };
             Some(value)
         })
     }
@@ -729,7 +729,9 @@ where
     where
         T: SoaWrite<W>,
     {
-        self.insert_from(index, |context, dst| unsafe { context.write(dst, value) });
+        self.insert_from(index, |context, dst| unsafe {
+            context.ptrs_write(dst, value);
+        });
     }
 
     pub fn push_from<'a, F, R>(&'a mut self, f: F) -> R
@@ -767,7 +769,7 @@ where
     where
         T: SoaWrite<W>,
     {
-        self.push_from(|context, dst| unsafe { context.write(dst, value) });
+        self.push_from(|context, dst| unsafe { context.ptrs_write(dst, value) });
     }
 
     #[inline]
@@ -805,7 +807,7 @@ where
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                context.clone_to_uninit(src, dst);
+                context.ptrs_clone_to_uninit(src, dst);
             }
             set_len_on_drop.local_len += 1;
         }
@@ -863,7 +865,7 @@ where
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                context.clone_to_uninit(src, dst);
+                context.ptrs_clone_to_uninit(src, dst);
             }
             set_len_on_drop.local_len += 1;
         }
@@ -1410,7 +1412,7 @@ where
             let (context, ptrs) = self.as_mut_ptrs_with_context();
             unsafe {
                 let dst = context.ptrs_add_mut(ptrs, len);
-                context.write(dst, element);
+                context.ptrs_write(dst, element);
             }
 
             unsafe {
@@ -1554,7 +1556,7 @@ where
         let (context, dst) = vector.as_mut_ptrs_with_context();
         unsafe {
             // SAFETY: We requested capacity at least 1
-            context.write(dst, first);
+            context.ptrs_write(dst, first);
             vector.set_len(1);
         }
 

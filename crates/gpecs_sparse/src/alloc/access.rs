@@ -190,7 +190,7 @@ where
             }
             Self::WriteOnly(ptrs) => ptrs.into_inner(),
         };
-        unsafe { context.write(dst, value) }
+        unsafe { context.ptrs_write(dst, value) }
     }
 }
 

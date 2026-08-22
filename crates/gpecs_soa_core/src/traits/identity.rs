@@ -196,7 +196,7 @@ where
     T: Clone,
 {
     #[inline]
-    unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
         let src = unsafe { src.as_ref_unchecked() }.clone();
         unsafe { ptr::write(dst, src) }
     }
@@ -204,14 +204,14 @@ where
 
 unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>> for () {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
+    unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
         unsafe { ptr::read(src) }
     }
 }
 
 unsafe impl<T> WriteSoaContext<Identity<T>, Identity<T>> for () {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: Identity<T>) {
+    unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: Identity<T>) {
         unsafe { ptr::write(dst, value) }
     }
 }

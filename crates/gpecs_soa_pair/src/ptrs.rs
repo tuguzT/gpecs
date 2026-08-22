@@ -91,7 +91,7 @@ where
         let (key, value) = self.into_parts();
 
         let key = unsafe { key.read() };
-        let value = unsafe { context.read(value) };
+        let value = unsafe { context.ptrs_read(value) };
         KeyValuePair::new(key, value)
     }
 }
@@ -113,7 +113,7 @@ where
 
         unsafe {
             dst_key.write(key.as_ref_unchecked().clone());
-            context.clone_to_uninit(value, dst_value);
+            context.ptrs_clone_to_uninit(value, dst_value);
         }
     }
 }

@@ -221,7 +221,7 @@ macro_rules! tuple_impl {
             $($types: Clone,)*
         {
             #[inline]
-            unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
+            unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
                 let src = unsafe { ($(src.$indices.as_ref_unchecked(),)*) };
                 unsafe { $(ptr::write(dst.$indices, src.$indices.clone());)* }
             }
@@ -229,14 +229,14 @@ macro_rules! tuple_impl {
 
         unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*)> for () {
             #[inline]
-            unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
+            unsafe fn ptrs_read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }
 
         unsafe impl<$($types,)*> WriteSoaContext<($($types,)*)> for () {
             #[inline]
-            unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ($($types,)*)) {
+            unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: ($($types,)*)) {
                 unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
         }

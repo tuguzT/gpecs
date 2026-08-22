@@ -134,7 +134,7 @@ where
 
         unsafe {
             key_ptr.write(key);
-            context.write(value_ptr, value);
+            context.ptrs_write(value_ptr, value);
         }
     }
 }

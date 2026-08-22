@@ -35,7 +35,7 @@ where
                 set_len_on_drop.local_len = index;
 
                 let dst = unsafe { context.ptrs_add_mut(dst.clone(), index) };
-                unsafe { context.clone_to_uninit(src, dst) }
+                unsafe { context.ptrs_clone_to_uninit(src, dst) }
             }
         }
 

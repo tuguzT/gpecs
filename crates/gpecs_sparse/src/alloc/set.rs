@@ -842,7 +842,7 @@ where
     {
         self.swap_remove_into(key, |context, src| {
             let src = context.ptrs_cast_const(src?);
-            let value = unsafe { context.read(src) };
+            let value = unsafe { context.ptrs_read(src) };
             Some(value)
         })
     }
@@ -896,7 +896,7 @@ where
     {
         self.remove_into(key, |context, src| {
             let src = context.ptrs_cast_const(src?);
-            let value = unsafe { context.read(src) };
+            let value = unsafe { context.ptrs_read(src) };
             Some(value)
         })
     }
@@ -931,7 +931,7 @@ where
         self.pop_into(|context, src| {
             let (key, value) = src?;
             let src = context.ptrs_cast_const(value);
-            let value = unsafe { context.read(src) };
+            let value = unsafe { context.ptrs_read(src) };
             Some((key, value))
         })
     }
@@ -1046,7 +1046,7 @@ where
                 Ok(Some(value))
             }
             Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
-                unsafe { context.write(dst.into_inner(), value) }
+                unsafe { context.ptrs_write(dst.into_inner(), value) }
                 Ok(None)
             }
             Ok(None) => Ok(None),
@@ -1116,7 +1116,7 @@ where
     {
         self.try_push_from(|context, dst| match dst {
             Ok((key, dst)) => {
-                unsafe { context.write(dst, value) }
+                unsafe { context.ptrs_write(dst, value) }
                 Ok(key)
             }
             Err(error) => Err(TryModifyError::new(error, value)),

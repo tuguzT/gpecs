@@ -220,7 +220,10 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
-    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedSoa<T, FieldLayoutsOutput<'a, D>, P> {
+    unsafe fn ptrs_read(
+        &'a self,
+        src: Self::Ptrs<'a>,
+    ) -> ErasedSoa<T, FieldLayoutsOutput<'a, D>, P> {
         let value = unsafe { src.read() };
         value.expect("erased SoA should be created successfully")
     }
@@ -235,7 +238,7 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
+    unsafe fn ptrs_write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
         unsafe { dst.write(value) }
     }
 }

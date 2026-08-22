@@ -9,8 +9,8 @@ where
     // such that the old value is not duplicated. Nothing is dropped and
     // nothing here can panic.
     unsafe {
-        let result = context.read(context.ptrs_cast_const(dest.clone()));
-        context.write(dest, src);
+        let result = context.ptrs_read(context.ptrs_cast_const(dest.clone()));
+        context.ptrs_write(dest, src);
         result
     }
 }

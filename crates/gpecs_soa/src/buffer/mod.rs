@@ -184,7 +184,6 @@ where
 }
 
 #[inline]
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
     T: AllocSoa + ?Sized,
@@ -205,6 +204,20 @@ where
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout with size smaller than the buffer one should be valid");
     context.capacity_from(buffer_layout)
+}
+
+#[inline]
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
+pub fn buffer_layout_capacity<T>(
+    context: &T::Context,
+    capacity: usize,
+) -> Result<(Layout, usize), LayoutError>
+where
+    T: AllocSoa + ?Sized,
+{
+    let buffer_layout = buffer_layout::<T>(context, capacity)?;
+    let capacity = capacity_from::<T>(context, buffer_layout);
+    Ok((buffer_layout, capacity))
 }
 
 #[inline]

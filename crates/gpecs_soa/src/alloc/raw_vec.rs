@@ -1,7 +1,5 @@
 use core::{
-    alloc::{Layout, LayoutError},
-    error::Error,
-    fmt::{self, Display},
+    alloc::Layout,
     mem::ManuallyDrop,
     ptr::{self, NonNull},
 };
@@ -11,80 +9,20 @@ use core_alloc::{
 };
 
 use crate::{
+    alloc::error::{
+        TryReserveError,
+        TryReserveErrorKind::{AllocError, CapacityOverflow},
+        alloc_error,
+    },
     buffer::{
         BufferDropCheck, buffer_align, buffer_dangling, buffer_is_dangling, buffer_layout,
-        capacity_from, fields_are_zst, ptr_to_capacity_mut, ptr_to_context, ptr_to_context_mut,
-        ptrs_from_buffer_mut,
+        buffer_layout_capacity, capacity_from, fields_are_zst, ptr_to_capacity_mut, ptr_to_context,
+        ptr_to_context_mut, ptrs_from_buffer_mut,
     },
     ptr::slice_from_raw_parts_mut,
     slice::SoaSlice,
-    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs},
+    traits::{AllocSoa, AllocSoaTrusted, MutPtrs},
 };
-
-use self::TryReserveErrorKind::{AllocError, CapacityOverflow};
-
-/// The error type for `try_reserve` methods.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct TryReserveError {
-    kind: TryReserveErrorKind,
-}
-
-impl TryReserveError {
-    /// Details about the allocation that caused the error.
-    #[inline]
-    #[must_use]
-    pub fn kind(&self) -> TryReserveErrorKind {
-        let Self { kind } = self;
-        kind.clone()
-    }
-}
-
-/// Details of the allocation that caused a [`TryReserveError`].
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum TryReserveErrorKind {
-    /// Error due to the computed capacity exceeding the collection's maximum
-    /// (usually `isize::MAX` bytes).
-    CapacityOverflow,
-
-    /// The memory allocator returned an error.
-    AllocError {
-        /// The layout of allocation request that failed.
-        layout: Layout,
-
-        #[doc(hidden)]
-        non_exhaustive: (),
-    },
-}
-
-impl From<TryReserveErrorKind> for TryReserveError {
-    #[inline]
-    fn from(kind: TryReserveErrorKind) -> Self {
-        Self { kind }
-    }
-}
-
-impl From<LayoutError> for TryReserveErrorKind {
-    /// Always evaluates to [`TryReserveErrorKind::CapacityOverflow`].
-    #[inline]
-    fn from(_: LayoutError) -> Self {
-        CapacityOverflow
-    }
-}
-
-impl Display for TryReserveError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str("memory allocation failed")?;
-
-        let Self { kind } = self;
-        let reason = match kind {
-            CapacityOverflow => " because the computed capacity exceeded the collection's maximum",
-            AllocError { .. } => " because the memory allocator returned an error",
-        };
-        fmt.write_str(reason)
-    }
-}
-
-impl Error for TryReserveError {}
 
 #[derive(Debug, Clone, Copy)]
 enum AllocInit {
@@ -118,7 +56,7 @@ where
 
         let buffer_layout = Layout::from_size_align(SIZE, buffer_align::<T>(context))
             .expect("layout size should not exceed `isize::MAX`");
-        match context.capacity_from(buffer_layout) {
+        match capacity_from::<T>(context, buffer_layout) {
             SIZE => 8,
             4.. => 4,
             _ => 1,
@@ -136,11 +74,9 @@ where
             return Ok(this);
         }
 
-        let Ok(layout) = buffer_layout::<T>(&context, capacity) else {
+        let Ok((layout, capacity)) = buffer_layout_capacity::<T>(&context, capacity) else {
             return Err(CapacityOverflow.into());
         };
-        let capacity = capacity_from::<T>(&context, layout);
-        alloc_guard(layout.size())?;
 
         let ptr = match init {
             AllocInit::Uninitialized => unsafe { alloc(layout) },
@@ -224,22 +160,6 @@ where
     pub fn into_context(self) -> T::Context {
         let mut me = ManuallyDrop::new(self);
         unsafe { me.dealloc() }
-    }
-
-    #[inline]
-    #[must_use]
-    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>>
-    where
-        T: AllocSoaTrusted,
-    {
-        debug_assert!(
-            len <= self.capacity(),
-            "`len` must be smaller than or equal to `self.capacity()`",
-        );
-
-        let me = ManuallyDrop::new(self);
-        let slice = unsafe { slice_from_raw_parts_mut(me.as_ptr(), len, me.capacity()) };
-        unsafe { Box::from_raw(slice) }
     }
 
     #[inline]
@@ -391,8 +311,8 @@ where
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
         let capacity = usize::max(self.capacity().saturating_mul(2), required_capacity);
         let capacity = usize::max(Self::min_non_zero_cap(context), capacity);
-        let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
-        let capacity = capacity_from::<T>(context, new_layout);
+        let (new_layout, capacity) =
+            buffer_layout_capacity::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
         let current_memory = self.current_memory(context);
         let ptr = finish_grow(new_layout, current_memory)?;
@@ -410,8 +330,8 @@ where
         }
 
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
-        let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
-        let capacity = capacity_from::<T>(context, new_layout);
+        let (new_layout, capacity) =
+            buffer_layout_capacity::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
         let current_memory = self.current_memory(context);
         let ptr = finish_grow(new_layout, current_memory)?;
@@ -433,7 +353,7 @@ where
             return Ok(());
         };
 
-        let Ok(new_layout) = buffer_layout::<T>(context, capacity) else {
+        let Ok((new_layout, capacity)) = buffer_layout_capacity::<T>(context, capacity) else {
             return Err(CapacityOverflow.into());
         };
         if new_layout.size() == 0 {
@@ -452,6 +372,24 @@ where
             self.set_ptr_and_capacity(ptr, capacity);
         }
         Ok(())
+    }
+}
+
+impl<T> RawSoaVec<T>
+where
+    T: AllocSoaTrusted + ?Sized,
+{
+    #[inline]
+    #[must_use]
+    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>> {
+        debug_assert!(
+            len <= self.capacity(),
+            "`len` must be smaller than or equal to `self.capacity()`",
+        );
+
+        let me = ManuallyDrop::new(self);
+        let slice = unsafe { slice_from_raw_parts_mut(me.as_ptr(), len, me.capacity()) };
+        unsafe { Box::from_raw(slice) }
     }
 }
 
@@ -486,8 +424,6 @@ fn finish_grow(
     new_layout: Layout,
     current_memory: Option<(NonNull<u8>, Layout)>,
 ) -> Result<NonNull<u8>, TryReserveError> {
-    alloc_guard(new_layout.size())?;
-
     let ptr = if let Some((ptr, old_layout)) = current_memory {
         debug_assert_eq!(old_layout.align(), new_layout.align());
         unsafe { realloc(ptr.as_ptr(), old_layout, new_layout.size()) }
@@ -501,17 +437,9 @@ fn finish_grow(
     }
 }
 
-#[inline(never)]
+#[cfg_attr(not(panic = "immediate-abort"), inline(never))]
 fn capacity_overflow() -> ! {
     panic!("capacity overflow")
-}
-
-#[inline]
-fn alloc_error(layout: Layout) -> TryReserveErrorKind {
-    AllocError {
-        layout,
-        non_exhaustive: (),
-    }
 }
 
 #[cold]
@@ -520,15 +448,5 @@ fn handle_error(error: TryReserveError) -> ! {
     match error.kind() {
         CapacityOverflow => capacity_overflow(),
         AllocError { layout, .. } => handle_alloc_error(layout),
-    }
-}
-
-#[expect(clippy::inline_always)]
-#[inline(always)]
-fn alloc_guard(alloc_size: usize) -> Result<(), TryReserveError> {
-    if usize::BITS < 64 && alloc_size > isize::MAX as usize {
-        Err(CapacityOverflow.into())
-    } else {
-        Ok(())
     }
 }

@@ -9,11 +9,11 @@ use core::{
 };
 use core_alloc::boxed::Box;
 
-pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
+pub use super::error::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     buffer::{
-        buffer_is_dangling, buffer_layout, capacity_from, ptr_to_len_mut, ptrs_from_buffer,
+        buffer_is_dangling, buffer_layout_capacity, ptr_to_len_mut, ptrs_from_buffer,
         ptrs_from_buffer_mut,
     },
     slice::{
@@ -403,7 +403,8 @@ where
         }
 
         let context = self.context();
-        let new_capacity = actual_capacity::<T>(context, len);
+        let (_, new_capacity) = buffer_layout_capacity::<T>(context, len)
+            .expect("buffer layout with smaller capacity should be valid");
 
         unsafe {
             self.move_left(new_capacity);
@@ -417,7 +418,9 @@ where
         }
 
         let context = self.context();
-        let new_capacity = actual_capacity::<T>(context, cmp::max(self.len(), min_capacity));
+        let new_capacity = cmp::max(self.len(), min_capacity);
+        let (_, new_capacity) = buffer_layout_capacity::<T>(context, new_capacity)
+            .expect("buffer layout with smaller capacity should be valid");
 
         unsafe {
             self.move_left(new_capacity);
@@ -1567,14 +1570,4 @@ where
     fn drop(&mut self) {
         unsafe { self.drop_slices_in_place() }
     }
-}
-
-#[inline]
-fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
-where
-    T: AllocSoa + ?Sized,
-{
-    let buffer_layout =
-        buffer_layout::<T>(context, capacity).expect("layout size should not exceed `isize::MAX`");
-    capacity_from::<T>(context, buffer_layout)
 }

@@ -27,6 +27,16 @@ unsafe impl<T> AllocSoaContext<Identity<T>> for () {
     }
 
     #[inline]
+    fn buffer_align(&self) -> usize {
+        align_of::<T>()
+    }
+
+    #[inline]
+    fn packed_size_of_fields(&self) -> Option<usize> {
+        Some(size_of::<T>())
+    }
+
+    #[inline]
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
         buffer_layout
             .size()

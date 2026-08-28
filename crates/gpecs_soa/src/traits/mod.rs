@@ -3,8 +3,8 @@ use core::alloc::{Layout, LayoutError};
 pub use gpecs_soa_core::traits::*;
 
 use crate::{
-    buffer::packed_size_of_fields,
     field::{BufferLayout, FieldLayouts, FieldLayoutsOwned, buffer_layout},
+    layout::WithLayout,
 };
 
 pub use self::tuple::*;
@@ -38,9 +38,27 @@ where
         buffer_layout(fields, capacity).map(BufferLayout::layout)
     }
 
+    /// Calculates an alignment for any possible [buffer layout](Self::buffer_layout).
+    fn buffer_align(&self) -> usize {
+        self.field_layouts()
+            .into_iter()
+            .map(|item| item.layout().align())
+            .max()
+            .unwrap_or(1)
+    }
+
+    /// Calculates sum of all the fields' sizes.
+    /// Returns [`None`] on integer overflow.
+    fn packed_size_of_fields(&self) -> Option<usize> {
+        self.field_layouts()
+            .into_iter()
+            .map(|item| item.layout().size())
+            .try_fold(0, usize::checked_add)
+    }
+
     /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
-        let Some(packed_size) = packed_size_of_fields(self.field_layouts()) else {
+        let Some(packed_size) = self.packed_size_of_fields() else {
             return 0;
         };
 

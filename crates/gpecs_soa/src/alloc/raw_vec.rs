@@ -15,9 +15,9 @@ use crate::{
         alloc_error,
     },
     buffer::{
-        BufferDropCheck, buffer_align, buffer_dangling, buffer_is_dangling, buffer_layout,
-        buffer_layout_capacity, capacity_from, fields_are_zst, ptr_to_capacity_mut, ptr_to_context,
-        ptr_to_context_mut, ptrs_from_buffer_mut,
+        BufferDropCheck, BufferPrefix, buffer_align, buffer_layout, buffer_layout_capacity,
+        capacity_from, fields_are_zst, layout_is_dangling, ptr_to_buffer_context_mut,
+        ptr_to_buffer_prefix_mut, ptrs_from_buffer_mut,
     },
     ptr::slice_from_raw_parts_mut,
     slice::SoaSlice,
@@ -57,7 +57,7 @@ where
         let buffer_layout = Layout::from_size_align(SIZE, buffer_align::<T>(context))
             .expect("layout size should not exceed `isize::MAX`");
         match capacity_from::<T>(context, buffer_layout) {
-            SIZE => 8,
+            SIZE.. => 8,
             4.. => 4,
             _ => 1,
         }
@@ -68,15 +68,14 @@ where
         capacity: usize,
         init: AllocInit,
     ) -> Result<Self, TryReserveError> {
-        if buffer_is_dangling::<T>(&context, capacity) {
-            let ptr = buffer_dangling::<T>(&context);
-            let this = unsafe { Self::from_nonnull(ptr, capacity) };
-            return Ok(this);
-        }
-
         let Ok((layout, capacity)) = buffer_layout_capacity::<T>(&context, capacity) else {
             return Err(CapacityOverflow.into());
         };
+        if layout_is_dangling(layout) {
+            let ptr = layout.dangling_ptr();
+            let this = unsafe { Self::from_nonnull(ptr, capacity) };
+            return Ok(this);
+        }
 
         let ptr = match init {
             AllocInit::Uninitialized => unsafe { alloc(layout) },
@@ -86,27 +85,36 @@ where
             return Err(alloc_error(layout).into());
         };
 
-        unsafe {
-            let dst = ptr_to_context_mut::<T>(ptr.as_ptr());
-            ptr::write(dst, context);
-        }
-
         let mut me = unsafe { Self::from_nonnull(ptr, capacity) };
-        me.set_capacity_in_buffer(capacity);
+        unsafe { ptr::write(me.ptr_to_context(), context) }
+        me.set_capacity_in_buffer();
+
         Ok(me)
     }
 
     #[inline]
-    fn set_capacity_in_buffer(&mut self, new_capacity: usize) {
-        let context = self.context();
-        if buffer_is_dangling::<T>(context, new_capacity) {
-            return;
-        }
+    pub fn ptr_to_context(&self) -> *mut T::Context {
+        let buffer = self.as_ptr();
+        unsafe { ptr_to_buffer_context_mut::<T>(buffer) }
+    }
 
-        unsafe {
-            let capacity = ptr_to_capacity_mut::<T>(self.ptr.as_ptr());
-            ptr::write(capacity, new_capacity);
-        }
+    #[inline]
+    pub fn ptr_to_prefix(&self) -> Option<*mut BufferPrefix<T>> {
+        let Self { ptr, capacity, .. } = *self;
+        let context = self.context();
+        let buffer = ptr.as_ptr();
+        unsafe { ptr_to_buffer_prefix_mut::<T>(context, capacity, buffer).unwrap_unchecked() }
+    }
+
+    #[inline]
+    fn set_capacity_in_buffer(&mut self) {
+        let Self { capacity, .. } = *self;
+        let Some(prefix) = self.ptr_to_prefix() else {
+            return;
+        };
+
+        let ptr_to_capacity = unsafe { &raw mut (*prefix).capacity };
+        unsafe { ptr::write(ptr_to_capacity, capacity) }
     }
 
     #[inline]
@@ -146,7 +154,7 @@ where
 
     #[inline]
     unsafe fn dealloc(&mut self) -> T::Context {
-        let context = self.context();
+        let context = self.ptr_to_context();
         // move context onto the stack to safely return it after buffer deallocation
         let context = unsafe { ptr::read(context) };
 
@@ -187,7 +195,8 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        unsafe { ptr_to_context::<T>(self.as_ptr()).as_ref_unchecked() }
+        let context = self.ptr_to_context();
+        unsafe { context.as_ref_unchecked() }
     }
 
     #[inline]
@@ -213,15 +222,16 @@ where
     #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
         let Self { ptr, capacity, .. } = *self;
-        if buffer_is_dangling::<T>(context, capacity) {
-            return None;
-        }
 
         // We could use Layout::from_size_align here which ensures the absence of isize and usize overflows
         // and could hypothetically handle differences between stride and size, but this memory
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
         let layout = unsafe { buffer_layout::<T>(context, capacity).unwrap_unchecked() };
+
+        if layout_is_dangling(layout) {
+            return None;
+        }
         Some((ptr, layout))
     }
 
@@ -297,48 +307,38 @@ where
     unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<u8>, capacity: usize) {
         self.ptr = ptr;
         self.capacity = capacity;
-        self.set_capacity_in_buffer(capacity);
+        self.set_capacity_in_buffer();
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
         debug_assert!(additional > 0);
 
-        let context = self.context();
-        if fields_are_zst::<T>(context) {
-            return Err(CapacityOverflow.into());
-        }
-
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
         let capacity = usize::max(self.capacity().saturating_mul(2), required_capacity);
+
+        let context = self.context();
         let capacity = usize::max(Self::min_non_zero_cap(context), capacity);
         let (new_layout, capacity) =
             buffer_layout_capacity::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
         let current_memory = self.current_memory(context);
-        let ptr = finish_grow(new_layout, current_memory)?;
+        let ptr = unsafe { finish_grow(new_layout, current_memory)? };
 
-        unsafe {
-            self.set_ptr_and_capacity(ptr, capacity);
-        }
+        unsafe { self.set_ptr_and_capacity(ptr, capacity) }
         Ok(())
     }
 
     fn grow_exact(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
-        let context = self.context();
-        if fields_are_zst::<T>(context) {
-            return Err(CapacityOverflow.into());
-        }
-
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
+
+        let context = self.context();
         let (new_layout, capacity) =
             buffer_layout_capacity::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
         let current_memory = self.current_memory(context);
-        let ptr = finish_grow(new_layout, current_memory)?;
+        let ptr = unsafe { finish_grow(new_layout, current_memory)? };
 
-        unsafe {
-            self.set_ptr_and_capacity(ptr, capacity);
-        }
+        unsafe { self.set_ptr_and_capacity(ptr, capacity) }
         Ok(())
     }
 
@@ -356,11 +356,11 @@ where
         let Ok((new_layout, capacity)) = buffer_layout_capacity::<T>(context, capacity) else {
             return Err(CapacityOverflow.into());
         };
-        if new_layout.size() == 0 {
-            unsafe {
-                dealloc(ptr.as_ptr(), old_layout);
-                self.set_ptr_and_capacity(buffer_dangling::<T>(context), 0);
-            }
+        if layout_is_dangling(new_layout) {
+            unsafe { dealloc(ptr.as_ptr(), old_layout) }
+
+            let ptr = new_layout.dangling_ptr();
+            unsafe { self.set_ptr_and_capacity(ptr, 0) }
             return Ok(());
         }
 
@@ -368,9 +368,7 @@ where
         let Some(ptr) = NonNull::new(ptr) else {
             return Err(alloc_error(new_layout).into());
         };
-        unsafe {
-            self.set_ptr_and_capacity(ptr, capacity);
-        }
+        unsafe { self.set_ptr_and_capacity(ptr, capacity) }
         Ok(())
     }
 }
@@ -420,10 +418,14 @@ where
 }
 
 #[inline(never)]
-fn finish_grow(
+unsafe fn finish_grow(
     new_layout: Layout,
     current_memory: Option<(NonNull<u8>, Layout)>,
 ) -> Result<NonNull<u8>, TryReserveError> {
+    if layout_is_dangling(new_layout) {
+        return Err(CapacityOverflow.into());
+    }
+
     let ptr = if let Some((ptr, old_layout)) = current_memory {
         debug_assert_eq!(old_layout.align(), new_layout.align());
         unsafe { realloc(ptr.as_ptr(), old_layout, new_layout.size()) }
@@ -431,10 +433,10 @@ fn finish_grow(
         unsafe { alloc(new_layout) }
     };
 
-    match NonNull::new(ptr) {
-        Some(ptr) => Ok(ptr),
-        None => Err(alloc_error(new_layout).into()),
-    }
+    let Some(ptr) = NonNull::new(ptr) else {
+        return Err(alloc_error(new_layout).into());
+    };
+    Ok(ptr)
 }
 
 #[cfg_attr(not(panic = "immediate-abort"), inline(never))]

@@ -12,10 +12,7 @@ use core_alloc::boxed::Box;
 pub use super::error::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    buffer::{
-        buffer_is_dangling, buffer_layout_capacity, ptr_to_len_mut, ptrs_from_buffer,
-        ptrs_from_buffer_mut,
-    },
+    buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
         SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
@@ -89,9 +86,7 @@ where
             len: 0,
         };
 
-        unsafe {
-            me.set_len_in_buffer(0);
-        }
+        unsafe { me.set_len_in_buffer(0) }
         me
     }
 
@@ -105,9 +100,7 @@ where
             len: 0,
         };
 
-        unsafe {
-            me.set_len_in_buffer(0);
-        }
+        unsafe { me.set_len_in_buffer(0) }
         Ok(me)
     }
 
@@ -277,17 +270,13 @@ where
     }
 
     #[inline]
-    unsafe fn set_len_in_buffer_raw(buffer: &RawSoaVec<T>, new_len: usize) {
-        let context = buffer.context();
-        let capacity = buffer.capacity();
-        if buffer_is_dangling::<T>(context, capacity) {
+    unsafe fn set_len_in_buffer_raw(buffer: &RawSoaVec<T>, len: usize) {
+        let Some(prefix) = buffer.ptr_to_prefix() else {
             return;
-        }
+        };
 
-        unsafe {
-            let len = ptr_to_len_mut::<T>(buffer.as_ptr());
-            ptr::write(len, new_len);
-        }
+        let ptr_to_len = unsafe { &raw mut (*prefix).len };
+        unsafe { ptr::write(ptr_to_len, len) }
     }
 
     #[inline]

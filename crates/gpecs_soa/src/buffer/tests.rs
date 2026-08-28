@@ -1,8 +1,8 @@
 #![expect(clippy::identity_op)]
 
-use core::{alloc::Layout, ops::Not};
+use core::alloc::Layout;
 
-use super::{BufferData, BufferPrefix, buffer_is_dangling, buffer_layout_inner, capacity_from};
+use super::{BufferData, BufferPrefix, buffer_layout_inner, capacity_from};
 
 #[test]
 #[cfg_attr(miri, ignore)]
@@ -19,13 +19,7 @@ fn u8_u8_u8_to_capacity_in_bytes() {
         .pad_to_align()
         .size();
 
-    assert_eq!(
-        to_capacity_in_bytes(0),
-        buffer_is_dangling::<(u8, u8, u8)>(&Default::default(), 0)
-            .not()
-            .then_some(prefix)
-            .unwrap_or_default(),
-    );
+    assert_eq!(to_capacity_in_bytes(0), 0);
     assert_eq!(to_capacity_in_bytes(1), prefix + 3 * u8 * 1);
     assert_eq!(to_capacity_in_bytes(2), prefix + 3 * u8 * 2);
     assert_eq!(to_capacity_in_bytes(3), prefix + 3 * u8 * 3);
@@ -86,13 +80,7 @@ fn u16_u16_u16_to_capacity_in_bytes() {
         .pad_to_align()
         .size();
 
-    assert_eq!(
-        to_capacity_in_bytes(0),
-        buffer_is_dangling::<(u16, u16, u16)>(&Default::default(), 0)
-            .not()
-            .then_some(prefix)
-            .unwrap_or_default(),
-    );
+    assert_eq!(to_capacity_in_bytes(0), 0);
     assert_eq!(to_capacity_in_bytes(1), prefix + 3 * u16 * 1);
     assert_eq!(to_capacity_in_bytes(2), prefix + 3 * u16 * 2);
     assert_eq!(to_capacity_in_bytes(3), prefix + 3 * u16 * 3);
@@ -149,13 +137,7 @@ fn u32_u32_u32_to_capacity_in_bytes() {
         .pad_to_align()
         .size();
 
-    assert_eq!(
-        to_capacity_in_bytes(0),
-        buffer_is_dangling::<(u32, u32, u32)>(&Default::default(), 0)
-            .not()
-            .then_some(prefix)
-            .unwrap_or_default(),
-    );
+    assert_eq!(to_capacity_in_bytes(0), 0);
     assert_eq!(to_capacity_in_bytes(1), prefix + 3 * u32 * 1);
     assert_eq!(to_capacity_in_bytes(2), prefix + 3 * u32 * 2);
     assert_eq!(to_capacity_in_bytes(3), prefix + 3 * u32 * 3);
@@ -211,13 +193,7 @@ fn u64_u64_u64_to_capacity_in_bytes() {
         .pad_to_align()
         .size();
 
-    assert_eq!(
-        to_capacity_in_bytes(0),
-        buffer_is_dangling::<(u64, u64, u64)>(&Default::default(), 0)
-            .not()
-            .then_some(prefix)
-            .unwrap_or_default(),
-    );
+    assert_eq!(to_capacity_in_bytes(0), 0);
     assert_eq!(to_capacity_in_bytes(1), prefix + 3 * u64 * 1);
     assert_eq!(to_capacity_in_bytes(2), prefix + 3 * u64 * 2);
     assert_eq!(to_capacity_in_bytes(3), prefix + 3 * u64 * 3);
@@ -276,13 +252,7 @@ fn u8_u16_u32_to_capacity_in_bytes() {
         .pad_to_align()
         .size();
 
-    assert_eq!(
-        to_capacity_in_bytes(0),
-        buffer_is_dangling::<(u8, u16, u32)>(&Default::default(), 0)
-            .not()
-            .then_some(prefix)
-            .unwrap_or_default(),
-    );
+    assert_eq!(to_capacity_in_bytes(0), 0);
     assert_eq!(to_capacity_in_bytes(1), prefix + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1));
     assert_eq!(to_capacity_in_bytes(2), prefix + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2));
     assert_eq!(to_capacity_in_bytes(3), prefix + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3));

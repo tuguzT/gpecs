@@ -98,6 +98,11 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
+            fn buffer_align(&self) -> usize {
+                align_of::<($($types,)*)>()
+            }
+
+            #[inline]
             unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 

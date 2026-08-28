@@ -4,28 +4,13 @@ use core::{
     fmt::{self, Display},
     marker::PhantomData,
     mem::{ManuallyDrop, offset_of},
-    ptr::{self, NonNull},
+    ptr,
 };
 
-use crate::{
-    field::FieldLayouts,
-    layout::WithLayout,
-    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext},
-};
+use crate::traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext};
 
 #[cfg(test)]
 mod tests;
-
-#[repr(C)]
-pub struct BufferPrefix<T>
-where
-    T: AllocSoa + ?Sized,
-{
-    _align: BufferAlign<T>,
-    pub context: T::Context,
-    pub len: usize,
-    pub capacity: usize,
-}
 
 #[repr(transparent)]
 pub struct BufferDropCheck<T>(PhantomData<(T::Fields, T::Context)>)
@@ -40,6 +25,16 @@ where
     fn default() -> Self {
         Self(PhantomData)
     }
+}
+
+#[repr(C)]
+pub struct BufferPrefix<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    pub context: T::Context,
+    pub len: usize,
+    pub capacity: usize,
 }
 
 union BufferData<T>
@@ -63,53 +58,9 @@ where
     _capacity: [usize; 0],
 }
 
-const _: () = {
-    #[cfg_attr(coverage_nightly, coverage(off))]
-    const fn assert_safety_preconditions<T>()
-    where
-        T: AllocSoa + ?Sized,
-    {
-        assert!(
-            size_of::<BufferAlign<T>>() == 0,
-            "BufferAlign should not occupy any space",
-        );
-        assert!(
-            offset_of!(BufferPrefix<T>, context) == 0,
-            "context should be located at the beginning of the buffer prefix",
-        );
-        assert!(
-            align_of::<BufferData<T>>() == align_of::<BufferPrefix<T>>(),
-            "alignment of buffer data and prefix should be the same",
-        );
-    }
-
-    assert_safety_preconditions::<()>();
-    assert_safety_preconditions::<(u8, u8, u8)>();
-    assert_safety_preconditions::<(u8, u32, u16)>();
-    assert_safety_preconditions::<(u128,)>();
-};
-
 #[inline]
-pub fn packed_size_of_fields<I>(fields: I) -> Option<usize>
-where
-    I: IntoIterator<Item: WithLayout>,
-{
-    fields
-        .into_iter()
-        .map(|item| item.layout().size())
-        .try_fold(0, usize::checked_add)
-}
-
-#[inline]
-pub fn align_of_fields<I>(fields: I) -> usize
-where
-    I: IntoIterator<Item: WithLayout>,
-{
-    fields
-        .into_iter()
-        .map(|item| item.layout().align())
-        .max()
-        .unwrap_or(1)
+pub fn layout_is_dangling(layout: Layout) -> bool {
+    layout.size() == 0
 }
 
 #[inline]
@@ -117,32 +68,15 @@ pub fn fields_are_zst<T>(context: &T::Context) -> bool
 where
     T: AllocSoa + ?Sized,
 {
-    packed_size_of_fields(context.field_layouts()) == Some(0)
+    context.packed_size_of_fields() == Some(0)
 }
 
 #[inline]
-pub const fn context_is_zst<T>() -> bool
-where
-    T: RawSoa + ?Sized,
-    T::Context: Sized,
-{
-    size_of::<T::Context>() == 0
-}
-
-#[inline]
-pub fn fields_are_dangling<T>(context: &T::Context, capacity: usize) -> bool
+pub fn buffer_align<T>(context: &T::Context) -> usize
 where
     T: AllocSoa + ?Sized,
 {
-    capacity == 0 || fields_are_zst::<T>(context)
-}
-
-#[inline]
-pub fn buffer_is_dangling<T>(context: &T::Context, capacity: usize) -> bool
-where
-    T: AllocSoa + ?Sized,
-{
-    context_is_zst::<T>() && fields_are_dangling::<T>(context, capacity)
+    context.buffer_align().max(align_of::<BufferAlign<T>>())
 }
 
 #[inline]
@@ -152,35 +86,68 @@ where
 {
     let layout = buffer_layout_inner::<T>(context, capacity)?;
 
-    let item_size = size_of::<BufferData<T>>();
-    if item_size == 0 {
-        return Ok(layout);
-    }
+    let item_layout = Layout::new::<BufferData<T>>();
+    let layout = fit_layout_in_array(layout, item_layout)?;
 
-    let size = layout
-        .size()
-        .checked_next_multiple_of(item_size)
-        .unwrap_or(usize::MAX);
-    Layout::from_size_align(size, layout.align())
+    let align = buffer_align::<T>(context);
+    layout.align_to(align)
 }
 
-#[inline]
+fn fit_layout_in_array(layout: Layout, item_layout: Layout) -> Result<Layout, LayoutError> {
+    if layout_is_dangling(item_layout) {
+        return layout.align_to(item_layout.align());
+    }
+
+    let item_layout = item_layout.pad_to_align();
+    let size = layout
+        .size()
+        .checked_next_multiple_of(item_layout.size())
+        .unwrap_or(usize::MAX);
+    let align = usize::max(layout.align(), item_layout.align());
+    Layout::from_size_align(size, align)
+}
+
 fn buffer_layout_inner<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
     T: AllocSoa + ?Sized,
 {
-    let layout = if fields_are_dangling::<T>(context, capacity) {
-        let prefix = size_of::<BufferPrefix<T>>();
-        let size = if context_is_zst::<T>() { 0 } else { prefix };
-        let align = align_of_fields(context.field_layouts());
-        Layout::from_size_align(size, align)?
-    } else {
-        let buffer = context.buffer_layout(capacity)?;
-        let prefix = Layout::new::<BufferPrefix<T>>();
-        let (layout, _) = prefix.extend(buffer)?;
-        layout
+    let buffer_layout = context.buffer_layout(capacity)?;
+    let prefix = Layout::new::<BufferPrefix<T>>();
+    let Some(buffer_layout) = buffer_layout_with_prefix(buffer_layout, prefix) else {
+        let n = (size_of_val(context) != 0).into();
+        return prefix.repeat_packed(n);
     };
-    layout.align_to(align_of::<BufferData<T>>())
+
+    let BufferLayoutWithPrefix { layout, .. } = buffer_layout?;
+    Ok(layout)
+}
+
+struct BufferLayoutWithPrefix {
+    layout: Layout,
+    buffer_offset: usize,
+}
+
+impl BufferLayoutWithPrefix {
+    fn new(layout: Layout, buffer_offset: usize) -> Self {
+        Self {
+            layout,
+            buffer_offset,
+        }
+    }
+}
+
+fn buffer_layout_with_prefix(
+    buffer_layout: Layout,
+    prefix: Layout,
+) -> Option<Result<BufferLayoutWithPrefix, LayoutError>> {
+    if layout_is_dangling(buffer_layout) {
+        return None;
+    }
+
+    let buffer_layout = prefix
+        .extend(buffer_layout)
+        .map(|(layout, buffer_offset)| BufferLayoutWithPrefix::new(layout, buffer_offset));
+    Some(buffer_layout)
 }
 
 #[inline]
@@ -189,21 +156,25 @@ where
     T: AllocSoa + ?Sized,
 {
     let prefix = Layout::new::<BufferPrefix<T>>();
-    if buffer_layout.size() <= prefix.size() || fields_are_zst::<T>(context) {
+    let align = context.buffer_align();
+    let Some(buffer_layout) = buffer_layout_without_prefix(buffer_layout, prefix, align) else {
         return 0;
-    }
+    };
 
-    let align = align_of_fields(context.field_layouts());
-    let offset_to_data = prefix
-        .align_to(align)
-        .expect("buffer layout is valid, so the alignment of prefix to the data should be")
-        .pad_to_align()
-        .size();
+    context.capacity_from(buffer_layout)
+}
 
-    let size = buffer_layout.size() - offset_to_data;
+fn buffer_layout_without_prefix(
+    buffer_layout: Layout,
+    prefix: Layout,
+    align: usize,
+) -> Option<Layout> {
+    let offset_to_data = prefix.align_to(align).ok()?.pad_to_align().size();
+    let size = buffer_layout.size().checked_sub(offset_to_data)?;
+
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout with size smaller than the buffer one should be valid");
-    context.capacity_from(buffer_layout)
+    Some(buffer_layout)
 }
 
 #[inline]
@@ -221,24 +192,86 @@ where
 }
 
 #[inline]
-pub fn buffer_align<T>(context: &T::Context) -> usize
+pub const unsafe fn ptr_to_buffer_context<T>(buffer: *const u8) -> *const T::Context
 where
     T: AllocSoa + ?Sized,
 {
-    let align = align_of_fields(context.field_layouts());
-    usize::max(align, align_of::<BufferData<T>>())
+    const { assert_buffer_context::<T>() }
+    buffer.cast()
 }
 
 #[inline]
 #[cfg_attr(not(feature = "alloc"), expect(unused))]
-pub fn buffer_dangling<T>(context: &T::Context) -> NonNull<u8>
+pub const unsafe fn ptr_to_buffer_context_mut<T>(buffer: *mut u8) -> *mut T::Context
 where
     T: AllocSoa + ?Sized,
 {
-    let addr = buffer_align::<T>(context)
-        .try_into()
-        .expect("alignment cannot be zero");
-    NonNull::without_provenance(addr)
+    const { assert_buffer_context::<T>() }
+    buffer.cast()
+}
+
+const fn assert_buffer_context<T>()
+where
+    T: AllocSoa + ?Sized,
+{
+    assert!(
+        offset_of!(BufferPrefix<T>, context) == 0,
+        "buffer prefix should always start with SoA context",
+    );
+}
+
+#[inline]
+#[expect(unused)]
+pub unsafe fn ptr_to_buffer_prefix<T>(
+    context: &T::Context,
+    capacity: usize,
+    buffer: *const u8,
+) -> Result<Option<*const BufferPrefix<T>>, LayoutError>
+where
+    T: AllocSoa + ?Sized,
+{
+    let buffer_layout = buffer_layout::<T>(context, capacity)?;
+    if layout_is_dangling(buffer_layout) {
+        return Ok(None);
+    }
+
+    let prefix = unsafe { ptr_to_buffer_prefix_unchecked::<T>(buffer) };
+    Ok(Some(prefix))
+}
+
+#[inline]
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
+pub unsafe fn ptr_to_buffer_prefix_mut<T>(
+    context: &T::Context,
+    capacity: usize,
+    buffer: *mut u8,
+) -> Result<Option<*mut BufferPrefix<T>>, LayoutError>
+where
+    T: AllocSoa + ?Sized,
+{
+    let buffer_layout = buffer_layout::<T>(context, capacity)?;
+    if layout_is_dangling(buffer_layout) {
+        return Ok(None);
+    }
+
+    let prefix = unsafe { ptr_to_buffer_prefix_unchecked_mut::<T>(buffer) };
+    Ok(Some(prefix))
+}
+
+#[inline]
+pub const unsafe fn ptr_to_buffer_prefix_unchecked<T>(buffer: *const u8) -> *const BufferPrefix<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    buffer.cast()
+}
+
+#[inline]
+pub const unsafe fn ptr_to_buffer_prefix_unchecked_mut<T>(buffer: *mut u8) -> *mut BufferPrefix<T>
+where
+    T: AllocSoa + ?Sized,
+{
+    buffer.cast()
 }
 
 #[inline]
@@ -250,11 +283,11 @@ pub unsafe fn ptrs_from_buffer<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    if fields_are_dangling::<T>(context, capacity) {
+    let buffer = unsafe { ptr_to_buffer_data::<T>(context, ptr, capacity) };
+    let Ok(buffer) = buffer else {
         return context.ptrs_dangling();
-    }
+    };
 
-    let buffer = unsafe { ptr_to_data::<T>(context, ptr, capacity).unwrap_unchecked() };
     unsafe { context.ptrs_from_buffer(buffer, capacity) }
 }
 
@@ -267,16 +300,16 @@ pub unsafe fn ptrs_from_buffer_mut<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    if fields_are_dangling::<T>(context, capacity) {
+    let buffer = unsafe { ptr_to_buffer_data_mut::<T>(context, ptr, capacity) };
+    let Ok(buffer) = buffer else {
         return context.ptrs_dangling_mut();
-    }
+    };
 
-    let buffer = unsafe { ptr_to_data_mut::<T>(context, ptr, capacity).unwrap_unchecked() };
     unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }
 }
 
 #[inline]
-pub unsafe fn ptr_to_data<T>(
+pub unsafe fn ptr_to_buffer_data<T>(
     context: &T::Context,
     ptr: *const u8,
     capacity: usize,
@@ -284,13 +317,13 @@ pub unsafe fn ptr_to_data<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    let offset = offset_to_data::<T>(context, capacity)?;
+    let offset = offset_to_buffer_data::<T>(context, capacity)?;
     let data = unsafe { ptr.add(offset) };
     Ok(data)
 }
 
 #[inline]
-pub unsafe fn ptr_to_data_mut<T>(
+pub unsafe fn ptr_to_buffer_data_mut<T>(
     context: &T::Context,
     ptr: *mut u8,
     capacity: usize,
@@ -298,24 +331,24 @@ pub unsafe fn ptr_to_data_mut<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    let offset = offset_to_data::<T>(context, capacity)?;
+    let offset = offset_to_buffer_data::<T>(context, capacity)?;
     let data = unsafe { ptr.add(offset) };
     Ok(data)
 }
 
-fn offset_to_data<T>(context: &T::Context, capacity: usize) -> Result<usize, PtrToDataError>
+fn offset_to_buffer_data<T>(context: &T::Context, capacity: usize) -> Result<usize, PtrToDataError>
 where
     T: AllocSoa + ?Sized,
 {
-    if fields_are_dangling::<T>(context, capacity) {
+    let buffer_layout = context.buffer_layout(capacity)?;
+    let prefix = Layout::new::<BufferPrefix<T>>();
+    let Some(buffer_layout) = buffer_layout_with_prefix(buffer_layout, prefix) else {
         let error = DanglingError(());
         return Err(error.into());
-    }
+    };
 
-    let buffer = context.buffer_layout(capacity)?;
-    let prefix = Layout::new::<BufferPrefix<T>>();
-    let (_, offset) = prefix.extend(buffer)?;
-    Ok(offset)
+    let BufferLayoutWithPrefix { buffer_offset, .. } = buffer_layout?;
+    Ok(buffer_offset)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -381,7 +414,7 @@ where
 {
     #[inline]
     pub unsafe fn ptr_from_raw_parts(data: *const u8, len: usize, capacity: usize) -> *const Self {
-        let context = unsafe { ptr_to_context::<T>(data).as_ref_unchecked() };
+        let context = unsafe { ptr_to_buffer_context::<T>(data).as_ref_unchecked() };
         let len = Self::len_of_inner(context, len, capacity);
         let inner = ptr::slice_from_raw_parts(data.cast(), len);
         Self::ptr_from_inner(inner)
@@ -389,7 +422,7 @@ where
 
     #[inline]
     pub unsafe fn ptr_from_raw_parts_mut(data: *mut u8, len: usize, capacity: usize) -> *mut Self {
-        let context = unsafe { ptr_to_context::<T>(data).as_ref_unchecked() };
+        let context = unsafe { ptr_to_buffer_context::<T>(data).as_ref_unchecked() };
         let len = Self::len_of_inner(context, len, capacity);
         let inner = ptr::slice_from_raw_parts_mut(data.cast(), len);
         Self::ptr_from_inner_mut(inner)
@@ -406,14 +439,13 @@ where
     }
 
     fn len_of_inner(context: &T::Context, len: usize, capacity: usize) -> usize {
-        if buffer_is_dangling::<T>(context, capacity) {
+        let buffer_layout = buffer_layout::<T>(context, capacity)
+            .expect("layout size should not exceed `isize::MAX`");
+
+        if layout_is_dangling(buffer_layout) {
             return len;
         }
-
-        let capacity_in_bytes = buffer_layout::<T>(context, capacity)
-            .expect("layout size should not exceed `isize::MAX`")
-            .size();
-        capacity_in_bytes / size_of::<BufferData<T>>()
+        buffer_layout.size() / size_of::<BufferData<T>>()
     }
 
     #[inline]
@@ -437,27 +469,60 @@ where
     }
 
     #[inline]
-    pub unsafe fn ptr_len(this: *const Self) -> usize {
-        if Self::ptr_is_dangling(this) {
-            return Self::ptr_as_inner(this).len();
-        }
-        unsafe { ptr_to_len::<T>(Self::ptr_as_ptr(this)).read() }
+    pub unsafe fn ptr_to_context(this: *const Self) -> *const T::Context {
+        let buffer = Self::ptr_as_ptr(this);
+        unsafe { ptr_to_buffer_context::<T>(buffer) }
     }
 
     #[inline]
-    pub unsafe fn ptr_capacity(this: *const Self) -> usize {
-        let context = unsafe { ptr_to_context::<T>(Self::ptr_as_ptr(this)).as_ref_unchecked() };
-        if fields_are_zst::<T>(context) {
-            return usize::MAX;
-        }
+    pub unsafe fn ptr_to_len(this: *const Self) -> Option<*const usize> {
+        let prefix = unsafe { Self::ptr_to_prefix(this) }?;
+        let len = unsafe { &raw const (*prefix).len };
+        Some(len)
+    }
+
+    #[inline]
+    pub unsafe fn ptr_to_capacity(this: *const Self) -> Option<*const usize> {
+        let prefix = unsafe { Self::ptr_to_prefix(this) }?;
+        let capacity = unsafe { &raw const (*prefix).capacity };
+        Some(capacity)
+    }
+
+    unsafe fn ptr_to_prefix(this: *const Self) -> Option<*const BufferPrefix<T>> {
         if Self::ptr_is_dangling(this) {
-            return 0;
+            return None;
         }
-        unsafe { ptr_to_capacity::<T>(Self::ptr_as_ptr(this)).read() }
+
+        let buffer = Self::ptr_as_ptr(this);
+        let prefix = unsafe { ptr_to_buffer_prefix_unchecked::<T>(buffer) };
+        Some(prefix)
     }
 
     fn ptr_is_dangling(this: *const Self) -> bool {
         size_of::<BufferData<T>>() == 0 || Self::ptr_as_inner(this).len() == 0
+    }
+
+    #[inline]
+    pub unsafe fn ptr_len(this: *const Self) -> usize {
+        let len = unsafe { Self::ptr_to_len(this) };
+        let Some(len) = len else {
+            return Self::ptr_as_inner(this).len();
+        };
+        unsafe { len.read() }
+    }
+
+    #[inline]
+    pub unsafe fn ptr_capacity(this: *const Self) -> usize {
+        let context = unsafe { Self::ptr_to_context(this).as_ref_unchecked() };
+        if fields_are_zst::<T>(context) {
+            return usize::MAX;
+        }
+
+        let capacity = unsafe { Self::ptr_to_capacity(this) };
+        let Some(capacity) = capacity else {
+            return 0;
+        };
+        unsafe { capacity.read() }
     }
 
     #[inline]
@@ -475,7 +540,7 @@ where
     #[inline]
     pub fn context(&self) -> &T::Context {
         let this = ptr::from_ref(self);
-        unsafe { ptr_to_context::<T>(Self::ptr_as_ptr(this)).as_ref_unchecked() }
+        unsafe { Self::ptr_to_context(this).as_ref_unchecked() }
     }
 
     #[inline]
@@ -494,67 +559,4 @@ where
         let this = ptr::from_ref(self);
         unsafe { Self::ptr_capacity(this) }
     }
-}
-
-#[inline]
-pub unsafe fn ptr_to_context<T>(buffer: *const u8) -> *const T::Context
-where
-    T: AllocSoa + ?Sized,
-{
-    let offset = offset_of!(BufferPrefix<T>, context);
-    let ptr = unsafe { buffer.add(offset) };
-    ptr.cast()
-}
-
-#[inline]
-pub unsafe fn ptr_to_len<T>(buffer: *const u8) -> *const usize
-where
-    T: AllocSoa + ?Sized,
-{
-    let offset = offset_of!(BufferPrefix<T>, len);
-    let ptr = unsafe { buffer.add(offset) };
-    ptr.cast()
-}
-
-#[inline]
-pub unsafe fn ptr_to_capacity<T>(buffer: *const u8) -> *const usize
-where
-    T: AllocSoa + ?Sized,
-{
-    let offset = offset_of!(BufferPrefix<T>, capacity);
-    let ptr = unsafe { buffer.add(offset) };
-    ptr.cast()
-}
-
-#[inline]
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
-pub unsafe fn ptr_to_context_mut<T>(buffer: *mut u8) -> *mut T::Context
-where
-    T: AllocSoa + ?Sized,
-{
-    let offset = offset_of!(BufferPrefix<T>, context);
-    let ptr = unsafe { buffer.add(offset) };
-    ptr.cast()
-}
-
-#[inline]
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
-pub unsafe fn ptr_to_len_mut<T>(buffer: *mut u8) -> *mut usize
-where
-    T: AllocSoa + ?Sized,
-{
-    let offset = offset_of!(BufferPrefix<T>, len);
-    let ptr = unsafe { buffer.add(offset) };
-    ptr.cast()
-}
-
-#[inline]
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
-pub unsafe fn ptr_to_capacity_mut<T>(buffer: *mut u8) -> *mut usize
-where
-    T: AllocSoa + ?Sized,
-{
-    let offset = offset_of!(BufferPrefix<T>, capacity);
-    let ptr = unsafe { buffer.add(offset) };
-    ptr.cast()
 }

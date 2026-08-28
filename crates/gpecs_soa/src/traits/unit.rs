@@ -23,6 +23,16 @@ unsafe impl AllocSoaContext<()> for () {
     }
 
     #[inline]
+    fn buffer_align(&self) -> usize {
+        align_of::<()>()
+    }
+
+    #[inline]
+    fn packed_size_of_fields(&self) -> Option<usize> {
+        Some(size_of::<()>())
+    }
+
+    #[inline]
     fn capacity_from(&self, _buffer_layout: Layout) -> usize {
         usize::MAX
     }

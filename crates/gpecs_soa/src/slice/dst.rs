@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    buffer::{DstBuffer, ptrs_from_buffer, ptrs_from_buffer_mut},
+    buffer::dst::DstBuffer,
     ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
@@ -133,12 +133,8 @@ where
 
     #[inline]
     pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
-        let ptr = self.as_ptr();
-        let context = self.context();
-        let capacity = self.capacity();
-
-        let ptrs = unsafe { ptrs_from_buffer::<T>(context, ptr, capacity) };
-        (context, ptrs)
+        let Self { buffer } = self;
+        buffer.as_ptrs_with_context()
     }
 
     #[inline]
@@ -149,12 +145,8 @@ where
 
     #[inline]
     pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
-        let ptr = self.as_mut_ptr();
-        let context = self.context();
-        let capacity = self.capacity();
-
-        let ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, capacity) };
-        (context, ptrs)
+        let Self { buffer } = self;
+        buffer.as_mut_ptrs_with_context()
     }
 
     #[inline]

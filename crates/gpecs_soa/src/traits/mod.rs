@@ -148,8 +148,8 @@ where
 /// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
 ///
 /// These safety requirements are:
-/// - sum of layouts' sizes of [field layouts](FieldLayouts::Output)
+/// - sum of sizes of [field layouts](FieldLayouts::Output)
 ///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
-/// - alignment of each layout of [field layouts](FieldLayouts::Output)
+/// - each alignment from [field layouts](FieldLayouts::Output)
 ///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
 pub unsafe trait AllocSoaTrusted: AllocSoa {}

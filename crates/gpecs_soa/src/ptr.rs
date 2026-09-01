@@ -3,6 +3,7 @@ pub use gpecs_soa_core::ptr::*;
 use crate::{slice::SoaSlice, traits::AllocSoaTrusted};
 
 #[inline]
+#[track_caller]
 pub unsafe fn slice_from_raw_parts<T>(
     data: *const u8,
     len: usize,
@@ -15,6 +16,7 @@ where
 }
 
 #[inline]
+#[track_caller]
 pub unsafe fn slice_from_raw_parts_mut<T>(
     data: *mut u8,
     len: usize,

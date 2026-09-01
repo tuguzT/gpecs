@@ -168,13 +168,16 @@ where
 fn buffer_layout_without_prefix(
     buffer_layout: Layout,
     prefix: Layout,
-    align: usize,
+    buffer_align: usize,
 ) -> Option<Layout> {
-    let offset_to_data = prefix.align_to(align).ok()?.pad_to_align().size();
-    let size = buffer_layout.size().checked_sub(offset_to_data)?;
+    let buffer_layout_dangling = Layout::from_size_align(0, buffer_align)
+        .expect("zero-sized layout should be valid for any valid alignment");
+    let (_, offset_to_buffer) = prefix.extend(buffer_layout_dangling).ok()?;
 
+    let size = buffer_layout.size().checked_sub(offset_to_buffer)?;
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout with size smaller than the buffer one should be valid");
+
     Some(buffer_layout)
 }
 

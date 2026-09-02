@@ -54,8 +54,11 @@ where
     pub fn min_non_zero_cap(context: &T::Context) -> usize {
         const SIZE: usize = 4096; // 4 KiB
 
-        let buffer_layout = Layout::from_size_align(SIZE, buffer_align::<T>(context))
-            .expect("layout size should not exceed `isize::MAX`");
+        let align = buffer_align::<T>(context);
+        let Ok(buffer_layout) = Layout::from_size_align(SIZE, align) else {
+            return 1;
+        };
+
         match capacity_from::<T>(context, buffer_layout) {
             SIZE.. => 8,
             4.. => 4,
@@ -153,7 +156,7 @@ where
     }
 
     #[inline]
-    unsafe fn dealloc(&mut self) -> T::Context {
+    unsafe fn deallocate(&mut self) -> T::Context {
         let context = self.ptr_to_context();
         // move context onto the stack to safely return it after buffer deallocation
         let context = unsafe { ptr::read(context) };
@@ -167,7 +170,7 @@ where
     #[inline]
     pub fn into_context(self) -> T::Context {
         let mut me = ManuallyDrop::new(self);
-        unsafe { me.dealloc() }
+        unsafe { me.deallocate() }
     }
 
     #[inline]
@@ -397,7 +400,7 @@ where
 {
     #[inline]
     fn drop(&mut self) {
-        let _ = unsafe { self.dealloc() };
+        let _ = unsafe { self.deallocate() };
     }
 }
 

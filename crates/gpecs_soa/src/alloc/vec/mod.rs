@@ -155,6 +155,12 @@ where
     }
 
     #[inline]
+    pub(super) fn are_fields_dangling(&self) -> bool {
+        let Self { buffer, .. } = self;
+        buffer.are_fields_dangling()
+    }
+
+    #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         let Self { buffer, .. } = self;
         buffer.as_ptr().cast_const()

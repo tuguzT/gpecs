@@ -2,7 +2,7 @@ use core::ptr;
 
 use crate::{
     buffer::{
-        BufferData, BufferPrefix, buffer_layout, fields_are_zst, layout_is_dangling,
+        BufferData, BufferPrefix, buffer_layout, capacity_from_dangling, layout_is_dangling,
         ptr_to_buffer_context, ptr_to_buffer_prefix_unchecked, ptrs_from_buffer,
         ptrs_from_buffer_mut,
     },
@@ -146,14 +146,10 @@ where
 
     #[inline]
     pub unsafe fn ptr_capacity(this: *const Self) -> usize {
-        let context = unsafe { Self::ptr_to_context(this).as_ref_unchecked() };
-        if fields_are_zst::<T>(context) {
-            return usize::MAX;
-        }
-
         let capacity = unsafe { Self::ptr_to_capacity(this) };
         let Some(capacity) = capacity else {
-            return 0;
+            let context = unsafe { Self::ptr_to_context(this).as_ref_unchecked() };
+            return capacity_from_dangling::<T>(context);
         };
         unsafe { capacity.read() }
     }

@@ -60,16 +60,13 @@ where
 }
 
 #[inline]
-pub fn layout_is_dangling(layout: Layout) -> bool {
-    layout.size() == 0
+pub fn layout_dangling(align: usize) -> Result<Layout, LayoutError> {
+    Layout::from_size_align(0, align)
 }
 
 #[inline]
-pub fn fields_are_zst<T>(context: &T::Context) -> bool
-where
-    T: AllocSoa + ?Sized,
-{
-    context.packed_size_of_fields() == Some(0)
+pub fn layout_is_dangling(layout: Layout) -> bool {
+    layout.size() == 0
 }
 
 #[inline]
@@ -78,6 +75,24 @@ where
     T: AllocSoa + ?Sized,
 {
     context.buffer_align().max(align_of::<BufferAlign<T>>())
+}
+
+#[inline]
+pub fn buffer_layout_dangling<T>(context: &T::Context) -> Layout
+where
+    T: AllocSoa + ?Sized,
+{
+    let align = buffer_align::<T>(context);
+    layout_dangling(align).expect("SoA buffer alignment should be valid")
+}
+
+#[inline]
+pub fn capacity_from_dangling<T>(context: &T::Context) -> usize
+where
+    T: AllocSoa + ?Sized,
+{
+    let buffer_layout = buffer_layout_dangling::<T>(context);
+    context.capacity_from(buffer_layout)
 }
 
 #[inline]
@@ -94,6 +109,21 @@ where
     layout.align_to(align)
 }
 
+fn buffer_layout_inner<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
+where
+    T: AllocSoa + ?Sized,
+{
+    let buffer_layout = context.buffer_layout(capacity)?;
+    let prefix = Layout::new::<BufferPrefix<T>>();
+    let Some(buffer_layout) = buffer_layout_with_prefix(buffer_layout, prefix) else {
+        let n = (size_of_val(context) != 0).into();
+        return prefix.repeat_packed(n);
+    };
+
+    let BufferLayoutWithPrefix { total_layout, .. } = buffer_layout?;
+    Ok(total_layout)
+}
+
 fn fit_layout_in_array(layout: Layout, item_layout: Layout) -> Result<Layout, LayoutError> {
     if layout_is_dangling(item_layout) {
         return layout.align_to(item_layout.align());
@@ -108,30 +138,15 @@ fn fit_layout_in_array(layout: Layout, item_layout: Layout) -> Result<Layout, La
     Layout::from_size_align(size, align)
 }
 
-fn buffer_layout_inner<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
-where
-    T: AllocSoa + ?Sized,
-{
-    let buffer_layout = context.buffer_layout(capacity)?;
-    let prefix = Layout::new::<BufferPrefix<T>>();
-    let Some(buffer_layout) = buffer_layout_with_prefix(buffer_layout, prefix) else {
-        let n = (size_of_val(context) != 0).into();
-        return prefix.repeat_packed(n);
-    };
-
-    let BufferLayoutWithPrefix { layout, .. } = buffer_layout?;
-    Ok(layout)
-}
-
 struct BufferLayoutWithPrefix {
-    layout: Layout,
+    total_layout: Layout,
     buffer_offset: usize,
 }
 
 impl BufferLayoutWithPrefix {
-    fn new(layout: Layout, buffer_offset: usize) -> Self {
+    fn new(total_layout: Layout, buffer_offset: usize) -> Self {
         Self {
-            layout,
+            total_layout,
             buffer_offset,
         }
     }
@@ -147,7 +162,7 @@ fn buffer_layout_with_prefix(
 
     let buffer_layout = prefix
         .extend(buffer_layout)
-        .map(|(layout, buffer_offset)| BufferLayoutWithPrefix::new(layout, buffer_offset));
+        .map(|(layout, offset)| BufferLayoutWithPrefix::new(layout, offset));
     Some(buffer_layout)
 }
 
@@ -158,9 +173,8 @@ where
 {
     let prefix = Layout::new::<BufferPrefix<T>>();
     let align = context.buffer_align();
-    let Some(buffer_layout) = buffer_layout_without_prefix(buffer_layout, prefix, align) else {
-        return 0;
-    };
+    let buffer_layout = buffer_layout_without_prefix(buffer_layout, prefix, align)
+        .expect("there is no valid layout of any capacity exists for this `AllocSoa` trait impl");
 
     context.capacity_from(buffer_layout)
 }
@@ -169,16 +183,18 @@ fn buffer_layout_without_prefix(
     buffer_layout: Layout,
     prefix: Layout,
     buffer_align: usize,
-) -> Option<Layout> {
-    let buffer_layout_dangling = Layout::from_size_align(0, buffer_align)
-        .expect("zero-sized layout should be valid for any valid alignment");
-    let (_, offset_to_buffer) = prefix.extend(buffer_layout_dangling).ok()?;
+) -> Result<Layout, LayoutError> {
+    let buffer_layout_dangling = layout_dangling(buffer_align)?;
+    let (_, offset_to_buffer) = prefix.extend(buffer_layout_dangling)?;
 
-    let size = buffer_layout.size().checked_sub(offset_to_buffer)?;
-    let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
-        .expect("layout with size smaller than the buffer one should be valid");
+    let buffer_layout = layout_shrink(buffer_layout, offset_to_buffer);
+    Ok(buffer_layout)
+}
 
-    Some(buffer_layout)
+fn layout_shrink(layout: Layout, size_to_shrink: usize) -> Layout {
+    let size = layout.size().saturating_sub(size_to_shrink);
+    Layout::from_size_align(size, layout.align())
+        .expect("new layout with size smaller than the current one should always be valid")
 }
 
 #[inline]

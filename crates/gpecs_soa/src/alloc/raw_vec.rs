@@ -16,12 +16,12 @@ use crate::{
     },
     buffer::{
         BufferDropCheck, BufferPrefix, buffer_align, buffer_layout, buffer_layout_capacity,
-        capacity_from, fields_are_zst, layout_is_dangling, ptr_to_buffer_context_mut,
-        ptr_to_buffer_prefix_mut, ptrs_from_buffer_mut,
+        capacity_from, layout_is_dangling, ptr_to_buffer_context_mut, ptr_to_buffer_prefix_mut,
+        ptrs_from_buffer_mut,
     },
     ptr::slice_from_raw_parts_mut,
     slice::SoaSlice,
-    traits::{AllocSoa, AllocSoaTrusted, MutPtrs},
+    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -106,16 +106,17 @@ where
         let Self { ptr, capacity, .. } = *self;
         let context = self.context();
         let buffer = ptr.as_ptr();
+
         unsafe { ptr_to_buffer_prefix_mut::<T>(context, capacity, buffer).unwrap_unchecked() }
     }
 
     #[inline]
     fn set_capacity_in_buffer(&mut self) {
-        let Self { capacity, .. } = *self;
         let Some(prefix) = self.ptr_to_prefix() else {
             return;
         };
 
+        let capacity = self.capacity();
         let ptr_to_capacity = unsafe { &raw mut (*prefix).capacity };
         unsafe { ptr::write(ptr_to_capacity, capacity) }
     }
@@ -206,35 +207,36 @@ where
     pub fn as_ptrs_with_context(&self) -> (&T::Context, MutPtrs<'_, T>) {
         let Self { ptr, capacity, .. } = *self;
         let context = self.context();
+        let ptr = ptr.as_ptr();
 
-        let ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr.as_ptr(), capacity) };
+        let ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, capacity) };
         (context, ptrs)
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let context = self.context();
-        if fields_are_zst::<T>(context) {
-            return usize::MAX;
-        }
-
         let Self { capacity, .. } = *self;
         capacity
+    }
+
+    #[inline]
+    pub fn are_fields_dangling(&self) -> bool {
+        let context = self.context();
+        let capacity = self.capacity();
+
+        let layout = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
+        layout_is_dangling(layout)
     }
 
     #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
         let Self { ptr, capacity, .. } = *self;
 
-        // We could use Layout::from_size_align here which ensures the absence of isize and usize overflows
-        // and could hypothetically handle differences between stride and size, but this memory
-        // has already been allocated so we know it can't overflow and currently Rust does not
-        // support such types. So we can do better by skipping some checks and avoid an unwrap.
         let layout = unsafe { buffer_layout::<T>(context, capacity).unwrap_unchecked() };
-
         if layout_is_dangling(layout) {
             return None;
         }
+
         Some((ptr, layout))
     }
 

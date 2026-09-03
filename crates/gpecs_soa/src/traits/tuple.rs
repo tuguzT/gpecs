@@ -103,6 +103,15 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
+            fn packed_size_of_fields(&self) -> Option<usize> {
+                #[repr(Rust, packed)]
+                struct PackedTuple<$($types,)*>($($types,)*);
+
+                let size = size_of::<PackedTuple<$($types,)*>>();
+                Some(size)
+            }
+
+            #[inline]
             unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 

@@ -18,7 +18,7 @@ unsafe impl RawSoaContext<()> for () {
     }
 
     #[inline]
-    #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
+    #[expect(clippy::zst_offset, reason = "as a reference for other manual impls")]
     unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a> {
         unsafe { ptrs.add(count) }
     }
@@ -41,7 +41,7 @@ unsafe impl RawSoaContext<()> for () {
     }
 
     #[inline]
-    #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
+    #[expect(clippy::zst_offset, reason = "as a reference for other manual impls")]
     unsafe fn ptrs_add_mut<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,

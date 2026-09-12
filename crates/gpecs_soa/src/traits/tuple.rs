@@ -29,6 +29,70 @@ pub use count_idents;
 /// Helper type for [SoA](super::RawSoa) implementation of [tuples](prim@tuple).
 pub struct TupleHelper<T>(PhantomData<fn() -> T>);
 
+impl<A> TupleHelper<(A,)> {
+    pub const SIZE: usize = count_idents!(A,);
+    pub const PERMUTATION: [usize; count_idents!(A,)] = [0];
+    pub const FIELD_LAYOUTS: [Layout; count_idents!(A,)] = [Layout::new::<A>()];
+}
+
+impl<'a, A> FieldLayouts<'a, (A,)> for () {
+    type Output = [Layout; count_idents!(A,)];
+    type OutputIter = array::IntoIter<Layout, { count_idents!(A,) }>;
+    type OutputItem = Layout;
+
+    #[inline]
+    fn field_layouts(&'a self) -> Self::Output {
+        TupleHelper::<(A,)>::FIELD_LAYOUTS
+    }
+}
+
+unsafe impl<A> AllocSoaContext<(A,)> for () {
+    #[inline]
+    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+        Layout::array::<A>(capacity)
+    }
+
+    #[inline]
+    fn buffer_align(&self) -> usize {
+        align_of::<A>()
+    }
+
+    #[inline]
+    fn packed_size_of_fields(&self) -> Option<usize> {
+        Some(size_of::<A>())
+    }
+
+    #[inline]
+    fn capacity_from(&self, buffer_layout: Layout) -> usize {
+        buffer_layout
+            .size()
+            .checked_div(size_of::<A>())
+            .unwrap_or(usize::MAX)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
+        (buffer.cast(),)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
+        (buffer.cast(),)
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { ptr::copy(src.0, dst.0, count) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { ptr::copy(src.0, dst.0, count) }
+    }
+}
+
+unsafe impl<A> AllocSoaTrusted for (A,) {}
+
 #[inline]
 #[must_use]
 #[doc(hidden)]
@@ -169,10 +233,6 @@ macro_rules! soa_tuple_impl {
         unsafe impl<$($types,)*> AllocSoaTrusted for ($($types,)*) {}
     };
 }
-
-soa_tuple_impl!(
-    A index 0,
-);
 
 soa_tuple_impl!(
     A index 0,

@@ -90,6 +90,7 @@ unsafe impl RawSoaContext<()> for () {
     }
 
     #[inline]
+    #[allow(dropping_copy_types, reason = "as a reference for other manual impls")]
     unsafe fn ptrs_drop_in_place(&self, to_drop: Self::MutPtrs<'_>) {
         unsafe { ptr::drop_in_place(to_drop) }
     }

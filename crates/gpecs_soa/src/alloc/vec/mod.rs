@@ -15,8 +15,8 @@ use crate::{
     buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
-        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
-        from_raw_parts_mut, range,
+        SoaSlicePtrs, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts, from_raw_parts_mut,
+        get_unchecked_from, range,
     },
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs,
@@ -798,7 +798,7 @@ where
         let dst = context.mut_slice_ptrs_as_ptrs(slices.clone());
 
         let slices = context.slice_ptrs_cast_const(slices);
-        let slices = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked(range, context, slices) };
+        let slices = unsafe { get_unchecked_from::<T, _>(context, slices, range) };
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);

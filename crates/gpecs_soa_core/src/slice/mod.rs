@@ -1,5 +1,9 @@
 pub use self::{
-    index::{IndexHelper, IndexHelperMut, SoaSlicePtrsIndex, SoaSlicesIndex, range, try_range},
+    index::{
+        IndexHelper, IndexHelperMut, SoaSlicePtrsIndex, SoaSlicesIndex, get_from, get_mut_from,
+        get_mut_ptrs_from, get_ptrs_from, get_unchecked_from, get_unchecked_mut_from, index_from,
+        index_mut_from, index_mut_ptrs_from, index_ptrs_from, range, try_range,
+    },
     iter::Iter,
     iter_mut::IterMut,
     partial_eq::partial_eq_impl,

@@ -5,7 +5,10 @@ use core::{
 };
 
 use crate::{
-    slice::{RawIter, RawIterMut, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut},
+    slice::{
+        RawIter, RawIterMut, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut,
+        get_unchecked_mut_from, index_mut_ptrs_from,
+    },
     traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
     wrapper,
 };
@@ -330,8 +333,8 @@ where
     pub unsafe fn swap(&mut self, a: usize, b: usize) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
 
-        let x = SoaSlicePtrsIndex::<T>::index_mut_ptrs(a, context, slices.clone());
-        let y = SoaSlicePtrsIndex::<T>::index_mut_ptrs(b, context, slices);
+        let x = index_mut_ptrs_from::<T, _>(context, slices.clone(), a);
+        let y = index_mut_ptrs_from::<T, _>(context, slices, b);
         if a == b {
             return;
         }
@@ -342,8 +345,8 @@ where
     #[inline]
     pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let x = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone()) };
-        let y = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices) };
+        let x = unsafe { get_unchecked_mut_from::<T, _>(context, slices.clone(), a) };
+        let y = unsafe { get_unchecked_mut_from::<T, _>(context, slices, b) };
         unsafe { context.ptrs_swap_nonoverlapping(x, y, 1) }
     }
 

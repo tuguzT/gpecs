@@ -261,7 +261,7 @@ where
     fn clone(&self) -> Self {
         let len = self.len();
         let (context, ptrs) = self.as_ptrs_with_context();
-        let slices = unsafe { SoaSlices::<T>::from_parts(context, ptrs, len) };
+        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
 
         let vec = slices.to_vec();
         Self::new(vec)

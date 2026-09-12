@@ -7,6 +7,7 @@ pub use self::{
     buffer_offsets::{BufferOffset, BufferOffsets},
     field_layouts::{
         FieldLayouts, FieldLayoutsItem, FieldLayoutsIter, FieldLayoutsOutput, FieldLayoutsOwned,
+        field_layouts,
     },
     into_layouts::{IntoFieldLayouts, IntoFieldLayoutsIter},
 };

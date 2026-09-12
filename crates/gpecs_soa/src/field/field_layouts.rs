@@ -36,6 +36,16 @@ where
     }
 }
 
+/// Returns a collection of items which could be converted into a [layout](core::alloc::Layout).
+#[inline]
+pub fn field_layouts<'a, T, F>(from: &'a F) -> F::Output
+where
+    F: FieldLayouts<'a, T> + ?Sized,
+    T: ?Sized,
+{
+    from.field_layouts()
+}
+
 impl<'a, T, U> FieldLayouts<'a, &U> for &T
 where
     T: FieldLayouts<'a, U> + ?Sized,

@@ -1,10 +1,6 @@
 use std::alloc::Layout;
 
-use gpecs_soa::{
-    field::{FieldLayouts, buffer_layout, buffer_offsets},
-    identity::Identity,
-    traits::AllocSoaContext,
-};
+use gpecs_soa::{field, identity::Identity, traits};
 
 use crate::common::{ZST1, ZST2, ZST3};
 
@@ -14,16 +10,16 @@ fn unit() {
 
     let context = ();
 
-    let context_layouts = FieldLayouts::<SoA>::field_layouts(&context);
+    let context_layouts = traits::field_layouts::<SoA>(&context);
     let layouts = [];
     itertools::assert_equal(context_layouts, layouts);
 
     let capacity = 5;
-    let from_layouts = buffer_layout(layouts, capacity).unwrap();
-    let from_context = AllocSoaContext::<SoA>::buffer_layout(&context, capacity).unwrap();
+    let from_layouts = field::buffer_layout(layouts, capacity).unwrap();
+    let from_context = traits::buffer_layout::<SoA>(&context, capacity).unwrap();
     assert_eq!(from_layouts.layout(), from_context);
 
-    let mut offsets = buffer_offsets(layouts, capacity);
+    let mut offsets = field::buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
     assert_eq!(offsets.capacity(), capacity);
     assert_eq!(
@@ -50,16 +46,16 @@ fn identity() {
 
     let context = ();
 
-    let context_layouts = FieldLayouts::<SoA>::field_layouts(&context);
+    let context_layouts = traits::field_layouts::<SoA>(&context);
     let layouts = [Layout::new::<u128>()];
     itertools::assert_equal(context_layouts, layouts);
 
     let capacity = 5;
-    let from_layouts = buffer_layout(layouts, capacity).unwrap();
-    let from_context = AllocSoaContext::<SoA>::buffer_layout(&context, capacity).unwrap();
+    let from_layouts = field::buffer_layout(layouts, capacity).unwrap();
+    let from_context = traits::buffer_layout::<SoA>(&context, capacity).unwrap();
     assert_eq!(from_layouts.layout(), from_context);
 
-    let mut offsets = buffer_offsets(layouts, capacity);
+    let mut offsets = field::buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
     assert_eq!(offsets.capacity(), capacity);
     assert_eq!(
@@ -94,7 +90,7 @@ fn tuple() {
 
     let context = ();
 
-    let context_layouts = FieldLayouts::<SoA>::field_layouts(&context);
+    let context_layouts = traits::field_layouts::<SoA>(&context);
     let layouts = [
         Layout::new::<u8>(),
         Layout::new::<()>(),
@@ -104,11 +100,11 @@ fn tuple() {
     itertools::assert_equal(context_layouts, layouts);
 
     let capacity = 5;
-    let from_layouts = buffer_layout(layouts, capacity).unwrap();
-    let from_context = AllocSoaContext::<SoA>::buffer_layout(&context, capacity).unwrap();
+    let from_layouts = field::buffer_layout(layouts, capacity).unwrap();
+    let from_context = traits::buffer_layout::<SoA>(&context, capacity).unwrap();
     assert_eq!(from_layouts.layout(), from_context);
 
-    let mut offsets = buffer_offsets(layouts, capacity);
+    let mut offsets = field::buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
     assert_eq!(offsets.capacity(), capacity);
     assert_eq!(
@@ -167,7 +163,7 @@ fn zst_tuple() {
 
     let context = ();
 
-    let context_layouts = FieldLayouts::<SoA>::field_layouts(&context);
+    let context_layouts = traits::field_layouts::<SoA>(&context);
     let layouts = [
         Layout::new::<ZST2>(),
         Layout::new::<ZST3>(),
@@ -176,11 +172,11 @@ fn zst_tuple() {
     itertools::assert_equal(context_layouts, layouts);
 
     let capacity = 5;
-    let from_layouts = buffer_layout(layouts, capacity).unwrap();
-    let from_context = AllocSoaContext::<SoA>::buffer_layout(&context, capacity).unwrap();
+    let from_layouts = field::buffer_layout(layouts, capacity).unwrap();
+    let from_context = traits::buffer_layout::<SoA>(&context, capacity).unwrap();
     assert_eq!(from_layouts.layout(), from_context);
 
-    let mut offsets = buffer_offsets(layouts, capacity);
+    let mut offsets = field::buffer_offsets(layouts, capacity);
     assert_eq!(offsets.len(), layouts.len());
     assert_eq!(offsets.capacity(), capacity);
     assert_eq!(

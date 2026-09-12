@@ -10,7 +10,7 @@ pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
     fn soa_slf_with_capacity(capacity: usize) -> SoaVec<Self> {
         let capacity = black_box(capacity);
         let context = Default::default();
-        let vec = SoaVec::<Self>::with_context_and_capacity(context, capacity);
+        let vec = SoaVec::with_context_and_capacity(context, capacity);
         black_box(vec)
     }
 
@@ -28,7 +28,7 @@ pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
 
     fn aos_std_with_capacity(capacity: usize) -> Vec<Self> {
         let capacity = black_box(capacity);
-        let vec = Vec::<Self>::with_capacity(capacity);
+        let vec = Vec::with_capacity(capacity);
         black_box(vec)
     }
 }

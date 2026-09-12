@@ -3,7 +3,7 @@ use core::alloc::{Layout, LayoutError};
 pub use gpecs_soa_core::traits::*;
 
 use crate::{
-    field::{BufferLayout, FieldLayouts, FieldLayoutsOwned, buffer_layout},
+    field::{self, BufferLayout, FieldLayouts, FieldLayoutsOutput, FieldLayoutsOwned},
     layout::WithLayout,
 };
 
@@ -35,7 +35,7 @@ where
     /// This layout should not include self, as it is handled by the crate itself.
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         let fields = self.field_layouts();
-        buffer_layout(fields, capacity).map(BufferLayout::layout)
+        field::buffer_layout(fields, capacity).map(BufferLayout::layout)
     }
 
     /// Calculates an alignment for any possible [buffer layout](Self::buffer_layout).
@@ -142,6 +142,94 @@ where
     T::Context: AllocSoaContext<T>,
     T::Fields: Sized,
 {
+}
+
+#[inline]
+pub fn field_layouts<T>(context: &T::Context) -> FieldLayoutsOutput<'_, T::Context, T>
+where
+    T: AllocSoa + ?Sized,
+{
+    field::field_layouts::<T, T::Context>(context)
+}
+
+#[inline]
+pub fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
+where
+    T: AllocSoa + ?Sized,
+{
+    context.buffer_layout(capacity)
+}
+
+#[inline]
+pub fn buffer_align<T>(context: &T::Context) -> usize
+where
+    T: AllocSoa + ?Sized,
+{
+    context.buffer_align()
+}
+
+#[inline]
+pub fn packed_size_of_fields<T>(context: &T::Context) -> Option<usize>
+where
+    T: AllocSoa + ?Sized,
+{
+    context.packed_size_of_fields()
+}
+
+#[inline]
+pub fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
+where
+    T: AllocSoa + ?Sized,
+{
+    context.capacity_from(buffer_layout)
+}
+
+#[inline]
+pub unsafe fn ptrs_from_buffer<T>(
+    context: &T::Context,
+    buffer: *const u8,
+    capacity: usize,
+) -> Ptrs<'_, T>
+where
+    T: AllocSoa + ?Sized,
+{
+    unsafe { context.ptrs_from_buffer(buffer, capacity) }
+}
+
+#[inline]
+pub unsafe fn ptrs_from_buffer_mut<T>(
+    context: &T::Context,
+    buffer: *mut u8,
+    capacity: usize,
+) -> MutPtrs<'_, T>
+where
+    T: AllocSoa + ?Sized,
+{
+    unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }
+}
+
+#[inline]
+pub unsafe fn ptrs_copy_forward<T>(
+    context: &T::Context,
+    src: Ptrs<'_, T>,
+    dst: MutPtrs<'_, T>,
+    count: usize,
+) where
+    T: AllocSoa + ?Sized,
+{
+    unsafe { context.ptrs_copy_forward(src, dst, count) }
+}
+
+#[inline]
+pub unsafe fn ptrs_copy_backward<T>(
+    context: &T::Context,
+    src: Ptrs<'_, T>,
+    dst: MutPtrs<'_, T>,
+    count: usize,
+) where
+    T: AllocSoa + ?Sized,
+{
+    unsafe { context.ptrs_copy_backward(src, dst, count) }
 }
 
 /// Marker trait which places additional safety requirements

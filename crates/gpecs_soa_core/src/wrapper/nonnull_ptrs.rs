@@ -19,7 +19,7 @@ where
     T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
-    phantom: PhantomData<&'ctx ()>,
+    marker: PhantomData<&'ctx ()>,
 }
 
 impl<'ctx, T> NonNullPtrs<'ctx, T>
@@ -29,10 +29,9 @@ where
     /// Creates self from the [non-null pointers](RawSoaContext::NonNullPtrs).
     #[inline]
     pub fn new(inner: Inner<'ctx, T>) -> Self {
-        Self {
-            inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
-            phantom: PhantomData,
-        }
+        let inner = unsafe { transmute::<Inner<'ctx, T>, Inner<'static, T>>(inner) };
+        let marker = PhantomData;
+        Self { inner, marker }
     }
 
     /// Retrieves a reference of [non-null pointers](RawSoaContext::NonNullPtrs).
@@ -86,10 +85,10 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref inner, phantom } = *self;
+        let Self { ref inner, marker } = *self;
 
         let inner = inner.clone();
-        Self { inner, phantom }
+        Self { inner, marker }
     }
 }
 
@@ -107,7 +106,8 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, .. } = self;
-        inner == &other.inner
+        let Self { inner: other, .. } = other;
+        inner.eq(other)
     }
 }
 
@@ -125,7 +125,8 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, .. } = self;
-        inner.partial_cmp(&other.inner)
+        let Self { inner: other, .. } = other;
+        inner.partial_cmp(other)
     }
 }
 
@@ -136,7 +137,8 @@ where
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, .. } = self;
-        inner.cmp(&other.inner)
+        let Self { inner: other, .. } = other;
+        inner.cmp(other)
     }
 }
 

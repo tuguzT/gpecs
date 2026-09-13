@@ -311,7 +311,8 @@ where
         let ptrs = context.ptrs_cast_const(ptrs.into_inner());
         let left = unsafe { SoaSlicePtrs::from_parts(context, ptrs.clone(), mid) };
         let right = unsafe {
-            SoaSlicePtrs::from_parts(context, context.ptrs_add(ptrs, mid), len.unchecked_sub(mid))
+            let ptrs = context.ptrs_add(ptrs, mid);
+            SoaSlicePtrs::from_parts(context, ptrs, len.unchecked_sub(mid))
         };
         (left, right)
     }

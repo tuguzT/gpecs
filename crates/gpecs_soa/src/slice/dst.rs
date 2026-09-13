@@ -291,7 +291,7 @@ where
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -304,7 +304,7 @@ where
     #[inline]
     pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, SlicesMut<'a, 'a, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
+        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
         (context, slices)
     }
 

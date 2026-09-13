@@ -130,7 +130,7 @@ where
     ) -> KeyValueRefs<'ctx, 'a, K, V, P> {
         let (key, value) = self.into_parts();
 
-        let value = unsafe { context.ptrs_to_refs(value) };
+        let value = unsafe { context.refs_from_ptrs(value) };
         unsafe { KeyValueRefs::from_parts(key, value) }
     }
 }

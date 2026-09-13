@@ -880,7 +880,7 @@ where
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -893,7 +893,7 @@ where
     #[inline]
     pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, SlicesMut<'a, 'a, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
+        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -903,7 +903,7 @@ where
         F: FnMut(&T::Context, Refs<'_, 'a, T>) -> bool,
     {
         self.retain_mut(|context, refs| {
-            let refs = T::Context::upcast_mut_refs(refs);
+            let refs = T::Context::mut_refs_upcast(refs);
             let refs = context.mut_refs_as_refs(refs);
             f(context, refs)
         });
@@ -993,7 +993,7 @@ where
                 // SAFETY: Unchecked element must be valid.
                 let cur = unsafe { context.ptrs_add_mut(ptrs.clone(), g.processed_len) };
                 let res = unsafe {
-                    let cur = context.mut_ptrs_to_mut_refs(cur.clone());
+                    let cur = context.mut_refs_from_mut_ptrs(cur.clone());
                     !f(context, cur)
                 };
                 if res {

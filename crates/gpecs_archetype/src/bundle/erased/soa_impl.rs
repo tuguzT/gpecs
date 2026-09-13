@@ -35,7 +35,7 @@ where
     type Ptrs<'a> = ErasedBundlePtrs<ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
-    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+    fn ptrs_upcast<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
         from
     }
 
@@ -60,7 +60,7 @@ where
     type MutPtrs<'a> = ErasedBundleMutPtrs<ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
-    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+    fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
         from
     }
 
@@ -131,26 +131,29 @@ where
     type NonNullPtrs<'a> = ErasedBundleNonNullPtrs<ErasedArchetypeView<'view, T::Meta>, P::NonNull>;
 
     #[inline]
-    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+    fn nonnull_ptrs_upcast<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short> {
         from
     }
 
     #[inline]
-    unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
+    unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a> {
         unsafe { ErasedBundleNonNullPtrs::new_unchecked(ptrs) }
     }
 
     #[inline]
-    fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
+    fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.into()
     }
 
     type SlicePtrs<'a> = ErasedBundleSlicePtrs<ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
-    fn upcast_slice_ptrs<'short, 'long: 'short>(
+    fn slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short> {
         from
@@ -178,7 +181,7 @@ where
     type SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
-    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
+    fn mut_slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
         from
@@ -366,12 +369,12 @@ where
     type Refs<'a> = ErasedBundleRefs<'data, ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
-    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
+    fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
         from
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
+    unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
         unsafe { ptrs.as_ref_unchecked() }
     }
 
@@ -383,12 +386,12 @@ where
     type RefsMut<'a> = ErasedBundleMutRefs<'data, ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
-    fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
+    fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
         from
     }
 
     #[inline]
-    unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
+    unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
         unsafe { ptrs.as_mut_unchecked() }
     }
 
@@ -405,12 +408,15 @@ where
     type Slices<'a> = ErasedBundleSlices<'data, ErasedArchetypeView<'view, T::Meta>, P::Const>;
 
     #[inline]
-    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
+    fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
         from
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
+    unsafe fn slices_from_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicePtrs<'a>,
+    ) -> Self::Slices<'a> {
         unsafe { slices.as_ref_unchecked() }
     }
 
@@ -427,14 +433,14 @@ where
     type SlicesMut<'a> = ErasedBundleMutSlices<'data, ErasedArchetypeView<'view, T::Meta>, P::Mut>;
 
     #[inline]
-    fn upcast_mut_slices<'short, 'long: 'short>(
+    fn mut_slices_upcast<'short, 'long: 'short>(
         from: Self::SlicesMut<'long>,
     ) -> Self::SlicesMut<'short> {
         from
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'a>(
+    unsafe fn mut_slices_from_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a> {

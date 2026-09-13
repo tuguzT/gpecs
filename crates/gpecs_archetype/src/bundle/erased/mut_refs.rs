@@ -156,7 +156,7 @@ where
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
-        let refs = unsafe { B::CONTEXT.mut_ptrs_to_mut_refs(ptrs) };
+        let refs = unsafe { B::CONTEXT.mut_refs_from_mut_ptrs(ptrs) };
         Ok(refs)
     }
 }

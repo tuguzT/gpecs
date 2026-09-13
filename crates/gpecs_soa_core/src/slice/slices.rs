@@ -241,7 +241,7 @@ where
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.into_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -323,7 +323,7 @@ where
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.as_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 

@@ -140,7 +140,7 @@ where
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
-        let refs = unsafe { B::CONTEXT.ptrs_to_refs(ptrs) };
+        let refs = unsafe { B::CONTEXT.refs_from_ptrs(ptrs) };
         Ok(refs)
     }
 }

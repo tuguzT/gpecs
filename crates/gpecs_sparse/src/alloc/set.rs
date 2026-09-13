@@ -776,7 +776,7 @@ where
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
         let drop_in_place = |context: &V::Context, src: Option<MutPtrs<'_, V>>| {
             let Some(value) = src else { return };
-            let value = V::Context::upcast_mut_ptrs(value);
+            let value = V::Context::mut_ptrs_upcast(value);
             unsafe { context.ptrs_drop_in_place(value) }
         };
 

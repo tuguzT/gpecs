@@ -105,7 +105,7 @@ where
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
 
-        let refs = unsafe { context.ptrs_to_refs(ptrs) };
+        let refs = unsafe { context.refs_from_ptrs(ptrs) };
         Ok(refs)
     }
 }

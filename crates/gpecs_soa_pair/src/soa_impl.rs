@@ -28,7 +28,7 @@ where
     type Ptrs<'a> = KeyValuePtrs<'a, K, V, P::Const>;
 
     #[inline]
-    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+    fn ptrs_upcast<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
         from
     }
 
@@ -51,7 +51,7 @@ where
     type MutPtrs<'a> = KeyValueMutPtrs<'a, K, V, P::Mut>;
 
     #[inline]
-    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+    fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
         from
     }
 
@@ -117,28 +117,31 @@ where
     type NonNullPtrs<'a> = KeyValueNonNullPtrs<'a, K, V, P::NonNull>;
 
     #[inline]
-    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+    fn nonnull_ptrs_upcast<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short> {
         from
     }
 
     #[inline]
-    unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
+    unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a> {
         let context = self.as_inner();
         let (key, value) = ptrs.into_parts();
         unsafe { KeyValueNonNullPtrs::new_unchecked(context, key, value) }
     }
 
     #[inline]
-    fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
+    fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.into_mut_ptrs(self)
     }
 
     type SlicePtrs<'a> = KeyValueSlicePtrs<'a, K, V, P::Const>;
 
     #[inline]
-    fn upcast_slice_ptrs<'short, 'long: 'short>(
+    fn slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short> {
         from
@@ -168,7 +171,7 @@ where
     type SliceMutPtrs<'a> = KeyValueMutSlicePtrs<'a, K, V, P::Mut>;
 
     #[inline]
-    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
+    fn mut_slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
         from
@@ -347,14 +350,14 @@ where
     type Refs<'a> = KeyValueRefs<'a, 'data, K, V, P::Const>;
 
     #[inline]
-    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
+    fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
         let (key, value) = from.into_parts();
-        let value = V::Context::upcast_refs(value);
+        let value = V::Context::refs_upcast(value);
         KeyValueRefs::new(key, value)
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
+    unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
         unsafe { ptrs.as_ref_unchecked(self) }
     }
 
@@ -366,14 +369,14 @@ where
     type RefsMut<'a> = KeyValueMutRefs<'a, 'data, K, V, P::Mut>;
 
     #[inline]
-    fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
+    fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
         let (key, value) = from.into_parts();
-        let value = V::Context::upcast_mut_refs(value);
+        let value = V::Context::mut_refs_upcast(value);
         KeyValueMutRefs::new(key, value)
     }
 
     #[inline]
-    unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
+    unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
         unsafe { ptrs.as_mut_unchecked(self) }
     }
 
@@ -390,14 +393,17 @@ where
     type Slices<'a> = KeyValueSlices<'a, 'data, K, V, P::Const>;
 
     #[inline]
-    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
+    fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
         let (keys, values) = from.into_parts();
-        let values = V::Context::upcast_slices(values);
+        let values = V::Context::slices_upcast(values);
         unsafe { KeyValueSlices::new_unchecked(keys, values) }
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
+    unsafe fn slices_from_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicePtrs<'a>,
+    ) -> Self::Slices<'a> {
         unsafe { slices.as_ref_unchecked(self) }
     }
 
@@ -414,16 +420,16 @@ where
     type SlicesMut<'a> = KeyValueMutSlices<'a, 'data, K, V, P::Mut>;
 
     #[inline]
-    fn upcast_mut_slices<'short, 'long: 'short>(
+    fn mut_slices_upcast<'short, 'long: 'short>(
         from: Self::SlicesMut<'long>,
     ) -> Self::SlicesMut<'short> {
         let (keys, values) = from.into_parts();
-        let values = V::Context::upcast_mut_slices(values);
+        let values = V::Context::mut_slices_upcast(values);
         unsafe { KeyValueMutSlices::new_unchecked(keys, values) }
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'a>(
+    unsafe fn mut_slices_from_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a> {

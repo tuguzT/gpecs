@@ -21,8 +21,8 @@ pub fn swap<'data, T>(context: &T::Context, x: RefsMut<'_, 'data, T>, y: RefsMut
 where
     T: Soa<'data> + ?Sized,
 {
-    let x = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(x));
-    let y = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(y));
+    let x = context.mut_refs_as_mut_ptrs(T::Context::mut_refs_upcast(x));
+    let y = context.mut_refs_as_mut_ptrs(T::Context::mut_refs_upcast(y));
 
     // SAFETY: `&mut` guarantees these are typed readable and writable
     // as well as non-overlapping.

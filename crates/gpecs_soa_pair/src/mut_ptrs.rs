@@ -197,7 +197,7 @@ where
     ) -> KeyValueMutRefs<'ctx, 'a, K, V, P> {
         let (key, value) = self.into_parts();
 
-        let value = unsafe { context.mut_ptrs_to_mut_refs(value) };
+        let value = unsafe { context.mut_refs_from_mut_ptrs(value) };
         unsafe { KeyValueMutRefs::from_parts(key, value) }
     }
 }

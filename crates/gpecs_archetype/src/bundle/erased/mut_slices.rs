@@ -168,7 +168,7 @@ where
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
-        let slices = unsafe { B::CONTEXT.mut_slice_ptrs_to_mut_slices(slices) };
+        let slices = unsafe { B::CONTEXT.mut_slices_from_mut_slice_ptrs(slices) };
         Ok(slices)
     }
 }

@@ -241,7 +241,7 @@ where
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
-        let ptrs = unsafe { B::CONTEXT.ptrs_to_nonnull(ptrs) };
+        let ptrs = unsafe { B::CONTEXT.nonnull_ptrs_from_mut_ptrs(ptrs) };
         Ok(ptrs)
     }
 }

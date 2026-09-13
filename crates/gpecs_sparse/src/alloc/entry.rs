@@ -211,7 +211,7 @@ where
     #[inline]
     pub fn into_mut_with_context(self) -> (&'a Context<C::Value>, RefsMut<'a, 'a, C::Value>) {
         let (context, ptrs) = self.into_mut_ptrs_with_context();
-        let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
+        let refs = unsafe { context.mut_refs_from_mut_ptrs(ptrs) };
         (context, refs)
     }
 }
@@ -229,7 +229,7 @@ where
     #[inline]
     pub fn get_with_context(&'a self) -> (&'a Context<C::Value>, Refs<'a, 'a, C::Value>) {
         let (context, ptrs) = self.as_ptrs_with_context();
-        let refs = unsafe { context.ptrs_to_refs(ptrs) };
+        let refs = unsafe { context.refs_from_ptrs(ptrs) };
         (context, refs)
     }
 
@@ -244,7 +244,7 @@ where
         &'a mut self,
     ) -> (&'a Context<C::Value>, RefsMut<'a, 'a, C::Value>) {
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
+        let refs = unsafe { context.mut_refs_from_mut_ptrs(ptrs) };
         (context, refs)
     }
 }

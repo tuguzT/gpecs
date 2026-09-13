@@ -453,7 +453,7 @@ where
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.into_mut_slice_ptrs_with_context();
-        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
+        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -578,7 +578,7 @@ where
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.as_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -593,7 +593,7 @@ where
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.as_mut_slice_ptrs_with_context();
-        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
+        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -755,8 +755,8 @@ where
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
         self.sort_unstable_with_permutation_by(permutation, |a, b| {
-            let a = T::Context::upcast_refs(a);
-            let b = T::Context::upcast_refs(b);
+            let a = T::Context::refs_upcast(a);
+            let b = T::Context::refs_upcast(b);
             Ord::cmp(&a, &b)
         });
     }
@@ -772,11 +772,11 @@ where
             permutation.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
                     let ptrs = context.ptrs_add(ptrs.clone(), a);
-                    context.ptrs_to_refs(ptrs)
+                    context.refs_from_ptrs(ptrs)
                 };
                 let b = unsafe {
                     let ptrs = context.ptrs_add(ptrs.clone(), b);
-                    context.ptrs_to_refs(ptrs)
+                    context.refs_from_ptrs(ptrs)
                 };
                 compare(a, b)
             });
@@ -794,7 +794,7 @@ where
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_unstable_by_key(|&index| unsafe {
                 let ptrs = context.ptrs_add(ptrs.clone(), index);
-                let refs = context.ptrs_to_refs(ptrs);
+                let refs = context.refs_from_ptrs(ptrs);
                 f(refs)
             });
         });
@@ -822,8 +822,8 @@ where
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
         self.sort_with_permutation_by(permutation, |a, b| {
-            let a = T::Context::upcast_refs(a);
-            let b = T::Context::upcast_refs(b);
+            let a = T::Context::refs_upcast(a);
+            let b = T::Context::refs_upcast(b);
             Ord::cmp(&a, &b)
         });
     }
@@ -848,11 +848,11 @@ where
             permutation.sort_by(|&a, &b| {
                 let a = unsafe {
                     let ptrs = context.ptrs_add(ptrs.clone(), a);
-                    context.ptrs_to_refs(ptrs)
+                    context.refs_from_ptrs(ptrs)
                 };
                 let b = unsafe {
                     let ptrs = context.ptrs_add(ptrs.clone(), b);
-                    context.ptrs_to_refs(ptrs)
+                    context.refs_from_ptrs(ptrs)
                 };
                 compare(a, b)
             });
@@ -880,7 +880,7 @@ where
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_by_key(|&index| unsafe {
                 let ptrs = context.ptrs_add(ptrs.clone(), index);
-                let refs = context.ptrs_to_refs(ptrs);
+                let refs = context.refs_from_ptrs(ptrs);
                 f(refs)
             });
         });
@@ -907,7 +907,7 @@ where
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_by_cached_key(|&index| unsafe {
                 let ptrs = context.ptrs_add(ptrs.clone(), index);
-                let refs = context.ptrs_to_refs(ptrs);
+                let refs = context.refs_from_ptrs(ptrs);
                 f(refs)
             });
         });

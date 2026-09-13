@@ -63,7 +63,7 @@ where
     #[inline]
     pub fn into_refs(self, context: &'ctx T::Context) -> RefsMut<'ctx, 'a, T> {
         let ptrs = self.into_ptrs();
-        unsafe { context.mut_ptrs_to_mut_refs(ptrs) }
+        unsafe { context.mut_refs_from_mut_ptrs(ptrs) }
     }
 }
 

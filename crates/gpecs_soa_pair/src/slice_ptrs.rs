@@ -115,7 +115,7 @@ where
     ) -> KeyValueSlices<'ctx, 'a, K, V, P> {
         let Self { key, len, values } = self;
 
-        let values = unsafe { context.slice_ptrs_to_slices(values.into_inner()) };
+        let values = unsafe { context.slices_from_slice_ptrs(values.into_inner()) };
         unsafe { KeyValueSlices::from_parts(key, len, values) }
     }
 }

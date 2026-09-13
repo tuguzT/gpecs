@@ -12,7 +12,7 @@ where
 
     /// Restricts [pointers](RawSoaContext::Ptrs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
+    fn ptrs_upcast<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
     /// Returns dangling [pointers](RawSoaContext::Ptrs) to each stored field.
     fn ptrs_dangling(&self) -> Self::Ptrs<'_>;
@@ -42,7 +42,7 @@ where
 
     /// Restricts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
+    fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
     /// Returns mutable dangling [pointers](RawSoaContext::MutPtrs) to each stored field.
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_>;
@@ -122,7 +122,7 @@ where
 
     /// Restricts [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+    fn nonnull_ptrs_upcast<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short>;
 
@@ -131,18 +131,21 @@ where
     /// All the safety requirements resulting from applying
     /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a>;
+    unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a>;
 
     /// Acquires the underlying [pointers](RawSoaContext::MutPtrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
     /// to each stored field.
-    fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
+    fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
 
     /// Collection of slice pointers to each stored field.
     type SlicePtrs<'a>: Clone;
 
     /// Restricts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_slice_ptrs<'short, 'long: 'short>(
+    fn slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short>;
 
@@ -172,7 +175,7 @@ where
 
     /// Restricts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
+    fn mut_slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short>;
 
@@ -213,7 +216,7 @@ where
     ///
     /// By default, this method just iterates by all the fields of slices and drops such fields one by one.
     unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
-        let slices = Self::upcast_mut_slice_ptrs(slices_to_drop);
+        let slices = Self::mut_slice_ptrs_upcast(slices_to_drop);
         let len = self.mut_slice_ptrs_len(&slices);
         let ptrs = self.mut_slice_ptrs_as_ptrs(slices);
         for index in 0..len {
@@ -361,14 +364,14 @@ where
 
     /// Restricts [references](SoaContext::Refs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short>;
+    fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short>;
 
     /// Converts [pointers](RawSoaContext::Ptrs) to each stored field
     /// to their [references](SoaContext::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a>;
+    unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a>;
 
     /// Converts [references](SoaContext::Refs) to each stored field
     /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
@@ -379,14 +382,14 @@ where
 
     /// Restricts [mutable references](SoaContext::RefsMut) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short>;
+    fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short>;
 
     /// Converts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
     /// to their [mutable references](SoaContext::RefsMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a>;
+    unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
     /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
@@ -401,14 +404,15 @@ where
 
     /// Restricts [slices](SoaContext::Slices) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short>;
+    fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short>;
 
     /// Converts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
     /// to their [slices](SoaContext::Slices) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a>;
+    unsafe fn slices_from_slice_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>)
+    -> Self::Slices<'a>;
 
     /// Converts [slices](SoaContext::Slices) to each stored field
     /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
@@ -426,7 +430,7 @@ where
 
     /// Restricts [mutable slices](SoaContext::SlicesMut) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_mut_slices<'short, 'long: 'short>(
+    fn mut_slices_upcast<'short, 'long: 'short>(
         from: Self::SlicesMut<'long>,
     ) -> Self::SlicesMut<'short>;
 
@@ -435,7 +439,7 @@ where
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn mut_slice_ptrs_to_mut_slices<'a>(
+    unsafe fn mut_slices_from_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a>;

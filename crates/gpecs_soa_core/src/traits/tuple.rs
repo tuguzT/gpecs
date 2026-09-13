@@ -13,7 +13,7 @@ macro_rules! tuple_impl {
             type Ptrs<'a> = ($(*const $types,)*);
 
             #[inline]
-            fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+            fn ptrs_upcast<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
                 from
             }
 
@@ -39,7 +39,7 @@ macro_rules! tuple_impl {
             type MutPtrs<'a> = ($(*mut $types,)*);
 
             #[inline]
-            fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+            fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
                 from
             }
 
@@ -111,20 +111,23 @@ macro_rules! tuple_impl {
             type NonNullPtrs<'a> = ($(NonNull<$types>,)*);
 
             #[inline]
-            fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+            fn nonnull_ptrs_upcast<'short, 'long: 'short>(
                 from: Self::NonNullPtrs<'long>,
             ) -> Self::NonNullPtrs<'short> {
                 from
             }
 
             #[inline]
-            unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
+            unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
+                &'a self,
+                ptrs: Self::MutPtrs<'a>,
+            ) -> Self::NonNullPtrs<'a> {
                 let ptrs = unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) };
                 ptrs
             }
 
             #[inline]
-            fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
+            fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
                 let ptrs = ($(ptrs.$indices.as_ptr(),)*);
                 ptrs
             }
@@ -132,7 +135,7 @@ macro_rules! tuple_impl {
             type SlicePtrs<'a> = ($(*const [$types],)*);
 
             #[inline]
-            fn upcast_slice_ptrs<'short, 'long: 'short>(
+            fn slice_ptrs_upcast<'short, 'long: 'short>(
                 from: Self::SlicePtrs<'long>,
             ) -> Self::SlicePtrs<'short> {
                 from
@@ -164,7 +167,7 @@ macro_rules! tuple_impl {
             type SliceMutPtrs<'a> = ($(*mut [$types],)*);
 
             #[inline]
-            fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
+            fn mut_slice_ptrs_upcast<'short, 'long: 'short>(
                 from: Self::SliceMutPtrs<'long>,
             ) -> Self::SliceMutPtrs<'short> {
                 from
@@ -248,12 +251,12 @@ macro_rules! tuple_impl {
             type Refs<'a> = ($(&'data $types,)*);
 
             #[inline]
-            fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
+            fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
                 from
             }
 
             #[inline]
-            unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
+            unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
                 let refs = unsafe { ($(ptrs.$indices.as_ref_unchecked(),)*) };
                 refs
             }
@@ -267,12 +270,12 @@ macro_rules! tuple_impl {
             type RefsMut<'a> = ($(&'data mut $types,)*);
 
             #[inline]
-            fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
+            fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
                 from
             }
 
             #[inline]
-            unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
+            unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
                 let refs = unsafe { ($(ptrs.$indices.as_mut_unchecked(),)*) };
                 refs
             }
@@ -292,12 +295,15 @@ macro_rules! tuple_impl {
             type Slices<'a> = ($(&'data [$types],)*);
 
             #[inline]
-            fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
+            fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
                 from
             }
 
             #[inline]
-            unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
+            unsafe fn slices_from_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicePtrs<'a>,
+            ) -> Self::Slices<'a> {
                 let data = RawSoaContext::<($($types,)*)>::slice_ptrs_as_ptrs(self, slices);
                 let len = RawSoaContext::<($($types,)*)>::slice_ptrs_len(self, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
@@ -320,14 +326,14 @@ macro_rules! tuple_impl {
             type SlicesMut<'a> = ($(&'data mut [$types],)*);
 
             #[inline]
-            fn upcast_mut_slices<'short, 'long: 'short>(
+            fn mut_slices_upcast<'short, 'long: 'short>(
                 from: Self::SlicesMut<'long>,
             ) -> Self::SlicesMut<'short> {
                 from
             }
 
             #[inline]
-            unsafe fn mut_slice_ptrs_to_mut_slices<'a>(
+            unsafe fn mut_slices_from_mut_slice_ptrs<'a>(
                 &'a self,
                 slices: Self::SliceMutPtrs<'a>,
             ) -> Self::SlicesMut<'a> {

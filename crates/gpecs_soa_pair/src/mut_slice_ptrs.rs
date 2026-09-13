@@ -145,7 +145,7 @@ where
     ) -> KeyValueMutSlices<'ctx, 'a, K, V, P> {
         let Self { key, len, values } = self;
 
-        let values = unsafe { context.mut_slice_ptrs_to_mut_slices(values.into_inner()) };
+        let values = unsafe { context.mut_slices_from_mut_slice_ptrs(values.into_inner()) };
         unsafe { KeyValueMutSlices::from_parts(key, len, values) }
     }
 }

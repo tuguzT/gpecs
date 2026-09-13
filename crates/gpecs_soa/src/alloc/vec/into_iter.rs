@@ -38,7 +38,7 @@ where
         let (buffer, len) = vec.into_parts();
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs = unsafe { context.ptrs_to_nonnull(ptrs) };
+        let ptrs = unsafe { context.nonnull_ptrs_from_mut_ptrs(ptrs) };
         let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
 
         Self {
@@ -84,7 +84,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
         (context, ptrs)
@@ -107,7 +107,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
         let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
         (context, ptrs)
     }
@@ -178,7 +178,7 @@ where
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 
@@ -191,7 +191,7 @@ where
     #[inline]
     pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, SlicesMut<'a, 'a, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
+        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
         (context, slices)
     }
 }
@@ -305,7 +305,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
@@ -343,7 +343,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
         unsafe {
             Self::post_inc_start(start, ptrs, context, n);
@@ -388,7 +388,7 @@ where
             // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
-            let ptrs = context.nonnull_to_ptrs(ptrs);
+            let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
             let ptrs = context.ptrs_cast_const(ptrs);
             let ptrs = unsafe { context.ptrs_add(ptrs, i) };
             let item = unsafe { context.ptrs_read(ptrs) };
@@ -527,7 +527,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
@@ -551,7 +551,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
         let ptrs = context.ptrs_cast_const(ptrs);
         unsafe {
             Self::pre_dec_end(end, ptrs, context, n);

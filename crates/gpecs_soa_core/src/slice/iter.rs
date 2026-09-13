@@ -136,7 +136,7 @@ where
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.into_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
 }
@@ -156,8 +156,8 @@ where
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.as_slice_ptrs_with_context();
-        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
-        let slices = T::Context::upcast_slices(slices);
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = T::Context::slices_upcast(slices);
         (context, slices)
     }
 }
@@ -208,7 +208,7 @@ where
         let Self { inner, .. } = self;
         let context = inner.context();
 
-        let f = |ptrs| unsafe { context.ptrs_to_refs(ptrs) };
+        let f = |ptrs| unsafe { context.refs_from_ptrs(ptrs) };
         inner.next().map(f)
     }
 
@@ -228,7 +228,7 @@ where
         let Self { inner, .. } = self;
         let context = inner.context();
 
-        let f = |ptrs| unsafe { context.ptrs_to_refs(ptrs) };
+        let f = |ptrs| unsafe { context.refs_from_ptrs(ptrs) };
         inner.next_back().map(f)
     }
 }

@@ -52,7 +52,7 @@ where
     #[inline]
     pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
-        T::Context::upcast_nonnull_ptrs(inner)
+        T::Context::nonnull_ptrs_upcast(inner)
     }
 }
 

@@ -42,7 +42,7 @@ where
         value: MutPtrs<'ctx, V>,
     ) -> Self {
         let key = unsafe { P::from_slice(NonNull::new_unchecked(key.slice()), key.index()) };
-        let value = unsafe { context.ptrs_to_nonnull(value) };
+        let value = unsafe { context.nonnull_ptrs_from_mut_ptrs(value) };
         Self::new(key, value)
     }
 
@@ -60,7 +60,7 @@ where
         let (key, value) = self.into_parts();
 
         let key = key.as_ptr().cast_const();
-        let value = context.nonnull_to_ptrs(value);
+        let value = context.nonnull_ptrs_as_mut_ptrs(value);
         let value = context.ptrs_cast_const(value);
         KeyValuePtrs::new(key, value)
     }
@@ -73,7 +73,7 @@ where
         let (key, value) = self.into_parts();
 
         let key = key.as_ptr();
-        let value = context.nonnull_to_ptrs(value);
+        let value = context.nonnull_ptrs_as_mut_ptrs(value);
         KeyValueMutPtrs::new(key, value)
     }
 }

@@ -29,21 +29,22 @@ where
     /// Creates self from the [mutable pointers](RawSoaContext::MutPtrs).
     #[inline]
     pub fn new(inner: Inner<'ctx, T>) -> Self {
+        // SAFETY: internal layout should not change even if lifetime changes: https://github.com/rust-lang/rust/pull/101520#issuecomment-1252016235
         let inner = unsafe { transmute::<Inner<'ctx, T>, Inner<'static, T>>(inner) };
         let marker = PhantomData;
         Self { inner, marker }
     }
 
-    /// Retrieves a reference of [mutable pointers](RawSoaContext::MutPtrs) .
+    /// Retrieves a reference of [mutable pointers](RawSoaContext::MutPtrs).
     #[inline]
-    pub fn as_inner(&self) -> &Inner<'_, T> {
+    pub fn as_inner(&self) -> &Inner<'ctx, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
     /// Retrieves a mutable reference of [mutable pointers](RawSoaContext::MutPtrs).
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
+    pub fn as_inner_mut(&mut self) -> &mut Inner<'ctx, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
@@ -56,13 +57,13 @@ where
     }
 }
 
-impl<T> Debug for MutPtrs<'_, T>
+impl<'ctx, T> Debug for MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: Debug,
+    Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner, .. } = self;
+        let inner = self.as_inner();
         f.debug_tuple("MutPtrs").field(inner).finish()
     }
 }
@@ -85,70 +86,75 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref inner, marker } = *self;
+        let inner = self.as_inner().clone();
+        Self::new(inner)
+    }
 
-        let inner = inner.clone();
-        Self { inner, marker }
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        let inner = self.as_inner_mut();
+        let source = source.as_inner();
+        inner.clone_from(source);
     }
 }
 
 impl<T> Copy for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: Copy,
+    Inner<'static, T>: Copy,
 {
 }
 
-impl<T> PartialEq for MutPtrs<'_, T>
+impl<'ctx, T> PartialEq for MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: PartialEq,
+    Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { inner, .. } = self;
-        let Self { inner: other, .. } = other;
+        let inner = self.as_inner();
+        let other = other.as_inner();
         inner.eq(other)
     }
 }
 
-impl<T> Eq for MutPtrs<'_, T>
+impl<'ctx, T> Eq for MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: Eq,
+    Inner<'ctx, T>: Eq,
 {
 }
 
-impl<T> PartialOrd for MutPtrs<'_, T>
+impl<'ctx, T> PartialOrd for MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: PartialOrd,
+    Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { inner, .. } = self;
-        let Self { inner: other, .. } = other;
+        let inner = self.as_inner();
+        let other = other.as_inner();
         inner.partial_cmp(other)
     }
 }
 
-impl<T> Ord for MutPtrs<'_, T>
+impl<'ctx, T> Ord for MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: Ord,
+    Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { inner, .. } = self;
-        let Self { inner: other, .. } = other;
+        let inner = self.as_inner();
+        let other = other.as_inner();
         inner.cmp(other)
     }
 }
 
-impl<T> Hash for MutPtrs<'_, T>
+impl<'ctx, T> Hash for MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> Inner<'ctx, T>: Hash,
+    Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { inner, .. } = self;
+        let inner = self.as_inner();
         inner.hash(state);
     }
 }

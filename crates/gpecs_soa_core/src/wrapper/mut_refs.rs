@@ -29,6 +29,7 @@ where
     /// Creates self from the [mutable references](SoaContext::RefsMut).
     #[inline]
     pub fn new(inner: Inner<'ctx, 'a, T>) -> Self {
+        // SAFETY: internal layout should not change even if lifetime changes: https://github.com/rust-lang/rust/pull/101520#issuecomment-1252016235
         let inner = unsafe { transmute::<Inner<'ctx, 'a, T>, Inner<'static, 'a, T>>(inner) };
         let marker = PhantomData;
         Self { inner, marker }
@@ -36,14 +37,14 @@ where
 
     /// Retrieves a reference of [mutable references](SoaContext::RefsMut).
     #[inline]
-    pub fn as_inner(&self) -> &Inner<'_, 'a, T> {
+    pub fn as_inner(&self) -> &Inner<'ctx, 'a, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
     /// Retrieves a mutable reference of [mutable references](SoaContext::RefsMut).
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut Inner<'_, 'a, T> {
+    pub fn as_inner_mut(&mut self) -> &mut Inner<'ctx, 'a, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
@@ -56,14 +57,14 @@ where
     }
 }
 
-impl<'a, T> Debug for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> Debug for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: Debug,
+    Inner<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner, .. } = self;
-        f.debug_tuple("Refs").field(inner).finish()
+        let inner = self.as_inner();
+        f.debug_tuple("RefsMut").field(inner).finish()
     }
 }
 
@@ -79,17 +80,22 @@ where
     }
 }
 
-impl<'a, T> Clone for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> Clone for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: Clone,
+    Inner<'ctx, 'a, T>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref inner, marker } = *self;
+        let inner = self.as_inner().clone();
+        Self::new(inner)
+    }
 
-        let inner = inner.clone();
-        Self { inner, marker }
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        let inner = self.as_inner_mut();
+        let source = source.as_inner();
+        inner.clone_from(source);
     }
 }
 
@@ -100,56 +106,56 @@ where
 {
 }
 
-impl<'a, T> PartialEq for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> PartialEq for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: PartialEq,
+    Inner<'ctx, 'a, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { inner, .. } = self;
-        let Self { inner: other, .. } = other;
+        let inner = self.as_inner();
+        let other = other.as_inner();
         inner.eq(other)
     }
 }
 
-impl<'a, T> Eq for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> Eq for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: Eq,
+    Inner<'ctx, 'a, T>: Eq,
 {
 }
 
-impl<'a, T> PartialOrd for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> PartialOrd for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: PartialOrd,
+    Inner<'ctx, 'a, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { inner, .. } = self;
-        let Self { inner: other, .. } = other;
+        let inner = self.as_inner();
+        let other = other.as_inner();
         inner.partial_cmp(other)
     }
 }
 
-impl<'a, T> Ord for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> Ord for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: Ord,
+    Inner<'ctx, 'a, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { inner, .. } = self;
-        let Self { inner: other, .. } = other;
+        let inner = self.as_inner();
+        let other = other.as_inner();
         inner.cmp(other)
     }
 }
 
-impl<'a, T> Hash for RefsMut<'_, 'a, T>
+impl<'ctx, 'a, T> Hash for RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> Inner<'ctx, 'a, T>: Hash,
+    Inner<'ctx, 'a, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { inner, .. } = self;
+        let inner = self.as_inner();
         inner.hash(state);
     }
 }

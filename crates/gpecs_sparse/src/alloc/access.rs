@@ -32,13 +32,13 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> &MutPtrs<'_, T> {
+    pub fn as_ptrs(&self) -> &MutPtrs<'ctx, T> {
         let Self { ptrs, .. } = self;
         ptrs.as_inner()
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> &mut MutPtrs<'_, T> {
+    pub fn as_mut_ptrs(&mut self) -> &mut MutPtrs<'ctx, T> {
         let Self { ptrs, .. } = self;
         ptrs.as_inner_mut()
     }
@@ -67,10 +67,10 @@ where
     }
 }
 
-impl<T> Debug for ReadWriteAccess<'_, '_, T>
+impl<'ctx, T> Debug for ReadWriteAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Debug,
+    MutPtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { ptrs, .. } = self;
@@ -78,10 +78,10 @@ where
     }
 }
 
-impl<T> PartialEq for ReadWriteAccess<'_, '_, T>
+impl<'ctx, T> PartialEq for ReadWriteAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: PartialEq,
+    MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { ptrs, .. } = self;
@@ -89,17 +89,17 @@ where
     }
 }
 
-impl<T> Eq for ReadWriteAccess<'_, '_, T>
+impl<'ctx, T> Eq for ReadWriteAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Eq,
+    MutPtrs<'ctx, T>: Eq,
 {
 }
 
-impl<T> PartialOrd for ReadWriteAccess<'_, '_, T>
+impl<'ctx, T> PartialOrd for ReadWriteAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
+    MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { ptrs, .. } = self;
@@ -107,10 +107,10 @@ where
     }
 }
 
-impl<T> Ord for ReadWriteAccess<'_, '_, T>
+impl<'ctx, T> Ord for ReadWriteAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Ord,
+    MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { ptrs, .. } = self;
@@ -118,10 +118,10 @@ where
     }
 }
 
-impl<T> Hash for ReadWriteAccess<'_, '_, T>
+impl<'ctx, T> Hash for ReadWriteAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Hash,
+    MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { ptrs, .. } = self;
@@ -154,7 +154,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> &MutPtrs<'_, T> {
+    pub fn as_ptrs(&self) -> &MutPtrs<'ctx, T> {
         match self {
             Self::ReadWrite(refs) => refs.as_ptrs(),
             Self::WriteOnly(ptrs) => ptrs.as_inner(),
@@ -162,7 +162,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> &mut MutPtrs<'_, T> {
+    pub fn as_mut_ptrs(&mut self) -> &mut MutPtrs<'ctx, T> {
         match self {
             Self::ReadWrite(refs) => refs.as_mut_ptrs(),
             Self::WriteOnly(ptrs) => ptrs.as_inner_mut(),
@@ -213,10 +213,10 @@ where
     }
 }
 
-impl<T> Debug for TryInsertAccess<'_, '_, T>
+impl<'ctx, T> Debug for TryInsertAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Debug,
+    MutPtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -226,10 +226,10 @@ where
     }
 }
 
-impl<T> PartialEq for TryInsertAccess<'_, '_, T>
+impl<'ctx, T> PartialEq for TryInsertAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: PartialEq,
+    MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -240,17 +240,17 @@ where
     }
 }
 
-impl<T> Eq for TryInsertAccess<'_, '_, T>
+impl<'ctx, T> Eq for TryInsertAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Eq,
+    MutPtrs<'ctx, T>: Eq,
 {
 }
 
-impl<T> PartialOrd for TryInsertAccess<'_, '_, T>
+impl<'ctx, T> PartialOrd for TryInsertAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
+    MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match (self, other) {
@@ -262,10 +262,10 @@ where
     }
 }
 
-impl<T> Ord for TryInsertAccess<'_, '_, T>
+impl<'ctx, T> Ord for TryInsertAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Ord,
+    MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
@@ -277,10 +277,10 @@ where
     }
 }
 
-impl<T> Hash for TryInsertAccess<'_, '_, T>
+impl<'ctx, T> Hash for TryInsertAccess<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
-    for<'ctx> MutPtrs<'ctx, T>: Hash,
+    MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {

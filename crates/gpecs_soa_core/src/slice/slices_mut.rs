@@ -1013,7 +1013,7 @@ where
 {
     #[inline]
     fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.ptrs_dangling_mut();
+        let ptrs = context.mut_ptrs_dangling();
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }

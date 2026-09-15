@@ -322,7 +322,7 @@ where
 {
     let buffer = unsafe { ptr_to_buffer_data_mut::<T>(context, ptr, capacity) };
     let Ok(buffer) = buffer else {
-        return context.ptrs_dangling_mut();
+        return context.mut_ptrs_dangling();
     };
 
     unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }

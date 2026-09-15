@@ -182,7 +182,7 @@ where
         }
 
         let ptrs = unsafe { context.ptrs_from_buffer_mut(buffer.cast(), capacity) };
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, offset) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, offset) };
         Ok(ptrs)
     }
 }

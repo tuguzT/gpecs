@@ -45,7 +45,7 @@ where
     fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
     /// Returns mutable dangling [pointers](RawSoaContext::MutPtrs) to each stored field.
-    fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_>;
+    fn mut_ptrs_dangling(&self) -> Self::MutPtrs<'_>;
 
     /// Adds an unsigned offset to each [mutable pointer](RawSoaContext::MutPtrs) of each stored field.
     ///
@@ -53,7 +53,7 @@ where
     /// should be satisfied to be safe to call this method.
     ///
     /// [`pointer::add()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.add-1
-    unsafe fn ptrs_add_mut<'a>(
+    unsafe fn mut_ptrs_add<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
         count: usize,
@@ -69,7 +69,7 @@ where
     /// or else this method could panic.
     ///
     /// [`pointer::offset_from()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.offset_from-1
-    unsafe fn ptrs_offset_from_mut(&self, ptrs: Self::MutPtrs<'_>, origin: Self::Ptrs<'_>)
+    unsafe fn mut_ptrs_offset_from(&self, ptrs: Self::MutPtrs<'_>, origin: Self::Ptrs<'_>)
     -> isize;
 
     /// Converts [pointers](RawSoaContext::Ptrs) of each stored field
@@ -220,7 +220,7 @@ where
         let len = self.mut_slice_ptrs_len(&slices);
         let ptrs = self.mut_slice_ptrs_as_ptrs(slices);
         for index in 0..len {
-            let to_drop = unsafe { self.ptrs_add_mut(ptrs.clone(), index) };
+            let to_drop = unsafe { self.mut_ptrs_add(ptrs.clone(), index) };
             unsafe { self.ptrs_drop_in_place(to_drop) }
         }
     }

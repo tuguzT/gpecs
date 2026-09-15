@@ -324,7 +324,7 @@ where
         let ptrs = ptrs.into_inner();
         let left = unsafe { Self::from_parts(context, ptrs.clone(), mid) };
         let right = unsafe {
-            let ptrs = context.ptrs_add_mut(ptrs, mid);
+            let ptrs = context.mut_ptrs_add(ptrs, mid);
             Self::from_parts(context, ptrs, len.unchecked_sub(mid))
         };
         (left, right)
@@ -388,7 +388,7 @@ where
 {
     #[inline]
     fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.ptrs_dangling_mut();
+        let ptrs = context.mut_ptrs_dangling();
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }

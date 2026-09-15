@@ -38,12 +38,12 @@ unsafe impl<T> RawSoaContext<Identity<T>> for () {
     }
 
     #[inline]
-    fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
+    fn mut_ptrs_dangling(&self) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
     }
 
     #[inline]
-    unsafe fn ptrs_add_mut<'a>(
+    unsafe fn mut_ptrs_add<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
         count: usize,
@@ -52,7 +52,7 @@ unsafe impl<T> RawSoaContext<Identity<T>> for () {
     }
 
     #[inline]
-    unsafe fn ptrs_offset_from_mut(
+    unsafe fn mut_ptrs_offset_from(
         &self,
         ptrs: Self::MutPtrs<'_>,
         origin: Self::Ptrs<'_>,

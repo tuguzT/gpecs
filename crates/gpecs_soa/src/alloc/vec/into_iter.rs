@@ -108,7 +108,7 @@ where
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 

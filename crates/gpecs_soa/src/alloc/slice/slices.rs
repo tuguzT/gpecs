@@ -34,7 +34,7 @@ where
             for (index, src) in self.raw_iter().enumerate() {
                 set_len_on_drop.local_len = index;
 
-                let dst = unsafe { context.ptrs_add_mut(dst.clone(), index) };
+                let dst = unsafe { context.mut_ptrs_add(dst.clone(), index) };
                 unsafe { context.ptrs_clone_to_uninit(src, dst) }
             }
         }

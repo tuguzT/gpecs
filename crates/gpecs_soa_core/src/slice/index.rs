@@ -1464,7 +1464,7 @@ where
     T: RawSoa + ?Sized,
 {
     let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
-    unsafe { context.ptrs_add_mut(ptrs, offset) }
+    unsafe { context.mut_ptrs_add(ptrs, offset) }
 }
 
 /// Copy of private `core::slice::index::get_offset_len_noubcheck()`.

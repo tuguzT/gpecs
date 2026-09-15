@@ -434,7 +434,7 @@ where
         }
 
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, len) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, len) };
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, old_len - len);
         unsafe { context.slices_drop_in_place(slices) }
     }
@@ -523,7 +523,7 @@ where
 
         let Self { buffer, .. } = self;
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
+        let dst = unsafe { context.mut_ptrs_add(ptrs.clone(), index) };
 
         let ptrs_into = dst.clone();
         let result = f(context, ptrs_into);
@@ -572,7 +572,7 @@ where
 
         let Self { buffer, .. } = self;
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
+        let dst = unsafe { context.mut_ptrs_add(ptrs, index) };
 
         let ptrs_into = dst.clone();
         let result = f(context, ptrs_into);
@@ -615,7 +615,7 @@ where
         let Self { buffer, .. } = self;
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs_into = unsafe { context.ptrs_add_mut(ptrs, len - 1) };
+        let ptrs_into = unsafe { context.mut_ptrs_add(ptrs, len - 1) };
         let result = f(context, Some(ptrs_into));
 
         let new_len = len - 1;
@@ -667,10 +667,10 @@ where
 
         if index < len {
             let (context, ptrs) = self.as_mut_ptrs_with_context();
-            let ptrs = unsafe { context.ptrs_add_mut(ptrs, index) };
+            let ptrs = unsafe { context.mut_ptrs_add(ptrs, index) };
 
             let src = context.ptrs_cast_const(ptrs.clone());
-            let dst = unsafe { context.ptrs_add_mut(ptrs, 1) };
+            let dst = unsafe { context.mut_ptrs_add(ptrs, 1) };
             unsafe { context.ptrs_copy_forward(src, dst, len - index) }
         }
 
@@ -694,7 +694,7 @@ where
 
                 if index < len {
                     let (context, ptrs) = buffer.as_ptrs_with_context();
-                    let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
+                    let dst = unsafe { context.mut_ptrs_add(ptrs, index) };
                     let src = context.ptrs_cast_const(dst.clone());
                     let src = unsafe { context.ptrs_add(src, 1) };
                     unsafe { context.ptrs_copy_backward(src, dst, len - index) }
@@ -706,7 +706,7 @@ where
         let guard = CopyBackGuard { buffer, index, len };
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, index) };
+        let ptrs_from = unsafe { context.mut_ptrs_add(ptrs, index) };
         let result = f(context, ptrs_from);
 
         let new_len = len + 1;
@@ -747,7 +747,7 @@ where
         let Self { buffer, .. } = self;
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, len) };
+        let ptrs_from = unsafe { context.mut_ptrs_add(ptrs, len) };
         let result = f(context, ptrs_from);
 
         let new_len = len + 1;
@@ -801,7 +801,7 @@ where
         let slices = unsafe { get_unchecked_from::<T, _>(context, slices, range) };
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
-                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
+                let dst = context.mut_ptrs_add(dst.clone(), set_len_on_drop.local_len);
                 context.ptrs_clone_to_uninit(src, dst);
             }
             set_len_on_drop.local_len += 1;
@@ -859,7 +859,7 @@ where
         let slices = context.slice_ptrs_cast_const(slices);
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
-                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
+                let dst = context.mut_ptrs_add(dst.clone(), set_len_on_drop.local_len);
                 context.ptrs_clone_to_uninit(src, dst);
             }
             set_len_on_drop.local_len += 1;
@@ -961,7 +961,7 @@ where
                     unsafe {
                         let src = context.ptrs_cast_const(ptrs.clone());
                         let src = context.ptrs_add(src, processed_len);
-                        let dst = context.ptrs_add_mut(ptrs, processed_len - deleted_cnt);
+                        let dst = context.mut_ptrs_add(ptrs, processed_len - deleted_cnt);
                         context.ptrs_copy_forward(src, dst, original_len - processed_len);
                     }
                 }
@@ -991,7 +991,7 @@ where
             while g.processed_len != original_len {
                 let (context, ptrs) = g.v.as_mut_ptrs_with_context();
                 // SAFETY: Unchecked element must be valid.
-                let cur = unsafe { context.ptrs_add_mut(ptrs.clone(), g.processed_len) };
+                let cur = unsafe { context.mut_ptrs_add(ptrs.clone(), g.processed_len) };
                 let res = unsafe {
                     let cur = context.mut_refs_from_mut_ptrs(cur.clone());
                     !f(context, cur)
@@ -1015,7 +1015,7 @@ where
                     // We use copy for move, and never touch this element again.
                     unsafe {
                         let src = context.ptrs_cast_const(cur);
-                        let dst = context.ptrs_add_mut(ptrs, g.processed_len - g.deleted_cnt);
+                        let dst = context.mut_ptrs_add(ptrs, g.processed_len - g.deleted_cnt);
                         context.ptrs_copy_nonoverlapping(src, dst, 1);
                     }
                 }
@@ -1406,7 +1406,7 @@ where
 
             let (context, ptrs) = self.as_mut_ptrs_with_context();
             unsafe {
-                let dst = context.ptrs_add_mut(ptrs, len);
+                let dst = context.mut_ptrs_add(ptrs, len);
                 context.ptrs_write(dst, element);
             }
 

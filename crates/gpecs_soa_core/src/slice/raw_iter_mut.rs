@@ -89,7 +89,7 @@ where
         } = *self;
 
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 
@@ -130,7 +130,7 @@ where
         } = self;
 
         let ptrs = ptrs.into_inner();
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 
@@ -174,7 +174,7 @@ where
 
         let len = self.len();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -220,7 +220,7 @@ where
         } = self;
 
         let ptrs = ptrs.into_inner();
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -251,7 +251,7 @@ where
     ) -> MutPtrs<'b, T> {
         let old_start = *start;
         *start += offset;
-        unsafe { context.ptrs_add_mut(ptrs, old_start) }
+        unsafe { context.mut_ptrs_add(ptrs, old_start) }
     }
 
     #[inline]
@@ -262,7 +262,7 @@ where
         offset: usize,
     ) -> MutPtrs<'b, T> {
         *end -= offset;
-        unsafe { context.ptrs_add_mut(ptrs, *end) }
+        unsafe { context.mut_ptrs_add(ptrs, *end) }
     }
 }
 
@@ -272,7 +272,7 @@ where
 {
     #[inline]
     fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.ptrs_dangling_mut();
+        let ptrs = context.mut_ptrs_dangling();
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, 0);
         Self::new(context, slices)
     }
@@ -405,7 +405,7 @@ where
             // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
-            let item = unsafe { context.ptrs_add_mut(ptrs, i) };
+            let item = unsafe { context.mut_ptrs_add(ptrs, i) };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop

@@ -258,7 +258,7 @@ where
 
                     let src = context.ptrs_cast_const(ptrs.clone());
                     let src = unsafe { context.ptrs_add(src, tail) };
-                    let dst = unsafe { context.ptrs_add_mut(ptrs, start) };
+                    let dst = unsafe { context.mut_ptrs_add(ptrs, start) };
                     unsafe { context.ptrs_copy_forward(src, dst, tail_len) }
                 }
                 unsafe { vec.set_len(start + tail_len) }
@@ -308,7 +308,7 @@ where
             let drop_offset = context.ptrs_offset_from(drop_ptrs, origin);
             let drop_offset = usize::try_from(drop_offset).unwrap_unchecked();
 
-            let ptrs = context.ptrs_add_mut(vec_ptrs, drop_offset);
+            let ptrs = context.mut_ptrs_add(vec_ptrs, drop_offset);
             let to_drop = context.mut_slice_ptrs_from_raw_parts(ptrs, drop_len);
             context.slices_drop_in_place(to_drop);
         }

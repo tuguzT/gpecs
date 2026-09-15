@@ -37,7 +37,7 @@ where
     #[inline]
     pub fn dangling(context: &'ctx V::Context) -> Self {
         let key = P::dangling();
-        let value = context.ptrs_dangling_mut();
+        let value = context.mut_ptrs_dangling();
         Self::new(key, value)
     }
 
@@ -62,7 +62,7 @@ where
         let (key, value) = self.into_parts();
 
         let key = unsafe { key.add(count) };
-        let value = unsafe { context.ptrs_add_mut(value, count) };
+        let value = unsafe { context.mut_ptrs_add(value, count) };
         Self::new(key, value)
     }
 
@@ -76,7 +76,7 @@ where
         let (origin_key, origin_value) = origin.into_parts();
 
         let key_offset = unsafe { key.cast_const().offset_from(origin_key) };
-        let values_offset = unsafe { context.ptrs_offset_from_mut(value, origin_value) };
+        let values_offset = unsafe { context.mut_ptrs_offset_from(value, origin_value) };
         assert_eq!(key_offset, values_offset);
 
         key_offset

@@ -5,6 +5,7 @@ use core::{
 
 use crate::traits::{
     CloneToUninitSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+    mut_slice_ptrs_as_ptrs, mut_slice_ptrs_len, slice_ptrs_as_ptrs, slice_ptrs_len,
 };
 
 macro_rules! tuple_impl {
@@ -304,8 +305,8 @@ macro_rules! tuple_impl {
                 &'a self,
                 slices: Self::SlicePtrs<'a>,
             ) -> Self::Slices<'a> {
-                let data = RawSoaContext::<($($types,)*)>::slice_ptrs_as_ptrs(self, slices);
-                let len = RawSoaContext::<($($types,)*)>::slice_ptrs_len(self, &slices);
+                let data = slice_ptrs_as_ptrs::<($($types,)*)>(self, slices);
+                let len = slice_ptrs_len::<($($types,)*)>(self, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
                 slices
             }
@@ -337,8 +338,8 @@ macro_rules! tuple_impl {
                 &'a self,
                 slices: Self::SliceMutPtrs<'a>,
             ) -> Self::SlicesMut<'a> {
-                let data = RawSoaContext::<($($types,)*)>::mut_slice_ptrs_as_ptrs(self, slices);
-                let len = RawSoaContext::<($($types,)*)>::mut_slice_ptrs_len(self, &slices);
+                let data = mut_slice_ptrs_as_ptrs::<($($types,)*)>(self, slices);
+                let len = mut_slice_ptrs_len::<($($types,)*)>(self, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) };
                 slices
             }

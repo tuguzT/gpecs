@@ -268,6 +268,275 @@ pub unsafe trait RawSoa {
     type Fields: ?Sized;
 }
 
+#[inline]
+pub fn ptrs_upcast<'short, 'long: 'short, T>(from: Ptrs<'long, T>) -> Ptrs<'short, T>
+where
+    T: RawSoa + ?Sized,
+{
+    T::Context::ptrs_upcast(from)
+}
+
+#[inline]
+pub fn ptrs_dangling<T>(context: &T::Context) -> Ptrs<'_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.ptrs_dangling()
+}
+
+#[inline]
+pub unsafe fn ptrs_add<'a, T>(
+    context: &'a T::Context,
+    ptrs: Ptrs<'a, T>,
+    count: usize,
+) -> Ptrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.ptrs_add(ptrs, count) }
+}
+
+#[inline]
+pub unsafe fn ptrs_offset_from<T>(
+    context: &T::Context,
+    ptrs: Ptrs<'_, T>,
+    origin: Ptrs<'_, T>,
+) -> isize
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.ptrs_offset_from(ptrs, origin) }
+}
+
+#[inline]
+pub fn mut_ptrs_upcast<'short, 'long: 'short, T>(from: MutPtrs<'long, T>) -> MutPtrs<'short, T>
+where
+    T: RawSoa + ?Sized,
+{
+    T::Context::mut_ptrs_upcast(from)
+}
+
+#[inline]
+pub fn mut_ptrs_dangling<T>(context: &T::Context) -> MutPtrs<'_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.mut_ptrs_dangling()
+}
+
+#[inline]
+pub unsafe fn mut_ptrs_add<'a, T>(
+    context: &'a T::Context,
+    ptrs: MutPtrs<'a, T>,
+    count: usize,
+) -> MutPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.mut_ptrs_add(ptrs, count) }
+}
+
+#[inline]
+pub unsafe fn mut_ptrs_offset_from<T>(
+    context: &T::Context,
+    ptrs: MutPtrs<'_, T>,
+    origin: Ptrs<'_, T>,
+) -> isize
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.mut_ptrs_offset_from(ptrs, origin) }
+}
+
+#[inline]
+pub fn ptrs_cast_const<'a, T>(context: &'a T::Context, ptrs: MutPtrs<'a, T>) -> Ptrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.ptrs_cast_const(ptrs)
+}
+
+#[inline]
+pub fn ptrs_cast_mut<'a, T>(context: &'a T::Context, ptrs: Ptrs<'a, T>) -> MutPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.ptrs_cast_mut(ptrs)
+}
+
+#[inline]
+pub unsafe fn ptrs_swap_nonoverlapping<T>(
+    context: &T::Context,
+    x: MutPtrs<'_, T>,
+    y: MutPtrs<'_, T>,
+    count: usize,
+) where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.ptrs_swap_nonoverlapping(x, y, count) }
+}
+
+#[inline]
+pub unsafe fn ptrs_copy_nonoverlapping<T>(
+    context: &T::Context,
+    src: Ptrs<'_, T>,
+    dst: MutPtrs<'_, T>,
+    count: usize,
+) where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.ptrs_copy_nonoverlapping(src, dst, count) }
+}
+
+#[inline]
+pub unsafe fn ptrs_drop_in_place<T>(context: &T::Context, to_drop: MutPtrs<'_, T>)
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.ptrs_drop_in_place(to_drop) }
+}
+
+#[inline]
+pub fn nonnull_ptrs_upcast<'short, 'long: 'short, T>(
+    from: NonNullPtrs<'long, T>,
+) -> NonNullPtrs<'short, T>
+where
+    T: RawSoa + ?Sized,
+{
+    T::Context::nonnull_ptrs_upcast(from)
+}
+
+#[inline]
+pub unsafe fn nonnull_ptrs_from_mut_ptrs<'a, T>(
+    context: &'a T::Context,
+    ptrs: MutPtrs<'a, T>,
+) -> NonNullPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_from_mut_ptrs(ptrs) }
+}
+
+#[inline]
+pub fn nonnull_ptrs_as_mut_ptrs<'a, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+) -> MutPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.nonnull_ptrs_as_mut_ptrs(ptrs)
+}
+
+#[inline]
+pub fn slice_ptrs_upcast<'short, 'long: 'short, T>(
+    from: SlicePtrs<'long, T>,
+) -> SlicePtrs<'short, T>
+where
+    T: RawSoa + ?Sized,
+{
+    T::Context::slice_ptrs_upcast(from)
+}
+
+#[inline]
+pub fn slice_ptrs_from_raw_parts<'a, T>(
+    context: &'a T::Context,
+    data: Ptrs<'a, T>,
+    len: usize,
+) -> SlicePtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.slice_ptrs_from_raw_parts(data, len)
+}
+
+#[inline]
+pub fn slice_ptrs_len<T>(context: &T::Context, slices: &SlicePtrs<'_, T>) -> usize
+where
+    T: RawSoa + ?Sized,
+{
+    context.slice_ptrs_len(slices)
+}
+
+#[inline]
+pub fn slice_ptrs_as_ptrs<'a, T>(context: &'a T::Context, slices: SlicePtrs<'a, T>) -> Ptrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.slice_ptrs_as_ptrs(slices)
+}
+
+#[inline]
+pub fn mut_slice_ptrs_upcast<'short, 'long: 'short, T>(
+    from: SliceMutPtrs<'long, T>,
+) -> SliceMutPtrs<'short, T>
+where
+    T: RawSoa + ?Sized,
+{
+    T::Context::mut_slice_ptrs_upcast(from)
+}
+
+#[inline]
+pub fn mut_slice_ptrs_from_raw_parts<'a, T>(
+    context: &'a T::Context,
+    data: MutPtrs<'a, T>,
+    len: usize,
+) -> SliceMutPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.mut_slice_ptrs_from_raw_parts(data, len)
+}
+
+#[inline]
+pub fn mut_slice_ptrs_len<T>(context: &T::Context, slices: &SliceMutPtrs<'_, T>) -> usize
+where
+    T: RawSoa + ?Sized,
+{
+    context.mut_slice_ptrs_len(slices)
+}
+
+#[inline]
+pub fn mut_slice_ptrs_as_ptrs<'a, T>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+) -> MutPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.mut_slice_ptrs_as_ptrs(slices)
+}
+
+#[inline]
+pub fn slice_ptrs_cast_const<'a, T>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+) -> SlicePtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.slice_ptrs_cast_const(slices)
+}
+
+#[inline]
+pub fn slice_ptrs_cast_mut<'a, T>(
+    context: &'a T::Context,
+    slices: SlicePtrs<'a, T>,
+) -> SliceMutPtrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.slice_ptrs_cast_mut(slices)
+}
+
+#[inline]
+pub unsafe fn slices_drop_in_place<T>(context: &T::Context, slices_to_drop: SliceMutPtrs<'_, T>)
+where
+    T: RawSoa + ?Sized,
+{
+    unsafe { context.slices_drop_in_place(slices_to_drop) }
+}
+
 /// An extension of [SoA context](RawSoaContext) type which allows to perform copy-assignment of each stored field.
 ///
 /// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
@@ -290,6 +559,14 @@ where
     T: RawSoa + ?Sized,
     T::Context: CloneToUninitSoaContext<T>,
 {
+}
+
+#[inline]
+pub unsafe fn ptrs_clone_to_uninit<T>(context: &T::Context, src: Ptrs<'_, T>, dst: MutPtrs<'_, T>)
+where
+    T: SoaCloneToUninit + ?Sized,
+{
+    unsafe { context.ptrs_clone_to_uninit(src, dst) }
 }
 
 /// An extension of [SoA context](RawSoaContext) type which allows to read a value borrowed from self
@@ -319,6 +596,14 @@ where
     T: RawSoa + ?Sized,
     T::Context: ReadSoaContext<'a, T, R>,
 {
+}
+
+#[inline]
+pub unsafe fn ptrs_read<'a, T, R>(context: &'a T::Context, src: Ptrs<'a, T>) -> R
+where
+    T: SoaRead<'a, R> + ?Sized,
+{
+    unsafe { context.ptrs_read(src) }
 }
 
 /// An extension of [SoA](RawSoa) type which allows to read a value of *any* lifetime
@@ -351,6 +636,14 @@ where
     T: RawSoa + ?Sized,
     T::Context: WriteSoaContext<T, W>,
 {
+}
+
+#[inline]
+pub unsafe fn ptrs_write<T, W>(context: &T::Context, dst: MutPtrs<'_, T>, value: W)
+where
+    T: SoaWrite<W> + ?Sized,
+{
+    unsafe { context.ptrs_write(dst, value) }
 }
 
 /// An extension of [SoA context](RawSoaContext) type which provides
@@ -488,6 +781,169 @@ where
     T: RawSoa + ?Sized,
     T::Context: SoaContext<'a, T>,
 {
+}
+
+#[inline]
+pub fn refs_upcast<'short, 'long: 'short, 'data, T>(
+    from: Refs<'long, 'data, T>,
+) -> Refs<'short, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    T::Context::refs_upcast(from)
+}
+
+#[inline]
+pub unsafe fn refs_from_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    ptrs: Ptrs<'a, T>,
+) -> Refs<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.refs_from_ptrs(ptrs) }
+}
+
+#[inline]
+pub fn refs_as_ptrs<'a, 'data, T>(context: &'a T::Context, refs: Refs<'a, 'data, T>) -> Ptrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.refs_as_ptrs(refs)
+}
+
+#[inline]
+pub fn mut_refs_upcast<'short, 'long: 'short, 'data, T>(
+    from: RefsMut<'long, 'data, T>,
+) -> RefsMut<'short, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    T::Context::mut_refs_upcast(from)
+}
+
+#[inline]
+pub unsafe fn mut_refs_from_mut_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    ptrs: MutPtrs<'a, T>,
+) -> RefsMut<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.mut_refs_from_mut_ptrs(ptrs) }
+}
+
+#[inline]
+pub fn mut_refs_as_mut_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    refs: RefsMut<'a, 'data, T>,
+) -> MutPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_refs_as_mut_ptrs(refs)
+}
+
+#[inline]
+pub fn mut_refs_as_refs<'a, 'data, T>(
+    context: &'a T::Context,
+    refs: RefsMut<'a, 'data, T>,
+) -> Refs<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_refs_as_refs(refs)
+}
+
+#[inline]
+pub fn slices_upcast<'short, 'long: 'short, 'data, T>(
+    from: Slices<'long, 'data, T>,
+) -> Slices<'short, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    T::Context::slices_upcast(from)
+}
+
+#[inline]
+pub unsafe fn slices_from_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicePtrs<'a, T>,
+) -> Slices<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.slices_from_slice_ptrs(slices) }
+}
+
+#[inline]
+pub fn slices_as_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: Slices<'a, 'data, T>,
+) -> SlicePtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.slices_as_slice_ptrs(slices)
+}
+
+#[inline]
+pub fn slices_len<'data, T>(context: &T::Context, slices: &Slices<'_, 'data, T>) -> usize
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.slices_len(slices)
+}
+
+#[inline]
+pub fn mut_slices_upcast<'short, 'long: 'short, 'data, T>(
+    from: SlicesMut<'long, 'data, T>,
+) -> SlicesMut<'short, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    T::Context::mut_slices_upcast(from)
+}
+
+#[inline]
+pub unsafe fn mut_slices_from_mut_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+) -> SlicesMut<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+}
+
+#[inline]
+pub fn mut_slices_as_mut_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> SliceMutPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_mut_slice_ptrs(slices)
+}
+
+#[inline]
+pub fn mut_slices_len<'data, T>(context: &T::Context, slices: &SlicesMut<'_, 'data, T>) -> usize
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_len(slices)
+}
+
+#[inline]
+pub fn mut_slices_as_slices<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> Slices<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_slices(slices)
 }
 
 /// An extension of [SoA](RawSoa) type which allows to access

@@ -1,6 +1,9 @@
 use std::{array, cmp::Reverse, convert::identity, hash::BuildHasher};
 
-use gpecs_soa_core::prelude::*;
+use gpecs_soa_core::{
+    prelude::*,
+    traits::{mut_slices_from_mut_slice_ptrs, slices_from_slice_ptrs},
+};
 use itertools::assert_equal;
 use rustc_hash::FxBuildHasher;
 
@@ -876,7 +879,7 @@ fn three_items() {
     );
 
     let sub_slices = unsafe { slices_mut.get_unchecked(..=0) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (
@@ -888,8 +891,7 @@ fn three_items() {
     );
 
     let sub_slices = unsafe { slices_mut.get_unchecked_mut(..=1) };
-    let sub_slices =
-        unsafe { SoaContext::<Item>::mut_slices_from_mut_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { mut_slices_from_mut_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (
@@ -923,7 +925,7 @@ fn three_items() {
     );
 
     let sub_slices = unsafe { slices.into_get_unchecked(..1) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (
@@ -1074,12 +1076,12 @@ fn three_items_unit() {
     assert_eq!(slices_mut.as_mut_slices(), [(); 3]);
 
     let sub_slices = unsafe { slices_mut.get_unchecked(..=0) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(sub_slices, [()]);
 
     let sub_slices_mut = unsafe { slices_mut.get_unchecked_mut(..=1) };
     let sub_slices_mut =
-        unsafe { SoaContext::<Item>::mut_slices_from_mut_slice_ptrs(&context, sub_slices_mut) };
+        unsafe { mut_slices_from_mut_slice_ptrs::<Item>(&context, sub_slices_mut) };
     assert_eq!(sub_slices_mut, [(); 2]);
 
     let slices = Slices::from(slices_mut);
@@ -1093,7 +1095,7 @@ fn three_items_unit() {
     assert_eq!(format!("{slices:?}"), "SoaSlices([(), (), ()])");
 
     let sub_slices = unsafe { slices.into_get_unchecked(..1) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(sub_slices, [()]);
 
     let mut iter = slices.into_iter();
@@ -1245,12 +1247,12 @@ fn three_items_identity() {
     assert_eq!(slices_mut.as_mut_slices(), [1.into(), 2.into(), 4.into()]);
 
     let sub_slices = unsafe { slices_mut.get_unchecked(..=0) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(sub_slices, [1.into()]);
 
     let sub_slices_mut = unsafe { slices_mut.get_unchecked_mut(..=1) };
     let sub_slices_mut =
-        unsafe { SoaContext::<Item>::mut_slices_from_mut_slice_ptrs(&context, sub_slices_mut) };
+        unsafe { mut_slices_from_mut_slice_ptrs::<Item>(&context, sub_slices_mut) };
     assert_eq!(sub_slices_mut, [1.into(), 2.into()]);
 
     let slices = Slices::from(slices_mut);
@@ -1267,7 +1269,7 @@ fn three_items_identity() {
     );
 
     let sub_slices = unsafe { slices.into_get_unchecked(..1) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(sub_slices, [1.into()]);
 
     let mut iter = slices.into_iter();
@@ -1457,7 +1459,7 @@ fn three_items_zst() {
     );
 
     let sub_slices = unsafe { slices_mut.get_unchecked(..=0) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (
@@ -1468,8 +1470,7 @@ fn three_items_zst() {
     );
 
     let sub_slices = unsafe { slices_mut.get_unchecked_mut(..=1) };
-    let sub_slices =
-        unsafe { SoaContext::<Item>::mut_slices_from_mut_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { mut_slices_from_mut_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (
@@ -1501,7 +1502,7 @@ fn three_items_zst() {
     );
 
     let sub_slices = unsafe { slices.into_get_unchecked(..1) };
-    let sub_slices = unsafe { SoaContext::<Item>::slices_from_slice_ptrs(&context, sub_slices) };
+    let sub_slices = unsafe { slices_from_slice_ptrs::<Item>(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (

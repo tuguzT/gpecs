@@ -285,7 +285,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+    unsafe fn mut_ptrs_from_buffer(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         unsafe { Self::ptrs_from_buffer_mut(self, buffer, capacity) }
     }
 

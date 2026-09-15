@@ -101,7 +101,7 @@ where
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](AllocSoaContext::buffer_layout) method.
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
+    unsafe fn mut_ptrs_from_buffer(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in the *same* order as they are stored in a buffer.
@@ -197,7 +197,7 @@ where
 }
 
 #[inline]
-pub unsafe fn ptrs_from_buffer_mut<T>(
+pub unsafe fn mut_ptrs_from_buffer<T>(
     context: &T::Context,
     buffer: *mut u8,
     capacity: usize,
@@ -205,7 +205,7 @@ pub unsafe fn ptrs_from_buffer_mut<T>(
 where
     T: AllocSoa + ?Sized,
 {
-    unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }
+    unsafe { context.mut_ptrs_from_buffer(buffer, capacity) }
 }
 
 #[inline]

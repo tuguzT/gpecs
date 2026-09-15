@@ -325,7 +325,7 @@ where
         return context.mut_ptrs_dangling();
     };
 
-    unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }
+    unsafe { context.mut_ptrs_from_buffer(buffer, capacity) }
 }
 
 #[inline]

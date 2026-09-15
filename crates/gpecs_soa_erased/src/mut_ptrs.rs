@@ -181,7 +181,7 @@ where
             return Err(DowncastError::new(self, error));
         }
 
-        let ptrs = unsafe { context.ptrs_from_buffer_mut(buffer.cast(), capacity) };
+        let ptrs = unsafe { context.mut_ptrs_from_buffer(buffer.cast(), capacity) };
         let ptrs = unsafe { context.mut_ptrs_add(ptrs, offset) };
         Ok(ptrs)
     }

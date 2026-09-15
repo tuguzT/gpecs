@@ -138,7 +138,7 @@ where
         }
 
         unsafe {
-            let ptrs = context.ptrs_from_buffer_mut(buffer.as_ptr().cast(), capacity);
+            let ptrs = context.mut_ptrs_from_buffer(buffer.as_ptr().cast(), capacity);
             let ptrs = context.mut_ptrs_add(ptrs, offset);
             let ptrs = context.nonnull_ptrs_from_mut_ptrs(ptrs);
             Ok(ptrs)

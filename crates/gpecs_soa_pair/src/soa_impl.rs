@@ -307,7 +307,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+    unsafe fn mut_ptrs_from_buffer(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         let context = self.as_inner();
 
         let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
@@ -319,7 +319,7 @@ where
             P::Mut::from_slice(slice, 0)
         };
         let buffer = unsafe { buffer.add(offset) };
-        let value = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
+        let value = unsafe { context.mut_ptrs_from_buffer(buffer, capacity) };
         KeyValueMutPtrs::new(key, value)
     }
 

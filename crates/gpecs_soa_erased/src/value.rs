@@ -406,7 +406,7 @@ where
 
         let layouts = context.field_layouts().into_iter().collect();
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
+            let dst = context.mut_ptrs_from_buffer(storage.as_mut_ptr().cast(), 1);
             context.ptrs_write(dst, value);
         }
 
@@ -456,7 +456,7 @@ where
         let (value, mut storage) = check_from_layouts_value(f, value)?;
 
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
+            let dst = context.mut_ptrs_from_buffer(storage.as_mut_ptr().cast(), 1);
             context.ptrs_write(dst, value);
         }
 
@@ -490,7 +490,7 @@ where
 
         let layouts = context.field_layouts().into_iter().collect();
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
+            let dst = context.mut_ptrs_from_buffer(storage.as_mut_ptr().cast(), 1);
             context.ptrs_write(dst, value);
         }
 

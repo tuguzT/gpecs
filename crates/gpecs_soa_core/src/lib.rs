@@ -13,3 +13,7 @@ pub mod ptr;
 pub mod slice;
 pub mod traits;
 pub mod wrapper;
+
+pub mod ptrs;
+pub mod refs;
+pub mod slices;

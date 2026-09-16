@@ -1042,7 +1042,7 @@ where
         self.try_insert_from(key, |context, dst| match dst {
             Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
                 let dst = dst.into_ptrs();
-                let value = unsafe { soa::ptr::replace::<V, R, W>(context, dst, value) };
+                let value = unsafe { soa::ptrs::replace::<V, R, W>(context, dst, value) };
                 Ok(Some(value))
             }
             Ok(Some(TryInsertAccess::WriteOnly(dst))) => {

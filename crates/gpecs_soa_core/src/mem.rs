@@ -1,5 +1,5 @@
 use crate::{
-    ptr,
+    ptrs,
     traits::{RawSoaContext, RefsMut, Soa, SoaContext, SoaRead, SoaWrite},
 };
 
@@ -13,7 +13,7 @@ where
     T: Soa<'data> + SoaRead<'a, R> + SoaWrite<W> + ?Sized,
 {
     let dest = context.mut_refs_as_mut_ptrs(dest);
-    unsafe { ptr::replace::<T, R, W>(context, dest, src) }
+    unsafe { ptrs::replace::<T, R, W>(context, dest, src) }
 }
 
 /// Version of [`core::mem::swap()`] but for [SoA](Soa) types.

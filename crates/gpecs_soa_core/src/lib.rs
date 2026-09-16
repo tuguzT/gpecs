@@ -9,11 +9,9 @@ pub use gpecs_identity as identity;
 
 pub mod mem;
 pub mod prelude;
-pub mod ptr;
-pub mod slice;
-pub mod traits;
-pub mod wrapper;
-
 pub mod ptrs;
 pub mod refs;
+pub mod slice;
 pub mod slices;
+pub mod traits;
+pub mod wrapper;

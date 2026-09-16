@@ -184,54 +184,6 @@ where
     context.capacity_from(buffer_layout)
 }
 
-#[inline]
-pub unsafe fn ptrs_from_buffer<T>(
-    context: &T::Context,
-    buffer: *const u8,
-    capacity: usize,
-) -> Ptrs<'_, T>
-where
-    T: AllocSoa + ?Sized,
-{
-    unsafe { context.ptrs_from_buffer(buffer, capacity) }
-}
-
-#[inline]
-pub unsafe fn mut_ptrs_from_buffer<T>(
-    context: &T::Context,
-    buffer: *mut u8,
-    capacity: usize,
-) -> MutPtrs<'_, T>
-where
-    T: AllocSoa + ?Sized,
-{
-    unsafe { context.mut_ptrs_from_buffer(buffer, capacity) }
-}
-
-#[inline]
-pub unsafe fn ptrs_copy_forward<T>(
-    context: &T::Context,
-    src: Ptrs<'_, T>,
-    dst: MutPtrs<'_, T>,
-    count: usize,
-) where
-    T: AllocSoa + ?Sized,
-{
-    unsafe { context.ptrs_copy_forward(src, dst, count) }
-}
-
-#[inline]
-pub unsafe fn ptrs_copy_backward<T>(
-    context: &T::Context,
-    src: Ptrs<'_, T>,
-    dst: MutPtrs<'_, T>,
-    count: usize,
-) where
-    T: AllocSoa + ?Sized,
-{
-    unsafe { context.ptrs_copy_backward(src, dst, count) }
-}
-
 /// Marker trait which places additional safety requirements
 /// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
 ///

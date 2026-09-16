@@ -1,3 +1,5 @@
+use core::mem::ManuallyDrop;
+
 use crate::{
     refs, slices,
     traits::{
@@ -329,4 +331,19 @@ where
     T: SoaWrite<W> + ?Sized,
 {
     unsafe { context.ptrs_write(dst, value) }
+}
+
+/// Version of [`core::ptr::replace()`] but for [SoA](RawSoa) types.
+pub unsafe fn replace<'a, T, R, W>(context: &'a T::Context, dst: MutPtrs<'a, T>, src: W) -> R
+where
+    T: SoaRead<'a, R> + SoaWrite<W> + ?Sized,
+{
+    let result = unsafe {
+        let src = context.ptrs_cast_const(dst.clone());
+        context.ptrs_read(src)
+    };
+    let slot = ManuallyDrop::new(result);
+
+    unsafe { context.ptrs_write(dst, src) }
+    ManuallyDrop::into_inner(slot)
 }

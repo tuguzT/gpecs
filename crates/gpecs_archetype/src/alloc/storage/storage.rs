@@ -580,7 +580,7 @@ where
                 let Ok(dst) = dst.into_ptrs().downcast::<B>(components) else {
                     unreachable!("exact archetype compatibility should be already checked")
                 };
-                let value = unsafe { soa::ptr::replace::<B, B, B>(B::CONTEXT, dst, value) };
+                let value = unsafe { soa::ptrs::replace::<B, B, B>(B::CONTEXT, dst, value) };
                 Some(value)
             }
             TryInsertAccess::WriteOnly(dst) => {
@@ -709,7 +709,7 @@ where
                     .downcast::<B>(components)
                     .map_err(DowncastError::into_source)
                     .expect("archetype compatibility should have been checked earlier");
-                let _ = unsafe { soa::ptr::replace::<B, B, B>(B::CONTEXT, dst, value) };
+                let _ = unsafe { soa::ptrs::replace::<B, B, B>(B::CONTEXT, dst, value) };
             });
         });
         Ok(())

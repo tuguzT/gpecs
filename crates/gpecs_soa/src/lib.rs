@@ -15,6 +15,7 @@ pub use self::alloc::vec;
 pub mod field;
 pub mod prelude;
 pub mod ptr;
+pub mod ptrs;
 pub mod slice;
 pub mod traits;
 

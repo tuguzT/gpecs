@@ -165,7 +165,7 @@ where
 
         let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
         let previous = unwrap_dense(values, *dense_index);
-        unsafe { soa::ptr::replace::<C::Value, R, W>(context, previous, value) }
+        unsafe { soa::ptrs::replace::<C::Value, R, W>(context, previous, value) }
     }
 
     #[inline]

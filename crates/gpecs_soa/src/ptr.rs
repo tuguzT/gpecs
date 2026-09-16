@@ -1,5 +1,3 @@
-pub use gpecs_soa_core::ptr::*;
-
 use crate::{slice::SoaSlice, traits::AllocSoaTrusted};
 
 #[inline]

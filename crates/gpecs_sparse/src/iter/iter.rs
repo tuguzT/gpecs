@@ -9,7 +9,7 @@ use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 
 use crate::{
     item::{KeyValuePair, KeyValueSlicePtrs, KeyValueSlices},
-    iter::{Keys, RawIter, Values},
+    iter::{IterPtrs, Keys, Values},
     soa::{
         self,
         identity::Identity,
@@ -138,9 +138,9 @@ where
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'ctx, K, V, P> {
+    pub fn into_iter_ptrs(self) -> IterPtrs<'ctx, K, V, P> {
         let Self { inner } = self;
-        RawIter::from_inner(inner.into_raw_iter())
+        IterPtrs::from_inner(inner.into_iter_ptrs())
     }
 }
 
@@ -175,7 +175,7 @@ where
 
     #[inline]
     pub fn into_keys(self) -> Keys<'ctx, 'a, K, V> {
-        let inner = self.into_raw_iter().into_raw_keys();
+        let inner = self.into_iter_ptrs().into_key_ptrs();
         unsafe { Keys::from_inner(inner) }
     }
 

@@ -16,7 +16,7 @@ use gpecs_soa_erased::{
 
 use crate::{erased::ErasedArchetypeView, storage::ErasedArchetypeSoa};
 
-type Inner<'ctx, T> = gpecs_sparse::iter::RawIterMut<'ctx, NoEpochEntity, T>;
+type Inner<'ctx, T> = gpecs_sparse::iter::IterMutPtrs<'ctx, NoEpochEntity, T>;
 
 #[repr(transparent)]
 pub struct IterMut<'ctx, 'a, T>

@@ -6,7 +6,7 @@ use core::{
 
 use crate::{iter::Keys, soa::traits::RawSoa};
 
-pub struct RawKeys<'ctx, K, V>
+pub struct KeyPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -15,17 +15,15 @@ where
     len: usize,
 }
 
-impl<'ctx, K, V> RawKeys<'ctx, K, V>
+impl<'ctx, K, V> KeyPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(context: &'ctx V::Context, keys: *const [K]) -> Self {
-        Self {
-            context,
-            key: keys.cast(),
-            len: keys.len(),
-        }
+        let key = keys.cast();
+        let len = keys.len();
+        Self { context, key, len }
     }
 
     #[inline]
@@ -103,17 +101,17 @@ where
     }
 }
 
-impl<K, V> Debug for RawKeys<'_, K, V>
+impl<K, V> Debug for KeyPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice_ptr();
-        f.debug_tuple("RawKeys").field(keys).finish()
+        f.debug_tuple("KeyPtrs").field(keys).finish()
     }
 }
 
-impl<K, V> Clone for RawKeys<'_, K, V>
+impl<K, V> Clone for KeyPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -124,7 +122,7 @@ where
     }
 }
 
-impl<K, V> Iterator for RawKeys<'_, K, V>
+impl<K, V> Iterator for KeyPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -151,7 +149,7 @@ where
     }
 }
 
-impl<K, V> DoubleEndedIterator for RawKeys<'_, K, V>
+impl<K, V> DoubleEndedIterator for KeyPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -169,14 +167,14 @@ where
     }
 }
 
-impl<K, V> ExactSizeIterator for RawKeys<'_, K, V>
+impl<K, V> ExactSizeIterator for KeyPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
-        RawKeys::len(self)
+        KeyPtrs::len(self)
     }
 }
 
-impl<K, V> FusedIterator for RawKeys<'_, K, V> where V: RawSoa + ?Sized {}
+impl<K, V> FusedIterator for KeyPtrs<'_, K, V> where V: RawSoa + ?Sized {}

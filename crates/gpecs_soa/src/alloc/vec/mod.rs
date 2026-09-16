@@ -14,9 +14,9 @@ pub use super::error::{TryReserveError, TryReserveErrorKind};
 use crate::{
     buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
     slice::{
-        IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
-        SoaSlicePtrs, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts, from_raw_parts_mut,
-        get_unchecked_from, range,
+        IndexHelper, IndexHelperMut, Iter, IterMut, IterMutPtrs, IterPtrs, SoaSlice,
+        SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
+        from_raw_parts_mut, get_unchecked_from, range,
     },
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs,
@@ -452,24 +452,24 @@ where
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, T> {
-        let (_, iter) = self.raw_iter_with_context();
+    pub fn iter_ptrs(&self) -> IterPtrs<'_, T> {
+        let (_, iter) = self.iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+    pub fn iter_ptrs_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
         self.slice_ptrs().into_iter_with_context()
     }
 
     #[inline]
-    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, T> {
-        let (_, iter) = self.raw_iter_mut_with_context();
+    pub fn iter_mut_ptrs(&mut self) -> IterMutPtrs<'_, T> {
+        let (_, iter) = self.iter_mut_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
+    pub fn iter_mut_ptrs_with_context(&mut self) -> (&T::Context, IterMutPtrs<'_, T>) {
         self.mut_slice_ptrs().into_iter_with_context()
     }
 
@@ -799,7 +799,7 @@ where
 
         let slices = context.slice_ptrs_cast_const(slices);
         let slices = unsafe { get_unchecked_from::<T, _>(context, slices, range) };
-        for src in RawIter::<T>::new(context, slices) {
+        for src in IterPtrs::<T>::new(context, slices) {
             unsafe {
                 let dst = context.mut_ptrs_add(dst.clone(), set_len_on_drop.local_len);
                 context.ptrs_clone_to_uninit(src, dst);
@@ -857,7 +857,7 @@ where
         let dst = context.mut_slice_ptrs_as_ptrs(slices.clone());
 
         let slices = context.slice_ptrs_cast_const(slices);
-        for src in RawIter::<T>::new(context, slices) {
+        for src in IterPtrs::<T>::new(context, slices) {
             unsafe {
                 let dst = context.mut_ptrs_add(dst.clone(), set_len_on_drop.local_len);
                 context.ptrs_clone_to_uninit(src, dst);
@@ -1041,7 +1041,7 @@ where
 
     #[inline]
     pub fn iter_with_context(&'a self) -> (&'a T::Context, Iter<'a, 'a, T>) {
-        let (context, iter) = self.raw_iter_with_context();
+        let (context, iter) = self.iter_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -1054,7 +1054,7 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&'a mut self) -> (&'a T::Context, IterMut<'a, 'a, T>) {
-        let (context, iter) = self.raw_iter_mut_with_context();
+        let (context, iter) = self.iter_mut_ptrs_with_context();
         let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }

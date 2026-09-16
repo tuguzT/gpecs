@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    slice::{RawIter, SoaSliceMutPtrs, SoaSlicePtrsIndex, SoaSlices},
+    slice::{IterPtrs, SoaSliceMutPtrs, SoaSlicePtrsIndex, SoaSlices},
     traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs},
     wrapper,
 };
@@ -191,21 +191,21 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> RawIter<'_, T> {
+    pub fn iter(&self) -> IterPtrs<'_, T> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+    pub fn iter_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        (context, RawIter::new(context, slices))
+        (context, IterPtrs::new(context, slices))
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'ctx T::Context, RawIter<'ctx, T>) {
+    pub fn into_iter_with_context(self) -> (&'ctx T::Context, IterPtrs<'ctx, T>) {
         let (context, slices) = self.into_slice_ptrs_with_context();
-        (context, RawIter::new(context, slices))
+        (context, IterPtrs::new(context, slices))
     }
 }
 
@@ -325,7 +325,7 @@ where
     T: RawSoa + ?Sized,
 {
     type Item = Ptrs<'a, T>;
-    type IntoIter = RawIter<'a, T>;
+    type IntoIter = IterPtrs<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -338,7 +338,7 @@ where
     T: RawSoa + ?Sized,
 {
     type Item = Ptrs<'ctx, T>;
-    type IntoIter = RawIter<'ctx, T>;
+    type IntoIter = IterPtrs<'ctx, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

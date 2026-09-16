@@ -127,7 +127,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 
-        let inner = inner.into_iter().into_raw_iter_mut();
+        let inner = inner.into_iter().into_iter_mut_ptrs();
         IterMut::from_inner(inner)
     }
 

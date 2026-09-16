@@ -21,11 +21,11 @@ fn slices_npo() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn iter_npo() {
-    type RawIter<'ctx> = slice::RawIter<'ctx, Item>;
-    type RawIterMut<'ctx> = slice::RawIterMut<'ctx, Item>;
+    type IterPtrs<'ctx> = slice::IterPtrs<'ctx, Item>;
+    type IterMutPtrs<'ctx> = slice::IterMutPtrs<'ctx, Item>;
 
-    assert_eq!(size_of::<Option<RawIter>>(), size_of::<RawIter>());
-    assert_eq!(size_of::<Option<RawIterMut>>(), size_of::<RawIterMut>());
+    assert_eq!(size_of::<Option<IterPtrs>>(), size_of::<IterPtrs>());
+    assert_eq!(size_of::<Option<IterMutPtrs>>(), size_of::<IterMutPtrs>());
 
     type Iter<'ctx, 'a> = slice::Iter<'ctx, 'a, Item>;
     type IterMut<'ctx, 'a> = slice::IterMut<'ctx, 'a, Item>;

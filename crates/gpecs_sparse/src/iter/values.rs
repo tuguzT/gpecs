@@ -6,7 +6,7 @@ use core::{
 use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 
 use crate::{
-    iter::{Iter, RawValues},
+    iter::{Iter, ValuePtrs},
     soa::traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaOwned},
 };
 
@@ -103,10 +103,10 @@ where
     }
 
     #[inline]
-    pub fn into_raw_values(self) -> RawValues<'ctx, K, V, P> {
+    pub fn into_iter_ptrs(self) -> ValuePtrs<'ctx, K, V, P> {
         let Self { inner } = self;
-        let inner = inner.into_inner().into_raw_iter();
-        RawValues::from_inner(inner)
+        let inner = inner.into_inner().into_iter_ptrs();
+        ValuePtrs::from_inner(inner)
     }
 }
 

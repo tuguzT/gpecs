@@ -6,7 +6,7 @@ use core::{
 
 use gpecs_component::registry::ComponentId;
 use gpecs_sparse::{
-    iter::{IntoIter as SparseIntoIter, RawIter},
+    iter::{IntoIter as SparseIntoIter, IterPtrs},
     soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
 };
 
@@ -29,7 +29,7 @@ impl<Meta> IntoIter<Meta> {
         let Self { inner } = self;
 
         let (context, components, metas) = inner.as_slices_with_context();
-        let inner = RawIter::new(context, components, ptr::from_ref(metas));
+        let inner = IterPtrs::new(context, components, ptr::from_ref(metas));
         Iter::from_inner(inner)
     }
 }

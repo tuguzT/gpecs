@@ -10,7 +10,7 @@ use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 use crate::{
     algo::sparse_get_unchecked,
     item::{DefaultSparseItem, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, SparseItem},
-    iter::{RawIter, RawKeys, RawValues},
+    iter::{IterPtrs, KeyPtrs, ValuePtrs},
     key::Key,
     soa::{
         identity::Identity,
@@ -472,88 +472,88 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> RawKeys<'_, K, V> {
+    pub fn keys(&self) -> KeyPtrs<'_, K, V> {
         let (_, iter) = self.keys_with_context();
         iter
     }
 
     #[inline]
-    pub fn keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
+    pub fn keys_with_context(&self) -> (&V::Context, KeyPtrs<'_, K, V>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slice_ptrs_with_context();
         let (keys, _) = slices.into();
-        let iter = RawKeys::new(context.as_inner(), keys);
+        let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_keys(self) -> RawKeys<'ctx, K, V> {
+    pub fn into_keys(self) -> KeyPtrs<'ctx, K, V> {
         let (_, iter) = self.into_keys_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_keys_with_context(self) -> (&'ctx V::Context, RawKeys<'ctx, K, V>) {
+    pub fn into_keys_with_context(self) -> (&'ctx V::Context, KeyPtrs<'ctx, K, V>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (keys, _) = slices.into();
-        let iter = RawKeys::new(context.as_inner(), keys);
+        let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
 
     #[inline]
-    pub fn values(&self) -> RawValues<'_, K, V, P> {
+    pub fn values(&self) -> ValuePtrs<'_, K, V, P> {
         let (_, iter) = self.values_with_context();
         iter
     }
 
     #[inline]
-    pub fn values_with_context(&self) -> (&V::Context, RawValues<'_, K, V, P>) {
+    pub fn values_with_context(&self) -> (&V::Context, ValuePtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, inner) = dense.iter_with_context();
-        let iter = RawValues::from_inner(inner);
+        let iter = ValuePtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_values(self) -> RawValues<'ctx, K, V, P> {
+    pub fn into_values(self) -> ValuePtrs<'ctx, K, V, P> {
         let (_, iter) = self.into_values_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_values_with_context(self) -> (&'ctx V::Context, RawValues<'ctx, K, V, P>) {
+    pub fn into_values_with_context(self) -> (&'ctx V::Context, ValuePtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, inner) = dense.into_iter_with_context();
-        let iter = RawValues::from_inner(inner);
+        let iter = ValuePtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn iter(&self) -> RawIter<'_, K, V, P> {
+    pub fn iter(&self) -> IterPtrs<'_, K, V, P> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V, P>) {
+    pub fn iter_with_context(&self) -> (&V::Context, IterPtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, iter) = dense.iter_with_context();
-        let iter = RawIter::from_inner(iter);
+        let iter = IterPtrs::from_inner(iter);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'ctx V::Context, RawIter<'ctx, K, V, P>) {
+    pub fn into_iter_with_context(self) -> (&'ctx V::Context, IterPtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, iter) = dense.into_iter_with_context();
-        let iter = RawIter::from_inner(iter);
+        let iter = IterPtrs::from_inner(iter);
         (context, iter)
     }
 }
@@ -713,7 +713,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (P::Const, Ptrs<'a, V>);
-    type IntoIter = RawIter<'a, K, V, P>;
+    type IntoIter = IterPtrs<'a, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -729,7 +729,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (P::Const, Ptrs<'ctx, V>);
-    type IntoIter = RawIter<'ctx, K, V, P>;
+    type IntoIter = IterPtrs<'ctx, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

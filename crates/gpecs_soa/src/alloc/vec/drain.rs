@@ -7,10 +7,10 @@ use core::{
 };
 
 use crate::{
-    slice::{Iter, range},
+    slice::{IterPtrs, range},
     traits::{
         AllocSoa, AllocSoaContext, Ptrs, RawSoaContext, ReadSoaContext, SlicePtrs, Slices, Soa,
-        SoaOwned, SoaRead,
+        SoaContext, SoaOwned, SoaRead,
     },
 };
 
@@ -26,7 +26,7 @@ where
     /// Length of tail
     tail_len: usize,
     /// Current remaining range to remove
-    iter: Iter<'a, 'a, T>,
+    iter: IterPtrs<'a, T>,
     vec: NonNull<SoaVec<T>>,
     phantom: PhantomData<fn() -> R>,
 }
@@ -64,7 +64,7 @@ where
         Self {
             tail_start: end,
             tail_len: len - end,
-            iter: unsafe { Iter::from_parts(context, slices) },
+            iter: IterPtrs::new(context, slices),
             vec,
             phantom: PhantomData,
         }
@@ -119,14 +119,17 @@ where
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
-        let (_, iter) = self.as_slices_with_context();
-        iter
+        let (_, slices) = self.as_slices_with_context();
+        slices
     }
 
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let Self { iter, .. } = self;
-        iter.as_slices_with_context()
+
+        let (context, slices) = iter.as_slice_ptrs_with_context();
+        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        (context, slices)
     }
 }
 
@@ -181,15 +184,14 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        iter.as_raw_iter_mut()
-            .next()
+        iter.next()
             .map(|src| unsafe { iter.context().ptrs_read(src) })
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let Self { iter, .. } = self;
-        iter.as_raw_iter().size_hint()
+        iter.size_hint()
     }
 }
 
@@ -201,8 +203,7 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        iter.as_raw_iter_mut()
-            .next_back()
+        iter.next_back()
             .map(|src| unsafe { iter.context().ptrs_read(src) })
     }
 }

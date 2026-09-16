@@ -4,13 +4,13 @@ use core::{
 };
 
 use gpecs_sparse::{
-    iter::RawIterMut,
+    iter::IterMutPtrs,
     soa::identity::{Identity, IdentitySlice},
 };
 
 use crate::Entity;
 
-type Inner<'a, Meta> = RawIterMut<'a, Entity, Identity<Meta>>;
+type Inner<'a, Meta> = IterMutPtrs<'a, Entity, Identity<Meta>>;
 
 pub struct IterMut<'a, Meta>
 where

@@ -31,7 +31,7 @@ where
             };
 
             let (context, dst, _) = set_len_on_drop.vec.mut_slices().into_parts();
-            for (index, src) in self.raw_iter().enumerate() {
+            for (index, src) in self.iter_ptrs().enumerate() {
                 set_len_on_drop.local_len = index;
 
                 let dst = unsafe { context.mut_ptrs_add(dst.clone(), index) };

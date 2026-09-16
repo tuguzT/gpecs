@@ -7,32 +7,32 @@ use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 
 use crate::{
     item::KeyValuePair,
-    iter::{IterMut, RawIterMut, RawValues, Values, ValuesMut},
+    iter::{IterMut, IterMutPtrs, ValuePtrs, Values, ValuesMut},
     soa::{
         self,
         traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs},
     },
 };
 
-type Inner<'ctx, K, V, P> = soa::slice::RawIterMut<'ctx, KeyValuePair<K, V, P>>;
+type Inner<'ctx, K, V, P> = soa::slice::IterMutPtrs<'ctx, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct RawValuesMut<'ctx, K, V, P = CoreSliceItemPtrs<K>>
+pub struct ValueMutPtrs<'ctx, K, V, P = CoreSliceItemPtrs<K>>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
-    inner: RawIterMut<'ctx, K, V, P>,
+    inner: IterMutPtrs<'ctx, K, V, P>,
 }
 
-impl<'ctx, K, V, P> RawValuesMut<'ctx, K, V, P>
+impl<'ctx, K, V, P> ValueMutPtrs<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     pub(crate) fn from_inner(inner: Inner<'ctx, K, V, P>) -> Self {
-        let inner = RawIterMut::from_inner(inner);
+        let inner = IterMutPtrs::from_inner(inner);
         Self { inner }
     }
 
@@ -172,9 +172,9 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> RawValues<'ctx, K, V, P> {
+    pub fn cast_const(self) -> ValuePtrs<'ctx, K, V, P> {
         let inner = self.into_inner().cast_const();
-        RawValues::from_inner(inner)
+        ValuePtrs::from_inner(inner)
     }
 
     #[inline]
@@ -190,7 +190,7 @@ where
     }
 }
 
-impl<K, V, P> Debug for RawValuesMut<'_, K, V, P>
+impl<K, V, P> Debug for ValueMutPtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
@@ -198,11 +198,11 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = &self.as_slice_ptrs();
-        f.debug_tuple("RawValuesMut").field(slices).finish()
+        f.debug_tuple("ValueMutPtrs").field(slices).finish()
     }
 }
 
-impl<K, V, P> Clone for RawValuesMut<'_, K, V, P>
+impl<K, V, P> Clone for ValueMutPtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
@@ -216,7 +216,7 @@ where
     }
 }
 
-impl<'ctx, K, V, P> Iterator for RawValuesMut<'ctx, K, V, P>
+impl<'ctx, K, V, P> Iterator for ValueMutPtrs<'ctx, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
@@ -236,7 +236,7 @@ where
     }
 }
 
-impl<K, V, P> DoubleEndedIterator for RawValuesMut<'_, K, V, P>
+impl<K, V, P> DoubleEndedIterator for ValueMutPtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
@@ -248,18 +248,18 @@ where
     }
 }
 
-impl<K, V, P> ExactSizeIterator for RawValuesMut<'_, K, V, P>
+impl<K, V, P> ExactSizeIterator for ValueMutPtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
-        RawValuesMut::len(self)
+        ValueMutPtrs::len(self)
     }
 }
 
-impl<K, V, P> FusedIterator for RawValuesMut<'_, K, V, P>
+impl<K, V, P> FusedIterator for ValueMutPtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,
     P: SliceItemPtrs<Item = K>,

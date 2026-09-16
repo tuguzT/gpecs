@@ -4,7 +4,7 @@ use core::{
     slice,
 };
 
-use crate::{iter::RawKeys, soa::traits::RawSoa};
+use crate::{iter::KeyPtrs, soa::traits::RawSoa};
 
 pub struct Keys<'ctx, 'a, K, V>
 where
@@ -25,16 +25,16 @@ where
     }
 
     #[inline]
-    pub(super) unsafe fn from_inner(inner: RawKeys<'ctx, K, V>) -> Self {
+    pub(super) unsafe fn from_inner(inner: KeyPtrs<'ctx, K, V>) -> Self {
         let (context, keys) = inner.into_slice_ptr_with_context();
         let keys = unsafe { keys.as_ref_unchecked() };
         Self::new(context, keys)
     }
 
     #[inline]
-    pub fn into_raw_keys(self) -> RawKeys<'ctx, K, V> {
+    pub fn into_iter_ptrs(self) -> KeyPtrs<'ctx, K, V> {
         let Self { context, keys } = self;
-        RawKeys::new(context, keys.as_slice())
+        KeyPtrs::new(context, keys.as_slice())
     }
 
     #[inline]

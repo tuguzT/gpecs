@@ -4,12 +4,12 @@ use core::{
 };
 
 use crate::{
-    slice::{Iter, RawIterMut},
+    slice::{Iter, IterMutPtrs},
     traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs},
     wrapper,
 };
 
-pub struct RawIter<'ctx, T>
+pub struct IterPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -19,7 +19,7 @@ where
     end: usize,
 }
 
-impl<'ctx, T> RawIter<'ctx, T>
+impl<'ctx, T> IterPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -138,10 +138,10 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> RawIterMut<'ctx, T> {
+    pub fn cast_mut(self) -> IterMutPtrs<'ctx, T> {
         let (context, slices) = self.into_slice_ptrs_with_context();
         let slices = context.slice_ptrs_cast_mut(slices);
-        RawIterMut::new(context, slices)
+        IterMutPtrs::new(context, slices)
     }
 
     #[inline]
@@ -174,7 +174,7 @@ where
     }
 }
 
-impl<'ctx, T> From<&'ctx T::Context> for RawIter<'ctx, T>
+impl<'ctx, T> From<&'ctx T::Context> for IterPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -186,18 +186,18 @@ where
     }
 }
 
-impl<T> Debug for RawIter<'_, T>
+impl<T> Debug for IterPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
-        f.debug_tuple("RawIter").field(&slices).finish()
+        f.debug_tuple("IterPtrs").field(&slices).finish()
     }
 }
 
-impl<T> Clone for RawIter<'_, T>
+impl<T> Clone for IterPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -220,7 +220,7 @@ where
 }
 
 #[expect(clippy::while_let_on_iterator)]
-impl<'ctx, T> Iterator for RawIter<'ctx, T>
+impl<'ctx, T> Iterator for IterPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -228,7 +228,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if RawIter::is_empty(self) {
+        if IterPtrs::is_empty(self) {
             return None;
         }
 
@@ -245,7 +245,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = RawIter::len(self);
+        let len = IterPtrs::len(self);
         (len, Some(len))
     }
 
@@ -254,12 +254,12 @@ where
     where
         Self: Sized,
     {
-        RawIter::len(&self)
+        IterPtrs::len(&self)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= RawIter::len(self) {
+        if n >= IterPtrs::len(self) {
             self.start = self.end;
             return None;
         }
@@ -290,7 +290,7 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        if RawIter::is_empty(&self) {
+        if IterPtrs::is_empty(&self) {
             return init;
         }
 
@@ -399,7 +399,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = RawIter::len(self);
+        let n = IterPtrs::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -417,7 +417,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = RawIter::len(self);
+        let n = IterPtrs::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -430,13 +430,13 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for RawIter<'_, T>
+impl<T> DoubleEndedIterator for IterPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if RawIter::is_empty(self) {
+        if IterPtrs::is_empty(self) {
             return None;
         }
 
@@ -453,7 +453,7 @@ where
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= RawIter::len(self) {
+        if n >= IterPtrs::len(self) {
             self.end = self.start;
             return None;
         }
@@ -472,14 +472,14 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for RawIter<'_, T>
+impl<T> ExactSizeIterator for IterPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
-        RawIter::len(self)
+        IterPtrs::len(self)
     }
 }
 
-impl<T> FusedIterator for RawIter<'_, T> where T: RawSoa + ?Sized {}
+impl<T> FusedIterator for IterPtrs<'_, T> where T: RawSoa + ?Sized {}

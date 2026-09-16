@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    slice::{RawIter, RawIterMut},
+    slice::{IterMutPtrs, IterPtrs},
     traits::{
         MutPtrs, Ptrs, RawSoa, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
         SoaContext, SoaOwned,
@@ -17,7 +17,7 @@ pub struct IterMut<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
-    inner: RawIterMut<'ctx, T>,
+    inner: IterMutPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
@@ -28,7 +28,7 @@ where
     #[inline]
     pub unsafe fn from_parts(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
         Self {
-            inner: RawIterMut::new(context, slices),
+            inner: IterMutPtrs::new(context, slices),
             phantom: PhantomData,
         }
     }
@@ -147,25 +147,13 @@ where
     }
 
     #[inline]
-    pub fn as_raw_iter(&self) -> &RawIterMut<'ctx, T> {
-        let Self { inner, .. } = self;
-        inner
-    }
-
-    #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'ctx, T> {
+    pub fn into_iter_ptrs(self) -> IterPtrs<'ctx, T> {
         let Self { inner, .. } = self;
         inner.cast_const()
     }
 
     #[inline]
-    pub fn as_raw_iter_mut(&mut self) -> &mut RawIterMut<'ctx, T> {
-        let Self { inner, .. } = self;
-        inner
-    }
-
-    #[inline]
-    pub fn into_raw_iter_mut(self) -> RawIterMut<'ctx, T> {
+    pub fn into_iter_mut_ptrs(self) -> IterMutPtrs<'ctx, T> {
         let Self { inner, .. } = self;
         inner
     }

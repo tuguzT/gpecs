@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     slice::{
-        RawIter, RawIterMut, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut,
+        IterMutPtrs, IterPtrs, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut,
         get_unchecked_mut_from, index_mut_ptrs_from,
     },
     traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
@@ -352,33 +352,33 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> RawIter<'_, T> {
+    pub fn iter(&self) -> IterPtrs<'_, T> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+    pub fn iter_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        (context, RawIter::new(context, slices))
+        (context, IterPtrs::new(context, slices))
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> RawIterMut<'_, T> {
+    pub fn iter_mut(&mut self) -> IterMutPtrs<'_, T> {
         let (_, iter) = self.iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMutPtrs<'_, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        (context, RawIterMut::new(context, slices))
+        (context, IterMutPtrs::new(context, slices))
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'ctx T::Context, RawIterMut<'ctx, T>) {
+    pub fn into_iter_with_context(self) -> (&'ctx T::Context, IterMutPtrs<'ctx, T>) {
         let (context, slices) = self.into_mut_slice_ptrs_with_context();
-        (context, RawIterMut::new(context, slices))
+        (context, IterMutPtrs::new(context, slices))
     }
 }
 
@@ -498,7 +498,7 @@ where
     T: RawSoa + ?Sized,
 {
     type Item = Ptrs<'a, T>;
-    type IntoIter = RawIter<'a, T>;
+    type IntoIter = IterPtrs<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -511,7 +511,7 @@ where
     T: RawSoa + ?Sized,
 {
     type Item = MutPtrs<'a, T>;
-    type IntoIter = RawIterMut<'a, T>;
+    type IntoIter = IterMutPtrs<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -524,7 +524,7 @@ where
     T: RawSoa + ?Sized,
 {
     type Item = MutPtrs<'ctx, T>;
-    type IntoIter = RawIterMut<'ctx, T>;
+    type IntoIter = IterMutPtrs<'ctx, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

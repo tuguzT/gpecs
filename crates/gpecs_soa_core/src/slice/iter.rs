@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    slice::RawIter,
+    slice::IterPtrs,
     traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
@@ -14,7 +14,7 @@ pub struct Iter<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
-    inner: RawIter<'ctx, T>,
+    inner: IterPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
@@ -25,7 +25,7 @@ where
     #[inline]
     pub unsafe fn from_parts(context: &'ctx T::Context, slices: SlicePtrs<'ctx, T>) -> Self {
         Self {
-            inner: RawIter::new(context, slices),
+            inner: IterPtrs::new(context, slices),
             phantom: PhantomData,
         }
     }
@@ -96,19 +96,7 @@ where
     }
 
     #[inline]
-    pub fn as_raw_iter(&self) -> &RawIter<'ctx, T> {
-        let Self { inner, .. } = self;
-        inner
-    }
-
-    #[inline]
-    pub fn as_raw_iter_mut(&mut self) -> &mut RawIter<'ctx, T> {
-        let Self { inner, .. } = self;
-        inner
-    }
-
-    #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'ctx, T> {
+    pub fn into_iter_ptrs(self) -> IterPtrs<'ctx, T> {
         let Self { inner, .. } = self;
         inner
     }

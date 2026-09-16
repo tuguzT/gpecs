@@ -13,7 +13,7 @@ use crate::{
         DefaultSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePair, KeyValuePtrs,
         KeyValueSlicePtrs, SparseItem,
     },
-    iter::{RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut},
+    iter::{IterMutPtrs, IterPtrs, KeyPtrs, ValueMutPtrs, ValuePtrs},
     key::Key,
     soa::{
         identity::Identity,
@@ -867,133 +867,133 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> RawKeys<'_, K, V> {
+    pub fn keys(&self) -> KeyPtrs<'_, K, V> {
         let (_, iter) = self.keys_with_context();
         iter
     }
 
     #[inline]
-    pub fn keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
+    pub fn keys_with_context(&self) -> (&V::Context, KeyPtrs<'_, K, V>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slice_ptrs_with_context();
         let (keys, _) = slices.into();
-        let iter = RawKeys::new(context.as_inner(), keys);
+        let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_keys(self) -> RawKeys<'ctx, K, V> {
+    pub fn into_keys(self) -> KeyPtrs<'ctx, K, V> {
         let (_, iter) = self.into_keys_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_keys_with_context(self) -> (&'ctx V::Context, RawKeys<'ctx, K, V>) {
+    pub fn into_keys_with_context(self) -> (&'ctx V::Context, KeyPtrs<'ctx, K, V>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (keys, _) = slices.into();
-        let iter = RawKeys::new(context.as_inner(), keys);
+        let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
 
     #[inline]
-    pub fn values(&self) -> RawValues<'_, K, V, P> {
+    pub fn values(&self) -> ValuePtrs<'_, K, V, P> {
         let (_, iter) = self.values_with_context();
         iter
     }
 
     #[inline]
-    pub fn values_with_context(&self) -> (&V::Context, RawValues<'_, K, V, P>) {
+    pub fn values_with_context(&self) -> (&V::Context, ValuePtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, inner) = dense.iter_with_context();
-        let iter = RawValues::from_inner(inner);
+        let iter = ValuePtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn values_mut(&mut self) -> RawValuesMut<'_, K, V, P> {
+    pub fn values_mut(&mut self) -> ValueMutPtrs<'_, K, V, P> {
         let (_, iter) = self.values_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V, P>) {
+    pub fn values_mut_with_context(&mut self) -> (&V::Context, ValueMutPtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, inner) = dense.iter_mut_with_context();
-        let iter = RawValuesMut::from_inner(inner);
+        let iter = ValueMutPtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_values(self) -> RawValues<'ctx, K, V, P> {
+    pub fn into_values(self) -> ValuePtrs<'ctx, K, V, P> {
         let (_, iter) = self.into_values_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_values_with_context(self) -> (&'ctx V::Context, RawValues<'ctx, K, V, P>) {
+    pub fn into_values_with_context(self) -> (&'ctx V::Context, ValuePtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, inner) = dense.into_iter_with_context();
-        let iter = RawValues::from_inner(inner.cast_const());
+        let iter = ValuePtrs::from_inner(inner.cast_const());
         (context, iter)
     }
 
     #[inline]
-    pub fn into_values_mut(self) -> RawValuesMut<'ctx, K, V, P> {
+    pub fn into_values_mut(self) -> ValueMutPtrs<'ctx, K, V, P> {
         let (_, iter) = self.into_values_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_values_mut_with_context(self) -> (&'ctx V::Context, RawValuesMut<'ctx, K, V, P>) {
+    pub fn into_values_mut_with_context(self) -> (&'ctx V::Context, ValueMutPtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, inner) = dense.into_iter_with_context();
-        let iter = RawValuesMut::from_inner(inner);
+        let iter = ValueMutPtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn iter(&self) -> RawIter<'_, K, V, P> {
+    pub fn iter(&self) -> IterPtrs<'_, K, V, P> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V, P>) {
+    pub fn iter_with_context(&self) -> (&V::Context, IterPtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, iter) = dense.iter_with_context();
-        let iter = RawIter::from_inner(iter);
+        let iter = IterPtrs::from_inner(iter);
         (context, iter)
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> RawIterMut<'_, K, V, P> {
+    pub fn iter_mut(&mut self) -> IterMutPtrs<'_, K, V, P> {
         let (_, iter) = self.iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V, P>) {
+    pub fn iter_mut_with_context(&mut self) -> (&V::Context, IterMutPtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, iter) = dense.iter_mut_with_context();
-        let iter = RawIterMut::from_inner(iter);
+        let iter = IterMutPtrs::from_inner(iter);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'ctx V::Context, RawIterMut<'ctx, K, V, P>) {
+    pub fn into_iter_with_context(self) -> (&'ctx V::Context, IterMutPtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
         let (context, iter) = dense.into_iter_with_context();
-        let iter = RawIterMut::from_inner(iter);
+        let iter = IterMutPtrs::from_inner(iter);
         (context, iter)
     }
 }
@@ -1153,7 +1153,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (P::Const, Ptrs<'a, V>);
-    type IntoIter = RawIter<'a, K, V, P>;
+    type IntoIter = IterPtrs<'a, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1169,7 +1169,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (P::Mut, MutPtrs<'a, V>);
-    type IntoIter = RawIterMut<'a, K, V, P>;
+    type IntoIter = IterMutPtrs<'a, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1185,7 +1185,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (P::Mut, MutPtrs<'ctx, V>);
-    type IntoIter = RawIterMut<'ctx, K, V, P>;
+    type IntoIter = IterMutPtrs<'ctx, K, V, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

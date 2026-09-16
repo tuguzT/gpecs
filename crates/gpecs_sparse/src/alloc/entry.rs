@@ -68,7 +68,7 @@ where
             ..
         } = self;
 
-        let (context, values) = container.slices().into_raw_iter_with_context();
+        let (context, values) = container.slices().into_iter_ptrs_with_context();
         let ptrs = unwrap_dense(values, *dense_index);
         (context, ptrs)
     }
@@ -87,7 +87,7 @@ where
             ..
         } = self;
 
-        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
+        let (context, values) = container.mut_slices().into_iter_mut_ptrs_with_context();
         let ptrs = unwrap_dense(values, *dense_index);
         (context, ptrs)
     }
@@ -106,7 +106,7 @@ where
             ..
         } = self;
 
-        let (context, values) = container.mut_slices().into_raw_iter_with_context();
+        let (context, values) = container.mut_slices().into_iter_ptrs_with_context();
         let ptrs = unwrap_dense(values, dense_index);
         (context, ptrs)
     }
@@ -125,7 +125,7 @@ where
             ..
         } = self;
 
-        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
+        let (context, values) = container.mut_slices().into_iter_mut_ptrs_with_context();
         let ptrs = unwrap_dense(values, dense_index);
         (context, ptrs)
     }
@@ -163,7 +163,7 @@ where
             ..
         } = self;
 
-        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
+        let (context, values) = container.mut_slices().into_iter_mut_ptrs_with_context();
         let previous = unwrap_dense(values, *dense_index);
         unsafe { soa::ptrs::replace::<C::Value, R, W>(context, previous, value) }
     }

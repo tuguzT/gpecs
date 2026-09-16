@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    slice::{IndexHelper, Iter, RawIter, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlicesIndex},
+    slice::{IndexHelper, Iter, IterPtrs, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlicesIndex},
     traits::{Ptrs, RawSoa, RawSoaContext, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
@@ -193,25 +193,25 @@ where
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, T> {
-        let (_, iter) = self.raw_iter_with_context();
+    pub fn iter_ptrs(&self) -> IterPtrs<'_, T> {
+        let (_, iter) = self.iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+    pub fn iter_ptrs_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
         let Self { ptrs, .. } = self;
         ptrs.iter_with_context()
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'ctx, T> {
-        let (_, iter) = self.into_raw_iter_with_context();
+    pub fn into_iter_ptrs(self) -> IterPtrs<'ctx, T> {
+        let (_, iter) = self.into_iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_raw_iter_with_context(self) -> (&'ctx T::Context, RawIter<'ctx, T>) {
+    pub fn into_iter_ptrs_with_context(self) -> (&'ctx T::Context, IterPtrs<'ctx, T>) {
         let Self { ptrs, .. } = self;
         ptrs.into_iter_with_context()
     }
@@ -285,7 +285,7 @@ where
 
     #[inline]
     pub fn into_iter_with_context(self) -> (&'ctx T::Context, Iter<'ctx, 'a, T>) {
-        let (context, iter) = self.into_raw_iter_with_context();
+        let (context, iter) = self.into_iter_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -373,7 +373,7 @@ where
 
     #[inline]
     pub fn iter_with_context(&'a self) -> (&'a T::Context, Iter<'a, 'a, T>) {
-        let (context, iter) = self.raw_iter_with_context();
+        let (context, iter) = self.iter_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }

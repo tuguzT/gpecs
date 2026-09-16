@@ -20,7 +20,7 @@ use crate::{
         DefaultSparseItem, KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
         SparseItem,
     },
-    iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
+    iter::{Iter, IterPtrs, KeyPtrs, Keys, ValuePtrs, Values},
     key::Key,
     soa::{
         slice::SoaSlices,
@@ -537,94 +537,94 @@ where
     }
 
     #[inline]
-    pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
-        let (_, iter) = self.raw_keys_with_context();
+    pub fn key_ptrs(&self) -> KeyPtrs<'_, K, V> {
+        let (_, iter) = self.key_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
+    pub fn key_ptrs_with_context(&self) -> (&V::Context, KeyPtrs<'_, K, V>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slice_ptrs_with_context();
         let (keys, _) = slices.into();
-        let iter = RawKeys::new(context.as_inner(), keys);
+        let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_raw_keys(self) -> RawKeys<'ctx, K, V> {
-        let (_, iter) = self.into_raw_keys_with_context();
+    pub fn into_key_ptrs(self) -> KeyPtrs<'ctx, K, V> {
+        let (_, iter) = self.into_key_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_raw_keys_with_context(self) -> (&'ctx V::Context, RawKeys<'ctx, K, V>) {
+    pub fn into_key_ptrs_with_context(self) -> (&'ctx V::Context, KeyPtrs<'ctx, K, V>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (keys, _) = slices.into();
-        let iter = RawKeys::new(context.as_inner(), keys);
+        let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
 
     #[inline]
-    pub fn raw_values(&self) -> RawValues<'_, K, V, P> {
-        let (_, iter) = self.raw_values_with_context();
+    pub fn iter_value_ptrs(&self) -> ValuePtrs<'_, K, V, P> {
+        let (_, iter) = self.iter_value_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V, P>) {
+    pub fn iter_value_ptrs_with_context(&self) -> (&V::Context, ValuePtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
-        let (context, inner) = dense.raw_iter_with_context();
-        let iter = RawValues::from_inner(inner);
+        let (context, inner) = dense.iter_ptrs_with_context();
+        let iter = ValuePtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_raw_values(self) -> RawValues<'ctx, K, V, P> {
-        let (_, iter) = self.into_raw_values_with_context();
+    pub fn into_iter_value_ptrs(self) -> ValuePtrs<'ctx, K, V, P> {
+        let (_, iter) = self.into_iter_value_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_raw_values_with_context(self) -> (&'ctx V::Context, RawValues<'ctx, K, V, P>) {
+    pub fn into_iter_value_ptrs_with_context(self) -> (&'ctx V::Context, ValuePtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
-        let (context, inner) = dense.into_raw_iter_with_context();
-        let iter = RawValues::from_inner(inner);
+        let (context, inner) = dense.into_iter_ptrs_with_context();
+        let iter = ValuePtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, K, V, P> {
-        let (_, iter) = self.raw_iter_with_context();
+    pub fn iter_ptrs(&self) -> IterPtrs<'_, K, V, P> {
+        let (_, iter) = self.iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V, P>) {
+    pub fn iter_ptrs_with_context(&self) -> (&V::Context, IterPtrs<'_, K, V, P>) {
         let Self { dense, .. } = self;
 
-        let (context, inner) = dense.raw_iter_with_context();
-        let iter = RawIter::from_inner(inner);
+        let (context, inner) = dense.iter_ptrs_with_context();
+        let iter = IterPtrs::from_inner(inner);
         (context, iter)
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'ctx, K, V, P> {
-        let (_, iter) = self.into_raw_iter_with_context();
+    pub fn into_iter_ptrs(self) -> IterPtrs<'ctx, K, V, P> {
+        let (_, iter) = self.into_iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_raw_iter_with_context(self) -> (&'ctx V::Context, RawIter<'ctx, K, V, P>) {
+    pub fn into_iter_ptrs_with_context(self) -> (&'ctx V::Context, IterPtrs<'ctx, K, V, P>) {
         let Self { dense, .. } = self;
 
-        let (context, inner) = dense.into_raw_iter_with_context();
-        let iter = RawIter::from_inner(inner);
+        let (context, inner) = dense.into_iter_ptrs_with_context();
+        let iter = IterPtrs::from_inner(inner);
         (context, iter)
     }
 
@@ -636,7 +636,7 @@ where
 
     #[inline]
     pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
-        let (context, iter) = self.raw_keys_with_context();
+        let (context, iter) = self.key_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -649,7 +649,7 @@ where
 
     #[inline]
     pub fn into_keys_with_context(self) -> (&'ctx V::Context, Keys<'ctx, 'a, K, V>) {
-        let (context, iter) = self.into_raw_keys_with_context();
+        let (context, iter) = self.into_key_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -806,14 +806,14 @@ where
 
     #[inline]
     pub fn into_values_with_context(self) -> (&'ctx V::Context, Values<'ctx, 'a, K, V, P>) {
-        let (context, iter) = self.into_raw_values_with_context();
+        let (context, iter) = self.into_iter_value_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
 
     #[inline]
     pub fn into_iter_with_context(self) -> (&'ctx V::Context, Iter<'ctx, 'a, K, V, P>) {
-        let (context, iter) = self.into_raw_iter_with_context();
+        let (context, iter) = self.into_iter_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -974,7 +974,7 @@ where
 
     #[inline]
     pub fn values_with_context(&'a self) -> (&'a V::Context, Values<'a, 'a, K, V, P>) {
-        let (context, iter) = self.raw_values_with_context();
+        let (context, iter) = self.iter_value_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -987,7 +987,7 @@ where
 
     #[inline]
     pub fn iter_with_context(&'a self) -> (&'a V::Context, Iter<'a, 'a, K, V, P>) {
-        let (context, iter) = self.raw_iter_with_context();
+        let (context, iter) = self.iter_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }

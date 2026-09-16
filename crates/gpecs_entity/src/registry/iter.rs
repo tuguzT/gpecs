@@ -4,13 +4,13 @@ use core::{
 };
 
 use gpecs_sparse::{
-    iter::RawIter,
+    iter::IterPtrs,
     soa::identity::{Identity, IdentitySlice},
 };
 
 use crate::Entity;
 
-type Inner<'a, Meta> = RawIter<'a, Entity, Identity<Meta>>;
+type Inner<'a, Meta> = IterPtrs<'a, Entity, Identity<Meta>>;
 
 pub struct Iter<'a, Meta>
 where

@@ -6,7 +6,7 @@ use core::{
 use gpecs_component::registry::ComponentId;
 use gpecs_soa_erased::CovariantFieldLayouts;
 use gpecs_sparse::{
-    iter::RawIter,
+    iter::IterPtrs,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::Identity,
@@ -14,7 +14,7 @@ use gpecs_sparse::{
     },
 };
 
-type Inner<'a, Meta> = RawIter<'a, u32, Identity<Meta>>;
+type Inner<'a, Meta> = IterPtrs<'a, u32, Identity<Meta>>;
 
 #[repr(transparent)]
 pub struct Iter<'a, Meta>

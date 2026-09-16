@@ -138,7 +138,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 
-        let inner = inner.into_iter().into_raw_iter();
+        let inner = inner.into_iter().into_iter_ptrs();
         Iter::from_inner(inner)
     }
 

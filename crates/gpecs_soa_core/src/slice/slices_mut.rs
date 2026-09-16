@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     slice::{
-        IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSliceMutPtrs,
+        IndexHelper, IndexHelperMut, Iter, IterMut, IterMutPtrs, IterPtrs, SoaSliceMutPtrs,
         SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex,
     },
     traits::{
@@ -313,49 +313,49 @@ where
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, T> {
-        let (_, iter) = self.raw_iter_with_context();
+    pub fn iter_ptrs(&self) -> IterPtrs<'_, T> {
+        let (_, iter) = self.iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+    pub fn iter_ptrs_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
         let Self { ptrs, .. } = self;
         ptrs.iter_with_context()
     }
 
     #[inline]
-    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, T> {
-        let (_, iter) = self.raw_iter_mut_with_context();
+    pub fn iter_mut_ptrs(&mut self) -> IterMutPtrs<'_, T> {
+        let (_, iter) = self.iter_mut_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
+    pub fn iter_mut_ptrs_with_context(&mut self) -> (&T::Context, IterMutPtrs<'_, T>) {
         let Self { ptrs, .. } = self;
         ptrs.iter_mut_with_context()
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'ctx, T> {
-        let (_, iter) = self.into_raw_iter_with_context();
+    pub fn into_iter_ptrs(self) -> IterPtrs<'ctx, T> {
+        let (_, iter) = self.into_iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_raw_iter_with_context(self) -> (&'ctx T::Context, RawIter<'ctx, T>) {
-        let (context, iter) = self.into_raw_iter_mut_with_context();
+    pub fn into_iter_ptrs_with_context(self) -> (&'ctx T::Context, IterPtrs<'ctx, T>) {
+        let (context, iter) = self.into_iter_mut_ptrs_with_context();
         (context, iter.cast_const())
     }
 
     #[inline]
-    pub fn into_raw_iter_mut(self) -> RawIterMut<'ctx, T> {
-        let (_, iter) = self.into_raw_iter_mut_with_context();
+    pub fn into_iter_mut_ptrs(self) -> IterMutPtrs<'ctx, T> {
+        let (_, iter) = self.into_iter_mut_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn into_raw_iter_mut_with_context(self) -> (&'ctx T::Context, RawIterMut<'ctx, T>) {
+    pub fn into_iter_mut_ptrs_with_context(self) -> (&'ctx T::Context, IterMutPtrs<'ctx, T>) {
         let Self { ptrs, .. } = self;
         ptrs.into_iter_with_context()
     }
@@ -540,7 +540,7 @@ where
 
     #[inline]
     pub fn into_iter_with_context(self) -> (&'ctx T::Context, IterMut<'ctx, 'a, T>) {
-        let (context, iter) = self.into_raw_iter_mut_with_context();
+        let (context, iter) = self.into_iter_mut_ptrs_with_context();
         let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }
@@ -684,7 +684,7 @@ where
 
     #[inline]
     pub fn iter_with_context(&'a self) -> (&'a T::Context, Iter<'a, 'a, T>) {
-        let (context, iter) = self.raw_iter_with_context();
+        let (context, iter) = self.iter_ptrs_with_context();
         let iter = unsafe { iter.as_ref_unchecked() };
         (context, iter)
     }
@@ -697,7 +697,7 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&'a mut self) -> (&'a T::Context, IterMut<'a, 'a, T>) {
-        let (context, iter) = self.raw_iter_mut_with_context();
+        let (context, iter) = self.iter_mut_ptrs_with_context();
         let iter = unsafe { iter.as_mut_unchecked() };
         (context, iter)
     }

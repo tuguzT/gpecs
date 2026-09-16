@@ -4,12 +4,12 @@ use core::{
 };
 
 use crate::{
-    slice::{Iter, IterMut, RawIter},
+    slice::{Iter, IterMut, IterPtrs},
     traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
     wrapper,
 };
 
-pub struct RawIterMut<'ctx, T>
+pub struct IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -19,7 +19,7 @@ where
     end: usize,
 }
 
-impl<'ctx, T> RawIterMut<'ctx, T>
+impl<'ctx, T> IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -226,9 +226,9 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> RawIter<'ctx, T> {
+    pub fn cast_const(self) -> IterPtrs<'ctx, T> {
         let (context, slices) = self.into_slice_ptrs_with_context();
-        RawIter::new(context, slices)
+        IterPtrs::new(context, slices)
     }
 
     #[inline]
@@ -266,7 +266,7 @@ where
     }
 }
 
-impl<'ctx, T> From<&'ctx T::Context> for RawIterMut<'ctx, T>
+impl<'ctx, T> From<&'ctx T::Context> for IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -278,18 +278,18 @@ where
     }
 }
 
-impl<T> Debug for RawIterMut<'_, T>
+impl<T> Debug for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
-        f.debug_tuple("RawIter").field(&slices).finish()
+        f.debug_tuple("IterMutPtrs").field(&slices).finish()
     }
 }
 
-impl<T> Clone for RawIterMut<'_, T>
+impl<T> Clone for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -312,7 +312,7 @@ where
 }
 
 #[expect(clippy::while_let_on_iterator)]
-impl<'ctx, T> Iterator for RawIterMut<'ctx, T>
+impl<'ctx, T> Iterator for IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -320,7 +320,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if RawIterMut::is_empty(self) {
+        if IterMutPtrs::is_empty(self) {
             return None;
         }
 
@@ -337,7 +337,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = RawIterMut::len(self);
+        let len = IterMutPtrs::len(self);
         (len, Some(len))
     }
 
@@ -346,12 +346,12 @@ where
     where
         Self: Sized,
     {
-        RawIterMut::len(&self)
+        IterMutPtrs::len(&self)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= RawIterMut::len(self) {
+        if n >= IterMutPtrs::len(self) {
             self.start = self.end;
             return None;
         }
@@ -382,7 +382,7 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        if RawIterMut::is_empty(&self) {
+        if IterMutPtrs::is_empty(&self) {
             return init;
         }
 
@@ -491,7 +491,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = RawIterMut::len(self);
+        let n = IterMutPtrs::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -509,7 +509,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = RawIterMut::len(self);
+        let n = IterMutPtrs::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -522,13 +522,13 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for RawIterMut<'_, T>
+impl<T> DoubleEndedIterator for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if RawIterMut::is_empty(self) {
+        if IterMutPtrs::is_empty(self) {
             return None;
         }
 
@@ -545,7 +545,7 @@ where
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= RawIterMut::len(self) {
+        if n >= IterMutPtrs::len(self) {
             self.end = self.start;
             return None;
         }
@@ -564,14 +564,14 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for RawIterMut<'_, T>
+impl<T> ExactSizeIterator for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
-        RawIterMut::len(self)
+        IterMutPtrs::len(self)
     }
 }
 
-impl<T> FusedIterator for RawIterMut<'_, T> where T: RawSoa + ?Sized {}
+impl<T> FusedIterator for IterMutPtrs<'_, T> where T: RawSoa + ?Sized {}

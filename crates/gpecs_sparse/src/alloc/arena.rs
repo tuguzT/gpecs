@@ -26,8 +26,8 @@ use crate::{
         SparseIndexKind,
     },
     iter::{
-        Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
-        RawValues, RawValuesMut, Values, ValuesMut,
+        Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, IterMutPtrs, IterPtrs, KeyPtrs, Keys,
+        ValueMutPtrs, ValuePtrs, Values, ValuesMut,
     },
     key::{Epoch, Key},
     soa::{
@@ -1373,63 +1373,63 @@ where
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
-    pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
-        let (_, iter) = self.raw_keys_with_context();
+    pub fn key_ptrs(&self) -> KeyPtrs<'_, K, V> {
+        let (_, iter) = self.key_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
+    pub fn key_ptrs_with_context(&self) -> (&V::Context, KeyPtrs<'_, K, V>) {
         let view = self.as_view();
-        view.into_raw_keys_with_context()
+        view.into_key_ptrs_with_context()
     }
 
     #[inline]
-    pub fn raw_values(&self) -> RawValues<'_, K, V, P> {
-        let (_, iter) = self.raw_values_with_context();
+    pub fn iter_value_ptrs(&self) -> ValuePtrs<'_, K, V, P> {
+        let (_, iter) = self.iter_value_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V, P>) {
+    pub fn iter_value_ptrs_with_context(&self) -> (&V::Context, ValuePtrs<'_, K, V, P>) {
         let view = self.as_view();
-        view.into_raw_values_with_context()
+        view.into_iter_value_ptrs_with_context()
     }
 
     #[inline]
-    pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V, P> {
-        let (_, iter) = self.raw_values_mut_with_context();
+    pub fn iter_value_mut_ptrs(&mut self) -> ValueMutPtrs<'_, K, V, P> {
+        let (_, iter) = self.iter_value_mut_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V, P>) {
+    pub fn iter_value_mut_ptrs_with_context(&mut self) -> (&V::Context, ValueMutPtrs<'_, K, V, P>) {
         let view_mut = self.as_mut_view();
-        view_mut.into_raw_values_mut_with_context()
+        view_mut.into_iter_value_mut_ptrs_with_context()
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, K, V, P> {
-        let (_, iter) = self.raw_iter_with_context();
+    pub fn iter_ptrs(&self) -> IterPtrs<'_, K, V, P> {
+        let (_, iter) = self.iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V, P>) {
+    pub fn iter_ptrs_with_context(&self) -> (&V::Context, IterPtrs<'_, K, V, P>) {
         let view = self.as_view();
-        view.into_raw_iter_with_context()
+        view.into_iter_ptrs_with_context()
     }
 
     #[inline]
-    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V, P> {
-        let (_, iter) = self.raw_iter_mut_with_context();
+    pub fn iter_mut_ptrs(&mut self) -> IterMutPtrs<'_, K, V, P> {
+        let (_, iter) = self.iter_mut_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V, P>) {
+    pub fn iter_mut_ptrs_with_context(&mut self) -> (&V::Context, IterMutPtrs<'_, K, V, P>) {
         let view_mut = self.as_mut_view();
-        view_mut.into_raw_iter_mut_with_context()
+        view_mut.into_iter_mut_ptrs_with_context()
     }
 
     #[inline]

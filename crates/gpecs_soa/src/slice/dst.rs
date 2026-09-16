@@ -15,8 +15,8 @@ use crate::{
 };
 
 use super::{
-    IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSliceMutPtrs, SoaSlicePtrs,
-    SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex, SoaSlicesMut,
+    IndexHelper, IndexHelperMut, Iter, IterMut, IterMutPtrs, IterPtrs, SoaSliceMutPtrs,
+    SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex, SoaSlicesMut,
 };
 
 #[repr(transparent)]
@@ -250,25 +250,25 @@ where
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, T> {
-        let (_, iter) = self.raw_iter_with_context();
+    pub fn iter_ptrs(&self) -> IterPtrs<'_, T> {
+        let (_, iter) = self.iter_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
-        self.slices().into_raw_iter_with_context()
+    pub fn iter_ptrs_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
+        self.slices().into_iter_ptrs_with_context()
     }
 
     #[inline]
-    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, T> {
-        let (_, iter) = self.raw_iter_mut_with_context();
+    pub fn iter_mut_ptrs(&mut self) -> IterMutPtrs<'_, T> {
+        let (_, iter) = self.iter_mut_ptrs_with_context();
         iter
     }
 
     #[inline]
-    pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
-        self.mut_slices().into_raw_iter_mut_with_context()
+    pub fn iter_mut_ptrs_with_context(&mut self) -> (&T::Context, IterMutPtrs<'_, T>) {
+        self.mut_slices().into_iter_mut_ptrs_with_context()
     }
 
     #[inline]

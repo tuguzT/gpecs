@@ -5,10 +5,8 @@ use core::{
 };
 
 use crate::{
-    slice::{
-        IterMutPtrs, IterPtrs, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut,
-        get_unchecked_mut_from, index_mut_ptrs_from,
-    },
+    ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSlicePtrs, get_unchecked_mut, index_mut},
+    slices::{SoaSlices, SoaSlicesMut},
     traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
     wrapper,
 };
@@ -219,7 +217,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_with_context(index) };
         ptrs
@@ -228,7 +226,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (context, slices) = self.as_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked(context, slices) };
@@ -238,7 +236,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtrs<'_>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_mut_with_context(index) };
         ptrs
@@ -250,7 +248,7 @@ where
         index: I,
     ) -> (&T::Context, I::MutPtrs<'_>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked_mut(context, slices) };
@@ -260,7 +258,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'ctx>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(index) };
         ptrs
@@ -272,7 +270,7 @@ where
         index: I,
     ) -> (&'ctx T::Context, I::Ptrs<'ctx>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (context, slices) = self.into_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked(context, slices) };
@@ -282,7 +280,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked_mut<I>(self, index: I) -> I::MutPtrs<'ctx>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_mut_with_context(index) };
         ptrs
@@ -294,7 +292,7 @@ where
         index: I,
     ) -> (&'ctx T::Context, I::MutPtrs<'ctx>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (context, slices) = self.into_mut_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked_mut(context, slices) };
@@ -334,8 +332,8 @@ where
     pub unsafe fn swap(&mut self, a: usize, b: usize) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
 
-        let x = index_mut_ptrs_from::<T, _>(context, slices.clone(), a);
-        let y = index_mut_ptrs_from::<T, _>(context, slices, b);
+        let x = index_mut::<T, _>(context, slices.clone(), a);
+        let y = index_mut::<T, _>(context, slices, b);
         if a == b {
             return;
         }
@@ -346,8 +344,8 @@ where
     #[inline]
     pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let x = unsafe { get_unchecked_mut_from::<T, _>(context, slices.clone(), a) };
-        let y = unsafe { get_unchecked_mut_from::<T, _>(context, slices, b) };
+        let x = unsafe { get_unchecked_mut::<T, _>(context, slices.clone(), a) };
+        let y = unsafe { get_unchecked_mut::<T, _>(context, slices, b) };
         unsafe { context.ptrs_swap_nonoverlapping(x, y, 1) }
     }
 

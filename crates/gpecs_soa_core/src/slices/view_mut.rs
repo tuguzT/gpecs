@@ -7,10 +7,8 @@ use core::{
 };
 
 use crate::{
-    slice::{
-        IndexHelper, IndexHelperMut, Iter, IterMut, IterMutPtrs, IterPtrs, SoaSliceMutPtrs,
-        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex,
-    },
+    ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs, SoaSlicePtrs},
+    slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SlicesIndex, SoaSlices},
     traits::{
         CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
         SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
@@ -172,7 +170,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_with_context(index) };
         ptrs
@@ -181,7 +179,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.get_unchecked_with_context(index) }
@@ -190,7 +188,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'ctx>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(index) };
         ptrs
@@ -202,7 +200,7 @@ where
         index: I,
     ) -> (&'ctx T::Context, I::Ptrs<'ctx>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.into_get_unchecked_with_context(index) }
@@ -211,7 +209,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtrs<'_>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_mut_with_context(index) };
         ptrs
@@ -223,7 +221,7 @@ where
         index: I,
     ) -> (&T::Context, I::MutPtrs<'_>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.get_unchecked_mut_with_context(index) }
@@ -232,7 +230,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked_mut<I>(self, index: I) -> I::MutPtrs<'ctx>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_mut_with_context(index) };
         ptrs
@@ -244,7 +242,7 @@ where
         index: I,
     ) -> (&'ctx T::Context, I::MutPtrs<'ctx>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.into_get_unchecked_mut_with_context(index) }
@@ -460,7 +458,7 @@ where
     #[inline]
     pub fn into_get<I>(self, index: I) -> Option<I::Refs<'ctx>>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.into_get_with_context(index);
         refs
@@ -469,7 +467,7 @@ where
     #[inline]
     pub fn into_get_with_context<I>(self, index: I) -> (&'ctx T::Context, Option<I::Refs<'ctx>>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = context.mut_slices_as_slices(slices);
@@ -479,7 +477,7 @@ where
     #[inline]
     pub fn into_get_mut<I>(self, index: I) -> Option<I::RefsMut<'ctx>>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.into_get_mut_with_context(index);
         refs
@@ -491,7 +489,7 @@ where
         index: I,
     ) -> (&'ctx T::Context, Option<I::RefsMut<'ctx>>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.get_mut(context, slices))
@@ -501,7 +499,7 @@ where
     #[track_caller]
     pub fn into_index<I>(self, index: I) -> I::Refs<'ctx>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.into_index_with_context(index);
         refs
@@ -511,7 +509,7 @@ where
     #[track_caller]
     pub fn into_index_with_context<I>(self, index: I) -> (&'ctx T::Context, I::Refs<'ctx>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = context.mut_slices_as_slices(slices);
@@ -522,7 +520,7 @@ where
     #[track_caller]
     pub fn into_index_mut<I>(self, index: I) -> I::RefsMut<'ctx>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.into_index_mut_with_context(index);
         refs
@@ -532,7 +530,7 @@ where
     #[track_caller]
     pub fn into_index_mut_with_context<I>(self, index: I) -> (&'ctx T::Context, I::RefsMut<'ctx>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.index_mut(context, slices))
@@ -547,7 +545,7 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn into_par_iter(self) -> crate::slice::ParIterMut<'ctx, 'a, T> {
+    pub fn into_par_iter(self) -> crate::slices::ParIterMut<'ctx, 'a, T> {
         let (_, iter) = self.into_par_iter_with_context();
         iter
     }
@@ -556,9 +554,9 @@ where
     #[cfg(feature = "rayon")]
     pub fn into_par_iter_with_context(
         self,
-    ) -> (&'ctx T::Context, crate::slice::ParIterMut<'ctx, 'a, T>) {
+    ) -> (&'ctx T::Context, crate::slices::ParIterMut<'ctx, 'a, T>) {
         let (context, _, _) = self.ptrs.clone().into_parts();
-        let iter = crate::slice::ParIterMut::new(self);
+        let iter = crate::slices::ParIterMut::new(self);
         (context, iter)
     }
 }
@@ -600,7 +598,7 @@ where
     #[inline]
     pub fn get<I>(&'a self, index: I) -> Option<I::Refs<'a>>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.get_with_context(index);
         refs
@@ -609,7 +607,7 @@ where
     #[inline]
     pub fn get_with_context<I>(&'a self, index: I) -> (&'a T::Context, Option<I::Refs<'a>>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.as_slices_with_context();
         (context, index.get(context, slices))
@@ -618,7 +616,7 @@ where
     #[inline]
     pub fn get_mut<I>(&'a mut self, index: I) -> Option<I::RefsMut<'a>>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.get_mut_with_context(index);
         refs
@@ -630,7 +628,7 @@ where
         index: I,
     ) -> (&'a T::Context, Option<I::RefsMut<'a>>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.as_mut_slices_with_context();
         (context, index.get_mut(context, slices))
@@ -640,7 +638,7 @@ where
     #[track_caller]
     pub fn index<I>(&'a self, index: I) -> I::Refs<'a>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.index_with_context(index);
         refs
@@ -650,7 +648,7 @@ where
     #[track_caller]
     pub fn index_with_context<I>(&'a self, index: I) -> (&'a T::Context, I::Refs<'a>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.as_slices_with_context();
         (context, index.index(context, slices))
@@ -660,7 +658,7 @@ where
     #[track_caller]
     pub fn index_mut<I>(&'a mut self, index: I) -> I::RefsMut<'a>
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (_, refs) = self.index_mut_with_context(index);
         refs
@@ -670,7 +668,7 @@ where
     #[track_caller]
     pub fn index_mut_with_context<I>(&'a mut self, index: I) -> (&'a T::Context, I::RefsMut<'a>)
     where
-        I: SoaSlicesIndex<'a, T>,
+        I: SlicesIndex<'a, T>,
     {
         let (context, slices) = self.as_mut_slices_with_context();
         (context, index.index_mut(context, slices))
@@ -704,22 +702,22 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter(&'a self) -> crate::slice::ParIter<'a, 'a, T> {
+    pub fn par_iter(&'a self) -> crate::slices::ParIter<'a, 'a, T> {
         let (_, iter) = self.par_iter_with_context();
         iter
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slice::ParIter<'a, 'a, T>) {
+    pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slices::ParIter<'a, 'a, T>) {
         let (context, slices) = self.slices_with_context();
-        let iter = crate::slice::ParIter::new(slices);
+        let iter = crate::slices::ParIter::new(slices);
         (context, iter)
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_mut(&'a mut self) -> crate::slice::ParIterMut<'a, 'a, T> {
+    pub fn par_iter_mut(&'a mut self) -> crate::slices::ParIterMut<'a, 'a, T> {
         let (_, iter) = self.par_iter_mut_with_context();
         iter
     }
@@ -728,9 +726,9 @@ where
     #[cfg(feature = "rayon")]
     pub fn par_iter_mut_with_context(
         &'a mut self,
-    ) -> (&'a T::Context, crate::slice::ParIterMut<'a, 'a, T>) {
+    ) -> (&'a T::Context, crate::slices::ParIterMut<'a, 'a, T>) {
         let (context, slices) = self.mut_slices_with_context();
-        let iter = crate::slice::ParIterMut::new(slices);
+        let iter = crate::slices::ParIterMut::new(slices);
         (context, iter)
     }
 
@@ -1178,7 +1176,7 @@ where
     Refs<'a, 'a, T>: Send,
 {
     type Item = Refs<'a, 'a, T>;
-    type Iter = crate::slice::ParIter<'a, 'a, T>;
+    type Iter = crate::slices::ParIter<'a, 'a, T>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -1195,7 +1193,7 @@ where
     RefsMut<'a, 'a, T>: Send,
 {
     type Item = RefsMut<'a, 'a, T>;
-    type Iter = crate::slice::ParIterMut<'a, 'a, T>;
+    type Iter = crate::slices::ParIterMut<'a, 'a, T>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -1212,7 +1210,7 @@ where
     RefsMut<'ctx, 'a, T>: Send,
 {
     type Item = RefsMut<'ctx, 'a, T>;
-    type Iter = crate::slice::ParIterMut<'ctx, 'a, T>;
+    type Iter = crate::slices::ParIterMut<'ctx, 'a, T>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {

@@ -1,6 +1,7 @@
 use core::mem::ManuallyDrop;
 
 use crate::{
+    ptrs::SlicePtrsIndex,
     refs, slices,
     traits::{
         CloneToUninitSoaContext, MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, ReadSoaContext,
@@ -346,4 +347,78 @@ where
 
     unsafe { context.ptrs_write(dst, src) }
     ManuallyDrop::into_inner(slot)
+}
+
+#[inline]
+pub unsafe fn get_unchecked<'a, T, I>(
+    context: &'a T::Context,
+    slices: SlicePtrs<'a, T>,
+    index: I,
+) -> I::Ptrs<'a>
+where
+    T: RawSoa + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    unsafe { index.get_unchecked(context, slices) }
+}
+
+#[inline]
+pub fn get<'a, T, I>(
+    context: &'a T::Context,
+    slices: SlicePtrs<'a, T>,
+    index: I,
+) -> Option<I::Ptrs<'a>>
+where
+    T: RawSoa + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    index.get_ptrs(context, slices)
+}
+
+#[inline]
+pub fn index<'a, T, I>(context: &'a T::Context, slices: SlicePtrs<'a, T>, index: I) -> I::Ptrs<'a>
+where
+    T: RawSoa + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    index.index_ptrs(context, slices)
+}
+
+#[inline]
+pub unsafe fn get_unchecked_mut<'a, T, I>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+    index: I,
+) -> I::MutPtrs<'a>
+where
+    T: RawSoa + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    unsafe { index.get_unchecked_mut(context, slices) }
+}
+
+#[inline]
+pub fn get_mut<'a, T, I>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+    index: I,
+) -> Option<I::MutPtrs<'a>>
+where
+    T: RawSoa + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    index.get_mut_ptrs(context, slices)
+}
+
+#[inline]
+pub fn index_mut<'a, T, I>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+    index: I,
+) -> I::MutPtrs<'a>
+where
+    T: RawSoa + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    index.index_mut_ptrs(context, slices)
 }

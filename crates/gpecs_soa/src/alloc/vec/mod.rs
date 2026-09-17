@@ -13,10 +13,10 @@ pub use super::error::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
+    ptrs::{IterMutPtrs, IterPtrs, SoaSliceMutPtrs, SoaSlicePtrs, get_unchecked, range},
     slice::{
-        IndexHelper, IndexHelperMut, Iter, IterMut, IterMutPtrs, IterPtrs, SoaSlice,
-        SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut, ToSoaVec, from_raw_parts,
-        from_raw_parts_mut, get_unchecked_from, range,
+        IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut, ToSoaVec,
+        from_raw_parts, from_raw_parts_mut,
     },
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs,
@@ -798,7 +798,7 @@ where
         let dst = context.mut_slice_ptrs_as_ptrs(slices.clone());
 
         let slices = context.slice_ptrs_cast_const(slices);
-        let slices = unsafe { get_unchecked_from::<T, _>(context, slices, range) };
+        let slices = unsafe { get_unchecked::<T, _>(context, slices, range) };
         for src in IterPtrs::<T>::new(context, slices) {
             unsafe {
                 let dst = context.mut_ptrs_add(dst.clone(), set_len_on_drop.local_len);

@@ -11,7 +11,6 @@ pub mod mem;
 pub mod prelude;
 pub mod ptrs;
 pub mod refs;
-pub mod slice;
 pub mod slices;
 pub mod traits;
 pub mod wrapper;

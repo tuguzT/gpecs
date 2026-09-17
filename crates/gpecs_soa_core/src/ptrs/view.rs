@@ -5,7 +5,8 @@ use core::{
 };
 
 use crate::{
-    slice::{IterPtrs, SoaSliceMutPtrs, SoaSlicePtrsIndex, SoaSlices},
+    ptrs::{IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs},
+    slices::SoaSlices,
     traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs},
     wrapper,
 };
@@ -139,7 +140,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_with_context(index) };
         ptrs
@@ -148,7 +149,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (context, slices) = self.as_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked(context, slices) };
@@ -158,7 +159,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'ctx>
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(index) };
         ptrs
@@ -170,7 +171,7 @@ where
         index: I,
     ) -> (&'ctx T::Context, I::Ptrs<'ctx>)
     where
-        I: SoaSlicePtrsIndex<T>,
+        I: SlicePtrsIndex<T>,
     {
         let (context, slices) = self.into_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked(context, slices) };

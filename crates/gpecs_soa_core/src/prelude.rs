@@ -1,5 +1,6 @@
 pub use crate::{
     identity::Identity,
-    slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
+    ptrs::{SoaSliceMutPtrs, SoaSlicePtrs},
+    slices::{SoaSlices, SoaSlicesMut},
     traits::{RawSoa, RawSoaContext, Soa, SoaContext, SoaOwned},
 };

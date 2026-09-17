@@ -9,7 +9,8 @@ use crate::{
     set::EpochSparseSet,
     soa::{
         self,
-        slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
+        ptrs::{SoaSliceMutPtrs, SoaSlicePtrs},
+        slice::{SoaSlices, SoaSlicesMut},
         traits::{
             AllocSoa, Context, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned,
             SoaRead, SoaReadOwned, SoaWrite,

@@ -6,24 +6,24 @@ use rayon::iter::{
 };
 
 use crate::{
-    slice::{IterMut, SoaSlices, SoaSlicesMut},
-    traits::{RawSoa, RefsMut, Slices, Soa, SoaOwned},
+    slices::{Iter, SoaSlices},
+    traits::{RawSoa, Refs, Slices, Soa, SoaOwned},
 };
 
 #[repr(transparent)]
-pub struct ParIterMut<'ctx, 'a, T>
+pub struct ParIter<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
-    slices: SoaSlicesMut<'ctx, 'a, T>,
+    slices: SoaSlices<'ctx, 'a, T>,
 }
 
-impl<'ctx, 'a, T> ParIterMut<'ctx, 'a, T>
+impl<'ctx, 'a, T> ParIter<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(slices: SoaSlicesMut<'ctx, 'a, T>) -> Self {
+    pub fn new(slices: SoaSlices<'ctx, 'a, T>) -> Self {
         Self { slices }
     }
 
@@ -40,25 +40,13 @@ where
     }
 
     #[inline]
-    pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        let (_, slices) = self.mut_slices_with_context();
-        slices
-    }
-
-    #[inline]
-    pub fn mut_slices_with_context(&mut self) -> (&T::Context, SoaSlicesMut<'_, '_, T>) {
-        let Self { slices } = self;
-        slices.mut_slices_with_context()
-    }
-
-    #[inline]
-    pub fn into_slices(self) -> SoaSlicesMut<'ctx, 'a, T> {
+    pub fn into_slices(self) -> SoaSlices<'ctx, 'a, T> {
         let Self { slices } = self;
         slices
     }
 }
 
-impl<T> Debug for ParIterMut<'_, '_, T>
+impl<T> Debug for ParIter<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
@@ -71,14 +59,27 @@ where
     }
 }
 
-impl<'ctx, 'a, T> ParallelIterator for ParIterMut<'ctx, 'a, T>
+impl<T> Clone for ParIter<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { slices } = self;
+
+        let slices = slices.clone();
+        Self { slices }
+    }
+}
+
+impl<'ctx, 'a, T> ParallelIterator for ParIter<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
     T::Context: Sync,
-    T::Fields: Send,
-    RefsMut<'ctx, 'a, T>: Send,
+    T::Fields: Sync,
+    Refs<'ctx, 'a, T>: Send,
 {
-    type Item = RefsMut<'ctx, 'a, T>;
+    type Item = Refs<'ctx, 'a, T>;
 
     fn drive_unindexed<C>(self, consumer: C) -> C::Result
     where
@@ -92,12 +93,12 @@ where
     }
 }
 
-impl<'ctx, 'a, T> IndexedParallelIterator for ParIterMut<'ctx, 'a, T>
+impl<'ctx, 'a, T> IndexedParallelIterator for ParIter<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
     T::Context: Sync,
-    T::Fields: Send,
-    RefsMut<'ctx, 'a, T>: Send,
+    T::Fields: Sync,
+    Refs<'ctx, 'a, T>: Send,
 {
     fn len(&self) -> usize {
         let Self { slices } = self;
@@ -119,14 +120,14 @@ where
     }
 }
 
-impl<'ctx, 'a, T> Producer for ParIterMut<'ctx, 'a, T>
+impl<'ctx, 'a, T> Producer for ParIter<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
     T::Context: Sync,
-    T::Fields: Send,
+    T::Fields: Sync,
 {
-    type Item = RefsMut<'ctx, 'a, T>;
-    type IntoIter = IterMut<'ctx, 'a, T>;
+    type Item = Refs<'ctx, 'a, T>;
+    type IntoIter = Iter<'ctx, 'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self { slices } = self;
@@ -136,7 +137,7 @@ where
     fn split_at(self, index: usize) -> (Self, Self) {
         let Self { slices } = self;
 
-        let (left, right) = slices.split_at_mut(index);
+        let (left, right) = slices.split_at(index);
         (Self { slices: left }, Self { slices: right })
     }
 }

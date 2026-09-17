@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    slice::IterPtrs,
+    ptrs::IterPtrs,
     traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 

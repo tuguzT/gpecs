@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, K, V, P> = soa::slice::IterPtrs<'ctx, KeyValuePair<K, V, P>>;
+type Inner<'ctx, K, V, P> = soa::ptrs::IterPtrs<'ctx, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
 pub struct IterPtrs<'ctx, K, V, P = CoreSliceItemPtrs<K>>

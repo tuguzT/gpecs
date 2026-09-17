@@ -1,4 +1,4 @@
-use crate::slice::{SoaSlices, SoaSlicesMut};
+use crate::slices::{SoaSlices, SoaSlicesMut};
 
 // Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
 #[macro_export]

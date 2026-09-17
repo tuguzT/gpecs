@@ -17,7 +17,7 @@ use crate::{
     key::Key,
     soa::{
         identity::Identity,
-        slice::SoaSliceMutPtrs,
+        ptrs::SoaSliceMutPtrs,
         traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs},
     },
     view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewPtr},

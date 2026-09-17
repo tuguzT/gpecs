@@ -1,4 +1,7 @@
-use crate::traits::{SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext};
+use crate::{
+    slices::SlicesIndex,
+    traits::{SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext},
+};
 
 #[inline]
 pub fn upcast<'short, 'long: 'short, 'data, T>(
@@ -89,4 +92,56 @@ where
     T: Soa<'data> + ?Sized,
 {
     context.mut_slices_as_slices(slices)
+}
+
+#[inline]
+pub fn get<'a, 'data, T, I>(
+    context: &'a T::Context,
+    slices: Slices<'a, 'data, T>,
+    index: I,
+) -> Option<I::Refs<'a>>
+where
+    T: Soa<'data> + ?Sized,
+    I: SlicesIndex<'data, T>,
+{
+    index.get(context, slices)
+}
+
+#[inline]
+pub fn index<'a, 'data, T, I>(
+    context: &'a T::Context,
+    slices: Slices<'a, 'data, T>,
+    index: I,
+) -> I::Refs<'a>
+where
+    T: Soa<'data> + ?Sized,
+    I: SlicesIndex<'data, T>,
+{
+    index.index(context, slices)
+}
+
+#[inline]
+pub fn get_mut<'a, 'data, T, I>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+    index: I,
+) -> Option<I::RefsMut<'a>>
+where
+    T: Soa<'data> + ?Sized,
+    I: SlicesIndex<'data, T>,
+{
+    index.get_mut(context, slices)
+}
+
+#[inline]
+pub fn index_mut<'a, 'data, T, I>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+    index: I,
+) -> I::RefsMut<'a>
+where
+    T: Soa<'data> + ?Sized,
+    I: SlicesIndex<'data, T>,
+{
+    index.index_mut(context, slices)
 }

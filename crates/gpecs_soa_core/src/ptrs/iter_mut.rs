@@ -4,31 +4,32 @@ use core::{
 };
 
 use crate::{
-    slice::{Iter, IterMutPtrs},
-    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs},
+    ptrs::IterPtrs,
+    slices::{Iter, IterMut},
+    traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
     wrapper,
 };
 
-pub struct IterPtrs<'ctx, T>
+pub struct IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: wrapper::Ptrs<'ctx, T>,
+    ptrs: wrapper::MutPtrs<'ctx, T>,
     context: &'ctx T::Context,
     start: usize,
     end: usize,
 }
 
-impl<'ctx, T> IterPtrs<'ctx, T>
+impl<'ctx, T> IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'ctx T::Context, slices: SlicePtrs<'ctx, T>) -> Self {
-        let len = context.slice_ptrs_len(&slices);
-        let ptrs = context.slice_ptrs_as_ptrs(slices);
+    pub fn new(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
+        let len = context.mut_slice_ptrs_len(&slices);
+        let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
         Self {
-            ptrs: wrapper::Ptrs::new(ptrs),
+            ptrs: wrapper::MutPtrs::new(ptrs),
             context,
             start: 0,
             end: len,
@@ -68,7 +69,28 @@ where
         } = *self;
 
         let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'ctx, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&'ctx T::Context, MutPtrs<'ctx, T>) {
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            ..
+        } = *self;
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 
@@ -88,7 +110,28 @@ where
         } = self;
 
         let ptrs = ptrs.into_inner();
+        let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> MutPtrs<'ctx, T> {
+        let (_, ptrs) = self.into_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs_with_context(self) -> (&'ctx T::Context, MutPtrs<'ctx, T>) {
+        let Self {
+            ptrs,
+            context,
+            start,
+            ..
+        } = self;
+
+        let ptrs = ptrs.into_inner();
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 
@@ -109,8 +152,31 @@ where
 
         let len = self.len();
         let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
         let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
+        (context, slices)
+    }
+
+    #[inline]
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'ctx, T> {
+        let (_, slices) = self.as_mut_slice_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&'ctx T::Context, SliceMutPtrs<'ctx, T>) {
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            ..
+        } = *self;
+
+        let len = self.len();
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -121,7 +187,6 @@ where
     }
 
     #[inline]
-    #[doc(alias = "into_parts")]
     pub fn into_slice_ptrs_with_context(self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
         let len = self.len();
         let Self {
@@ -132,72 +197,100 @@ where
         } = self;
 
         let ptrs = ptrs.into_inner();
+        let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
         let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
     #[inline]
-    pub fn cast_mut(self) -> IterMutPtrs<'ctx, T> {
+    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'ctx, T> {
+        let (_, slices) = self.into_mut_slice_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    #[doc(alias = "into_parts")]
+    pub fn into_mut_slice_ptrs_with_context(self) -> (&'ctx T::Context, SliceMutPtrs<'ctx, T>) {
+        let len = self.len();
+        let Self {
+            ptrs,
+            context,
+            start,
+            ..
+        } = self;
+
+        let ptrs = ptrs.into_inner();
+        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
+        (context, slices)
+    }
+
+    #[inline]
+    pub fn cast_const(self) -> IterPtrs<'ctx, T> {
         let (context, slices) = self.into_slice_ptrs_with_context();
-        let slices = context.slice_ptrs_cast_mut(slices);
-        IterMutPtrs::new(context, slices)
+        IterPtrs::new(context, slices)
     }
 
     #[inline]
     pub unsafe fn as_ref_unchecked<'a>(self) -> Iter<'ctx, 'a, T> {
-        let (context, slices) = self.into_slice_ptrs_with_context();
-        unsafe { Iter::from_parts(context, slices) }
+        unsafe { self.cast_const().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> IterMut<'ctx, 'a, T> {
+        let (context, slices) = self.into_mut_slice_ptrs_with_context();
+        unsafe { IterMut::from_parts(context, slices) }
     }
 
     #[inline]
     unsafe fn post_inc_start<'b>(
         start: &mut usize,
-        ptrs: Ptrs<'b, T>,
+        ptrs: MutPtrs<'b, T>,
         context: &'b T::Context,
         offset: usize,
-    ) -> Ptrs<'b, T> {
+    ) -> MutPtrs<'b, T> {
         let old_start = *start;
         *start += offset;
-        unsafe { context.ptrs_add(ptrs, old_start) }
+        unsafe { context.mut_ptrs_add(ptrs, old_start) }
     }
 
     #[inline]
     unsafe fn pre_dec_end<'b>(
         end: &mut usize,
-        ptrs: Ptrs<'b, T>,
+        ptrs: MutPtrs<'b, T>,
         context: &'b T::Context,
         offset: usize,
-    ) -> Ptrs<'b, T> {
+    ) -> MutPtrs<'b, T> {
         *end -= offset;
-        unsafe { context.ptrs_add(ptrs, *end) }
+        unsafe { context.mut_ptrs_add(ptrs, *end) }
     }
 }
 
-impl<'ctx, T> From<&'ctx T::Context> for IterPtrs<'ctx, T>
+impl<'ctx, T> From<&'ctx T::Context> for IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.ptrs_dangling();
-        let slices = context.slice_ptrs_from_raw_parts(ptrs, 0);
+        let ptrs = context.mut_ptrs_dangling();
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, 0);
         Self::new(context, slices)
     }
 }
 
-impl<T> Debug for IterPtrs<'_, T>
+impl<T> Debug for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
-        f.debug_tuple("IterPtrs").field(&slices).finish()
+        f.debug_tuple("IterMutPtrs").field(&slices).finish()
     }
 }
 
-impl<T> Clone for IterPtrs<'_, T>
+impl<T> Clone for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -220,15 +313,15 @@ where
 }
 
 #[expect(clippy::while_let_on_iterator)]
-impl<'ctx, T> Iterator for IterPtrs<'ctx, T>
+impl<'ctx, T> Iterator for IterMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    type Item = Ptrs<'ctx, T>;
+    type Item = MutPtrs<'ctx, T>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if IterPtrs::is_empty(self) {
+        if IterMutPtrs::is_empty(self) {
             return None;
         }
 
@@ -245,7 +338,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = IterPtrs::len(self);
+        let len = IterMutPtrs::len(self);
         (len, Some(len))
     }
 
@@ -254,12 +347,12 @@ where
     where
         Self: Sized,
     {
-        IterPtrs::len(&self)
+        IterMutPtrs::len(&self)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= IterPtrs::len(self) {
+        if n >= IterMutPtrs::len(self) {
             self.start = self.end;
             return None;
         }
@@ -290,7 +383,7 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        if IterPtrs::is_empty(&self) {
+        if IterMutPtrs::is_empty(&self) {
             return init;
         }
 
@@ -313,7 +406,7 @@ where
             // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
-            let item = unsafe { context.ptrs_add(ptrs, i) };
+            let item = unsafe { context.mut_ptrs_add(ptrs, i) };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
@@ -399,7 +492,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = IterPtrs::len(self);
+        let n = IterMutPtrs::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -417,7 +510,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = IterPtrs::len(self);
+        let n = IterMutPtrs::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -430,13 +523,13 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for IterPtrs<'_, T>
+impl<T> DoubleEndedIterator for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if IterPtrs::is_empty(self) {
+        if IterMutPtrs::is_empty(self) {
             return None;
         }
 
@@ -453,7 +546,7 @@ where
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= IterPtrs::len(self) {
+        if n >= IterMutPtrs::len(self) {
             self.end = self.start;
             return None;
         }
@@ -472,14 +565,14 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for IterPtrs<'_, T>
+impl<T> ExactSizeIterator for IterMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
-        IterPtrs::len(self)
+        IterMutPtrs::len(self)
     }
 }
 
-impl<T> FusedIterator for IterPtrs<'_, T> where T: RawSoa + ?Sized {}
+impl<T> FusedIterator for IterMutPtrs<'_, T> where T: RawSoa + ?Sized {}

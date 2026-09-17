@@ -15,7 +15,8 @@ use crate::{
     item::{KeyValuePair, SparseItem},
     key::Key,
     soa::{
-        slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices},
+        ptrs::{SoaSliceMutPtrs, SoaSlicePtrs},
+        slice::SoaSlices,
         traits::{MutPtrs, Ptrs, RawSoa},
     },
 };

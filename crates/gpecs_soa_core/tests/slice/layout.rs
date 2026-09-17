@@ -1,4 +1,4 @@
-use gpecs_soa_core::{prelude::*, slice};
+use gpecs_soa_core::{prelude::*, ptrs, slices};
 
 type Item = (u32, u16, u8);
 
@@ -21,14 +21,14 @@ fn slices_npo() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn iter_npo() {
-    type IterPtrs<'ctx> = slice::IterPtrs<'ctx, Item>;
-    type IterMutPtrs<'ctx> = slice::IterMutPtrs<'ctx, Item>;
+    type IterPtrs<'ctx> = ptrs::IterPtrs<'ctx, Item>;
+    type IterMutPtrs<'ctx> = ptrs::IterMutPtrs<'ctx, Item>;
 
     assert_eq!(size_of::<Option<IterPtrs>>(), size_of::<IterPtrs>());
     assert_eq!(size_of::<Option<IterMutPtrs>>(), size_of::<IterMutPtrs>());
 
-    type Iter<'ctx, 'a> = slice::Iter<'ctx, 'a, Item>;
-    type IterMut<'ctx, 'a> = slice::IterMut<'ctx, 'a, Item>;
+    type Iter<'ctx, 'a> = slices::Iter<'ctx, 'a, Item>;
+    type IterMut<'ctx, 'a> = slices::IterMut<'ctx, 'a, Item>;
 
     assert_eq!(size_of::<Option<Iter>>(), size_of::<Iter>());
     assert_eq!(size_of::<Option<IterMut>>(), size_of::<IterMut>());

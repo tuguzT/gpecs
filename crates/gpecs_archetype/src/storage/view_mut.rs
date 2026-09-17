@@ -14,7 +14,7 @@ use gpecs_soa_erased::{
     soa::{
         field::FieldLayouts,
         identity::Identity,
-        slice::SoaSlicesMut,
+        slices::SoaSlicesMut,
         traits::{
             Refs as ErasedBundleRefs, RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles,
             SlicesMut as ErasedBundlesMut,

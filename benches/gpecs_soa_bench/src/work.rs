@@ -3,7 +3,7 @@ use std::{array, hint::black_box, iter::Zip, mem::MaybeUninit, slice};
 use gpecs_soa_erased::{
     BoxedErasedSoa,
     ptr::slice::CoreSliceItemPtrs,
-    soa::{prelude::*, slice as soa_slice},
+    soa::{prelude::*, slices},
 };
 use num_traits::ToPrimitive;
 
@@ -89,7 +89,7 @@ impl Work for Tiny {
         (index.try_into().unwrap(),)
     }
 
-    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = slices::Iter<'ctx, 'a, Self>;
 
     fn soa_slf_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, Self>,
@@ -106,7 +106,7 @@ impl Work for Tiny {
     }
 
     type SoaSerIter<'ctx, 'a> =
-        soa_slice::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
+        slices::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     fn soa_ser_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
@@ -163,7 +163,7 @@ impl Work for Small {
         (1.0 * index, 0.2 * index, -2.3 * index)
     }
 
-    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = slices::Iter<'ctx, 'a, Self>;
 
     fn soa_slf_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, Self>,
@@ -180,7 +180,7 @@ impl Work for Small {
     }
 
     type SoaSerIter<'ctx, 'a> =
-        soa_slice::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
+        slices::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     fn soa_ser_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
@@ -242,7 +242,7 @@ impl Work for Big {
         )
     }
 
-    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = slices::Iter<'ctx, 'a, Self>;
 
     fn soa_slf_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, Self>,
@@ -259,7 +259,7 @@ impl Work for Big {
     }
 
     type SoaSerIter<'ctx, 'a> =
-        soa_slice::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
+        slices::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     fn soa_ser_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
@@ -335,7 +335,7 @@ impl Work for Large {
         )
     }
 
-    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = slices::Iter<'ctx, 'a, Self>;
 
     fn soa_slf_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, Self>,
@@ -354,7 +354,7 @@ impl Work for Large {
     }
 
     type SoaSerIter<'ctx, 'a> =
-        soa_slice::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
+        slices::Iter<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     fn soa_ser_prepare_iter<'ctx, 'a>(
         data: SoaSlices<'ctx, 'a, BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,

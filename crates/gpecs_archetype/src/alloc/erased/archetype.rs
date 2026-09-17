@@ -19,7 +19,7 @@ use gpecs_sparse::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::Identity,
         layout::WithLayout,
-        slice::ToSoaVec,
+        slices::ToSoaVec,
     },
 };
 

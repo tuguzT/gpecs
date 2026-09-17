@@ -12,7 +12,7 @@ use gpecs_sparse::{
     item::{KeyValueSlices, SparseItem},
     soa::{
         identity::Identity,
-        slice::SoaSlices,
+        slices::SoaSlices,
         traits::{Ptrs, Slices},
     },
     view::EpochSparseView,

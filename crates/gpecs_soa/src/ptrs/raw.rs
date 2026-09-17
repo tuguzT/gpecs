@@ -1,5 +1,3 @@
-pub use gpecs_soa_core::ptrs::*;
-
 use crate::traits::{AllocSoa, AllocSoaContext, MutPtrs, Ptrs};
 
 #[inline]

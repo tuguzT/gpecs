@@ -16,7 +16,7 @@ use crate::{
     key::Key,
     soa::{
         ptrs::{SoaSliceMutPtrs, SoaSlicePtrs},
-        slice::SoaSlices,
+        slices::SoaSlices,
         traits::{MutPtrs, Ptrs, RawSoa},
     },
 };

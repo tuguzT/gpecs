@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, 'a, K, V, P> = soa::slice::IterMut<'ctx, 'a, KeyValuePair<K, V, P>>;
+type Inner<'ctx, 'a, K, V, P> = soa::slices::IterMut<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
 pub struct IterMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>

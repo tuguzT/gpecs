@@ -23,7 +23,7 @@ use crate::{
     iter::{Iter, IterPtrs, KeyPtrs, Keys, ValuePtrs, Values},
     key::Key,
     soa::{
-        slice::SoaSlices,
+        slices::SoaSlices,
         traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
     },
     view::EpochSparseViewPtr,

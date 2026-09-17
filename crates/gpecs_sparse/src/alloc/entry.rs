@@ -10,7 +10,7 @@ use crate::{
     soa::{
         self,
         ptrs::{SoaSliceMutPtrs, SoaSlicePtrs},
-        slice::{SoaSlices, SoaSlicesMut},
+        slices::{SoaSlices, SoaSlicesMut},
         traits::{
             AllocSoa, Context, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned,
             SoaRead, SoaReadOwned, SoaWrite,

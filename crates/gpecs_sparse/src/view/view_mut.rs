@@ -31,7 +31,7 @@ use crate::{
     key::{Epoch, Key},
     soa::{
         ptrs::SoaSliceMutPtrs,
-        slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
+        slices::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
         traits::{
             MutPtrs, Ptrs, RawSoa, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
             SoaContext, SoaOwned,

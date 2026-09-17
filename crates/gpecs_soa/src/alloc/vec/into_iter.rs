@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     alloc::raw_vec::RawSoaVec,
-    slice::{SoaSlices, ToSoaVec},
+    slices::{SoaSlices, ToSoaVec},
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
         SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaReadOwned,

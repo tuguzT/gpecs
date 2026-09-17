@@ -1,5 +1,5 @@
 use crate::{
-    slice::{SoaSlice, SoaSlices, SoaSlicesMut, partial_eq_impl},
+    slices::{SoaSlice, SoaSlices, SoaSlicesMut, partial_eq_impl},
     traits::AllocSoaTrusted,
 };
 

@@ -9,7 +9,7 @@ use glam::{USizeVec3, UVec3};
 use gpecs_entity::{Entity, EntityEpoch, EntitySparseItem};
 use gpecs_soa_erased::{
     ErasedSoa, ErasedSoaContext, ErasedSoaMutSlices,
-    soa::{identity::Identity, slice::SoaSlicesMut},
+    soa::{identity::Identity, slices::SoaSlicesMut},
 };
 use gpecs_sparse::{
     item::{KeyValueMutSlices, KeyValuePair},

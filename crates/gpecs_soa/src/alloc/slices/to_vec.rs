@@ -1,6 +1,6 @@
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
-    slice::{SoaSlices, SoaSlicesMut},
+    slices::{SoaSlices, SoaSlicesMut},
     traits::{AllocSoa, CloneToUninitSoaContext, RawSoaContext, SoaCloneToUninit},
     vec::SoaVec,
 };

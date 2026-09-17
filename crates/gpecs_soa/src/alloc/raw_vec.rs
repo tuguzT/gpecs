@@ -19,8 +19,8 @@ use crate::{
         capacity_from, layout_is_dangling, ptr_to_buffer_context_mut, ptr_to_buffer_prefix_mut,
         ptrs_from_buffer_mut,
     },
-    ptr::slice_from_raw_parts_mut,
-    slice::SoaSlice,
+    ptrs::slice_from_raw_parts_mut,
+    slices::SoaSlice,
     traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs},
 };
 

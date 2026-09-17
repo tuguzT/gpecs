@@ -2,7 +2,7 @@ use core::cmp;
 use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    slice::{Iter, IterMut, SoaSlice, ToSoaVec},
+    slices::{Iter, IterMut, SoaSlice, ToSoaVec},
     traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaOwned, SoaReadOwned},
     vec::{IntoIter, SoaVec},
 };

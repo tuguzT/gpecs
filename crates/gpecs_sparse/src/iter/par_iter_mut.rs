@@ -10,12 +10,12 @@ use crate::{
     item::KeyValuePair,
     iter::IterMut,
     soa::{
-        slice,
+        slices,
         traits::{RawSoa, RefsMut, Slices, SlicesMut, Soa, SoaOwned},
     },
 };
 
-type Inner<'ctx, 'a, K, V, P> = slice::ParIterMut<'ctx, 'a, KeyValuePair<K, V, P>>;
+type Inner<'ctx, 'a, K, V, P> = slices::ParIterMut<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 pub struct ParIterMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where

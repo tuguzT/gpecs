@@ -7,9 +7,11 @@ use core::{
 
 use crate::{
     buffer::dst::DstBuffer,
-    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
-    ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs, SoaSlicePtrs},
-    slice::{IndexHelper, IndexHelperMut, Iter, IterMut, SlicesIndex, SoaSlices, SoaSlicesMut},
+    ptrs::{
+        IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs, SoaSlicePtrs, slice_from_raw_parts,
+        slice_from_raw_parts_mut,
+    },
+    slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SlicesIndex, SoaSlices, SoaSlicesMut},
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
         Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,

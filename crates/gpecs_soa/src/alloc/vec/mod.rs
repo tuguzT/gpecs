@@ -14,7 +14,7 @@ pub use super::error::{TryReserveError, TryReserveErrorKind};
 use crate::{
     buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
     ptrs::{IterMutPtrs, IterPtrs, SoaSliceMutPtrs, SoaSlicePtrs, get_unchecked, range},
-    slice::{
+    slices::{
         IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut, ToSoaVec,
         from_raw_parts, from_raw_parts_mut,
     },
@@ -1061,22 +1061,22 @@ where
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter(&'a self) -> crate::slice::ParIter<'a, 'a, T> {
+    pub fn par_iter(&'a self) -> crate::slices::ParIter<'a, 'a, T> {
         let (_, iter) = self.par_iter_with_context();
         iter
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slice::ParIter<'a, 'a, T>) {
+    pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slices::ParIter<'a, 'a, T>) {
         let (context, slices) = self.slices_with_context();
-        let iter = crate::slice::ParIter::new(slices);
+        let iter = crate::slices::ParIter::new(slices);
         (context, iter)
     }
 
     #[inline]
     #[cfg(feature = "rayon")]
-    pub fn par_iter_mut(&'a mut self) -> crate::slice::ParIterMut<'a, 'a, T> {
+    pub fn par_iter_mut(&'a mut self) -> crate::slices::ParIterMut<'a, 'a, T> {
         let (_, iter) = self.par_iter_mut_with_context();
         iter
     }
@@ -1085,9 +1085,9 @@ where
     #[cfg(feature = "rayon")]
     pub fn par_iter_mut_with_context(
         &'a mut self,
-    ) -> (&'a T::Context, crate::slice::ParIterMut<'a, 'a, T>) {
+    ) -> (&'a T::Context, crate::slices::ParIterMut<'a, 'a, T>) {
         let (context, slices) = self.mut_slices_with_context();
-        let iter = crate::slice::ParIterMut::new(slices);
+        let iter = crate::slices::ParIterMut::new(slices);
         (context, iter)
     }
 }
@@ -1499,7 +1499,7 @@ where
     Refs<'a, 'a, T>: Send,
 {
     type Item = Refs<'a, 'a, T>;
-    type Iter = crate::slice::ParIter<'a, 'a, T>;
+    type Iter = crate::slices::ParIter<'a, 'a, T>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
@@ -1516,7 +1516,7 @@ where
     RefsMut<'a, 'a, T>: Send,
 {
     type Item = RefsMut<'a, 'a, T>;
-    type Iter = crate::slice::ParIterMut<'a, 'a, T>;
+    type Iter = crate::slices::ParIterMut<'a, 'a, T>;
 
     #[inline]
     fn into_par_iter(self) -> Self::Iter {

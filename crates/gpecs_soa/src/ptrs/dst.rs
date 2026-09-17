@@ -1,4 +1,4 @@
-use crate::{slice::SoaSlice, traits::AllocSoaTrusted};
+use crate::{slices::SoaSlice, traits::AllocSoaTrusted};
 
 #[inline]
 #[track_caller]
@@ -100,7 +100,7 @@ where
 }
 
 mod private {
-    use crate::{slice::SoaSlice, traits::AllocSoaTrusted};
+    use crate::{slices::SoaSlice, traits::AllocSoaTrusted};
 
     pub trait Sealed {}
 

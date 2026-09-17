@@ -18,7 +18,7 @@ use gpecs_sparse::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         layout::WithLayout,
-        slice::SoaSlices,
+        slices::SoaSlices,
     },
     view::{EpochSparseView, EpochSparseViewPtr},
 };

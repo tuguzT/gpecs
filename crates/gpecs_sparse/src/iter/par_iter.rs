@@ -10,12 +10,12 @@ use crate::{
     item::KeyValuePair,
     iter::Iter,
     soa::{
-        slice,
+        slices,
         traits::{RawSoa, Refs, Slices, Soa, SoaOwned},
     },
 };
 
-type Inner<'ctx, 'a, K, V, P> = slice::ParIter<'ctx, 'a, KeyValuePair<K, V, P>>;
+type Inner<'ctx, 'a, K, V, P> = slices::ParIter<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
 pub struct ParIter<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>

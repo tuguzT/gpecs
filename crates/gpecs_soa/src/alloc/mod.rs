@@ -1,5 +1,5 @@
 pub mod error;
-pub mod slice;
+pub mod slices;
 pub mod vec;
 
 mod raw_vec;

@@ -27,7 +27,7 @@ where
     #[inline]
     pub fn new(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
         let len = context.mut_slice_ptrs_len(&slices);
-        let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
+        let ptrs = context.mut_slice_ptrs_as_mut_ptrs(slices);
         unsafe { Self::from_parts(context, ptrs, len) }
     }
 

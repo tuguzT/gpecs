@@ -105,11 +105,21 @@ unsafe impl<T> RawSoaContext<Identity<T>> for () {
     }
 
     #[inline]
+    fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_> {
+        NonNull::dangling()
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
         unsafe { NonNull::new_unchecked(ptrs) }
+    }
+
+    #[inline]
+    fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
+        ptrs.as_ptr().cast_const()
     }
 
     #[inline]
@@ -169,8 +179,16 @@ unsafe impl<T> RawSoaContext<Identity<T>> for () {
     }
 
     #[inline]
-    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
-        slices.cast()
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
+        slices.cast_const().cast() // should be `slices.as_ptr()` but it's unstable
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
+        slices.cast() // should be `slices.as_mut_ptr()` but it's unstable
     }
 
     #[inline]

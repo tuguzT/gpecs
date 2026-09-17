@@ -141,6 +141,14 @@ where
 }
 
 #[inline]
+pub fn dangling_nonnull<T>(context: &T::Context) -> NonNullPtrs<'_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.nonnull_ptrs_dangling()
+}
+
+#[inline]
 pub unsafe fn nonnull_from_mut<'a, T>(
     context: &'a T::Context,
     ptrs: MutPtrs<'a, T>,
@@ -152,7 +160,18 @@ where
 }
 
 #[inline]
-pub fn nonnull_as_mut<'a, T>(context: &'a T::Context, ptrs: NonNullPtrs<'a, T>) -> MutPtrs<'a, T>
+pub fn nonnull_as_ptrs<'a, T>(context: &'a T::Context, ptrs: NonNullPtrs<'a, T>) -> Ptrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.nonnull_ptrs_as_ptrs(ptrs)
+}
+
+#[inline]
+pub fn nonnull_as_mut_ptrs<'a, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+) -> MutPtrs<'a, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -233,7 +252,7 @@ pub fn slices_as_mut_ptrs<'a, T>(
 where
     T: RawSoa + ?Sized,
 {
-    context.mut_slice_ptrs_as_ptrs(slices)
+    context.mut_slice_ptrs_as_mut_ptrs(slices)
 }
 
 #[inline]

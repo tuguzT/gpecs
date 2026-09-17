@@ -14,7 +14,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
-    ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::RawSoaContext,
@@ -25,7 +25,7 @@ use crate::{
     bundle::{
         Bundle, BundleNonNullPtrs,
         erased::{
-            ErasedBundleMutPtrs,
+            ErasedBundleMutPtrs, ErasedBundlePtrs,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -46,7 +46,7 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptrs: ErasedBundleMutPtrs<D, NonNullAsPtr<P>>) -> Option<Self> {
+    pub fn new(ptrs: ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>>) -> Option<Self> {
         let ptrs = ptrs.into_inner();
         let inner = ErasedSoaNonNullPtrs::new(ptrs)?;
 
@@ -55,7 +55,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, NonNullAsPtr<P>>) -> Self {
+    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>>) -> Self {
         let ptrs = ptrs.into_inner();
         let inner = unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) };
         unsafe { Self::from_inner(inner) }
@@ -329,7 +329,19 @@ where
     }
 }
 
-impl<D, P> From<ErasedBundleNonNullPtrs<D, P>> for ErasedBundleMutPtrs<D, NonNullAsPtr<P>>
+impl<D, P> From<ErasedBundleNonNullPtrs<D, P>> for ErasedBundlePtrs<D, NonNullAsPtr<P>>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    fn from(ptrs: ErasedBundleNonNullPtrs<D, P>) -> Self {
+        let inner = ptrs.into_inner();
+        let inner = inner.into();
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
+    }
+}
+
+impl<D, P> From<ErasedBundleNonNullPtrs<D, P>> for ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>>
 where
     P: NonNullSliceItemPtr,
 {

@@ -8,13 +8,13 @@ use core::{
 use gpecs_erased::{
     data::ErasedNonNullPtr,
     layout::WithLayout,
-    ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
 };
 
 use crate::{
     Component,
     erased::{
-        ErasedComponentMutPtr,
+        ErasedComponentMutPtr, ErasedComponentPtr,
         error::{
             DanglingError, DowncastError, NotRegisteredError, TryFromPtrError, check_downcast,
         },
@@ -69,7 +69,7 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptr: ErasedComponentMutPtr<NonNullAsPtr<T>>) -> Option<Self> {
+    pub fn new(ptr: ErasedComponentMutPtr<NonNullAsMutPtr<T>>) -> Option<Self> {
         let (component_id, field) = ptr.into_parts();
         let field = Field::new(field)?;
 
@@ -78,7 +78,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptr: ErasedComponentMutPtr<NonNullAsPtr<T>>) -> Self {
+    pub unsafe fn new_unchecked(ptr: ErasedComponentMutPtr<NonNullAsMutPtr<T>>) -> Self {
         let (component_id, field) = ptr.into_parts();
         let field = unsafe { Field::new_unchecked(field) };
 
@@ -246,7 +246,19 @@ impl<T> Borrow<ComponentId> for ErasedComponentNonNullPtr<T> {
     }
 }
 
-impl<T> From<ErasedComponentNonNullPtr<T>> for ErasedComponentMutPtr<NonNullAsPtr<T>>
+impl<T> From<ErasedComponentNonNullPtr<T>> for ErasedComponentPtr<NonNullAsPtr<T>>
+where
+    T: NonNullSliceItemPtr,
+{
+    #[inline]
+    fn from(ptr: ErasedComponentNonNullPtr<T>) -> Self {
+        let (component_id, field) = ptr.into_parts();
+        let field = field.into();
+        unsafe { Self::from_parts(component_id, field) }
+    }
+}
+
+impl<T> From<ErasedComponentNonNullPtr<T>> for ErasedComponentMutPtr<NonNullAsMutPtr<T>>
 where
     T: NonNullSliceItemPtr,
 {

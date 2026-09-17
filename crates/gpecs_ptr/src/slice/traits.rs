@@ -7,7 +7,8 @@ pub type PtrsItem<T> = <T as SliceItemPtrs>::Item;
 
 pub type CastConst<T> = <<T as MutSliceItemPtr>::Ptrs as SliceItemPtrs>::Const;
 pub type CastMut<T> = <<T as ConstSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
-pub type NonNullAsPtr<T> = <<T as NonNullSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
+pub type NonNullAsPtr<T> = <<T as NonNullSliceItemPtr>::Ptrs as SliceItemPtrs>::Const;
+pub type NonNullAsMutPtr<T> = <<T as NonNullSliceItemPtr>::Ptrs as SliceItemPtrs>::Mut;
 
 pub unsafe trait SliceItemPtrs {
     type Item;
@@ -118,6 +119,12 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
     }
 
     fn as_ptr(self) -> NonNullAsPtr<Self> {
+        let slice = self.slice().as_ptr();
+        let index = self.index();
+        unsafe { ConstSliceItemPtr::from_slice(slice, index) }
+    }
+
+    fn as_mut_ptr(self) -> NonNullAsMutPtr<Self> {
         let slice = self.slice().as_ptr();
         let index = self.index();
         unsafe { MutSliceItemPtr::from_slice(slice, index) }

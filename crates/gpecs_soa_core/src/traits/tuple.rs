@@ -115,11 +115,23 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_> {
+                let ptrs = ($(NonNull::<$types>::dangling(),)*);
+                ptrs
+            }
+
+            #[inline]
             unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
                 &'a self,
                 ptrs: Self::MutPtrs<'a>,
             ) -> Self::NonNullPtrs<'a> {
                 let ptrs = unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) };
+                ptrs
+            }
+
+            #[inline]
+            fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
+                let ptrs = ($(ptrs.$indices.as_ptr().cast_const(),)*);
                 ptrs
             }
 
@@ -188,7 +200,19 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
-            fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+            fn mut_slice_ptrs_as_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceMutPtrs<'a>,
+            ) -> Self::Ptrs<'a> {
+                let slices = ($(slices.$indices.cast_const().cast(),)*); // should be `slices.$indices.as_ptr()` but it's unstable
+                slices
+            }
+
+            #[inline]
+            fn mut_slice_ptrs_as_mut_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceMutPtrs<'a>,
+            ) -> Self::MutPtrs<'a> {
                 let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_mut_ptr()` but it's unstable
                 slices
             }

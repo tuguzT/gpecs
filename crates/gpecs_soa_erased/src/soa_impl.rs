@@ -120,11 +120,22 @@ where
     }
 
     #[inline]
+    fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_> {
+        ErasedSoaNonNullPtrs::dangling(self.field_layouts())
+            .expect("layouts should have sufficient alignment")
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
         unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) }
+    }
+
+    #[inline]
+    fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
+        ptrs.into()
     }
 
     #[inline]
@@ -184,7 +195,15 @@ where
     }
 
     #[inline]
-    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
+        slices.into_ptrs().cast_const()
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
         slices.into_ptrs()
     }
 

@@ -108,7 +108,7 @@ where
     pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, P> {
         let Self { key, values, .. } = self;
 
-        let value = context.mut_slice_ptrs_as_ptrs(values.into_inner());
+        let value = context.mut_slice_ptrs_as_mut_ptrs(values.into_inner());
         KeyValueMutPtrs::new(key, value)
     }
 

@@ -124,6 +124,12 @@ where
     }
 
     #[inline]
+    fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_> {
+        let context = self.as_inner();
+        KeyValueNonNullPtrs::dangling(context)
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
@@ -131,6 +137,11 @@ where
         let context = self.as_inner();
         let (key, value) = ptrs.into_parts();
         unsafe { KeyValueNonNullPtrs::new_unchecked(context, key, value) }
+    }
+
+    #[inline]
+    fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
+        ptrs.into_ptrs(self)
     }
 
     #[inline]
@@ -194,7 +205,15 @@ where
     }
 
     #[inline]
-    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
+        slices.into_ptrs(self)
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
         slices.into_mut_ptrs(self)
     }
 

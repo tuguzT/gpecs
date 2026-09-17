@@ -236,7 +236,7 @@ where
 
     #[inline]
     unsafe fn read(self) -> T {
-        unsafe { *self.as_ptr().as_mut_unchecked() }
+        unsafe { self.as_ptr().read() }
     }
 }
 

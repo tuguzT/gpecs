@@ -6,7 +6,7 @@ use core::{
 };
 
 use gpecs_ptr::slice::{
-    CastConst, MutSliceItemPtr, NonNullAsPtr, NonNullSliceItemPtr, SliceItemPtr,
+    MutSliceItemPtr, NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr, SliceItemPtr,
 };
 use gpecs_soa::{
     traits::{MutPtrs, NonNullPtrs, RawSoa, RawSoaContext},
@@ -36,9 +36,16 @@ where
     }
 
     #[inline]
+    pub fn dangling(context: &'ctx V::Context) -> Self {
+        let key = P::dangling();
+        let value = context.nonnull_ptrs_dangling();
+        Self::new(key, value)
+    }
+
+    #[inline]
     pub unsafe fn new_unchecked(
         context: &'ctx V::Context,
-        key: NonNullAsPtr<P>,
+        key: NonNullAsMutPtr<P>,
         value: MutPtrs<'ctx, V>,
     ) -> Self {
         let key = unsafe { P::from_slice(NonNull::new_unchecked(key.slice()), key.index()) };
@@ -53,15 +60,11 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(
-        self,
-        context: &'ctx V::Context,
-    ) -> KeyValuePtrs<'ctx, K, V, CastConst<NonNullAsPtr<P>>> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, NonNullAsPtr<P>> {
         let (key, value) = self.into_parts();
 
-        let key = key.as_ptr().cast_const();
-        let value = context.nonnull_ptrs_as_mut_ptrs(value);
-        let value = context.ptrs_cast_const(value);
+        let key = key.as_ptr();
+        let value = context.nonnull_ptrs_as_ptrs(value);
         KeyValuePtrs::new(key, value)
     }
 
@@ -69,10 +72,10 @@ where
     pub fn into_mut_ptrs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutPtrs<'ctx, K, V, NonNullAsPtr<P>> {
+    ) -> KeyValueMutPtrs<'ctx, K, V, NonNullAsMutPtr<P>> {
         let (key, value) = self.into_parts();
 
-        let key = key.as_ptr();
+        let key = key.as_mut_ptr();
         let value = context.nonnull_ptrs_as_mut_ptrs(value);
         KeyValueMutPtrs::new(key, value)
     }

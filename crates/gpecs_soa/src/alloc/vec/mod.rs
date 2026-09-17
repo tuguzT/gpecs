@@ -795,7 +795,7 @@ where
         };
 
         let (context, slices) = set_len_on_drop.vec.as_mut_slice_ptrs_with_context();
-        let dst = context.mut_slice_ptrs_as_ptrs(slices.clone());
+        let dst = context.mut_slice_ptrs_as_mut_ptrs(slices.clone());
 
         let slices = context.slice_ptrs_cast_const(slices);
         let slices = unsafe { get_unchecked::<T, _>(context, slices, range) };
@@ -854,7 +854,7 @@ where
         };
 
         let (context, slices) = set_len_on_drop.vec.as_mut_slice_ptrs_with_context();
-        let dst = context.mut_slice_ptrs_as_ptrs(slices.clone());
+        let dst = context.mut_slice_ptrs_as_mut_ptrs(slices.clone());
 
         let slices = context.slice_ptrs_cast_const(slices);
         for src in IterPtrs::<T>::new(context, slices) {

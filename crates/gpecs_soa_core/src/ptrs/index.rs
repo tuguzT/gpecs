@@ -801,7 +801,7 @@ unsafe fn get_offset_unchecked_mut<'a, T>(
 where
     T: RawSoa + ?Sized,
 {
-    let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
+    let ptrs = context.mut_slice_ptrs_as_mut_ptrs(slices);
     unsafe { context.mut_ptrs_add(ptrs, offset) }
 }
 

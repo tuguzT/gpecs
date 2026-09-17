@@ -84,8 +84,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
         (context, ptrs)
     }
@@ -305,8 +304,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
         let item = unsafe { context.ptrs_read(ptrs) };
@@ -343,8 +341,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         unsafe {
             Self::post_inc_start(start, ptrs, context, n);
         }
@@ -388,8 +385,7 @@ where
             // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
-            let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-            let ptrs = context.ptrs_cast_const(ptrs);
+            let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
             let ptrs = unsafe { context.ptrs_add(ptrs, i) };
             let item = unsafe { context.ptrs_read(ptrs) };
             acc = f(acc, item);
@@ -527,8 +523,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
         let item = unsafe { context.ptrs_read(ptrs) };
@@ -551,8 +546,7 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         unsafe {
             Self::pre_dec_end(end, ptrs, context, n);
         }

@@ -15,7 +15,10 @@ where
     fn ptrs_upcast<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
     /// Returns dangling [pointers](RawSoaContext::Ptrs) to each stored field.
-    fn ptrs_dangling(&self) -> Self::Ptrs<'_>;
+    fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
+        let ptrs = self.nonnull_ptrs_dangling();
+        self.nonnull_ptrs_as_ptrs(ptrs)
+    }
 
     /// Adds an unsigned offset to each [pointer](RawSoaContext::Ptrs) of each stored field.
     ///
@@ -45,7 +48,10 @@ where
     fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
     /// Returns mutable dangling [pointers](RawSoaContext::MutPtrs) to each stored field.
-    fn mut_ptrs_dangling(&self) -> Self::MutPtrs<'_>;
+    fn mut_ptrs_dangling(&self) -> Self::MutPtrs<'_> {
+        let ptrs = self.nonnull_ptrs_dangling();
+        self.nonnull_ptrs_as_mut_ptrs(ptrs)
+    }
 
     /// Adds an unsigned offset to each [mutable pointer](RawSoaContext::MutPtrs) of each stored field.
     ///
@@ -69,8 +75,15 @@ where
     /// or else this method could panic.
     ///
     /// [`pointer::offset_from()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.offset_from-1
-    unsafe fn mut_ptrs_offset_from(&self, ptrs: Self::MutPtrs<'_>, origin: Self::Ptrs<'_>)
-    -> isize;
+    unsafe fn mut_ptrs_offset_from(
+        &self,
+        ptrs: Self::MutPtrs<'_>,
+        origin: Self::Ptrs<'_>,
+    ) -> isize {
+        let ptrs = Self::mut_ptrs_upcast(ptrs);
+        let ptrs = self.ptrs_cast_const(ptrs);
+        unsafe { self.ptrs_offset_from(ptrs, origin) }
+    }
 
     /// Converts [pointers](RawSoaContext::Ptrs) of each stored field
     /// to the [mutable ones](RawSoaContext::MutPtrs).
@@ -126,6 +139,9 @@ where
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short>;
 
+    /// Returns dangling [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field.
+    fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_>;
+
     /// Creates [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field.
     ///
     /// All the safety requirements resulting from applying
@@ -136,7 +152,14 @@ where
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a>;
 
-    /// Acquires the underlying [pointers](RawSoaContext::MutPtrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
+    /// Acquires the underlying [pointers](RawSoaContext::Ptrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
+    /// to each stored field.
+    fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
+        let ptrs = self.nonnull_ptrs_as_mut_ptrs(ptrs);
+        self.ptrs_cast_const(ptrs)
+    }
+
+    /// Acquires the underlying [mutable pointers](RawSoaContext::MutPtrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
     /// to each stored field.
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
 
@@ -196,9 +219,19 @@ where
     /// or else this method could panic.
     fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
+    /// Returns [pointers](RawSoaContext::Ptrs) to the slice's buffer
+    /// of each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields.
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
+        let ptrs = self.mut_slice_ptrs_as_mut_ptrs(slices);
+        self.ptrs_cast_const(ptrs)
+    }
+
     /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
     /// of each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields.
-    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a>;
+    fn mut_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::MutPtrs<'a>;
 
     /// Converts [slice pointers](RawSoaContext::SlicePtrs) of each field of stored fields
     /// to the [mutable ones](RawSoaContext::SliceMutPtrs).
@@ -218,7 +251,7 @@ where
     unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
         let slices = Self::mut_slice_ptrs_upcast(slices_to_drop);
         let len = self.mut_slice_ptrs_len(&slices);
-        let ptrs = self.mut_slice_ptrs_as_ptrs(slices);
+        let ptrs = self.mut_slice_ptrs_as_mut_ptrs(slices);
         for index in 0..len {
             let to_drop = unsafe { self.mut_ptrs_add(ptrs.clone(), index) };
             unsafe { self.ptrs_drop_in_place(to_drop) }

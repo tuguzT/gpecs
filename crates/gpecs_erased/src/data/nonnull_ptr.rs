@@ -2,12 +2,12 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use crate::{
     data::{
-        ErasedMutPtr,
+        ErasedMutPtr, ErasedPtr,
         error::{DowncastError, check_downcast},
     },
     error::{InsufficientAlignError, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{MutSliceItemPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{MutSliceItemPtr, NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -46,7 +46,7 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptr: ErasedMutPtr<NonNullAsPtr<T>>) -> Option<Self> {
+    pub fn new(ptr: ErasedMutPtr<NonNullAsMutPtr<T>>) -> Option<Self> {
         let (desc, ptr) = ptr.into_parts();
 
         let buffer = ptr.slice();
@@ -58,7 +58,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptr: ErasedMutPtr<NonNullAsPtr<T>>) -> Self {
+    pub unsafe fn new_unchecked(ptr: ErasedMutPtr<NonNullAsMutPtr<T>>) -> Self {
         let (desc, ptr) = ptr.into_parts();
 
         let buffer = ptr.slice();
@@ -111,8 +111,8 @@ where
         let Self { layout, ptr } = self;
 
         for i in 0..bytes_to_items::<T::Item>(layout.size()) {
-            let this = unsafe { ptr.add(i) }.as_ptr();
-            let with = unsafe { with.ptr.add(i) }.as_ptr();
+            let this = unsafe { ptr.add(i) }.as_mut_ptr();
+            let with = unsafe { with.ptr.add(i) }.as_mut_ptr();
             unsafe { this.swap(with) }
         }
     }
@@ -121,18 +121,18 @@ where
     pub unsafe fn copy_from(self, src: Self, count: usize) {
         let Self { layout, ptr } = self;
 
-        let src = src.ptr().as_ptr().cast_const();
+        let src = src.ptr().as_mut_ptr().cast_const();
         let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
-        unsafe { ptr.as_ptr().copy_from(src, count) }
+        unsafe { ptr.as_mut_ptr().copy_from(src, count) }
     }
 
     #[inline]
     pub unsafe fn copy_from_nonoverlapping(self, src: Self, count: usize) {
         let Self { layout, ptr } = self;
 
-        let src = src.ptr().as_ptr().cast_const();
+        let src = src.ptr().as_mut_ptr().cast_const();
         let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
-        unsafe { ptr.as_ptr().copy_from_nonoverlapping(src, count) }
+        unsafe { ptr.as_mut_ptr().copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
@@ -183,7 +183,7 @@ where
     }
 }
 
-impl<T> From<ErasedNonNullPtr<T>> for ErasedMutPtr<NonNullAsPtr<T>>
+impl<T> From<ErasedNonNullPtr<T>> for ErasedPtr<NonNullAsPtr<T>>
 where
     T: NonNullSliceItemPtr,
 {
@@ -191,6 +191,18 @@ where
     fn from(ptr: ErasedNonNullPtr<T>) -> Self {
         let ErasedNonNullPtr { layout, ptr } = ptr;
         let ptr = ptr.as_ptr();
+        unsafe { ErasedPtr::from_parts(layout, ptr) }
+    }
+}
+
+impl<T> From<ErasedNonNullPtr<T>> for ErasedMutPtr<NonNullAsMutPtr<T>>
+where
+    T: NonNullSliceItemPtr,
+{
+    #[inline]
+    fn from(ptr: ErasedNonNullPtr<T>) -> Self {
+        let ErasedNonNullPtr { layout, ptr } = ptr;
+        let ptr = ptr.as_mut_ptr();
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }

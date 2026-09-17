@@ -5,13 +5,13 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutPtrs,
+    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaPtrs,
     assert::{assert_layouts, check_downcast},
     data::ErasedNonNullPtr,
     error::{DowncastError, InsufficientAlignError},
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -36,7 +36,7 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptrs: ErasedSoaMutPtrs<D, NonNullAsPtr<P>>) -> Option<Self> {
+    pub fn new(ptrs: ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>>) -> Option<Self> {
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = NonNull::new(buffer)?;
 
@@ -45,7 +45,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, NonNullAsPtr<P>>) -> Self {
+    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>>) -> Self {
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
 
@@ -429,7 +429,19 @@ where
     }
 }
 
-impl<D, P> From<ErasedSoaNonNullPtrs<D, P>> for ErasedSoaMutPtrs<D, NonNullAsPtr<P>>
+impl<D, P> From<ErasedSoaNonNullPtrs<D, P>> for ErasedSoaPtrs<D, NonNullAsPtr<P>>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    fn from(ptrs: ErasedSoaNonNullPtrs<D, P>) -> Self {
+        let (layouts, ptr, capacity, offset) = ptrs.into_parts();
+        let ptr = ptr.as_ptr();
+        unsafe { ErasedSoaPtrs::new_unchecked(layouts, ptr, capacity, offset) }
+    }
+}
+
+impl<D, P> From<ErasedSoaNonNullPtrs<D, P>> for ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>>
 where
     P: NonNullSliceItemPtr,
 {

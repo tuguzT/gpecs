@@ -1,6 +1,6 @@
 pub use gpecs_soa_core::slices::*;
 
-pub use self::dst::{SoaSlice, from_raw_parts, from_raw_parts_mut};
+pub use self::dst::SoaSlice;
 
 #[cfg(feature = "alloc")]
 pub use crate::alloc::slices::ToSoaVec;

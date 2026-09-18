@@ -245,7 +245,18 @@ where
 }
 
 #[inline]
-pub fn slices_as_mut_ptrs<'a, T>(
+pub fn mut_slices_as_ptrs<'a, T>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+) -> Ptrs<'a, T>
+where
+    T: RawSoa + ?Sized,
+{
+    context.mut_slice_ptrs_as_ptrs(slices)
+}
+
+#[inline]
+pub fn mut_slices_as_mut_ptrs<'a, T>(
     context: &'a T::Context,
     slices: SliceMutPtrs<'a, T>,
 ) -> MutPtrs<'a, T>

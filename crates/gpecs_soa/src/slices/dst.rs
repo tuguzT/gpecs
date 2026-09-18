@@ -7,10 +7,7 @@ use core::{
 
 use crate::{
     buffer::dst::DstBuffer,
-    ptrs::{
-        IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs, SoaSlicePtrs, slice_from_raw_parts,
-        slice_from_raw_parts_mut,
-    },
+    ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs, SoaSlicePtrs},
     slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SlicesIndex, SoaSlices, SoaSlicesMut},
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
@@ -86,6 +83,22 @@ where
     pub(crate) unsafe fn ptr_capacity(this: *const Self) -> usize {
         let this = Self::ptr_as_inner(this);
         unsafe { DstBuffer::ptr_capacity(this) }
+    }
+
+    #[inline]
+    pub unsafe fn from_raw_parts<'a>(data: *const u8, len: usize, capacity: usize) -> &'a Self {
+        let this = unsafe { Self::ptr_from_raw_parts(data, len, capacity) };
+        unsafe { this.as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn from_raw_parts_mut<'a>(
+        data: *mut u8,
+        len: usize,
+        capacity: usize,
+    ) -> &'a mut Self {
+        let this = unsafe { Self::ptr_from_raw_parts_mut(data, len, capacity) };
+        unsafe { this.as_mut_unchecked() }
     }
 
     #[inline]
@@ -628,28 +641,4 @@ where
     T::Context: Sync,
     T::Fields: Sync,
 {
-}
-
-#[inline]
-pub unsafe fn from_raw_parts<'slice, T>(
-    data: *const u8,
-    len: usize,
-    capacity: usize,
-) -> &'slice SoaSlice<T>
-where
-    T: AllocSoaTrusted + ?Sized,
-{
-    unsafe { slice_from_raw_parts(data, len, capacity).as_ref_unchecked() }
-}
-
-#[inline]
-pub unsafe fn from_raw_parts_mut<'slice, T>(
-    data: *mut u8,
-    len: usize,
-    capacity: usize,
-) -> &'slice mut SoaSlice<T>
-where
-    T: AllocSoaTrusted + ?Sized,
-{
-    unsafe { slice_from_raw_parts_mut(data, len, capacity).as_mut_unchecked() }
 }

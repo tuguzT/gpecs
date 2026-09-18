@@ -16,7 +16,6 @@ use crate::{
     ptrs::{IterMutPtrs, IterPtrs, SoaSliceMutPtrs, SoaSlicePtrs, get_unchecked, range},
     slices::{
         IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut, ToSoaVec,
-        from_raw_parts, from_raw_parts_mut,
     },
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs,
@@ -1336,10 +1335,10 @@ where
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        let data = self.as_ptr().cast();
+        let data = self.as_ptr();
         let len = self.len();
         let capacity = self.capacity();
-        unsafe { from_raw_parts(data, len, capacity) }
+        unsafe { SoaSlice::from_raw_parts(data, len, capacity) }
     }
 }
 
@@ -1349,10 +1348,10 @@ where
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let data = self.as_mut_ptr().cast();
+        let data = self.as_mut_ptr();
         let len = self.len();
         let capacity = self.capacity();
-        unsafe { from_raw_parts_mut(data, len, capacity) }
+        unsafe { SoaSlice::from_raw_parts_mut(data, len, capacity) }
     }
 }
 

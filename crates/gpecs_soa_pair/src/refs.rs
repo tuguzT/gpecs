@@ -57,29 +57,6 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V, P> From<(&'a K, Refs<'ctx, 'a, V>)> for KeyValueRefs<'ctx, 'a, K, V, P>
-where
-    V: Soa<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: (&'a K, Refs<'ctx, 'a, V>)) -> Self {
-        let (key, value) = value;
-        Self::new(key, value)
-    }
-}
-
-impl<'ctx, 'a, K, V, P> From<KeyValueRefs<'ctx, 'a, K, V, P>> for (&'a K, Refs<'ctx, 'a, V>)
-where
-    V: Soa<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: KeyValueRefs<'ctx, 'a, K, V, P>) -> Self {
-        value.into_parts()
-    }
-}
-
 impl<K, V, P> Debug for KeyValueRefs<'_, '_, K, V, P>
 where
     K: Debug,

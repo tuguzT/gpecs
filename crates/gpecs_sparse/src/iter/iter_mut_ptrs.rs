@@ -6,7 +6,7 @@ use core::{
 use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 
 use crate::{
-    item::{KeyValueMutSlicePtrs, KeyValuePair},
+    item::{KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePair},
     iter::{Iter, IterMut, IterPtrs, KeyPtrs, ValueMutPtrs},
     soa::{
         self,
@@ -263,7 +263,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(From::from)
+        inner.next().map(KeyValueMutPtrs::into_parts)
     }
 
     #[inline]
@@ -281,7 +281,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(From::from)
+        inner.next_back().map(KeyValueMutPtrs::into_parts)
     }
 }
 

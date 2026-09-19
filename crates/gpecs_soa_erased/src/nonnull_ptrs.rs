@@ -79,6 +79,32 @@ where
     }
 
     #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, NonNullAsPtr<P>> {
+        let Self {
+            layouts,
+            buffer,
+            capacity,
+            offset,
+        } = self;
+
+        let buffer = buffer.as_ptr().cast_const();
+        unsafe { ErasedSoaPtrs::new_unchecked(layouts, buffer, capacity, offset) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>> {
+        let Self {
+            layouts,
+            buffer,
+            capacity,
+            offset,
+        } = self;
+
+        let buffer = buffer.as_ptr();
+        unsafe { ErasedSoaMutPtrs::new_unchecked(layouts, buffer, capacity, offset) }
+    }
+
+    #[inline]
     pub unsafe fn map_layouts<N, F>(self, f: F) -> ErasedSoaNonNullPtrs<N, P>
     where
         F: FnOnce(D) -> N,
@@ -426,30 +452,6 @@ where
         let layouts = layouts.into_iter();
         let from = Default::default();
         unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(buffer, capacity, offset, from, layouts) }
-    }
-}
-
-impl<D, P> From<ErasedSoaNonNullPtrs<D, P>> for ErasedSoaPtrs<D, NonNullAsPtr<P>>
-where
-    P: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptrs: ErasedSoaNonNullPtrs<D, P>) -> Self {
-        let (layouts, ptr, capacity, offset) = ptrs.into_parts();
-        let ptr = ptr.as_ptr();
-        unsafe { ErasedSoaPtrs::new_unchecked(layouts, ptr, capacity, offset) }
-    }
-}
-
-impl<D, P> From<ErasedSoaNonNullPtrs<D, P>> for ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>>
-where
-    P: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptrs: ErasedSoaNonNullPtrs<D, P>) -> Self {
-        let (layouts, ptr, capacity, offset) = ptrs.into_parts();
-        let ptr = ptr.as_ptr();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(layouts, ptr, capacity, offset) }
     }
 }
 

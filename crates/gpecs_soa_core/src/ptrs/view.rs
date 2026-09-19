@@ -32,6 +32,12 @@ where
     }
 
     #[inline]
+    pub fn empty(context: &'ctx T::Context) -> Self {
+        let ptrs = context.ptrs_dangling();
+        unsafe { Self::from_parts(context, ptrs, 0) }
+    }
+
+    #[inline]
     pub unsafe fn from_parts(context: &'ctx T::Context, ptrs: Ptrs<'ctx, T>, len: usize) -> Self {
         let ptrs = wrapper::Ptrs::new(ptrs);
         Self { ptrs, context, len }
@@ -52,8 +58,7 @@ where
 
     #[inline]
     pub unsafe fn as_ref_unchecked<'a>(self) -> SoaSlices<'ctx, 'a, T> {
-        let (context, ptrs, len) = self.into_parts();
-        unsafe { SoaSlices::from_parts(context, ptrs, len) }
+        unsafe { SoaSlices::from_ptrs(self) }
     }
 
     #[inline]
@@ -207,17 +212,6 @@ where
     pub fn into_iter_with_context(self) -> (&'ctx T::Context, IterPtrs<'ctx, T>) {
         let (context, slices) = self.into_slice_ptrs_with_context();
         (context, IterPtrs::new(context, slices))
-    }
-}
-
-impl<'ctx, T> From<&'ctx T::Context> for SoaSlicePtrs<'ctx, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.ptrs_dangling();
-        unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }
 

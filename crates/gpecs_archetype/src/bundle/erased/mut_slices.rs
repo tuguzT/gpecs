@@ -24,7 +24,8 @@ use crate::{
     bundle::{
         Bundle, BundleSlicesMut,
         erased::{
-            ErasedBundleMutSlicePtrs, ErasedBundleSlices, ErasedBundleSlicesIter,
+            ErasedBundleMutSlicePtrs, ErasedBundleSlicePtrs, ErasedBundleSlices,
+            ErasedBundleSlicesIter,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -63,11 +64,27 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundleMutSlicePtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedBundleSlicePtrs<D, CastConst<P>> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
+        unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutSlicePtrs<D, P> {
+        let Self { inner } = self;
+
+        let inner = inner.into_mut_ptrs();
         unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> ErasedBundleSlices<'a, D, CastConst<P>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_slices();
+        unsafe { ErasedBundleSlices::from_inner(inner) }
     }
 }
 
@@ -164,7 +181,7 @@ where
     {
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let slices = self
-            .into_ptrs()
+            .into_mut_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
@@ -254,18 +271,6 @@ where
 
         let inner = inner.into_iter();
         unsafe { ErasedBundleMutSlicesIter::from_inner(inner) }
-    }
-}
-
-impl<'a, D, P> From<ErasedBundleMutSlices<'a, D, P>> for ErasedBundleSlices<'a, D, CastConst<P>>
-where
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    fn from(slices: ErasedBundleMutSlices<'a, D, P>) -> Self {
-        let inner = slices.into_inner();
-        let inner = inner.into();
-        unsafe { Self::from_inner(inner) }
     }
 }
 

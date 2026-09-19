@@ -150,17 +150,6 @@ where
     }
 }
 
-impl<'ctx, K, V, P> From<KeyValueMutSlicePtrs<'ctx, K, V, P>> for (*mut [K], SliceMutPtrs<'ctx, V>)
-where
-    V: RawSoa + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: KeyValueMutSlicePtrs<'ctx, K, V, P>) -> Self {
-        value.into_parts()
-    }
-}
-
 impl<K, V, P> Debug for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,

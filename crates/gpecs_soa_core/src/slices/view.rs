@@ -9,7 +9,7 @@ use core::{
 use crate::{
     ptrs::{IterPtrs, SlicePtrsIndex, SoaSlicePtrs},
     slices::{IndexHelper, Iter, SlicesIndex},
-    traits::{Ptrs, RawSoa, RawSoaContext, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
+    traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
 #[repr(transparent)]
@@ -25,6 +25,24 @@ impl<'ctx, T> SoaSlices<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
 {
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: SoaSlicePtrs<'ctx, T>) -> Self {
+        let phantom = PhantomData;
+        Self { ptrs, phantom }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(context: &'ctx T::Context, ptrs: Ptrs<'ctx, T>, len: usize) -> Self {
+        let ptrs = unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) };
+        unsafe { Self::from_ptrs(ptrs) }
+    }
+
+    #[inline]
+    pub fn empty(context: &'ctx T::Context) -> Self {
+        let iter = SoaSlicePtrs::empty(context);
+        unsafe { Self::from_ptrs(iter) }
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         let Self { ptrs, .. } = self;
@@ -116,14 +134,6 @@ where
     pub fn into_parts(self) -> (&'ctx T::Context, Ptrs<'ctx, T>, usize) {
         let Self { ptrs, .. } = self;
         ptrs.into_parts()
-    }
-
-    #[inline]
-    pub unsafe fn from_parts(context: &'ctx T::Context, ptrs: Ptrs<'ctx, T>, len: usize) -> Self {
-        Self {
-            ptrs: unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) },
-            phantom: PhantomData,
-        }
     }
 
     #[inline]
@@ -401,27 +411,6 @@ where
     {
         let mut iter = self.into_iter();
         iter.any(move |item| item.eq(&value))
-    }
-}
-
-impl<'ctx, T> From<SoaSlices<'ctx, '_, T>> for SoaSlicePtrs<'ctx, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(slices: SoaSlices<'ctx, '_, T>) -> Self {
-        slices.into_slice_ptrs()
-    }
-}
-
-impl<'ctx, T> From<&'ctx T::Context> for SoaSlices<'ctx, '_, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.ptrs_dangling();
-        unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }
 

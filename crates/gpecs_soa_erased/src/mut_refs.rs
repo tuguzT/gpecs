@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaRefs,
+    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaPtrs, ErasedSoaRefs,
     ErasedSoaRefsIter,
     data::{ErasedMutRef, ErasedRef},
     error::{DowncastError, PtrsError},
@@ -58,9 +58,21 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        ptrs.cast_const()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
+    }
+
+    #[inline]
+    pub fn into_refs(self) -> ErasedSoaRefs<'a, D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        unsafe { ptrs.as_ref_unchecked() }
     }
 
     #[inline]
@@ -234,17 +246,6 @@ where
 
         let ptrs = ptrs.into_iter();
         unsafe { ErasedSoaMutRefsIter::from_ptrs(ptrs) }
-    }
-}
-
-impl<'a, D, P> From<ErasedSoaMutRefs<'a, D, P>> for ErasedSoaRefs<'a, D, CastConst<P>>
-where
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    fn from(refs: ErasedSoaMutRefs<'a, D, P>) -> Self {
-        let (layouts, buffer, capacity, offset) = refs.into_parts();
-        unsafe { Self::new_unchecked(layouts, buffer, capacity, offset) }
     }
 }
 

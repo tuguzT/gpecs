@@ -11,7 +11,7 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::{KeyValueMutPtrs, KeyValueRefs};
+use crate::{KeyValueMutPtrs, KeyValuePtrs, KeyValueRefs};
 
 pub struct KeyValueMutRefs<'ctx, 'a, K, V, P = *mut K>
 where
@@ -49,7 +49,16 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, P> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+        let Self { key, value } = self;
+
+        let key = key.cast_const();
+        let value = context.mut_refs_as_ptrs(value.into_inner());
+        KeyValuePtrs::new(key, value)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, P> {
         let Self { key, value } = self;
 
         let value = context.mut_refs_as_mut_ptrs(value.into_inner());
@@ -66,31 +75,6 @@ where
         let key = key.cast_const();
         let value = context.mut_refs_as_refs(value.into_inner());
         unsafe { KeyValueRefs::from_parts(key, value) }
-    }
-}
-
-impl<'ctx, 'a, K, V, P> From<(&'a mut K, RefsMut<'ctx, 'a, V>)>
-    for KeyValueMutRefs<'ctx, 'a, K, V, P>
-where
-    V: Soa<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: (&'a mut K, RefsMut<'ctx, 'a, V>)) -> Self {
-        let (key, value) = value;
-        Self::new(key, value)
-    }
-}
-
-impl<'ctx, 'a, K, V, P> From<KeyValueMutRefs<'ctx, 'a, K, V, P>>
-    for (&'a mut K, RefsMut<'ctx, 'a, V>)
-where
-    V: Soa<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: KeyValueMutRefs<'ctx, 'a, K, V, P>) -> Self {
-        value.into_parts()
     }
 }
 

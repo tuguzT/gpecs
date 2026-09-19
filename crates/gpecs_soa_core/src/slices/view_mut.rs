@@ -29,6 +29,28 @@ where
     T: RawSoa + ?Sized,
 {
     #[inline]
+    pub unsafe fn from_ptrs(ptrs: SoaSliceMutPtrs<'ctx, T>) -> Self {
+        let phantom = PhantomData;
+        Self { ptrs, phantom }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(
+        context: &'ctx T::Context,
+        ptrs: MutPtrs<'ctx, T>,
+        len: usize,
+    ) -> Self {
+        let ptrs = unsafe { SoaSliceMutPtrs::from_parts(context, ptrs, len) };
+        unsafe { Self::from_ptrs(ptrs) }
+    }
+
+    #[inline]
+    pub fn empty(context: &'ctx T::Context) -> Self {
+        let iter = SoaSliceMutPtrs::empty(context);
+        unsafe { Self::from_ptrs(iter) }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.len()
@@ -153,18 +175,6 @@ where
     pub fn into_parts(self) -> (&'ctx T::Context, MutPtrs<'ctx, T>, usize) {
         let Self { ptrs, .. } = self;
         ptrs.into_parts()
-    }
-
-    #[inline]
-    pub unsafe fn from_parts(
-        context: &'ctx T::Context,
-        ptrs: MutPtrs<'ctx, T>,
-        len: usize,
-    ) -> Self {
-        Self {
-            ptrs: unsafe { SoaSliceMutPtrs::from_parts(context, ptrs, len) },
-            phantom: PhantomData,
-        }
     }
 
     #[inline]
@@ -973,46 +983,14 @@ fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
     panic!("source slice length ({src_len}) does not match destination slice length ({dst_len})")
 }
 
-impl<'ctx, T> From<SoaSlicesMut<'ctx, '_, T>> for SoaSlicePtrs<'ctx, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(slices: SoaSlicesMut<'ctx, '_, T>) -> Self {
-        slices.into_slice_ptrs()
-    }
-}
-
-impl<'ctx, T> From<SoaSlicesMut<'ctx, '_, T>> for SoaSliceMutPtrs<'ctx, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(slices: SoaSlicesMut<'ctx, '_, T>) -> Self {
-        slices.into_mut_slice_ptrs()
-    }
-}
-
 impl<'ctx, 'a, T> From<SoaSlicesMut<'ctx, 'a, T>> for SoaSlices<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
     fn from(slices: SoaSlicesMut<'ctx, 'a, T>) -> Self {
-        let (context, ptrs, len) = slices.into_parts();
-        let ptrs = context.ptrs_cast_const(ptrs);
-        unsafe { Self::from_parts(context, ptrs, len) }
-    }
-}
-
-impl<'ctx, T> From<&'ctx T::Context> for SoaSlicesMut<'ctx, '_, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.mut_ptrs_dangling();
-        unsafe { Self::from_parts(context, ptrs, 0) }
+        let ptrs = slices.into_slice_ptrs();
+        unsafe { ptrs.as_ref_unchecked() }
     }
 }
 

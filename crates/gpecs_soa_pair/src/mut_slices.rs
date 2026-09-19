@@ -112,18 +112,6 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V, P> From<KeyValueMutSlices<'ctx, 'a, K, V, P>>
-    for (&'a mut [K], SlicesMut<'ctx, 'a, V>)
-where
-    V: Soa<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: KeyValueMutSlices<'ctx, 'a, K, V, P>) -> Self {
-        value.into_parts()
-    }
-}
-
 impl<K, V, P> Debug for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: Debug,

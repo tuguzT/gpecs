@@ -395,7 +395,7 @@ where
         };
 
         unsafe {
-            let mut dst = bundle.into_ptrs();
+            let mut dst = bundle.into_mut_ptrs();
             let src = &value.as_ptrs();
             dst.move_from_compatible_nonoverlapping::<_, T::DropKind>(src, 1);
         }

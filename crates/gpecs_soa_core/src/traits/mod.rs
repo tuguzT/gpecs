@@ -425,6 +425,13 @@ where
     unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
+    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
+        let ptrs = self.mut_refs_as_mut_ptrs(refs);
+        self.ptrs_cast_const(ptrs)
+    }
+
+    /// Converts [mutable references](SoaContext::RefsMut) to each stored field
     /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a>;
 

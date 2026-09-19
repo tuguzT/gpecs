@@ -101,27 +101,6 @@ where
     }
 }
 
-impl<K, V, P> From<(K, V)> for KeyValuePair<K, V, P>
-where
-    P: SliceItemPtrs<Item = K>,
-{
-    #[inline]
-    fn from(pair: (K, V)) -> Self {
-        let (key, value) = pair;
-        Self::new(key, value)
-    }
-}
-
-impl<K, V, P> From<KeyValuePair<K, V, P>> for (K, V)
-where
-    P: SliceItemPtrs<Item = K>,
-{
-    #[inline]
-    fn from(pair: KeyValuePair<K, V, P>) -> Self {
-        pair.into_parts()
-    }
-}
-
 impl<K, V, P> Debug for KeyValuePair<K, V, P>
 where
     K: Debug,

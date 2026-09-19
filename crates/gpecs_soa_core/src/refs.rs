@@ -51,6 +51,17 @@ where
 }
 
 #[inline]
+pub fn mut_as_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    refs: RefsMut<'a, 'data, T>,
+) -> Ptrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_refs_as_ptrs(refs)
+}
+
+#[inline]
 pub fn as_mut_ptrs<'a, 'data, T>(
     context: &'a T::Context,
     refs: RefsMut<'a, 'data, T>,

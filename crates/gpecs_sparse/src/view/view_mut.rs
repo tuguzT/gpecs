@@ -21,8 +21,9 @@ use crate::{
     },
     error::FromPartsError,
     item::{
-        DefaultSparseItem, KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair,
-        KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, SparseItem,
+        DefaultSparseItem, KeyValueMutPtrs, KeyValueMutRefs, KeyValueMutSlicePtrs,
+        KeyValueMutSlices, KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueSlicePtrs,
+        KeyValueSlices, SparseItem,
     },
     iter::{
         Iter, IterMut, IterMutPtrs, IterPtrs, KeyPtrs, Keys, ValueMutPtrs, ValuePtrs, Values,
@@ -1117,7 +1118,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slice_ptrs_with_context();
-        let (keys, _) = slices.into();
+        let (keys, _) = slices.into_parts();
         let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
@@ -1133,7 +1134,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slice_ptrs().into_slice_ptrs_with_context();
-        let (keys, _) = slices.into();
+        let (keys, _) = slices.into_parts();
         let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
@@ -1435,7 +1436,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
-        let refs = sparse_get(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueRefs::into_parts);
+        let refs = sparse_get(dense, sparse, key);
         (context, refs)
     }
 
@@ -1453,7 +1455,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.into_iter_with_context();
-        let refs = sparse_get(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueMutRefs::into_parts);
+        let refs = sparse_get(dense, sparse, key);
         (context, refs)
     }
 
@@ -1476,7 +1479,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
-        let refs = sparse_index(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueRefs::into_parts);
+        let refs = sparse_index(dense, sparse, key);
         (context, refs)
     }
 
@@ -1498,7 +1502,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.into_iter_with_context();
-        let refs = sparse_index(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueMutRefs::into_parts);
+        let refs = sparse_index(dense, sparse, key);
         (context, refs)
     }
 
@@ -1515,9 +1520,9 @@ where
     ) -> (&'ctx V::Context, Option<(K, Refs<'ctx, 'a, V>)>) {
         let Self { dense, sparse } = self;
 
-        let (context, dense) = dense.into_iter_with_context();
-        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index)
-            .map(|(key, value)| (key, context.as_inner().mut_refs_as_refs(value)));
+        let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
+        let dense = dense.map(KeyValueRefs::into_parts);
+        let pair = sparse_get_with_key(dense, sparse, sparse_index);
         (context, pair)
     }
 
@@ -1538,7 +1543,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.into_iter_with_context();
-        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        let dense = dense.map(KeyValueMutRefs::into_parts);
+        let pair = sparse_get_with_key(dense, sparse, sparse_index);
         (context, pair)
     }
 
@@ -1733,7 +1739,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.iter_with_context();
-        let refs = sparse_get(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueRefs::into_parts);
+        let refs = sparse_get(dense, sparse, key);
         (context, refs)
     }
 
@@ -1751,7 +1758,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.iter_mut_with_context();
-        let refs = sparse_get(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueMutRefs::into_parts);
+        let refs = sparse_get(dense, sparse, key);
         (context, refs)
     }
 
@@ -1774,7 +1782,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.iter_with_context();
-        let refs = sparse_index(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueRefs::into_parts);
+        let refs = sparse_index(dense, sparse, key);
         (context, refs)
     }
 
@@ -1797,7 +1806,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.iter_mut_with_context();
-        let refs = sparse_index(dense.map(From::from), sparse, key);
+        let dense = dense.map(KeyValueMutRefs::into_parts);
+        let refs = sparse_index(dense, sparse, key);
         (context, refs)
     }
 
@@ -1815,7 +1825,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.iter_with_context();
-        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        let dense = dense.map(KeyValueRefs::into_parts);
+        let pair = sparse_get_with_key(dense, sparse, sparse_index);
         (context, pair)
     }
 
@@ -1836,7 +1847,8 @@ where
         let Self { dense, sparse } = self;
 
         let (context, dense) = dense.iter_mut_with_context();
-        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        let dense = dense.map(KeyValueMutRefs::into_parts);
+        let pair = sparse_get_with_key(dense, sparse, sparse_index);
         (context, pair)
     }
 

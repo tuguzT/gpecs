@@ -271,6 +271,11 @@ where
     }
 
     #[inline]
+    fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
+        ptr::from_ref(refs)
+    }
+
+    #[inline]
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
         ptr::from_mut(refs)
     }

@@ -400,8 +400,13 @@ where
     }
 
     #[inline]
-    fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
+    fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
         refs.into_ptrs(self)
+    }
+
+    #[inline]
+    fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
+        refs.into_mut_ptrs(self)
     }
 
     #[inline]

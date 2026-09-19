@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaMutSlices,
-    ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter, ErasedSoaSlices,
+    ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter, ErasedSoaSlices,
     data::{ErasedMutSlicePtr, ErasedSlicePtr},
     error::{
         DowncastError, SlicePtrsError, check_offset, check_offset_len, check_ptr_align,
@@ -61,7 +61,13 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        ptrs.cast_const()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
     }

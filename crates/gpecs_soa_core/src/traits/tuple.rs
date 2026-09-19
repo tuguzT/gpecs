@@ -302,6 +302,12 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
+                let ptrs = ($(ptr::from_ref(refs.$indices),)*);
+                ptrs
+            }
+
+            #[inline]
             fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
                 let ptrs = ($(ptr::from_mut(refs.$indices),)*);
                 ptrs

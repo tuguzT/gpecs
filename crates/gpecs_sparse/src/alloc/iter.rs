@@ -816,7 +816,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(Into::into)
+        inner.next().map(KeyValuePair::into_parts)
     }
 
     #[inline]
@@ -843,7 +843,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(Into::into)
+        inner.next_back().map(KeyValuePair::into_parts)
     }
 }
 
@@ -1022,7 +1022,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(Into::into)
+        inner.next().map(KeyValuePair::into_parts)
     }
 
     #[inline]
@@ -1040,7 +1040,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(Into::into)
+        inner.next_back().map(KeyValuePair::into_parts)
     }
 }
 

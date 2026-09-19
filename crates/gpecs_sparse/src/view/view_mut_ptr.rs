@@ -702,7 +702,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
 
-        let (_, value) = ptrs.into();
+        let (_, value) = ptrs.into_parts();
         (context, value)
     }
 
@@ -723,7 +723,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked_mut::<K, _, _>(dense.clone(), sparse, sparse_index) };
 
-        let (_, value) = ptrs.into();
+        let (_, value) = ptrs.into_parts();
         (context, value)
     }
 
@@ -745,7 +745,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
 
-        let (_, value) = ptrs.into();
+        let (_, value) = ptrs.into_parts();
         (context, value)
     }
 
@@ -766,7 +766,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked_mut::<K, _, _>(dense, sparse, sparse_index) };
 
-        let (_, value) = ptrs.into();
+        let (_, value) = ptrs.into_parts();
         (context, value)
     }
 
@@ -790,7 +790,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
 
-        let (key, value) = ptrs.into();
+        let (key, value) = ptrs.into_parts();
         (context, key, value)
     }
 
@@ -813,7 +813,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked_mut::<K, _, _>(dense.clone(), sparse, sparse_index) };
 
-        let (key, value) = ptrs.into();
+        let (key, value) = ptrs.into_parts();
         (context, key, value)
     }
 
@@ -838,7 +838,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked::<K, _, _>(dense, sparse, sparse_index) };
 
-        let (key, value) = ptrs.into();
+        let (key, value) = ptrs.into_parts();
         (context, key, value)
     }
 
@@ -862,7 +862,7 @@ where
         let (context, ptrs) =
             unsafe { sparse_get_unchecked_mut::<K, _, _>(dense, sparse, sparse_index) };
 
-        let (key, value) = ptrs.into();
+        let (key, value) = ptrs.into_parts();
         (context, key, value)
     }
 
@@ -877,7 +877,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slice_ptrs_with_context();
-        let (keys, _) = slices.into();
+        let (keys, _) = slices.into_parts();
         let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
@@ -893,7 +893,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slice_ptrs_with_context();
-        let (keys, _) = slices.into();
+        let (keys, _) = slices.into_parts();
         let iter = KeyPtrs::new(context.as_inner(), keys);
         (context, iter)
     }
@@ -1008,7 +1008,7 @@ where
     #[inline]
     fn from(context: &'ctx V::Context) -> Self {
         let context = Identity::from_inner_ref(context);
-        let dense = SoaSliceMutPtrs::from(context);
+        let dense = SoaSliceMutPtrs::empty(context);
         let sparse = ptr::from_mut(Default::default());
         unsafe { Self::from_parts(dense, sparse) }
     }

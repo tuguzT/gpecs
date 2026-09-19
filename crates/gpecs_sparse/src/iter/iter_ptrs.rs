@@ -6,7 +6,7 @@ use core::{
 use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 
 use crate::{
-    item::{KeyValuePair, KeyValueSlicePtrs},
+    item::{KeyValuePair, KeyValuePtrs, KeyValueSlicePtrs},
     iter::{Iter, IterMutPtrs, KeyPtrs, ValuePtrs},
     soa::{
         self,
@@ -133,7 +133,7 @@ where
     #[inline]
     pub fn into_key_ptrs(self) -> KeyPtrs<'ctx, K, V> {
         let (context, slices) = self.into_inner().into_slice_ptrs_with_context();
-        let (keys, _) = slices.into();
+        let (keys, _) = slices.into_parts();
         KeyPtrs::new(context.as_inner(), keys)
     }
 
@@ -196,7 +196,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(From::from)
+        inner.next().map(KeyValuePtrs::into_parts)
     }
 
     #[inline]
@@ -214,7 +214,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(From::from)
+        inner.next_back().map(KeyValuePtrs::into_parts)
     }
 }
 

@@ -135,12 +135,12 @@ where
 
     #[inline]
     fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
-        ptrs.into()
+        ptrs.into_ptrs()
     }
 
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
-        ptrs.into()
+        ptrs.into_mut_ptrs()
     }
 
     type SlicePtrs<'a> = ErasedSoaSlicePtrs<FieldLayoutsOutput<'a, D>, P::Const>;
@@ -196,7 +196,7 @@ where
 
     #[inline]
     fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
-        slices.into_ptrs().cast_const()
+        slices.into_ptrs()
     }
 
     #[inline]
@@ -204,7 +204,7 @@ where
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::MutPtrs<'a> {
-        slices.into_ptrs()
+        slices.into_mut_ptrs()
     }
 
     #[inline]
@@ -365,13 +365,18 @@ where
     }
 
     #[inline]
-    fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
+    fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
         refs.into_ptrs()
     }
 
     #[inline]
+    fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
+        refs.into_mut_ptrs()
+    }
+
+    #[inline]
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        refs.into()
+        refs.into_refs()
     }
 
     type Slices<'a> = ErasedSoaSlices<'data, FieldLayoutsOutput<'a, D>, P::Const>;
@@ -421,7 +426,7 @@ where
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a> {
-        slices.into_ptrs()
+        slices.into_mut_ptrs()
     }
 
     #[inline]
@@ -431,6 +436,6 @@ where
 
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
-        slices.into()
+        slices.into_slices()
     }
 }

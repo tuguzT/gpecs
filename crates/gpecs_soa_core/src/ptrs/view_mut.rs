@@ -32,6 +32,12 @@ where
     }
 
     #[inline]
+    pub fn empty(context: &'ctx T::Context) -> Self {
+        let ptrs = context.mut_ptrs_dangling();
+        unsafe { Self::from_parts(context, ptrs, 0) }
+    }
+
+    #[inline]
     pub unsafe fn from_parts(
         context: &'ctx T::Context,
         ptrs: MutPtrs<'ctx, T>,
@@ -61,8 +67,7 @@ where
 
     #[inline]
     pub unsafe fn as_mut_unchecked<'a>(self) -> SoaSlicesMut<'ctx, 'a, T> {
-        let (context, ptrs, len) = self.into_parts();
-        unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
+        unsafe { SoaSlicesMut::from_ptrs(self) }
     }
 
     #[inline]
@@ -377,17 +382,6 @@ where
     pub fn into_iter_with_context(self) -> (&'ctx T::Context, IterMutPtrs<'ctx, T>) {
         let (context, slices) = self.into_mut_slice_ptrs_with_context();
         (context, IterMutPtrs::new(context, slices))
-    }
-}
-
-impl<'ctx, T> From<&'ctx T::Context> for SoaSliceMutPtrs<'ctx, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.mut_ptrs_dangling();
-        unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }
 

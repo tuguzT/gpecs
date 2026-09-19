@@ -1096,7 +1096,7 @@ where
                         }
 
                         dense.push_from(|context, dst| {
-                            let (key_ptr, value_ptrs) = dst.into();
+                            let (key_ptr, value_ptrs) = dst.into_parts();
                             let result =
                                 f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
@@ -1112,7 +1112,8 @@ where
                         let (context, dense) = dense.mut_slice_ptrs().into_iter_with_context();
 
                         let dense_index = unwrap_into_usize(index);
-                        let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
+                        let (dense_key, dense_value) =
+                            unwrap_dense(dense, dense_index).into_parts();
 
                         let access = unsafe { TryInsertAccess::read_write_unchecked(dense_value) };
                         let result = f(context, Ok(Some(access)));
@@ -1154,7 +1155,7 @@ where
                 }
 
                 dense.push_from(|context, dst| {
-                    let (key_ptr, value_ptrs) = dst.into();
+                    let (key_ptr, value_ptrs) = dst.into_parts();
                     let result = f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
                     sparse[sparse_index] = S::occupied(key.epoch(), dense_index);
@@ -1259,7 +1260,7 @@ where
             }
 
             return dense.push_from(|context, dst| {
-                let (key_ptr, value_ptrs) = dst.into();
+                let (key_ptr, value_ptrs) = dst.into_parts();
                 let result = f(context, Ok((key, value_ptrs)));
 
                 *sparse_item = S::occupied(sparse_item.epoch(), dense_index);
@@ -1303,7 +1304,7 @@ where
 
         let new_sparse_vacant_head = dense.len() + 1;
         dense.push_from(|context, dst| {
-            let (key_ptr, value_ptrs) = dst.into();
+            let (key_ptr, value_ptrs) = dst.into_parts();
             let result = f(context, Ok((key, value_ptrs)));
 
             sparse.push(sparse_item);
@@ -1858,7 +1859,7 @@ where
 
         let mut last = 0;
         for curr in 0..old_len {
-            let (&mut key, value) = dense.mut_slices().into_index_mut(curr).into();
+            let (&mut key, value) = dense.mut_slices().into_index_mut(curr).into_parts();
             if !f(key, value) {
                 let sparse_index = unwrap_into_usize(key.sparse_index());
 

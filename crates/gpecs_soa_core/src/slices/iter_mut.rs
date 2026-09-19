@@ -26,11 +26,22 @@ where
     T: RawSoa + ?Sized,
 {
     #[inline]
+    pub unsafe fn from_iter_ptrs(iter: IterMutPtrs<'ctx, T>) -> Self {
+        let inner = iter;
+        let phantom = PhantomData;
+        Self { inner, phantom }
+    }
+
+    #[inline]
     pub unsafe fn from_parts(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
-        Self {
-            inner: IterMutPtrs::new(context, slices),
-            phantom: PhantomData,
-        }
+        let iter = IterMutPtrs::new(context, slices);
+        unsafe { Self::from_iter_ptrs(iter) }
+    }
+
+    #[inline]
+    pub fn empty(context: &'ctx T::Context) -> Self {
+        let iter = IterMutPtrs::empty(context);
+        unsafe { Self::from_iter_ptrs(iter) }
     }
 
     #[inline]

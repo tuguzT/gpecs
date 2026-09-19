@@ -120,17 +120,6 @@ where
     }
 }
 
-impl<'ctx, K, V, P> From<KeyValueSlicePtrs<'ctx, K, V, P>> for (*const [K], SlicePtrs<'ctx, V>)
-where
-    V: RawSoa + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: KeyValueSlicePtrs<'ctx, K, V, P>) -> Self {
-        value.into_parts()
-    }
-}
-
 impl<K, V, P> Debug for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,

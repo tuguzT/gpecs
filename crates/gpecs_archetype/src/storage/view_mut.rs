@@ -111,7 +111,7 @@ where
     #[inline]
     pub fn into_slices(self) -> Slices<'ctx, 'a, T, S> {
         let (entities, bundles, sparse, _) = unsafe { self.into_parts() };
-        (entities, bundles.into(), sparse)
+        (entities, bundles.into_slices(), sparse)
     }
 
     #[inline]

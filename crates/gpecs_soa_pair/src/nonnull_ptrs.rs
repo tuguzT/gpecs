@@ -81,29 +81,6 @@ where
     }
 }
 
-impl<'ctx, K, V, P> From<(P, NonNullPtrs<'ctx, V>)> for KeyValueNonNullPtrs<'ctx, K, V, P>
-where
-    V: RawSoa + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: (P, NonNullPtrs<'ctx, V>)) -> Self {
-        let (key, value) = value;
-        Self::new(key, value)
-    }
-}
-
-impl<'ctx, K, V, P> From<KeyValueNonNullPtrs<'ctx, K, V, P>> for (P, NonNullPtrs<'ctx, V>)
-where
-    V: RawSoa + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
-{
-    #[inline]
-    fn from(value: KeyValueNonNullPtrs<'ctx, K, V, P>) -> Self {
-        value.into_parts()
-    }
-}
-
 impl<K, V, P> Debug for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: RawSoa + ?Sized,

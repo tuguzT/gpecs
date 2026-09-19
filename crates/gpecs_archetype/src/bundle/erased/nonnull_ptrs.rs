@@ -73,6 +73,22 @@ where
     }
 
     #[inline]
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, NonNullAsPtr<P>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_ptrs();
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_mut_ptrs();
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
+    }
+
+    #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { inner } = self;
@@ -237,7 +253,8 @@ where
         B: Bundle,
     {
         let into_self = |ptrs| unsafe { Self::new_unchecked(ptrs) };
-        let ptrs = ErasedBundleMutPtrs::from(self)
+        let ptrs = self
+            .into_mut_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
@@ -326,30 +343,6 @@ where
 
         let inner = inner.into_iter();
         unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
-    }
-}
-
-impl<D, P> From<ErasedBundleNonNullPtrs<D, P>> for ErasedBundlePtrs<D, NonNullAsPtr<P>>
-where
-    P: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptrs: ErasedBundleNonNullPtrs<D, P>) -> Self {
-        let inner = ptrs.into_inner();
-        let inner = inner.into();
-        unsafe { ErasedBundlePtrs::from_inner(inner) }
-    }
-}
-
-impl<D, P> From<ErasedBundleNonNullPtrs<D, P>> for ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>>
-where
-    P: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptrs: ErasedBundleNonNullPtrs<D, P>) -> Self {
-        let inner = ptrs.into_inner();
-        let inner = inner.into();
-        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
 

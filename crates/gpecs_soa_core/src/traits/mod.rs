@@ -63,7 +63,11 @@ where
         &'a self,
         ptrs: Self::MutPtrs<'a>,
         count: usize,
-    ) -> Self::MutPtrs<'a>;
+    ) -> Self::MutPtrs<'a> {
+        let ptrs = self.ptrs_cast_const(ptrs);
+        let ptrs = unsafe { self.ptrs_add(ptrs, count) };
+        self.ptrs_cast_mut(ptrs)
+    }
 
     /// Calculates the distance between two [mutable pointers](RawSoaContext::MutPtrs)
     /// to each stored field within the same allocation.
@@ -235,11 +239,20 @@ where
 
     /// Converts [slice pointers](RawSoaContext::SlicePtrs) of each field of stored fields
     /// to the [mutable ones](RawSoaContext::SliceMutPtrs).
-    fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a>;
+    fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
+        let len = self.mut_slice_ptrs_len(&slices);
+        let data = self.mut_slice_ptrs_as_ptrs(slices);
+        self.slice_ptrs_from_raw_parts(data, len)
+    }
 
     /// Converts [mutable slice pointers](RawSoaContext::SliceMutPtrs) of each field of stored fields
     /// to the [const ones](RawSoaContext::SlicePtrs).
-    fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a>;
+    fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
+        let len = self.slice_ptrs_len(&slices);
+        let ptrs = self.slice_ptrs_as_ptrs(slices);
+        let data = self.ptrs_cast_mut(ptrs);
+        self.mut_slice_ptrs_from_raw_parts(data, len)
+    }
 
     /// Executes the destructors (if any) for the each [slice](RawSoaContext::SliceMutPtrs) of stored fields.
     ///
@@ -425,12 +438,22 @@ where
     unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
+    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
+        let ptrs = self.mut_refs_as_mut_ptrs(refs);
+        self.ptrs_cast_const(ptrs)
+    }
+
+    /// Converts [mutable references](SoaContext::RefsMut) to each stored field
     /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
     /// to their [references](SoaContext::Refs) by explicitly converting each one of them via `&*` operator combination.
-    fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a>;
+    fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
+        let ptrs = self.mut_refs_as_ptrs(refs);
+        unsafe { self.refs_from_ptrs(ptrs) }
+    }
 
     /// Collection of slices of each stored field.
     type Slices<'a>;

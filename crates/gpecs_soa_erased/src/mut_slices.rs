@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter, ErasedSoaSlices,
-    ErasedSoaSlicesIter,
+    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter, ErasedSoaSlicePtrs,
+    ErasedSoaSlices, ErasedSoaSlicesIter,
     data::{ErasedMutSlice, ErasedSlice},
     error::{DowncastError, SlicePtrsError},
     layout::WithLayout,
@@ -60,9 +60,21 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaMutSlicePtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        ptrs.cast_const()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutSlicePtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> ErasedSoaSlices<'a, D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        unsafe { ptrs.as_ref_unchecked() }
     }
 
     #[inline]
@@ -248,17 +260,6 @@ where
 
         let ptrs = ptrs.into_iter();
         unsafe { ErasedSoaMutSlicesIter::from_ptrs(ptrs) }
-    }
-}
-
-impl<'a, D, P> From<ErasedSoaMutSlices<'a, D, P>> for ErasedSoaSlices<'a, D, CastConst<P>>
-where
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    fn from(slices: ErasedSoaMutSlices<'a, D, P>) -> Self {
-        let (layouts, buffer, capacity, offset, len) = slices.into_parts();
-        unsafe { Self::new_unchecked(layouts, buffer, capacity, offset, len) }
     }
 }
 

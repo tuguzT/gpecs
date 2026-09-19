@@ -70,7 +70,7 @@ where
     pub fn into_ptrs(self) -> ErasedBundleMutPtrs<D, P> {
         let Self { inner } = self;
 
-        let inner = inner.into_ptrs();
+        let inner = inner.into_mut_ptrs();
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 

@@ -51,7 +51,7 @@ where
         let Self { inner } = self;
 
         let (context, slices) = inner.slices().into_slices_with_context();
-        let (keys, values) = slices.into();
+        let (keys, values) = slices.into_parts();
         (context, keys, values)
     }
 
@@ -68,7 +68,7 @@ where
         let Self { inner } = self;
 
         let (context, slices) = inner.mut_slices().into_slices_with_context();
-        let (keys, values) = slices.into();
+        let (keys, values) = slices.into_parts();
         (context, keys, values)
     }
 }

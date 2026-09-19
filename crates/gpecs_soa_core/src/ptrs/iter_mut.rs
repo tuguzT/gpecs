@@ -37,6 +37,13 @@ where
     }
 
     #[inline]
+    pub fn empty(context: &'ctx T::Context) -> Self {
+        let ptrs = context.mut_ptrs_dangling();
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, 0);
+        Self::new(context, slices)
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { start, end, .. } = *self;
         end - start
@@ -264,18 +271,6 @@ where
     ) -> MutPtrs<'b, T> {
         *end -= offset;
         unsafe { context.mut_ptrs_add(ptrs, *end) }
-    }
-}
-
-impl<'ctx, T> From<&'ctx T::Context> for IterMutPtrs<'ctx, T>
-where
-    T: RawSoa + ?Sized,
-{
-    #[inline]
-    fn from(context: &'ctx T::Context) -> Self {
-        let ptrs = context.mut_ptrs_dangling();
-        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, 0);
-        Self::new(context, slices)
     }
 }
 

@@ -24,7 +24,7 @@ use crate::{
     bundle::{
         Bundle, BundleSlices,
         erased::{
-            ErasedBundleSlicePtrs,
+            ErasedBundlePtrs, ErasedBundleSlicePtrs,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -50,9 +50,16 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedBundleSlicePtrs<D, P>) -> Self {
-        let inner = ptrs.into_inner();
-        let inner = unsafe { inner.as_ref_unchecked() };
+    pub unsafe fn from_slice_ptrs(ptrs: ErasedBundleSlicePtrs<D, P>) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaSlices::from_slice_ptrs(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: ErasedBundlePtrs<D, P>, len: usize) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaSlices::from_ptrs(ptrs, len) };
         unsafe { Self::from_inner(inner) }
     }
 
@@ -63,11 +70,19 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundleSlicePtrs<D, P> {
+    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, P> {
+        let Self { inner } = self;
+
+        let inner = inner.into_slice_ptrs();
+        unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, P> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
-        unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 }
 
@@ -145,9 +160,9 @@ where
     where
         B: Bundle,
     {
-        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_slice_ptrs(ptrs) };
         let slices = self
-            .into_ptrs()
+            .into_slice_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 

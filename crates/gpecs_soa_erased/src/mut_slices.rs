@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter, ErasedSoaSlicePtrs,
-    ErasedSoaSlices, ErasedSoaSlicesIter,
+    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter,
+    ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices, ErasedSoaSlicesIter,
     data::{ErasedMutSlice, ErasedSlice},
     error::{DowncastError, SlicePtrsError},
     layout::WithLayout,
@@ -41,13 +41,19 @@ where
     ) -> Self {
         let ptrs =
             unsafe { ErasedSoaMutSlicePtrs::new_unchecked(layouts, buffer, capacity, offset, len) };
-        unsafe { Self::from_ptrs(ptrs) }
+        unsafe { Self::from_slice_ptrs(ptrs) }
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedSoaMutSlicePtrs<D, P>) -> Self {
+    pub unsafe fn from_slice_ptrs(ptrs: ErasedSoaMutSlicePtrs<D, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaMutPtrs<D, P>, len: usize) -> Self {
+        let ptrs = unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) };
+        unsafe { Self::from_slice_ptrs(ptrs) }
     }
 
     #[inline]
@@ -60,15 +66,27 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
         let Self { ptrs, .. } = self;
         ptrs.cast_const()
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutSlicePtrs<D, P> {
+    pub fn into_mut_slice_ptrs(self) -> ErasedSoaMutSlicePtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_ptrs()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_mut_ptrs()
     }
 
     #[inline]
@@ -85,7 +103,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = unsafe { ptrs.map_layouts(f) };
-        unsafe { ErasedSoaMutSlices::from_ptrs(ptrs) }
+        unsafe { ErasedSoaMutSlices::from_slice_ptrs(ptrs) }
     }
 }
 
@@ -104,7 +122,7 @@ where
     ) -> Result<Self, SlicePtrsError> {
         let ptrs = ErasedSoaMutSlicePtrs::new(layouts, buffer, capacity, offset, len)?;
 
-        let me = unsafe { Self::from_ptrs(ptrs) };
+        let me = unsafe { Self::from_slice_ptrs(ptrs) };
         Ok(me)
     }
 
@@ -119,7 +137,7 @@ where
         let Self { ptrs, .. } = self;
 
         let result = unsafe { ptrs.downcast::<T>(context) };
-        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_slice_ptrs(ptrs) };
         let slices = result.map_err(|err| err.map_value(into_self))?;
 
         let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };

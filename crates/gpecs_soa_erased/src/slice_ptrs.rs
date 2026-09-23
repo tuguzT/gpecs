@@ -86,7 +86,7 @@ where
 
     #[inline]
     pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, P> {
-        unsafe { ErasedSoaSlices::from_ptrs(self) }
+        unsafe { ErasedSoaSlices::from_slice_ptrs(self) }
     }
 }
 

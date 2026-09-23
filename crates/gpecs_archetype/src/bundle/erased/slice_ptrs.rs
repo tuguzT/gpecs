@@ -80,7 +80,7 @@ where
 
     #[inline]
     pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleSlices<'a, D, P> {
-        unsafe { ErasedBundleSlices::from_ptrs(self) }
+        unsafe { ErasedBundleSlices::from_slice_ptrs(self) }
     }
 }
 

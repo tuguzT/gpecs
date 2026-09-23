@@ -1,4 +1,7 @@
-use core::ptr::{self, NonNull};
+use core::{
+    ptr::{self, NonNull},
+    slice,
+};
 
 use crate::traits::{
     CloneToUninitSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
@@ -336,9 +339,25 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            unsafe fn slices_from_raw_parts<'a>(
+                &'a self,
+                data: Self::Ptrs<'a>,
+                len: usize,
+            ) -> Self::Slices<'a> {
+                let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
+                slices
+            }
+
+            #[inline]
             fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
                 let slices = ($(ptr::from_ref(slices.$indices),)*);
                 slices
+            }
+
+            #[inline]
+            fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
+                let ptrs = ($(slices.$indices.as_ptr(),)*);
+                ptrs
             }
 
             #[inline]
@@ -367,12 +386,49 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            unsafe fn mut_slices_from_raw_parts<'a>(
+                &'a self,
+                data: Self::MutPtrs<'a>,
+                len: usize,
+            ) -> Self::SlicesMut<'a> {
+                let slices = unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) };
+                slices
+            }
+
+            #[inline]
+            fn mut_slices_as_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicesMut<'a>,
+            ) -> Self::SlicePtrs<'a> {
+                let slices = ($(ptr::from_ref(slices.$indices),)*);
+                slices
+            }
+
+            #[inline]
             fn mut_slices_as_mut_slice_ptrs<'a>(
                 &'a self,
                 slices: Self::SlicesMut<'a>,
             ) -> Self::SliceMutPtrs<'a> {
                 let slices = ($(ptr::from_mut(slices.$indices),)*);
                 slices
+            }
+
+            #[inline]
+            fn mut_slices_as_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicesMut<'a>,
+            ) -> Self::Ptrs<'a> {
+                let ptrs = ($(slices.$indices.as_ptr(),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn mut_slices_as_mut_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicesMut<'a>,
+            ) -> Self::MutPtrs<'a> {
+                let ptrs = ($(slices.$indices.as_mut_ptr(),)*);
+                ptrs
             }
 
             #[inline]

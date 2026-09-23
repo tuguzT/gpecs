@@ -11,7 +11,9 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::{KeyValueMutSlicePtrs, KeyValueSlicePtrs, KeyValueSlices};
+use crate::{
+    KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
+};
 
 pub struct KeyValueMutSlices<'ctx, 'a, K, V, P = *mut K>
 where
@@ -57,6 +59,17 @@ where
     }
 
     #[inline]
+    pub unsafe fn from_raw_parts(
+        context: &'ctx V::Context,
+        data: KeyValueMutPtrs<'ctx, K, V, P>,
+        len: usize,
+    ) -> Self {
+        let (key, values) = data.into_parts();
+        let values = unsafe { context.mut_slices_from_raw_parts(values, len) };
+        unsafe { Self::from_parts(key, len, values) }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { len, .. } = *self;
         len
@@ -97,6 +110,23 @@ where
 
         let values = context.mut_slices_as_mut_slice_ptrs(values.into_inner());
         unsafe { KeyValueMutSlicePtrs::from_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+        let Self { key, values, .. } = self;
+
+        let key = key.cast_const();
+        let values = context.mut_slices_as_ptrs(values.into_inner());
+        KeyValuePtrs::new(key, values)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, P> {
+        let Self { key, values, .. } = self;
+
+        let values = context.mut_slices_as_mut_ptrs(values.into_inner());
+        KeyValueMutPtrs::new(key, values)
     }
 
     #[inline]

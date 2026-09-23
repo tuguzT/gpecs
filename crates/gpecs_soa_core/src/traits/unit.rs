@@ -1,4 +1,7 @@
-use core::ptr::{self, NonNull};
+use core::{
+    ptr::{self, NonNull},
+    slice,
+};
 
 use crate::traits::{
     CloneToUninitSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
@@ -292,8 +295,22 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
     }
 
     #[inline]
+    unsafe fn slices_from_raw_parts<'a>(
+        &'a self,
+        data: Self::Ptrs<'a>,
+        len: usize,
+    ) -> Self::Slices<'a> {
+        unsafe { slice::from_raw_parts(data, len) }
+    }
+
+    #[inline]
     fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
         ptr::from_ref(slices)
+    }
+
+    #[inline]
+    fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
+        slices.as_ptr()
     }
 
     #[inline]
@@ -319,11 +336,35 @@ unsafe impl<'data> SoaContext<'data, ()> for () {
     }
 
     #[inline]
+    unsafe fn mut_slices_from_raw_parts<'a>(
+        &'a self,
+        data: Self::MutPtrs<'a>,
+        len: usize,
+    ) -> Self::SlicesMut<'a> {
+        unsafe { slice::from_raw_parts_mut(data, len) }
+    }
+
+    #[inline]
+    fn mut_slices_as_slice_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::SlicePtrs<'a> {
+        ptr::from_ref(slices)
+    }
+
+    #[inline]
     fn mut_slices_as_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a> {
         ptr::from_mut(slices)
+    }
+
+    #[inline]
+    fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
+        slices.as_ptr()
+    }
+
+    #[inline]
+    fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
+        slices.as_mut_ptr()
     }
 
     #[inline]

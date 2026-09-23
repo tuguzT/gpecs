@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
+    CovariantFieldLayouts, ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
     data::ErasedSlice,
     error::{DowncastError, SlicePtrsError},
     layout::WithLayout,
@@ -40,13 +40,19 @@ where
     ) -> Self {
         let ptrs =
             unsafe { ErasedSoaSlicePtrs::new_unchecked(layouts, buffer, capacity, offset, len) };
-        unsafe { Self::from_ptrs(ptrs) }
+        unsafe { Self::from_slice_ptrs(ptrs) }
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedSoaSlicePtrs<D, P>) -> Self {
+    pub unsafe fn from_slice_ptrs(ptrs: ErasedSoaSlicePtrs<D, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaPtrs<D, P>, len: usize) -> Self {
+        let ptrs = unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) };
+        unsafe { Self::from_slice_ptrs(ptrs) }
     }
 
     #[inline]
@@ -59,9 +65,15 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaSlicePtrs<D, P> {
+    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, P> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_ptrs()
     }
 
     #[inline]
@@ -72,7 +84,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = unsafe { ptrs.map_layouts(f) };
-        unsafe { ErasedSoaSlices::from_ptrs(ptrs) }
+        unsafe { ErasedSoaSlices::from_slice_ptrs(ptrs) }
     }
 }
 
@@ -91,7 +103,7 @@ where
     ) -> Result<Self, SlicePtrsError> {
         let ptrs = ErasedSoaSlicePtrs::new(layouts, buffer, capacity, offset, len)?;
 
-        let me = unsafe { Self::from_ptrs(ptrs) };
+        let me = unsafe { Self::from_slice_ptrs(ptrs) };
         Ok(me)
     }
 
@@ -106,7 +118,7 @@ where
         let Self { ptrs, .. } = self;
 
         let result = unsafe { ptrs.downcast::<T>(context) };
-        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_slice_ptrs(ptrs) };
         let slices = result.map_err(|err| err.map_value(into_self))?;
 
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };

@@ -89,7 +89,7 @@ where
 
     #[inline]
     pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedBundleMutSlices<'a, D, P> {
-        unsafe { ErasedBundleMutSlices::from_ptrs(self) }
+        unsafe { ErasedBundleMutSlices::from_slice_ptrs(self) }
     }
 }
 

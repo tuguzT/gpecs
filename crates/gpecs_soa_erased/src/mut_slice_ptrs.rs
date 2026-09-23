@@ -97,7 +97,7 @@ where
 
     #[inline]
     pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutSlices<'a, D, P> {
-        unsafe { ErasedSoaMutSlices::from_ptrs(self) }
+        unsafe { ErasedSoaMutSlices::from_slice_ptrs(self) }
     }
 }
 

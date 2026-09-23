@@ -470,9 +470,33 @@ where
     unsafe fn slices_from_slice_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>)
     -> Self::Slices<'a>;
 
+    /// Forms [slices](SoaContext::Slices) to each stored field
+    /// from [pointers](RawSoaContext::Ptrs) to each field and a length.
+    ///
+    /// The len argument is the number of elements, not the number of bytes.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`slice::from_raw_parts()`](core::slice::from_raw_parts) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn slices_from_raw_parts<'a>(
+        &'a self,
+        data: Self::Ptrs<'a>,
+        len: usize,
+    ) -> Self::Slices<'a> {
+        let slices = self.slice_ptrs_from_raw_parts(data, len);
+        unsafe { self.slices_from_slice_ptrs(slices) }
+    }
+
     /// Converts [slices](SoaContext::Slices) to each stored field
     /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
     fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a>;
+
+    /// Converts [slices](SoaContext::Slices) to each stored field
+    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
+        let slices = self.slices_as_slice_ptrs(slices);
+        self.slice_ptrs_as_ptrs(slices)
+    }
 
     /// Returns the number of elements in [slices](SoaContext::Slices) to each stored field,
     /// also referred to as their 'length'.
@@ -500,12 +524,50 @@ where
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a>;
 
+    /// Forms [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// from [mutable pointers](RawSoaContext::MutPtrs) to each field and a length.
+    ///
+    /// The len argument is the number of elements, not the number of bytes.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`slice::from_raw_parts_mut()`](core::slice::from_raw_parts_mut) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn mut_slices_from_raw_parts<'a>(
+        &'a self,
+        data: Self::MutPtrs<'a>,
+        len: usize,
+    ) -> Self::SlicesMut<'a> {
+        let slices = self.mut_slice_ptrs_from_raw_parts(data, len);
+        unsafe { self.mut_slices_from_mut_slice_ptrs(slices) }
+    }
+
+    /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
+    fn mut_slices_as_slice_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::SlicePtrs<'a> {
+        let slices = self.mut_slices_as_mut_slice_ptrs(slices);
+        self.slice_ptrs_cast_const(slices)
+    }
+
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
     /// to their [mutable slice pointers](RawSoaContext::SliceMutPtrs) by taking the pointer of each one of them.
     fn mut_slices_as_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a>;
+
+    /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
+        let slices = self.mut_slices_as_slice_ptrs(slices);
+        self.slice_ptrs_as_ptrs(slices)
+    }
+
+    /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
+    fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
+        let slices = self.mut_slices_as_mut_slice_ptrs(slices);
+        self.mut_slice_ptrs_as_mut_ptrs(slices)
+    }
 
     /// Returns the number of elements in [mutable slices](SoaContext::SlicesMut) to each stored field,
     /// also referred to as their 'length'.
@@ -516,7 +578,10 @@ where
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
     /// to their [slices](SoaContext::Slices) by explicitly converting each one of them via `&*` operator combination.
-    fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a>;
+    fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
+        let slices = self.mut_slices_as_slice_ptrs(slices);
+        unsafe { self.slices_from_slice_ptrs(slices) }
+    }
 }
 
 /// Alias for the [`Refs`](SoaContext::Refs) associated type

@@ -1,6 +1,6 @@
 use crate::{
     slices::SlicesIndex,
-    traits::{SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext},
+    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext},
 };
 
 #[inline]
@@ -36,6 +36,14 @@ where
 }
 
 #[inline]
+pub fn as_ptrs<'a, 'data, T>(context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Ptrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.slices_as_ptrs(slices)
+}
+
+#[inline]
 pub fn len<'data, T>(context: &T::Context, slices: &Slices<'_, 'data, T>) -> usize
 where
     T: Soa<'data> + ?Sized,
@@ -65,6 +73,17 @@ where
 }
 
 #[inline]
+pub fn mut_as_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> SlicePtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_slice_ptrs(slices)
+}
+
+#[inline]
 pub fn as_mut_slice_ptrs<'a, 'data, T>(
     context: &'a T::Context,
     slices: SlicesMut<'a, 'data, T>,
@@ -73,6 +92,28 @@ where
     T: Soa<'data> + ?Sized,
 {
     context.mut_slices_as_mut_slice_ptrs(slices)
+}
+
+#[inline]
+pub fn mut_as_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> Ptrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_ptrs(slices)
+}
+
+#[inline]
+pub fn as_mut_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> MutPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_mut_ptrs(slices)
 }
 
 #[inline]

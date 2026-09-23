@@ -11,7 +11,9 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::{KeyValueMutSlicePtrs, KeyValueSlicePtrs, KeyValueSlices};
+use crate::{
+    KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices,
+};
 
 pub struct KeyValueMutSlices<'ctx, 'a, K, V, P = *mut K>
 where
@@ -97,6 +99,23 @@ where
 
         let values = context.mut_slices_as_mut_slice_ptrs(values.into_inner());
         unsafe { KeyValueMutSlicePtrs::from_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+        let Self { key, values, .. } = self;
+
+        let key = key.cast_const();
+        let values = context.mut_slices_as_ptrs(values.into_inner());
+        KeyValuePtrs::new(key, values)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, P> {
+        let Self { key, values, .. } = self;
+
+        let values = context.mut_slices_as_mut_ptrs(values.into_inner());
+        KeyValueMutPtrs::new(key, values)
     }
 
     #[inline]

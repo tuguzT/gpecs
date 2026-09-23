@@ -459,6 +459,11 @@ where
 
     #[inline]
     fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
+        slices.into_slice_ptrs()
+    }
+
+    #[inline]
+    fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
         slices.into_ptrs()
     }
 
@@ -485,10 +490,25 @@ where
     }
 
     #[inline]
+    fn mut_slices_as_slice_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::SlicePtrs<'a> {
+        slices.into_slice_ptrs()
+    }
+
+    #[inline]
     fn mut_slices_as_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a> {
+        slices.into_mut_slice_ptrs()
+    }
+
+    #[inline]
+    fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
+        slices.into_ptrs()
+    }
+
+    #[inline]
+    fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
         slices.into_mut_ptrs()
     }
 

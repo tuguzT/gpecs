@@ -11,7 +11,7 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::KeyValueSlicePtrs;
+use crate::{KeyValuePtrs, KeyValueSlicePtrs};
 
 pub struct KeyValueSlices<'ctx, 'a, K, V, P = *const K>
 where
@@ -77,6 +77,14 @@ where
 
         let values = context.slices_as_slice_ptrs(values.into_inner());
         unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, P> {
+        let Self { key, values, .. } = self;
+
+        let values = context.slices_as_ptrs(values.into_inner());
+        KeyValuePtrs::new(key, values)
     }
 }
 

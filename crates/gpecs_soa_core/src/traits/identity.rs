@@ -306,6 +306,11 @@ where
     }
 
     #[inline]
+    fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
+        slices.as_ptr()
+    }
+
+    #[inline]
     fn slices_len(&self, slices: &Self::Slices<'_>) -> usize {
         slices.len()
     }
@@ -328,11 +333,26 @@ where
     }
 
     #[inline]
+    fn mut_slices_as_slice_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::SlicePtrs<'a> {
+        ptr::from_ref(slices)
+    }
+
+    #[inline]
     fn mut_slices_as_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a> {
         ptr::from_mut(slices)
+    }
+
+    #[inline]
+    fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
+        slices.as_ptr()
+    }
+
+    #[inline]
+    fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
+        slices.as_mut_ptr()
     }
 
     #[inline]

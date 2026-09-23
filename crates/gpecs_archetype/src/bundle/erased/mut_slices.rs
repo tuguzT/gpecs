@@ -24,8 +24,8 @@ use crate::{
     bundle::{
         Bundle, BundleSlicesMut,
         erased::{
-            ErasedBundleMutSlicePtrs, ErasedBundleSlicePtrs, ErasedBundleSlices,
-            ErasedBundleSlicesIter,
+            ErasedBundleMutPtrs, ErasedBundleMutSlicePtrs, ErasedBundlePtrs, ErasedBundleSlicePtrs,
+            ErasedBundleSlices, ErasedBundleSlicesIter,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -64,19 +64,35 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundleSlicePtrs<D, CastConst<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, CastConst<P>> {
         let Self { inner } = self;
 
-        let inner = inner.into_ptrs();
+        let inner = inner.into_slice_ptrs();
         unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedBundleMutSlicePtrs<D, P> {
+    pub fn into_mut_slice_ptrs(self) -> ErasedBundleMutSlicePtrs<D, P> {
+        let Self { inner } = self;
+
+        let inner = inner.into_mut_slice_ptrs();
+        unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, CastConst<P>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_ptrs();
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, P> {
         let Self { inner } = self;
 
         let inner = inner.into_mut_ptrs();
-        unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -181,7 +197,7 @@ where
     {
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let slices = self
-            .into_mut_ptrs()
+            .into_mut_slice_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 

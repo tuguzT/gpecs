@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
+    CovariantFieldLayouts, ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
     data::ErasedSlice,
     error::{DowncastError, SlicePtrsError},
     layout::WithLayout,
@@ -59,9 +59,15 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaSlicePtrs<D, P> {
+    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, P> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_ptrs()
     }
 
     #[inline]

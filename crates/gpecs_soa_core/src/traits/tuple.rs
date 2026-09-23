@@ -342,6 +342,12 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
+                let ptrs = ($(slices.$indices.as_ptr(),)*);
+                ptrs
+            }
+
+            #[inline]
             fn slices_len(&self, slices: &Self::Slices<'_>) -> usize {
                 let lens = [$(slices.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));
@@ -367,12 +373,39 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            fn mut_slices_as_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicesMut<'a>,
+            ) -> Self::SlicePtrs<'a> {
+                let slices = ($(ptr::from_ref(slices.$indices),)*);
+                slices
+            }
+
+            #[inline]
             fn mut_slices_as_mut_slice_ptrs<'a>(
                 &'a self,
                 slices: Self::SlicesMut<'a>,
             ) -> Self::SliceMutPtrs<'a> {
                 let slices = ($(ptr::from_mut(slices.$indices),)*);
                 slices
+            }
+
+            #[inline]
+            fn mut_slices_as_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicesMut<'a>,
+            ) -> Self::Ptrs<'a> {
+                let ptrs = ($(slices.$indices.as_ptr(),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn mut_slices_as_mut_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicesMut<'a>,
+            ) -> Self::MutPtrs<'a> {
+                let ptrs = ($(slices.$indices.as_mut_ptr(),)*);
+                ptrs
             }
 
             #[inline]

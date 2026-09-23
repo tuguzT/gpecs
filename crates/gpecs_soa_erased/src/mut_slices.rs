@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter, ErasedSoaSlicePtrs,
-    ErasedSoaSlices, ErasedSoaSlicesIter,
+    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter,
+    ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices, ErasedSoaSlicesIter,
     data::{ErasedMutSlice, ErasedSlice},
     error::{DowncastError, SlicePtrsError},
     layout::WithLayout,
@@ -60,15 +60,27 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
         let Self { ptrs, .. } = self;
         ptrs.cast_const()
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutSlicePtrs<D, P> {
+    pub fn into_mut_slice_ptrs(self) -> ErasedSoaMutSlicePtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConst<P>> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_ptrs()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_mut_ptrs()
     }
 
     #[inline]

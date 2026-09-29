@@ -40,11 +40,11 @@ fn new() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let slices = vec.slices();
-    assert!(slices.is_empty());
+    let view = vec.as_view();
+    assert!(view.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -86,11 +86,11 @@ fn new_zst() {
         [].as_slice(),
     );
 
-    let slices = vec.slices();
-    assert!(slices.is_empty());
+    let view = vec.as_view();
+    assert!(view.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -138,11 +138,11 @@ fn with_capacity() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let slices = vec.slices();
-    assert!(slices.is_empty());
+    let view = vec.as_view();
+    assert!(view.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -185,11 +185,11 @@ fn with_capacity_zst() {
         [].as_slice(),
     );
 
-    let slices = vec.slices();
-    assert!(slices.is_empty());
+    let view = vec.as_view();
+    assert!(view.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -234,7 +234,7 @@ fn one_item() {
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&u8, &u128, &u16, &())),
@@ -255,10 +255,10 @@ fn one_item() {
         ),
     );
 
-    let slices = vec.slices();
-    assert_eq!(slices.len(), 1);
+    let view = vec.as_view();
+    assert_eq!(view.len(), 1);
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u128].as_slice(),
@@ -267,14 +267,14 @@ fn one_item() {
         ),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&u8, &u128, &u16, &())),
     );
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u128].as_slice(),
@@ -283,7 +283,7 @@ fn one_item() {
         ),
     );
 
-    let mut iter = vec.slices().into_iter();
+    let mut iter = vec.as_view().into_iter();
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
@@ -298,7 +298,7 @@ fn one_item() {
 
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
-    assert!(vec.slices().into_get(0).is_none());
+    assert!(vec.as_view().into_get(0).is_none());
 
     assert_eq!(
         unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
@@ -331,7 +331,7 @@ fn one_item_zst() {
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
@@ -347,25 +347,25 @@ fn one_item_zst() {
         [()].as_slice(),
     );
 
-    let slices = vec.slices();
-    assert_eq!(slices.len(), 1);
+    let view = vec.as_view();
+    assert_eq!(view.len(), 1);
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
 
-    let mut iter = vec.slices().into_iter();
+    let mut iter = vec.as_view().into_iter();
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
@@ -380,7 +380,7 @@ fn one_item_zst() {
 
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
-    assert!(vec.slices().into_get(0).is_none());
+    assert!(vec.as_view().into_get(0).is_none());
 
     assert_eq!(
         unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
@@ -424,19 +424,19 @@ fn three_items() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(1)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(2)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
@@ -490,11 +490,11 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let slices = vec.slices();
-    assert_eq!(slices.len(), 3);
+    let view = vec.as_view();
+    assert_eq!(view.len(), 3);
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
@@ -504,20 +504,17 @@ fn three_items() {
     );
 
     assert_eq!(
-        slices
-            .get(0)
+        view.get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&4, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
-        slices
-            .get(1)
+        view.get(1)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&7, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
-        slices
-            .get(2)
+        view.get(2)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&1, &"2".to_owned(), &3, &())),
     );
@@ -527,7 +524,7 @@ fn three_items() {
         *t += 1;
     }
 
-    let mut iter = vec.slices().into_iter();
+    let mut iter = vec.as_view().into_iter();
     assert_eq!(iter.len(), 3);
 
     assert_eq!(
@@ -564,31 +561,31 @@ fn three_items() {
     assert!(vec.capacity() >= 5);
 
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&5, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(1)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(2)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(3)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(4)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
@@ -706,7 +703,7 @@ fn three_items() {
     // use this code instead of `retain_mut` to drop needed contents,
     // erased vec does not do it automatically
     for index in (0..vec.len()).rev() {
-        let refs = vec.mut_slices().into_index_mut(index);
+        let refs = vec.as_mut_view().into_index_mut(index);
         let (x, _, _, _) = unsafe { refs.downcast::<Soa>(&context) }.unwrap();
         if *x <= 3 {
             *x += 1;
@@ -765,19 +762,19 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(1)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(2)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
@@ -811,29 +808,26 @@ fn three_items_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let slices = vec.slices();
-    assert_eq!(slices.len(), 3);
+    let view = vec.as_view();
+    assert_eq!(view.len(), 3);
 
     assert_eq!(
-        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
+        unsafe { view.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
     assert_eq!(
-        slices
-            .get(0)
+        view.get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        slices
-            .get(1)
+        view.get(1)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        slices
-            .get(2)
+        view.get(2)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
@@ -842,7 +836,7 @@ fn three_items_zst() {
         let () = unsafe { refs.downcast::<Soa>(&context) }.unwrap();
     }
 
-    let mut iter = vec.slices().into_iter();
+    let mut iter = vec.as_view().into_iter();
     assert_eq!(iter.len(), 3);
 
     assert_eq!(
@@ -879,31 +873,31 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 5);
 
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(1)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(2)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(3)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
-        vec.slices()
+        vec.as_view()
             .into_get(4)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),

@@ -39,7 +39,7 @@ use crate::{
         },
         vec::SoaVec,
     },
-    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewMutPtr, EpochSparseViewPtr},
+    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewMutPtrs, EpochSparseViewPtrs},
 };
 
 use super::{
@@ -143,11 +143,11 @@ where
         dense: SoaVec<KeyValuePair<K, V, P>>,
         mut sparse: Vec<S>,
     ) -> Result<Self, FromPartsError<K>> {
-        check_parts(dense.slices(), sparse.as_slice())?;
+        check_parts(dense.as_view(), sparse.as_slice())?;
 
         sparse.clear();
         let mut sparse_vacant_head = 0;
-        for (dense_index, key) in dense_keys(dense.slices()).iter().enumerate() {
+        for (dense_index, key) in dense_keys(dense.as_view()).iter().enumerate() {
             let sparse_index = key
                 .sparse_index()
                 .try_into()
@@ -333,25 +333,31 @@ where
     }
 
     #[inline]
-    pub fn as_view_ptr(&self) -> EpochSparseViewPtr<'_, K, V, S, P> {
+    pub fn as_view_ptrs(&self) -> EpochSparseViewPtrs<'_, K, V, S, P> {
         let Self { dense, sparse, .. } = self;
-        unsafe { EpochSparseViewPtr::from_parts(dense.slice_ptrs(), sparse.as_slice()) }
+
+        let dense = dense.as_view_ptrs();
+        let sparse = ptr::from_ref(sparse.as_slice());
+        unsafe { EpochSparseViewPtrs::from_parts(dense, sparse) }
     }
 
     #[inline]
-    pub fn as_mut_view_ptr(&mut self) -> EpochSparseViewMutPtr<'_, K, V, S, P> {
+    pub fn as_mut_view_ptrs(&mut self) -> EpochSparseViewMutPtrs<'_, K, V, S, P> {
         let Self { dense, sparse, .. } = self;
-        unsafe { EpochSparseViewMutPtr::from_parts(dense.mut_slice_ptrs(), sparse.as_mut_slice()) }
+
+        let dense = dense.as_mut_view_ptrs();
+        let sparse = ptr::from_mut(sparse.as_mut_slice());
+        unsafe { EpochSparseViewMutPtrs::from_parts(dense, sparse) }
     }
 
     #[inline]
     pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V, S, P> {
-        unsafe { self.as_view_ptr().as_ref_unchecked() }
+        unsafe { self.as_view_ptrs().as_ref_unchecked() }
     }
 
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V, S, P> {
-        unsafe { self.as_mut_view_ptr().as_mut_unchecked() }
+        unsafe { self.as_mut_view_ptrs().as_mut_unchecked() }
     }
 
     #[inline]
@@ -698,7 +704,7 @@ where
 
     #[inline]
     pub unsafe fn get_unchecked_with_context(&self, key: K) -> (&V::Context, Ptrs<'_, V>) {
-        let view_ptr = self.as_view_ptr();
+        let view_ptr = self.as_view_ptrs();
         unsafe { view_ptr.into_get_unchecked_with_context(key) }
     }
 
@@ -713,7 +719,7 @@ where
         &mut self,
         key: K,
     ) -> (&V::Context, MutPtrs<'_, V>) {
-        let view_ptr = self.as_mut_view_ptr();
+        let view_ptr = self.as_mut_view_ptrs();
         unsafe { view_ptr.into_get_unchecked_mut_with_context(key) }
     }
 
@@ -731,7 +737,7 @@ where
         &self,
         sparse_index: K::SparseIndex,
     ) -> (&V::Context, P::Const, Ptrs<'_, V>) {
-        let view_ptr = self.as_view_ptr();
+        let view_ptr = self.as_view_ptrs();
         unsafe { view_ptr.into_get_with_key_unchecked_with_context(sparse_index) }
     }
 
@@ -749,7 +755,7 @@ where
         &mut self,
         sparse_index: K::SparseIndex,
     ) -> (&V::Context, P::Mut, MutPtrs<'_, V>) {
-        let view_ptr = self.as_mut_view_ptr();
+        let view_ptr = self.as_mut_view_ptrs();
         unsafe { view_ptr.into_get_mut_with_key_unchecked_with_context(sparse_index) }
     }
 
@@ -807,7 +813,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        for key in dense_keys(dense.slices()) {
+        for key in dense_keys(dense.as_view()) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let next_vacant = unwrap_into_index(*sparse_vacant_head);
             sparse[sparse_index] = S::with_next_vacant(key.epoch().next(), next_vacant);
@@ -873,7 +879,7 @@ where
         let dense_index_usize = unwrap_into_usize(dense_index);
         assert_dense_index_bounds(dense_index_usize, dense.len());
 
-        let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
+        let (keys, _) = dense.as_view_ptrs().into_slice_ptrs().into_parts();
         let result = dense.swap_remove_into(dense_index_usize, |context, src| {
             let (src_key, src_value) = src.into_parts();
             let dense_key = unsafe { src_key.read() };
@@ -941,7 +947,7 @@ where
         let dense_index = unwrap_into_usize(dense_index);
         assert_dense_index_bounds(dense_index, dense.len());
 
-        let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
+        let (keys, _) = dense.as_view_ptrs().into_slice_ptrs().into_parts();
         let result = dense.remove_into(dense_index, |context, src| {
             let (src_key, src_value) = src.into_parts();
             let dense_key = unsafe { src_key.read() };
@@ -1109,7 +1115,7 @@ where
                     SparseIndexKind::Dense => {
                         assert_occupied(sparse_item);
 
-                        let (context, dense) = dense.mut_slice_ptrs().into_iter_with_context();
+                        let (context, dense) = dense.as_mut_view_ptrs().into_iter_with_context();
 
                         let dense_index = unwrap_into_usize(index);
                         let (dense_key, dense_value) =
@@ -1478,7 +1484,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        for key in dense_keys(dense.slices()) {
+        for key in dense_keys(dense.as_view()) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
 
             let next_vacant = unwrap_into_index(*sparse_vacant_head);
@@ -1780,7 +1786,7 @@ where
     ) -> (&'a V::Context, crate::iter::ParIter<'a, 'a, K, V, P>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices_with_context();
+        let (context, slices) = dense.as_view_with_context();
         let iter = crate::iter::ParIter::new(slices.into_par_iter());
         (context, iter)
     }
@@ -1799,7 +1805,7 @@ where
     ) -> (&'a V::Context, crate::iter::ParIterMut<'a, 'a, K, V, P>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.mut_slices_with_context();
+        let (context, slices) = dense.as_mut_view_with_context();
         let iter = crate::iter::ParIterMut::new(slices.into_par_iter());
         (context, iter)
     }
@@ -1859,7 +1865,7 @@ where
 
         let mut last = 0;
         for curr in 0..old_len {
-            let (&mut key, value) = dense.mut_slices().into_index_mut(curr).into_parts();
+            let (&mut key, value) = dense.as_mut_view().into_index_mut(curr).into_parts();
             if !f(key, value) {
                 let sparse_index = unwrap_into_usize(key.sparse_index());
 
@@ -1869,7 +1875,7 @@ where
                 continue;
             }
 
-            dense.mut_slices().swap(curr, last);
+            dense.as_mut_view().swap(curr, last);
 
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);

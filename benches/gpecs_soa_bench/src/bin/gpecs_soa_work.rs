@@ -5,7 +5,7 @@ where
     T: Work,
 {
     let vec = T::soa_slf_prepare_vec(count);
-    let iter = T::soa_slf_prepare_iter(vec.slices());
+    let iter = T::soa_slf_prepare_iter(vec.as_view());
     T::soa_slf_work(iter)
 }
 
@@ -14,7 +14,7 @@ where
     T: Work,
 {
     let vec = T::soa_ser_prepare_vec(count);
-    let iter = T::soa_ser_prepare_iter(vec.slices());
+    let iter = T::soa_ser_prepare_iter(vec.as_view());
     T::soa_ser_work(iter)
 }
 

@@ -14,14 +14,14 @@ use gpecs_soa_erased::{
     soa::{
         field::FieldLayouts,
         identity::Identity,
-        slices::SoaSlices,
+        slices::SoaView,
         traits::{Refs as ErasedBundleRefs, Slices as ErasedBundles},
     },
 };
 use gpecs_sparse::{
     error::FromPartsError,
     item::{KeyValueSlices, SparseItem},
-    view::{EpochSparseView, EpochSparseViewPtr},
+    view::{EpochSparseView, EpochSparseViewPtrs},
 };
 
 use crate::{
@@ -30,7 +30,7 @@ use crate::{
     storage::{BundleIter, Bundles, Iter, traits::ErasedArchetypeSoa},
 };
 
-type Inner<'ctx, T, S> = EpochSparseViewPtr<'ctx, NoEpochEntity, T, S>;
+type Inner<'ctx, T, S> = EpochSparseViewPtrs<'ctx, NoEpochEntity, T, S>;
 
 #[repr(transparent)]
 pub struct ArchetypeStorageView<'ctx, 'a, T, S = NoEpochEntitySparseItem>
@@ -55,12 +55,12 @@ where
         sparse: &'a [S],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice(entities);
-        let dense = SoaSlices::new(
+        let dense = SoaView::new(
             Identity::from_inner_ref(context),
             KeyValueSlices::new(context, entities, bundles),
         );
 
-        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
+        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptrs();
         let me = unsafe { Self::from_inner(inner) };
         Ok(me)
     }
@@ -73,12 +73,12 @@ where
         sparse: &'a [S],
     ) -> Self {
         let entities = must_cast_slice(entities);
-        let dense = SoaSlices::new(
+        let dense = SoaView::new(
             Identity::from_inner_ref(context),
             KeyValueSlices::new(context, entities, bundles),
         );
 
-        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();
+        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptrs();
         unsafe { Self::from_inner(inner) }
     }
 

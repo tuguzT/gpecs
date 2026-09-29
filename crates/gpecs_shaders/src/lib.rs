@@ -9,7 +9,7 @@ use glam::{USizeVec3, UVec3};
 use gpecs_entity::{Entity, EntityEpoch, EntitySparseItem};
 use gpecs_soa_erased::{
     ErasedSoa, ErasedSoaContext, ErasedSoaMutSlices,
-    soa::{identity::Identity, slices::SoaSlicesMut},
+    soa::{identity::Identity, slices::SoaViewMut},
 };
 use gpecs_sparse::{
     item::{KeyValueMutSlices, KeyValuePair},
@@ -68,14 +68,14 @@ pub fn swap_erased(
         let capacity = u32_to_usize(lhs_capacity);
         ErasedSoaMutSlices::new_unchecked(layouts, lhs_dense, capacity, 0, len)
     };
-    let mut lhs_dense = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, lhs_dense);
+    let mut lhs_dense = SoaViewMut::<GpuErasedSoa<_>>::new(&context, lhs_dense);
 
     let rhs_dense = unsafe {
         let len = u32_to_usize(rhs_len);
         let capacity = u32_to_usize(rhs_capacity);
         ErasedSoaMutSlices::new_unchecked(layouts, rhs_dense, capacity, 0, len)
     };
-    let mut rhs_dense = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, rhs_dense);
+    let mut rhs_dense = SoaViewMut::<GpuErasedSoa<_>>::new(&context, rhs_dense);
 
     assert!(invocation_id < lhs_dense.len());
     let mut lhs = unsafe { lhs_dense.get_unchecked_mut(invocation_id) };
@@ -132,8 +132,7 @@ pub fn sparse_get(
     let lhs_dense = unsafe {
         KeyValueMutSlices::<_, GpuErasedSoa<_>, _>::new_unchecked(lhs_entities, lhs_values)
     };
-    let lhs_dense =
-        SoaSlicesMut::<KeyValuePair<_, _, GpuSliceItemPtrs<_>>>::new(&context, lhs_dense);
+    let lhs_dense = SoaViewMut::<KeyValuePair<_, _, GpuSliceItemPtrs<_>>>::new(&context, lhs_dense);
     let mut lhs_view = unsafe { EpochSparseViewMut::from_parts(lhs_dense, lhs_sparse) };
 
     let rhs_values = unsafe {
@@ -144,8 +143,7 @@ pub fn sparse_get(
     let rhs_dense = unsafe {
         KeyValueMutSlices::<_, GpuErasedSoa<_>, _>::new_unchecked(rhs_entities, rhs_values)
     };
-    let rhs_dense =
-        SoaSlicesMut::<KeyValuePair<_, _, GpuSliceItemPtrs<_>>>::new(&context, rhs_dense);
+    let rhs_dense = SoaViewMut::<KeyValuePair<_, _, GpuSliceItemPtrs<_>>>::new(&context, rhs_dense);
     let mut rhs_view = unsafe { EpochSparseViewMut::from_parts(rhs_dense, rhs_sparse) };
 
     let entity = Entity::new(invocation_id, EntityEpoch::default(), WorldId::default());

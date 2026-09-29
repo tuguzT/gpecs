@@ -84,7 +84,7 @@ where
     pub fn as_view(&self) -> ArchetypeStorageView<'_, '_, T, S> {
         let Self { sparse_set } = self;
 
-        let inner = sparse_set.as_view_ptr();
+        let inner = sparse_set.as_view_ptrs();
         unsafe { ArchetypeStorageView::from_inner(inner) }
     }
 
@@ -92,7 +92,7 @@ where
     pub fn as_mut_view(&mut self) -> ArchetypeStorageViewMut<'_, '_, T, S> {
         let Self { sparse_set } = self;
 
-        let inner = sparse_set.as_mut_view_ptr();
+        let inner = sparse_set.as_mut_view_ptrs();
         unsafe { ArchetypeStorageViewMut::from_inner(inner) }
     }
 

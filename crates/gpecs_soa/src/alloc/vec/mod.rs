@@ -13,10 +13,8 @@ pub use super::error::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
-    ptrs::{IterMutPtrs, IterPtrs, SoaSliceMutPtrs, SoaSlicePtrs, get_unchecked, range},
-    slices::{
-        IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut, ToSoaVec,
-    },
+    ptrs::{IterMutPtrs, IterPtrs, SoaViewMutPtrs, SoaViewPtrs, get_unchecked, range},
+    slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaView, SoaViewMut, ToSoaVec},
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs,
         RawSoaContext, ReadSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut,
@@ -229,28 +227,28 @@ where
     }
 
     #[inline]
-    pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
-        let (_, slices) = self.slice_ptrs_with_context();
+    pub fn as_view_ptrs(&self) -> SoaViewPtrs<'_, T> {
+        let (_, slices) = self.as_view_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn slice_ptrs_with_context(&self) -> (&T::Context, SoaSlicePtrs<'_, T>) {
+    pub fn as_view_ptrs_with_context(&self) -> (&T::Context, SoaViewPtrs<'_, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        let slices = SoaSlicePtrs::new(context, slices);
+        let slices = SoaViewPtrs::new(context, slices);
         (context, slices)
     }
 
     #[inline]
-    pub fn mut_slice_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
-        let (_, slices) = self.mut_slice_ptrs_with_context();
+    pub fn as_mut_view_ptrs(&mut self) -> SoaViewMutPtrs<'_, T> {
+        let (_, slices) = self.as_mut_view_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn mut_slice_ptrs_with_context(&mut self) -> (&T::Context, SoaSliceMutPtrs<'_, T>) {
+    pub fn as_mut_view_ptrs_with_context(&mut self) -> (&T::Context, SoaViewMutPtrs<'_, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let slices = SoaSliceMutPtrs::new(context, slices);
+        let slices = SoaViewMutPtrs::new(context, slices);
         (context, slices)
     }
 
@@ -458,7 +456,7 @@ where
 
     #[inline]
     pub fn iter_ptrs_with_context(&self) -> (&T::Context, IterPtrs<'_, T>) {
-        self.slice_ptrs().into_iter_with_context()
+        self.as_view_ptrs().into_iter_with_context()
     }
 
     #[inline]
@@ -469,31 +467,31 @@ where
 
     #[inline]
     pub fn iter_mut_ptrs_with_context(&mut self) -> (&T::Context, IterMutPtrs<'_, T>) {
-        self.mut_slice_ptrs().into_iter_with_context()
+        self.as_mut_view_ptrs().into_iter_with_context()
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        let (_, slices) = self.slices_with_context();
+    pub fn as_view(&self) -> SoaView<'_, '_, T> {
+        let (_, slices) = self.as_view_with_context();
         slices
     }
 
     #[inline]
-    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
-        let (context, slices) = self.slice_ptrs_with_context();
+    pub fn as_view_with_context(&self) -> (&T::Context, SoaView<'_, '_, T>) {
+        let (context, slices) = self.as_view_ptrs_with_context();
         let slices = unsafe { slices.as_ref_unchecked() };
         (context, slices)
     }
 
     #[inline]
-    pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        let (_, slices) = self.mut_slices_with_context();
+    pub fn as_mut_view(&mut self) -> SoaViewMut<'_, '_, T> {
+        let (_, slices) = self.as_mut_view_with_context();
         slices
     }
 
     #[inline]
-    pub fn mut_slices_with_context(&mut self) -> (&T::Context, SoaSlicesMut<'_, '_, T>) {
-        let (context, slices) = self.mut_slice_ptrs_with_context();
+    pub fn as_mut_view_with_context(&mut self) -> (&T::Context, SoaViewMut<'_, '_, T>) {
+        let (context, slices) = self.as_mut_view_ptrs_with_context();
         let slices = unsafe { slices.as_mut_unchecked() };
         (context, slices)
     }
@@ -1068,7 +1066,7 @@ where
     #[inline]
     #[cfg(feature = "rayon")]
     pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slices::ParIter<'a, 'a, T>) {
-        let (context, slices) = self.slices_with_context();
+        let (context, slices) = self.as_view_with_context();
         let iter = crate::slices::ParIter::new(slices);
         (context, iter)
     }
@@ -1085,7 +1083,7 @@ where
     pub fn par_iter_mut_with_context(
         &'a mut self,
     ) -> (&'a T::Context, crate::slices::ParIterMut<'a, 'a, T>) {
-        let (context, slices) = self.mut_slices_with_context();
+        let (context, slices) = self.as_mut_view_with_context();
         let iter = crate::slices::ParIterMut::new(slices);
         (context, iter)
     }
@@ -1101,7 +1099,7 @@ where
         P: AsMut<[usize]>,
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
-        self.mut_slices().sort_with_permutation(permutation);
+        self.as_mut_view().sort_with_permutation(permutation);
     }
 
     #[inline]
@@ -1109,7 +1107,7 @@ where
     where
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
-        self.mut_slices().sort();
+        self.as_mut_view().sort();
     }
 
     #[inline]
@@ -1118,7 +1116,7 @@ where
         P: AsMut<[usize]>,
         for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
-        self.mut_slices()
+        self.as_mut_view()
             .sort_with_permutation_by(permutation, compare);
     }
 
@@ -1127,7 +1125,7 @@ where
     where
         for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
-        self.mut_slices().sort_by(compare);
+        self.as_mut_view().sort_by(compare);
     }
 
     #[inline]
@@ -1137,7 +1135,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices()
+        self.as_mut_view()
             .sort_with_permutation_by_key(permutation, f);
     }
 
@@ -1147,7 +1145,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices().sort_by_key(f);
+        self.as_mut_view().sort_by_key(f);
     }
 
     #[inline]
@@ -1157,7 +1155,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices()
+        self.as_mut_view()
             .sort_with_permutation_by_cached_key(permutation, f);
     }
 
@@ -1167,7 +1165,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices().sort_by_cached_key(f);
+        self.as_mut_view().sort_by_cached_key(f);
     }
 
     #[inline]
@@ -1175,7 +1173,7 @@ where
     where
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
-        self.mut_slices().sort_unstable();
+        self.as_mut_view().sort_unstable();
     }
 
     #[inline]
@@ -1183,7 +1181,7 @@ where
     where
         for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
-        self.mut_slices().sort_unstable_by(compare);
+        self.as_mut_view().sort_unstable_by(compare);
     }
 
     #[inline]
@@ -1192,7 +1190,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices().sort_unstable_by_key(f);
+        self.as_mut_view().sort_unstable_by_key(f);
     }
 }
 
@@ -1317,13 +1315,13 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        self.slices().to_vec()
+        self.as_view().to_vec()
     }
 
     #[inline]
     fn clone_from(&mut self, source: &Self) {
-        let src = &source.slices();
-        self.mut_slices().clone_from_slices(src);
+        let src = &source.as_view();
+        self.as_mut_view().clone_from_slices(src);
     }
 }
 
@@ -1365,7 +1363,7 @@ where
 
     #[inline]
     fn index(&self, index: I) -> &Self::Output {
-        self.slices().into_index(index)
+        self.as_view().into_index(index)
     }
 }
 
@@ -1377,7 +1375,7 @@ where
 {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
-        self.mut_slices().into_index_mut(index)
+        self.as_mut_view().into_index_mut(index)
     }
 }
 

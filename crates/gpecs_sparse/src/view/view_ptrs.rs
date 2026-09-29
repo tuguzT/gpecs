@@ -14,27 +14,27 @@ use crate::{
     key::Key,
     soa::{
         identity::Identity,
-        ptrs::SoaSlicePtrs,
+        ptrs::SoaViewPtrs,
         traits::{Ptrs, RawSoa, SlicePtrs},
     },
-    view::{EpochSparseView, EpochSparseViewMutPtr},
+    view::{EpochSparseView, EpochSparseViewMutPtrs},
 };
 
-pub type SparseViewPtr<'ctx, T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
-    EpochSparseViewPtr<'ctx, usize, T, S, P>;
+pub type SparseViewPtrs<'ctx, T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
+    EpochSparseViewPtrs<'ctx, usize, T, S, P>;
 
-pub struct EpochSparseViewPtr<'ctx, K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
+pub struct EpochSparseViewPtrs<'ctx, K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
 where
     K: Key,
     V: RawSoa<Context: 'ctx> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
-    dense: SoaSlicePtrs<'ctx, KeyValuePair<K, V, P>>,
+    dense: SoaViewPtrs<'ctx, KeyValuePair<K, V, P>>,
     sparse: *const [S],
 }
 
-impl<'ctx, K, V, S, P> EpochSparseViewPtr<'ctx, K, V, S, P>
+impl<'ctx, K, V, S, P> EpochSparseViewPtrs<'ctx, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -43,25 +43,33 @@ where
 {
     #[inline]
     pub unsafe fn from_parts(
-        dense: SoaSlicePtrs<'ctx, KeyValuePair<K, V, P>>,
+        dense: SoaViewPtrs<'ctx, KeyValuePair<K, V, P>>,
         sparse: *const [S],
     ) -> Self {
         Self { dense, sparse }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (SoaSlicePtrs<'ctx, KeyValuePair<K, V, P>>, *const [S]) {
+    pub fn empty(context: &'ctx V::Context) -> Self {
+        let context = Identity::from_inner_ref(context);
+        let dense = SoaViewPtrs::empty(context);
+        let sparse = ptr::slice_from_raw_parts(ptr::dangling(), 0);
+        unsafe { Self::from_parts(dense, sparse) }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (SoaViewPtrs<'ctx, KeyValuePair<K, V, P>>, *const [S]) {
         let Self { dense, sparse } = self;
         (dense, sparse)
     }
 
     #[inline]
-    pub fn cast_mut(self) -> EpochSparseViewMutPtr<'ctx, K, V, S, P> {
+    pub fn cast_mut(self) -> EpochSparseViewMutPtrs<'ctx, K, V, S, P> {
         let Self { dense, sparse } = self;
 
         let dense = dense.cast_mut();
         let sparse = sparse.cast_mut();
-        unsafe { EpochSparseViewMutPtr::from_parts(dense, sparse) }
+        unsafe { EpochSparseViewMutPtrs::from_parts(dense, sparse) }
     }
 
     #[inline]
@@ -558,38 +566,7 @@ where
     }
 }
 
-impl<'ctx, K, V, S, P> From<&'ctx V::Context> for EpochSparseViewPtr<'ctx, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(context: &'ctx V::Context) -> Self {
-        let context = Identity::from_inner_ref(context);
-        let dense = SoaSlicePtrs::empty(context);
-        let sparse = ptr::from_ref(Default::default());
-        unsafe { Self::from_parts(dense, sparse) }
-    }
-}
-
-impl<'ctx, K, V, S, P> Default for EpochSparseViewPtr<'ctx, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    &'ctx V::Context: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        let context: &V::Context = Default::default();
-        Self::from(context)
-    }
-}
-
-impl<K, V, S, P> Debug for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> Debug for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -600,14 +577,14 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
 
-        f.debug_struct("EpochSparseViewPtr")
+        f.debug_struct("EpochSparseViewPtrs")
             .field("dense", dense)
             .field("sparse", sparse)
             .finish()
     }
 }
 
-impl<K, V, S, P> Clone for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> Clone for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -619,11 +596,11 @@ where
         let Self { ref dense, sparse } = *self;
 
         let dense = dense.clone();
-        Self { dense, sparse }
+        unsafe { Self::from_parts(dense, sparse) }
     }
 }
 
-impl<K, V, S, P> Copy for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> Copy for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -633,7 +610,7 @@ where
 {
 }
 
-impl<K, V, S, P> PartialEq for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> PartialEq for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: PartialEq> + ?Sized,
@@ -649,7 +626,7 @@ where
     }
 }
 
-impl<K, V, S, P> Eq for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> Eq for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: Eq> + ?Sized,
@@ -659,7 +636,7 @@ where
 {
 }
 
-impl<K, V, S, P> PartialOrd for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> PartialOrd for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: PartialOrd> + ?Sized,
@@ -675,7 +652,7 @@ where
     }
 }
 
-impl<K, V, S, P> Ord for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> Ord for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: Ord> + ?Sized,
@@ -691,7 +668,7 @@ where
     }
 }
 
-impl<K, V, S, P> Hash for EpochSparseViewPtr<'_, K, V, S, P>
+impl<K, V, S, P> Hash for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: Hash> + ?Sized,
@@ -705,7 +682,7 @@ where
     }
 }
 
-impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseViewPtr<'_, K, V, S, P>
+impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -721,7 +698,7 @@ where
     }
 }
 
-impl<'ctx, K, V, S, P> IntoIterator for EpochSparseViewPtr<'ctx, K, V, S, P>
+impl<'ctx, K, V, S, P> IntoIterator for EpochSparseViewPtrs<'ctx, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,

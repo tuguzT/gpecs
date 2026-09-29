@@ -13,7 +13,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for count in COUNT_RANGE {
         let vec = T::soa_ser_prepare_vec(count);
-        let iter = T::soa_ser_prepare_iter(vec.slices());
+        let iter = T::soa_ser_prepare_iter(vec.as_view());
         group
             .throughput(Throughput::Elements(count.try_into().unwrap()))
             .bench_with_input(
@@ -27,7 +27,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for count in COUNT_RANGE {
         let vec = T::soa_slf_prepare_vec(count);
-        let iter = T::soa_slf_prepare_iter(vec.slices());
+        let iter = T::soa_slf_prepare_iter(vec.as_view());
         group
             .throughput(Throughput::Elements(count.try_into().unwrap()))
             .bench_with_input(

@@ -10,14 +10,14 @@ use gpecs_sparse::{
     item::{KeyValueSlices, SparseItem},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
-        slices::SoaSlices,
+        slices::SoaView,
     },
-    view::{EpochSparseView, EpochSparseViewPtr},
+    view::{EpochSparseView, EpochSparseViewPtrs},
 };
 
 use crate::{Entity, EntityEpoch, EntitySparseItem, registry::Iter};
 
-type Inner<'a, Meta, S> = EpochSparseViewPtr<'a, Entity, Identity<Meta>, S>;
+type Inner<'a, Meta, S> = EpochSparseViewPtrs<'a, Entity, Identity<Meta>, S>;
 
 #[repr(transparent)]
 pub struct EntityRegistryView<'a, Meta, S = EntitySparseItem>
@@ -41,12 +41,12 @@ where
         sparse: &'a [S],
     ) -> Result<Self, FromPartsError<Entity>> {
         let context = Self::CONTEXT;
-        let dense = SoaSlices::new(
+        let dense = SoaView::new(
             Identity::from_inner_ref(context),
             KeyValueSlices::new(context, entities, metas.as_identity_slice()),
         );
 
-        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
+        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptrs();
         let me = Self::from_inner(inner);
         Ok(me)
     }
@@ -55,13 +55,13 @@ where
     pub unsafe fn from_parts(entities: &'a [Entity], metas: &'a [Meta], sparse: &'a [S]) -> Self {
         let context = Self::CONTEXT;
         let dense = unsafe {
-            SoaSlices::new(
+            SoaView::new(
                 Identity::from_inner_ref(context),
                 KeyValueSlices::new_unchecked(entities, metas.as_identity_slice()),
             )
         };
 
-        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();
+        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptrs();
         Self::from_inner(inner)
     }
 
@@ -212,7 +212,7 @@ where
     S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     fn default() -> Self {
-        let inner = Inner::from(Self::CONTEXT);
+        let inner = Inner::empty(Self::CONTEXT);
         Self::from_inner(inner)
     }
 }

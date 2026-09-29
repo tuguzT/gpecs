@@ -50,7 +50,7 @@ where
     pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], Slices<'a, 'a, V>) {
         let Self { inner } = self;
 
-        let (context, slices) = inner.slices().into_slices_with_context();
+        let (context, slices) = inner.as_view().into_slices_with_context();
         let (keys, values) = slices.into_parts();
         (context, keys, values)
     }
@@ -67,7 +67,7 @@ where
     ) -> (&'a V::Context, &'a [K], SlicesMut<'a, 'a, V>) {
         let Self { inner } = self;
 
-        let (context, slices) = inner.mut_slices().into_slices_with_context();
+        let (context, slices) = inner.as_mut_view().into_mut_slices_with_context();
         let (keys, values) = slices.into_parts();
         (context, keys, values)
     }
@@ -123,7 +123,7 @@ where
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
-        inner.slices().len()
+        inner.as_view().len()
     }
 
     fn drive<C>(self, consumer: C) -> C::Result
@@ -156,7 +156,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let Self { inner } = self;
 
-        let inner = inner.into_slices().into_iter();
+        let inner = inner.into_view().into_iter();
         IterMut::from_inner(inner)
     }
 

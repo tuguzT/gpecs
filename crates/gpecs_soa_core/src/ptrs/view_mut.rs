@@ -5,13 +5,13 @@ use core::{
 };
 
 use crate::{
-    ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaSlicePtrs, get_unchecked_mut, index_mut},
-    slices::{SoaSlices, SoaSlicesMut},
+    ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaViewPtrs, get_unchecked_mut, index_mut},
+    slices::{SoaView, SoaViewMut},
     traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
     wrapper,
 };
 
-pub struct SoaSliceMutPtrs<'ctx, T>
+pub struct SoaViewMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -20,7 +20,7 @@ where
     len: usize,
 }
 
-impl<'ctx, T> SoaSliceMutPtrs<'ctx, T>
+impl<'ctx, T> SoaViewMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -54,20 +54,20 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> SoaSlicePtrs<'ctx, T> {
+    pub fn cast_const(self) -> SoaViewPtrs<'ctx, T> {
         let (context, ptrs, len) = self.into_parts();
         let ptrs = context.ptrs_cast_const(ptrs);
-        unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) }
+        unsafe { SoaViewPtrs::from_parts(context, ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> SoaSlices<'ctx, 'a, T> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> SoaView<'ctx, 'a, T> {
         unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> SoaSlicesMut<'ctx, 'a, T> {
-        unsafe { SoaSlicesMut::from_ptrs(self) }
+    pub unsafe fn as_mut_unchecked<'a>(self) -> SoaViewMut<'ctx, 'a, T> {
+        unsafe { SoaViewMut::from_view_ptrs(self) }
     }
 
     #[inline]
@@ -308,14 +308,14 @@ where
     pub unsafe fn split_at_unchecked(
         self,
         mid: usize,
-    ) -> (SoaSlicePtrs<'ctx, T>, SoaSlicePtrs<'ctx, T>) {
+    ) -> (SoaViewPtrs<'ctx, T>, SoaViewPtrs<'ctx, T>) {
         let Self { ptrs, context, len } = self;
 
         let ptrs = context.ptrs_cast_const(ptrs.into_inner());
-        let left = unsafe { SoaSlicePtrs::from_parts(context, ptrs.clone(), mid) };
+        let left = unsafe { SoaViewPtrs::from_parts(context, ptrs.clone(), mid) };
         let right = unsafe {
             let ptrs = context.ptrs_add(ptrs, mid);
-            SoaSlicePtrs::from_parts(context, ptrs, len.unchecked_sub(mid))
+            SoaViewPtrs::from_parts(context, ptrs, len.unchecked_sub(mid))
         };
         (left, right)
     }
@@ -385,18 +385,18 @@ where
     }
 }
 
-impl<T> Debug for SoaSliceMutPtrs<'_, T>
+impl<T> Debug for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
-        f.debug_tuple("SoaSliceMutPtrs").field(&slices).finish()
+        f.debug_tuple("SoaViewMutPtrs").field(&slices).finish()
     }
 }
 
-impl<T> Clone for SoaSliceMutPtrs<'_, T>
+impl<T> Clone for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -413,14 +413,14 @@ where
     }
 }
 
-impl<T> Copy for SoaSliceMutPtrs<'_, T>
+impl<T> Copy for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: Copy,
 {
 }
 
-impl<T> PartialEq for SoaSliceMutPtrs<'_, T>
+impl<T> PartialEq for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: PartialEq,
@@ -435,7 +435,7 @@ where
     }
 }
 
-impl<T> Eq for SoaSliceMutPtrs<'_, T>
+impl<T> Eq for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Eq,
@@ -443,7 +443,7 @@ where
 {
 }
 
-impl<T> PartialOrd for SoaSliceMutPtrs<'_, T>
+impl<T> PartialOrd for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: PartialOrd,
@@ -458,7 +458,7 @@ where
     }
 }
 
-impl<T> Ord for SoaSliceMutPtrs<'_, T>
+impl<T> Ord for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Ord,
@@ -473,7 +473,7 @@ where
     }
 }
 
-impl<T> Hash for SoaSliceMutPtrs<'_, T>
+impl<T> Hash for SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Hash,
@@ -485,7 +485,7 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a SoaSliceMutPtrs<'_, T>
+impl<'a, T> IntoIterator for &'a SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -498,7 +498,7 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut SoaSliceMutPtrs<'_, T>
+impl<'a, T> IntoIterator for &'a mut SoaViewMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -511,7 +511,7 @@ where
     }
 }
 
-impl<'ctx, T> IntoIterator for SoaSliceMutPtrs<'ctx, T>
+impl<'ctx, T> IntoIterator for SoaViewMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {

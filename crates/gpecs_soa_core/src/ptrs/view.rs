@@ -5,13 +5,13 @@ use core::{
 };
 
 use crate::{
-    ptrs::{IterPtrs, SlicePtrsIndex, SoaSliceMutPtrs},
-    slices::SoaSlices,
+    ptrs::{IterPtrs, SlicePtrsIndex, SoaViewMutPtrs},
+    slices::SoaView,
     traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs},
     wrapper,
 };
 
-pub struct SoaSlicePtrs<'ctx, T>
+pub struct SoaViewPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -20,7 +20,7 @@ where
     len: usize,
 }
 
-impl<'ctx, T> SoaSlicePtrs<'ctx, T>
+impl<'ctx, T> SoaViewPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -50,15 +50,15 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> SoaSliceMutPtrs<'ctx, T> {
+    pub fn cast_mut(self) -> SoaViewMutPtrs<'ctx, T> {
         let (context, ptrs, len) = self.into_parts();
         let ptrs = context.ptrs_cast_mut(ptrs);
-        unsafe { SoaSliceMutPtrs::from_parts(context, ptrs, len) }
+        unsafe { SoaViewMutPtrs::from_parts(context, ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> SoaSlices<'ctx, 'a, T> {
-        unsafe { SoaSlices::from_ptrs(self) }
+    pub unsafe fn as_ref_unchecked<'a>(self) -> SoaView<'ctx, 'a, T> {
+        unsafe { SoaView::from_view_ptrs(self) }
     }
 
     #[inline]
@@ -215,18 +215,18 @@ where
     }
 }
 
-impl<T> Debug for SoaSlicePtrs<'_, T>
+impl<T> Debug for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
-        f.debug_tuple("SoaSlicePtrs").field(&slices).finish()
+        f.debug_tuple("SoaViewPtrs").field(&slices).finish()
     }
 }
 
-impl<T> Clone for SoaSlicePtrs<'_, T>
+impl<T> Clone for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -243,14 +243,14 @@ where
     }
 }
 
-impl<T> Copy for SoaSlicePtrs<'_, T>
+impl<T> Copy for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     for<'ctx> Ptrs<'ctx, T>: Copy,
 {
 }
 
-impl<T> PartialEq for SoaSlicePtrs<'_, T>
+impl<T> PartialEq for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: PartialEq,
@@ -265,7 +265,7 @@ where
     }
 }
 
-impl<T> Eq for SoaSlicePtrs<'_, T>
+impl<T> Eq for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Eq,
@@ -273,7 +273,7 @@ where
 {
 }
 
-impl<T> PartialOrd for SoaSlicePtrs<'_, T>
+impl<T> PartialOrd for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: PartialOrd,
@@ -288,7 +288,7 @@ where
     }
 }
 
-impl<T> Ord for SoaSlicePtrs<'_, T>
+impl<T> Ord for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Ord,
@@ -303,7 +303,7 @@ where
     }
 }
 
-impl<T> Hash for SoaSlicePtrs<'_, T>
+impl<T> Hash for SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Hash,
@@ -315,7 +315,7 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a SoaSlicePtrs<'_, T>
+impl<'a, T> IntoIterator for &'a SoaViewPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -328,7 +328,7 @@ where
     }
 }
 
-impl<'ctx, T> IntoIterator for SoaSlicePtrs<'ctx, T>
+impl<'ctx, T> IntoIterator for SoaViewPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {

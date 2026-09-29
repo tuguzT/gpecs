@@ -1,4 +1,4 @@
-use crate::slices::{SoaSlices, SoaSlicesMut};
+use crate::slices::{SoaView, SoaViewMut};
 
 // Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
 #[macro_export]
@@ -22,8 +22,8 @@ macro_rules! partial_eq_impl {
 #[doc(hidden)]
 pub use partial_eq_impl;
 
-partial_eq_impl! { [] SoaSlices<'_, '_, T>, Self }
-partial_eq_impl! { [] SoaSlices<'_, '_, T>, SoaSlicesMut<'_, '_, T> }
+partial_eq_impl! { [] SoaView<'_, '_, T>, Self }
+partial_eq_impl! { [] SoaView<'_, '_, T>, SoaViewMut<'_, '_, T> }
 
-partial_eq_impl! { [] SoaSlicesMut<'_, '_, T>, Self }
-partial_eq_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlices<'_, '_, T> }
+partial_eq_impl! { [] SoaViewMut<'_, '_, T>, Self }
+partial_eq_impl! { [] SoaViewMut<'_, '_, T>, SoaView<'_, '_, T> }

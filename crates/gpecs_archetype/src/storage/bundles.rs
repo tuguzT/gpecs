@@ -12,7 +12,7 @@ use gpecs_sparse::{
     item::{KeyValueSlices, SparseItem},
     soa::{
         identity::Identity,
-        slices::SoaSlices,
+        slices::SoaView,
         traits::{Ptrs, Slices},
     },
     view::EpochSparseView,
@@ -46,7 +46,7 @@ where
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice(entities);
         let slices = KeyValueSlices::new(B::CONTEXT, entities, bundles);
-        let dense = SoaSlices::new(Identity::from_inner_ref(B::CONTEXT), slices);
+        let dense = SoaView::new(Identity::from_inner_ref(B::CONTEXT), slices);
 
         let inner = EpochSparseView::new(dense, sparse)?;
         let me = unsafe { Self::from_inner(inner) };
@@ -61,7 +61,7 @@ where
     ) -> Self {
         let entities = must_cast_slice(entities);
         let slices = KeyValueSlices::new(B::CONTEXT, entities, bundles);
-        let dense = SoaSlices::new(Identity::from_inner_ref(B::CONTEXT), slices);
+        let dense = SoaView::new(Identity::from_inner_ref(B::CONTEXT), slices);
 
         let inner = unsafe { EpochSparseView::from_parts(dense, sparse) };
         unsafe { Self::from_inner(inner) }

@@ -12,7 +12,7 @@ use gpecs_sparse::{
     item::{KeyValueMutSlices, SparseItem},
     soa::{
         identity::Identity,
-        slices::SoaSlicesMut,
+        slices::SoaViewMut,
         traits::{Slices, SoaContext},
     },
     view::{EpochSparseView, EpochSparseViewMut},
@@ -46,7 +46,7 @@ where
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice_mut(entities);
         let slices = KeyValueMutSlices::new(B::CONTEXT, entities, bundles);
-        let dense = SoaSlicesMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
+        let dense = SoaViewMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
 
         let inner = EpochSparseViewMut::new(dense, sparse)?;
         let me = unsafe { Self::from_inner(inner) };
@@ -61,7 +61,7 @@ where
     ) -> Self {
         let entities = must_cast_slice_mut(entities);
         let slices = KeyValueMutSlices::new(B::CONTEXT, entities, bundles);
-        let dense = SoaSlicesMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
+        let dense = SoaViewMut::new(Identity::from_inner_ref(B::CONTEXT), slices);
 
         let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) };
         unsafe { Self::from_inner(inner) }

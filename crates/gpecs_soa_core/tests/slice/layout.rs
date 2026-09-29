@@ -5,17 +5,17 @@ type Item = (u32, u16, u8);
 #[test]
 #[cfg_attr(miri, ignore)]
 fn slices_npo() {
-    type SlicePtrs<'ctx> = SoaSlicePtrs<'ctx, Item>;
-    type SliceMutPtrs<'ctx> = SoaSliceMutPtrs<'ctx, Item>;
+    type ViewPtrs<'ctx> = SoaViewPtrs<'ctx, Item>;
+    type ViewMutPtrs<'ctx> = SoaViewMutPtrs<'ctx, Item>;
 
-    assert_eq!(size_of::<Option<SlicePtrs>>(), size_of::<SlicePtrs>());
-    assert_eq!(size_of::<Option<SliceMutPtrs>>(), size_of::<SliceMutPtrs>());
+    assert_eq!(size_of::<Option<ViewPtrs>>(), size_of::<ViewPtrs>());
+    assert_eq!(size_of::<Option<ViewMutPtrs>>(), size_of::<ViewMutPtrs>());
 
-    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
-    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
+    type View<'ctx, 'a> = SoaView<'ctx, 'a, Item>;
+    type ViewMut<'ctx, 'a> = SoaViewMut<'ctx, 'a, Item>;
 
-    assert_eq!(size_of::<Option<Slices>>(), size_of::<Slices>());
-    assert_eq!(size_of::<Option<SlicesMut>>(), size_of::<SlicesMut>());
+    assert_eq!(size_of::<Option<View>>(), size_of::<View>());
+    assert_eq!(size_of::<Option<ViewMut>>(), size_of::<ViewMut>());
 }
 
 #[test]

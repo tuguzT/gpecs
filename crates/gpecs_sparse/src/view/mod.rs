@@ -1,11 +1,11 @@
 pub use self::{
     view::{EpochSparseView, SparseView},
     view_mut::{EpochSparseViewMut, SparseViewMut},
-    view_mut_ptr::{EpochSparseViewMutPtr, SparseViewMutPtr},
-    view_ptr::{EpochSparseViewPtr, SparseViewPtr},
+    view_mut_ptrs::{EpochSparseViewMutPtrs, SparseViewMutPtrs},
+    view_ptrs::{EpochSparseViewPtrs, SparseViewPtrs},
 };
 
 mod view;
 mod view_mut;
-mod view_mut_ptr;
-mod view_ptr;
+mod view_mut_ptrs;
+mod view_ptrs;

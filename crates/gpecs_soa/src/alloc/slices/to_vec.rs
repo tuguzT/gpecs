@@ -1,6 +1,6 @@
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
-    slices::{SoaSlices, SoaSlicesMut},
+    slices::{SoaView, SoaViewMut},
     traits::{AllocSoa, CloneToUninitSoaContext, RawSoaContext, SoaCloneToUninit},
     vec::SoaVec,
 };
@@ -11,7 +11,7 @@ pub trait ToSoaVec {
     fn to_vec(&self) -> SoaVec<Self::Soa>;
 }
 
-impl<T> ToSoaVec for SoaSlices<'_, '_, T>
+impl<T> ToSoaVec for SoaView<'_, '_, T>
 where
     T: AllocSoa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
@@ -30,7 +30,7 @@ where
                 local_len: 0,
             };
 
-            let (context, dst, _) = set_len_on_drop.vec.mut_slices().into_parts();
+            let (context, dst) = set_len_on_drop.vec.as_mut_ptrs_with_context();
             for (index, src) in self.iter_ptrs().enumerate() {
                 set_len_on_drop.local_len = index;
 
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<T> ToSoaVec for SoaSlicesMut<'_, '_, T>
+impl<T> ToSoaVec for SoaViewMut<'_, '_, T>
 where
     T: AllocSoa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
@@ -57,6 +57,6 @@ where
 
     #[inline]
     fn to_vec(&self) -> SoaVec<T> {
-        self.slices().to_vec()
+        self.as_view().to_vec()
     }
 }

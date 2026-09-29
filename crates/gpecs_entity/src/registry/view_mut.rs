@@ -10,9 +10,9 @@ use gpecs_sparse::{
     item::{KeyValueMutSlices, SparseItem},
     soa::{
         identity::{AsIdentitySlice, Identity, IdentitySlice},
-        slices::SoaSlicesMut,
+        slices::SoaViewMut,
     },
-    view::{EpochSparseViewMut, EpochSparseViewMutPtr},
+    view::{EpochSparseViewMut, EpochSparseViewMutPtrs},
 };
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
     registry::{EntityRegistryView, Iter, IterMut},
 };
 
-type Inner<'a, Meta, S> = EpochSparseViewMutPtr<'a, Entity, Identity<Meta>, S>;
+type Inner<'a, Meta, S> = EpochSparseViewMutPtrs<'a, Entity, Identity<Meta>, S>;
 
 #[repr(transparent)]
 pub struct EntityRegistryViewMut<'a, Meta, S = EntitySparseItem>
@@ -44,12 +44,12 @@ where
         sparse: &'a mut [S],
     ) -> Result<Self, FromPartsError<Entity>> {
         let context = Self::CONTEXT;
-        let dense = SoaSlicesMut::new(
+        let dense = SoaViewMut::new(
             Identity::from_inner_ref(context),
             KeyValueMutSlices::new(context, entities, metas.as_identity_slice_mut()),
         );
 
-        let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptr();
+        let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptrs();
         let me = Self::from_inner(inner);
         Ok(me)
     }
@@ -62,13 +62,13 @@ where
     ) -> Self {
         let context = Self::CONTEXT;
         let dense = unsafe {
-            SoaSlicesMut::new(
+            SoaViewMut::new(
                 Identity::from_inner_ref(context),
                 KeyValueMutSlices::new_unchecked(entities, metas.as_identity_slice_mut()),
             )
         };
 
-        let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) }.into_mut_view_ptr();
+        let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) }.into_mut_view_ptrs();
         Self::from_inner(inner)
     }
 
@@ -318,7 +318,7 @@ where
     S: SparseItem<Index = u32, Epoch = EntityEpoch>,
 {
     fn default() -> Self {
-        let inner = Inner::from(Self::CONTEXT);
+        let inner = Inner::empty(Self::CONTEXT);
         Self::from_inner(inner)
     }
 }

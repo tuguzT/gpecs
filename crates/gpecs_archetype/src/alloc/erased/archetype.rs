@@ -238,7 +238,7 @@ where
     pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta, S> {
         let Self { components } = self;
 
-        let inner = components.as_view_ptr();
+        let inner = components.as_view_ptrs();
         ErasedArchetypeView::from_inner(inner)
     }
 

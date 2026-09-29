@@ -17,27 +17,27 @@ use crate::{
     key::Key,
     soa::{
         identity::Identity,
-        ptrs::SoaSliceMutPtrs,
+        ptrs::SoaViewMutPtrs,
         traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs},
     },
-    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewPtr},
+    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewPtrs},
 };
 
-pub type SparseViewMutPtr<'ctx, T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
-    EpochSparseViewMutPtr<'ctx, usize, T, S, P>;
+pub type SparseViewMutPtrs<'ctx, T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
+    EpochSparseViewMutPtrs<'ctx, usize, T, S, P>;
 
-pub struct EpochSparseViewMutPtr<'ctx, K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
+pub struct EpochSparseViewMutPtrs<'ctx, K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
 where
     K: Key,
     V: RawSoa<Context: 'ctx> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
-    dense: SoaSliceMutPtrs<'ctx, KeyValuePair<K, V, P>>,
+    dense: SoaViewMutPtrs<'ctx, KeyValuePair<K, V, P>>,
     sparse: *mut [S],
 }
 
-impl<'ctx, K, V, S, P> EpochSparseViewMutPtr<'ctx, K, V, S, P>
+impl<'ctx, K, V, S, P> EpochSparseViewMutPtrs<'ctx, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -46,25 +46,33 @@ where
 {
     #[inline]
     pub unsafe fn from_parts(
-        dense: SoaSliceMutPtrs<'ctx, KeyValuePair<K, V, P>>,
+        dense: SoaViewMutPtrs<'ctx, KeyValuePair<K, V, P>>,
         sparse: *mut [S],
     ) -> Self {
         Self { dense, sparse }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (SoaSliceMutPtrs<'ctx, KeyValuePair<K, V, P>>, *mut [S]) {
+    pub fn empty(context: &'ctx V::Context) -> Self {
+        let context = Identity::from_inner_ref(context);
+        let dense = SoaViewMutPtrs::empty(context);
+        let sparse = ptr::slice_from_raw_parts_mut(ptr::dangling_mut(), 0);
+        unsafe { Self::from_parts(dense, sparse) }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (SoaViewMutPtrs<'ctx, KeyValuePair<K, V, P>>, *mut [S]) {
         let Self { dense, sparse } = self;
         (dense, sparse)
     }
 
     #[inline]
-    pub fn cast_const(self) -> EpochSparseViewPtr<'ctx, K, V, S, P> {
+    pub fn cast_const(self) -> EpochSparseViewPtrs<'ctx, K, V, S, P> {
         let Self { dense, sparse } = self;
 
         let dense = dense.cast_const();
         let sparse = sparse.cast_const();
-        unsafe { EpochSparseViewPtr::from_parts(dense, sparse) }
+        unsafe { EpochSparseViewPtrs::from_parts(dense, sparse) }
     }
 
     #[inline]
@@ -998,38 +1006,7 @@ where
     }
 }
 
-impl<'ctx, K, V, S, P> From<&'ctx V::Context> for EpochSparseViewMutPtr<'ctx, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(context: &'ctx V::Context) -> Self {
-        let context = Identity::from_inner_ref(context);
-        let dense = SoaSliceMutPtrs::empty(context);
-        let sparse = ptr::from_mut(Default::default());
-        unsafe { Self::from_parts(dense, sparse) }
-    }
-}
-
-impl<'ctx, K, V, S, P> Default for EpochSparseViewMutPtr<'ctx, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    &'ctx V::Context: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        let context: &V::Context = Default::default();
-        Self::from(context)
-    }
-}
-
-impl<K, V, S, P> Debug for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> Debug for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -1040,14 +1017,14 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
 
-        f.debug_struct("EpochSparseViewMutPtr")
+        f.debug_struct("EpochSparseViewMutPtrs")
             .field("dense", dense)
             .field("sparse", sparse)
             .finish()
     }
 }
 
-impl<K, V, S, P> Clone for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> Clone for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -1063,7 +1040,7 @@ where
     }
 }
 
-impl<K, V, S, P> Copy for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> Copy for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -1073,7 +1050,7 @@ where
 {
 }
 
-impl<K, V, S, P> PartialEq for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> PartialEq for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: PartialEq> + ?Sized,
@@ -1089,7 +1066,7 @@ where
     }
 }
 
-impl<K, V, S, P> Eq for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> Eq for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: Eq> + ?Sized,
@@ -1099,7 +1076,7 @@ where
 {
 }
 
-impl<K, V, S, P> PartialOrd for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> PartialOrd for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: PartialOrd> + ?Sized,
@@ -1115,7 +1092,7 @@ where
     }
 }
 
-impl<K, V, S, P> Ord for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> Ord for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: Ord> + ?Sized,
@@ -1131,7 +1108,7 @@ where
     }
 }
 
-impl<K, V, S, P> Hash for EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<K, V, S, P> Hash for EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa<Context: Hash> + ?Sized,
@@ -1145,7 +1122,7 @@ where
     }
 }
 
-impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -1161,7 +1138,7 @@ where
     }
 }
 
-impl<'a, K, V, S, P> IntoIterator for &'a mut EpochSparseViewMutPtr<'_, K, V, S, P>
+impl<'a, K, V, S, P> IntoIterator for &'a mut EpochSparseViewMutPtrs<'_, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,
@@ -1177,7 +1154,7 @@ where
     }
 }
 
-impl<'ctx, K, V, S, P> IntoIterator for EpochSparseViewMutPtr<'ctx, K, V, S, P>
+impl<'ctx, K, V, S, P> IntoIterator for EpochSparseViewMutPtrs<'ctx, K, V, S, P>
 where
     K: Key,
     V: RawSoa + ?Sized,

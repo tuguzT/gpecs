@@ -5,8 +5,8 @@ pub use self::{
     partial_eq::partial_eq_impl,
     partial_ord::partial_ord_impl,
     raw::*,
-    view::SoaSlices,
-    view_mut::SoaSlicesMut,
+    view::SoaView,
+    view_mut::SoaViewMut,
 };
 
 #[cfg(feature = "rayon")]

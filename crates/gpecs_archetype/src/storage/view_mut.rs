@@ -14,7 +14,7 @@ use gpecs_soa_erased::{
     soa::{
         field::FieldLayouts,
         identity::Identity,
-        slices::SoaSlicesMut,
+        slices::SoaViewMut,
         traits::{
             Refs as ErasedBundleRefs, RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles,
             SlicesMut as ErasedBundlesMut,
@@ -24,7 +24,7 @@ use gpecs_soa_erased::{
 use gpecs_sparse::{
     error::FromPartsError,
     item::{KeyValueMutSlices, SparseItem},
-    view::{EpochSparseViewMut, EpochSparseViewMutPtr},
+    view::{EpochSparseViewMut, EpochSparseViewMutPtrs},
 };
 
 use crate::{
@@ -36,7 +36,7 @@ use crate::{
     },
 };
 
-type Inner<'ctx, T, S> = EpochSparseViewMutPtr<'ctx, NoEpochEntity, T, S>;
+type Inner<'ctx, T, S> = EpochSparseViewMutPtrs<'ctx, NoEpochEntity, T, S>;
 
 #[repr(transparent)]
 pub struct ArchetypeStorageViewMut<'ctx, 'a, T, S = NoEpochEntitySparseItem>
@@ -61,12 +61,12 @@ where
         sparse: &'a mut [S],
     ) -> Result<Self, FromPartsError<NoEpochEntity>> {
         let entities = must_cast_slice_mut(entities);
-        let dense = SoaSlicesMut::new(
+        let dense = SoaViewMut::new(
             Identity::from_inner_ref(context),
             KeyValueMutSlices::new(context, entities, bundles),
         );
 
-        let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptr();
+        let inner = EpochSparseViewMut::new(dense, sparse)?.into_mut_view_ptrs();
         let me = unsafe { Self::from_inner(inner) };
         Ok(me)
     }
@@ -79,12 +79,12 @@ where
         sparse: &'a mut [S],
     ) -> Self {
         let entities = must_cast_slice_mut(entities);
-        let dense = SoaSlicesMut::new(
+        let dense = SoaViewMut::new(
             Identity::from_inner_ref(context),
             KeyValueMutSlices::new(context, entities, bundles),
         );
 
-        let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) }.into_mut_view_ptr();
+        let inner = unsafe { EpochSparseViewMut::from_parts(dense, sparse) }.into_mut_view_ptrs();
         unsafe { Self::from_inner(inner) }
     }
 

@@ -9,8 +9,8 @@ use crate::{
     set::EpochSparseSet,
     soa::{
         self,
-        ptrs::{SoaSliceMutPtrs, SoaSlicePtrs},
-        slices::{SoaSlices, SoaSlicesMut},
+        ptrs::{SoaViewMutPtrs, SoaViewPtrs},
+        slices::{SoaView, SoaViewMut},
         traits::{
             AllocSoa, Context, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned,
             SoaRead, SoaReadOwned, SoaWrite,
@@ -351,9 +351,9 @@ pub trait EpochSparseContainer {
 
     fn context(&self) -> &Context<Self::Value>;
 
-    fn slices(&self) -> SoaSlices<'_, '_, Self::Value>;
+    fn slices(&self) -> SoaView<'_, '_, Self::Value>;
 
-    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, Self::Value>;
+    fn mut_slices(&mut self) -> SoaViewMut<'_, '_, Self::Value>;
 
     fn try_insert<'a, R, W>(
         &'a mut self,
@@ -387,21 +387,21 @@ where
     }
 
     #[inline]
-    fn slices(&self) -> SoaSlices<'_, '_, V> {
+    fn slices(&self) -> SoaView<'_, '_, V> {
         let (dense, _) = self.as_view().into_parts();
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSlicePtrs::new(context.as_inner(), values).as_ref_unchecked() }
+        unsafe { SoaViewPtrs::new(context.as_inner(), values).as_ref_unchecked() }
     }
 
     #[inline]
-    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V> {
+    fn mut_slices(&mut self) -> SoaViewMut<'_, '_, V> {
         let (dense, _) = self.as_mut_view().into_parts();
         let (context, slices) = dense
-            .into_mut_slice_ptrs()
+            .into_mut_view_ptrs()
             .into_mut_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).as_mut_unchecked() }
+        unsafe { SoaViewMutPtrs::new(context.as_inner(), values).as_mut_unchecked() }
     }
 
     #[inline]
@@ -448,21 +448,21 @@ where
     }
 
     #[inline]
-    fn slices(&self) -> SoaSlices<'_, '_, V> {
+    fn slices(&self) -> SoaView<'_, '_, V> {
         let (dense, _) = self.as_view().into_parts();
         let (context, slices) = dense.into_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSlicePtrs::new(context.as_inner(), values).as_ref_unchecked() }
+        unsafe { SoaViewPtrs::new(context.as_inner(), values).as_ref_unchecked() }
     }
 
     #[inline]
-    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V> {
+    fn mut_slices(&mut self) -> SoaViewMut<'_, '_, V> {
         let (dense, _) = self.as_mut_view().into_parts();
         let (context, slices) = dense
-            .into_mut_slice_ptrs()
+            .into_mut_view_ptrs()
             .into_mut_slice_ptrs_with_context();
         let (_, values) = slices.into_parts();
-        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).as_mut_unchecked() }
+        unsafe { SoaViewMutPtrs::new(context.as_inner(), values).as_mut_unchecked() }
     }
 
     #[inline]

@@ -31,7 +31,7 @@ where
         P: AsMut<[usize]>,
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
-        self.mut_slices().sort_with_permutation(permutation);
+        self.as_mut_view().sort_with_permutation(permutation);
     }
 
     #[inline]
@@ -39,7 +39,7 @@ where
     where
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
-        self.mut_slices().sort();
+        self.as_mut_view().sort();
     }
 
     #[inline]
@@ -48,7 +48,7 @@ where
         P: AsMut<[usize]>,
         for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
-        self.mut_slices()
+        self.as_mut_view()
             .sort_with_permutation_by(permutation, compare);
     }
 
@@ -57,7 +57,7 @@ where
     where
         for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
-        self.mut_slices().sort_by(compare);
+        self.as_mut_view().sort_by(compare);
     }
 
     #[inline]
@@ -67,7 +67,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices()
+        self.as_mut_view()
             .sort_with_permutation_by_key(permutation, f);
     }
 
@@ -77,7 +77,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices().sort_by_key(f);
+        self.as_mut_view().sort_by_key(f);
     }
 
     #[inline]
@@ -87,7 +87,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices()
+        self.as_mut_view()
             .sort_with_permutation_by_cached_key(permutation, f);
     }
 
@@ -97,7 +97,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices().sort_by_cached_key(f);
+        self.as_mut_view().sort_by_cached_key(f);
     }
 
     #[inline]
@@ -105,7 +105,7 @@ where
     where
         for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
-        self.mut_slices().sort_unstable();
+        self.as_mut_view().sort_unstable();
     }
 
     #[inline]
@@ -113,7 +113,7 @@ where
     where
         for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
-        self.mut_slices().sort_unstable_by(compare);
+        self.as_mut_view().sort_unstable_by(compare);
     }
 
     #[inline]
@@ -122,7 +122,7 @@ where
         F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
-        self.mut_slices().sort_unstable_by_key(f);
+        self.as_mut_view().sort_unstable_by_key(f);
     }
 }
 
@@ -133,7 +133,7 @@ where
 {
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T> {
-        self.slices().to_vec()
+        self.as_view().to_vec()
     }
 }
 

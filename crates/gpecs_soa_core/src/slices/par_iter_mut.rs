@@ -6,7 +6,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    slices::{IterMut, SoaSlices, SoaSlicesMut},
+    slices::{IterMut, SoaView, SoaViewMut},
     traits::{RawSoa, RefsMut, Slices, Soa, SoaOwned},
 };
 
@@ -15,7 +15,7 @@ pub struct ParIterMut<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
-    slices: SoaSlicesMut<'ctx, 'a, T>,
+    view: SoaViewMut<'ctx, 'a, T>,
 }
 
 impl<'ctx, 'a, T> ParIterMut<'ctx, 'a, T>
@@ -23,38 +23,38 @@ where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(slices: SoaSlicesMut<'ctx, 'a, T>) -> Self {
-        Self { slices }
+    pub fn new(view: SoaViewMut<'ctx, 'a, T>) -> Self {
+        Self { view }
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        let (_, slices) = self.slices_with_context();
-        slices
+    pub fn as_view(&self) -> SoaView<'_, '_, T> {
+        let (_, view) = self.as_view_with_context();
+        view
     }
 
     #[inline]
-    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
-        let Self { slices } = self;
-        slices.slices_with_context()
+    pub fn as_view_with_context(&self) -> (&T::Context, SoaView<'_, '_, T>) {
+        let Self { view } = self;
+        view.as_view_with_context()
     }
 
     #[inline]
-    pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        let (_, slices) = self.mut_slices_with_context();
-        slices
+    pub fn as_mut_view(&mut self) -> SoaViewMut<'_, '_, T> {
+        let (_, view) = self.as_mut_view_with_context();
+        view
     }
 
     #[inline]
-    pub fn mut_slices_with_context(&mut self) -> (&T::Context, SoaSlicesMut<'_, '_, T>) {
-        let Self { slices } = self;
-        slices.mut_slices_with_context()
+    pub fn as_mut_view_with_context(&mut self) -> (&T::Context, SoaViewMut<'_, '_, T>) {
+        let Self { view } = self;
+        view.as_mut_view_with_context()
     }
 
     #[inline]
-    pub fn into_slices(self) -> SoaSlicesMut<'ctx, 'a, T> {
-        let Self { slices } = self;
-        slices
+    pub fn into_view(self) -> SoaViewMut<'ctx, 'a, T> {
+        let Self { view } = self;
+        view
     }
 }
 
@@ -64,10 +64,10 @@ where
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { slices } = self;
+        let Self { view } = self;
 
-        let slices = slices.as_slices();
-        f.debug_tuple("ParIter").field(&slices).finish()
+        let slices = view.as_slices();
+        f.debug_tuple("ParIterMut").field(&slices).finish()
     }
 }
 
@@ -100,8 +100,8 @@ where
     RefsMut<'ctx, 'a, T>: Send,
 {
     fn len(&self) -> usize {
-        let Self { slices } = self;
-        slices.len()
+        let Self { view } = self;
+        view.len()
     }
 
     fn drive<C>(self, consumer: C) -> C::Result
@@ -129,14 +129,14 @@ where
     type IntoIter = IterMut<'ctx, 'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let Self { slices } = self;
-        slices.into_iter()
+        let Self { view } = self;
+        view.into_iter()
     }
 
     fn split_at(self, index: usize) -> (Self, Self) {
-        let Self { slices } = self;
+        let Self { view } = self;
 
-        let (left, right) = slices.split_at_mut(index);
-        (Self { slices: left }, Self { slices: right })
+        let (left, right) = view.split_at_mut(index);
+        (Self::new(left), Self::new(right))
     }
 }

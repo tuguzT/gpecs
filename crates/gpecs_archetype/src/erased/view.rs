@@ -18,9 +18,9 @@ use gpecs_sparse::{
         field::{FieldLayouts, FieldLayoutsOutput},
         identity::{AsIdentitySlice, Identity, IdentitySlice},
         layout::WithLayout,
-        slices::SoaSlices,
+        slices::SoaView,
     },
-    view::{EpochSparseView, EpochSparseViewPtr},
+    view::{EpochSparseView, EpochSparseViewPtrs},
 };
 
 use crate::{
@@ -34,7 +34,7 @@ use crate::{
     },
 };
 
-type Inner<'a, Meta, S> = EpochSparseViewPtr<'a, u32, Identity<Meta>, S>;
+type Inner<'a, Meta, S> = EpochSparseViewPtrs<'a, u32, Identity<Meta>, S>;
 
 #[repr(transparent)]
 pub struct ErasedArchetypeView<'a, Meta, S = DefaultSparseItem<u32>>
@@ -60,12 +60,12 @@ where
         let context = Self::CONTEXT;
         let keys = component_ids_to_u32s(component_ids);
         let values = metas.as_identity_slice();
-        let dense = SoaSlices::new(
+        let dense = SoaView::new(
             Identity::from_inner_ref(context),
             KeyValueSlices::new(context, keys, values),
         );
 
-        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptr();
+        let inner = EpochSparseView::new(dense, sparse)?.into_view_ptrs();
         let me = Self::from_inner(inner);
         Ok(me)
     }
@@ -80,13 +80,13 @@ where
         let keys = component_ids_to_u32s(component_ids);
         let values = metas.as_identity_slice();
         let dense = unsafe {
-            SoaSlices::new(
+            SoaView::new(
                 Identity::from_inner_ref(context),
                 KeyValueSlices::new_unchecked(keys, values),
             )
         };
 
-        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptr();
+        let inner = unsafe { EpochSparseView::from_parts(dense, sparse) }.into_view_ptrs();
         Self::from_inner(inner)
     }
 
@@ -371,7 +371,7 @@ where
     S: SparseItem<Index = u32, Epoch = ()>,
 {
     fn default() -> Self {
-        let inner = Inner::from(Self::CONTEXT);
+        let inner = Inner::empty(Self::CONTEXT);
         Self::from_inner(inner)
     }
 }

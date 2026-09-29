@@ -54,8 +54,8 @@ where
 
         let mut vec = NonNull::from_mut(vec);
         // index before setting length, otherwise range is invalid
-        let slices = unsafe { vec.as_ref() }.slice_ptrs();
-        let (context, slices) = unsafe { slices.into_get_unchecked_with_context(range) };
+        let view = unsafe { vec.as_ref() }.as_view_ptrs();
+        let (context, slices) = unsafe { view.into_get_unchecked_with_context(range) };
         unsafe {
             // set self.vec length's to start, to be safe in case Drain is leaked
             vec.as_mut().set_len(start);

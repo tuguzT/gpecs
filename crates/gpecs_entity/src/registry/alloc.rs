@@ -107,7 +107,7 @@ where
     pub fn as_view(&self) -> EntityRegistryView<'_, Meta, S> {
         let Self { inner } = self;
 
-        let inner = inner.as_view_ptr();
+        let inner = inner.as_view_ptrs();
         EntityRegistryView::from_inner(inner)
     }
 
@@ -115,7 +115,7 @@ where
     pub fn as_mut_view(&mut self) -> EntityRegistryViewMut<'_, Meta, S> {
         let Self { inner } = self;
 
-        let inner = inner.as_mut_view_ptr();
+        let inner = inner.as_mut_view_ptrs();
         EntityRegistryViewMut::from_inner(inner)
     }
 

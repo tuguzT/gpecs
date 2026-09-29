@@ -3,8 +3,8 @@ pub use self::{
     iter::IterPtrs,
     iter_mut::IterMutPtrs,
     raw::*,
-    view::SoaSlicePtrs,
-    view_mut::SoaSliceMutPtrs,
+    view::SoaViewPtrs,
+    view_mut::SoaViewMutPtrs,
 };
 
 mod index;

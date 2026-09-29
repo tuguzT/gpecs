@@ -7,40 +7,40 @@ use core::{
 };
 
 use crate::{
-    ptrs::{IterPtrs, SlicePtrsIndex, SoaSlicePtrs},
+    ptrs::{IterPtrs, SlicePtrsIndex, SoaViewPtrs},
     slices::{IndexHelper, Iter, SlicesIndex},
     traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
 #[repr(transparent)]
-pub struct SoaSlices<'ctx, 'a, T>
+pub struct SoaView<'ctx, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: SoaSlicePtrs<'ctx, T>,
+    ptrs: SoaViewPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
-impl<'ctx, T> SoaSlices<'ctx, '_, T>
+impl<'ctx, T> SoaView<'ctx, '_, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: SoaSlicePtrs<'ctx, T>) -> Self {
+    pub unsafe fn from_view_ptrs(ptrs: SoaViewPtrs<'ctx, T>) -> Self {
         let phantom = PhantomData;
         Self { ptrs, phantom }
     }
 
     #[inline]
     pub unsafe fn from_parts(context: &'ctx T::Context, ptrs: Ptrs<'ctx, T>, len: usize) -> Self {
-        let ptrs = unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) };
-        unsafe { Self::from_ptrs(ptrs) }
+        let ptrs = unsafe { SoaViewPtrs::from_parts(context, ptrs, len) };
+        unsafe { Self::from_view_ptrs(ptrs) }
     }
 
     #[inline]
     pub fn empty(context: &'ctx T::Context) -> Self {
-        let iter = SoaSlicePtrs::empty(context);
-        unsafe { Self::from_ptrs(iter) }
+        let iter = SoaViewPtrs::empty(context);
+        unsafe { Self::from_view_ptrs(iter) }
     }
 
     #[inline]
@@ -97,37 +97,46 @@ where
     }
 
     #[inline]
+    pub fn into_slice_ptrs(self) -> SlicePtrs<'ctx, T> {
+        let (_, ptrs) = self.into_slice_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
     pub fn into_slice_ptrs_with_context(self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
         let Self { ptrs, .. } = self;
         ptrs.into_slice_ptrs_with_context()
     }
 
     #[inline]
-    pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
-        let Self { ptrs, .. } = self;
-        ptrs.clone()
+    pub fn as_view_ptrs(&self) -> SoaViewPtrs<'_, T> {
+        let (_, view) = self.as_view_ptrs_with_context();
+        view
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> SoaSlicePtrs<'ctx, T> {
+    pub fn as_view_ptrs_with_context(&self) -> (&T::Context, SoaViewPtrs<'_, T>) {
+        let Self { ptrs, .. } = self;
+        (ptrs.context(), ptrs.clone())
+    }
+
+    #[inline]
+    pub fn into_view_ptrs(self) -> SoaViewPtrs<'ctx, T> {
         let Self { ptrs, .. } = self;
         ptrs
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        let (_, slices) = self.slices_with_context();
-        slices
+    pub fn as_view(&self) -> SoaView<'_, '_, T> {
+        let (_, view) = self.as_view_with_context();
+        view
     }
 
     #[inline]
-    pub fn slices_with_context(&self) -> (&T::Context, SoaSlices<'_, '_, T>) {
-        let Self { ptrs, .. } = self;
-
-        let len = ptrs.len();
-        let (context, ptrs) = ptrs.as_ptrs_with_context();
-        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
-        (context, slices)
+    pub fn as_view_with_context(&self) -> (&T::Context, SoaView<'_, '_, T>) {
+        let (context, view) = self.as_view_ptrs_with_context();
+        let view = unsafe { view.as_ref_unchecked() };
+        (context, view)
     }
 
     #[inline]
@@ -228,17 +237,15 @@ where
     }
 }
 
-impl<'ctx, 'a, T> SoaSlices<'ctx, 'a, T>
+impl<'ctx, 'a, T> SoaView<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
     pub fn new(context: &'ctx T::Context, slices: Slices<'ctx, 'a, T>) -> Self {
         let slices = context.slices_as_slice_ptrs(slices);
-        Self {
-            ptrs: SoaSlicePtrs::new(context, slices),
-            phantom: PhantomData,
-        }
+        let ptrs = SoaViewPtrs::new(context, slices);
+        unsafe { Self::from_view_ptrs(ptrs) }
     }
 
     #[inline]
@@ -319,7 +326,7 @@ where
     }
 }
 
-impl<'a, T> SoaSlices<'_, '_, T>
+impl<'a, T> SoaView<'_, '_, T>
 where
     T: Soa<'a> + ?Sized,
 {
@@ -399,7 +406,7 @@ where
     #[inline]
     #[cfg(feature = "rayon")]
     pub fn par_iter_with_context(&'a self) -> (&'a T::Context, crate::slices::ParIter<'a, 'a, T>) {
-        let (context, slices) = self.slices_with_context();
+        let (context, slices) = self.as_view_with_context();
         let iter = crate::slices::ParIter::new(slices);
         (context, iter)
     }
@@ -414,18 +421,18 @@ where
     }
 }
 
-impl<T> Debug for SoaSlices<'_, '_, T>
+impl<T> Debug for SoaView<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
-        f.debug_tuple("SoaSlices").field(&slices).finish()
+        f.debug_tuple("SoaView").field(&slices).finish()
     }
 }
 
-impl<T> AsRef<Self> for SoaSlices<'_, '_, T>
+impl<T> AsRef<Self> for SoaView<'_, '_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -435,7 +442,7 @@ where
     }
 }
 
-impl<T, U> AsRef<[U]> for SoaSlices<'_, '_, T>
+impl<T, U> AsRef<[U]> for SoaView<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
@@ -446,14 +453,14 @@ where
     }
 }
 
-impl<T> Eq for SoaSlices<'_, '_, T>
+impl<T> Eq for SoaView<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
-impl<T> Ord for SoaSlices<'_, '_, T>
+impl<T> Ord for SoaView<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
@@ -466,7 +473,7 @@ where
     }
 }
 
-impl<T> Hash for SoaSlices<'_, '_, T>
+impl<T> Hash for SoaView<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
@@ -478,7 +485,7 @@ where
     }
 }
 
-impl<T> Clone for SoaSlices<'_, '_, T>
+impl<T> Clone for SoaView<'_, '_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -491,14 +498,14 @@ where
     }
 }
 
-impl<T> Copy for SoaSlices<'_, '_, T>
+impl<T> Copy for SoaView<'_, '_, T>
 where
     T: RawSoa + ?Sized,
     for<'a> Ptrs<'a, T>: Copy,
 {
 }
 
-impl<T, U, I> Index<I> for SoaSlices<'_, '_, T>
+impl<T, U, I> Index<I> for SoaView<'_, '_, T>
 where
     T: SoaOwned + ?Sized,
     U: ?Sized,
@@ -508,11 +515,11 @@ where
 
     #[inline]
     fn index(&self, index: I) -> &Self::Output {
-        SoaSlices::index(self, index)
+        SoaView::index(self, index)
     }
 }
 
-impl<'a, T> IntoIterator for &'a SoaSlices<'_, '_, T>
+impl<'a, T> IntoIterator for &'a SoaView<'_, '_, T>
 where
     T: Soa<'a> + ?Sized,
 {
@@ -525,7 +532,7 @@ where
     }
 }
 
-impl<'ctx, 'a, T> IntoIterator for SoaSlices<'ctx, 'a, T>
+impl<'ctx, 'a, T> IntoIterator for SoaView<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
 {
@@ -540,7 +547,7 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'a, T> rayon::iter::IntoParallelIterator for &'a SoaSlices<'_, '_, T>
+impl<'a, T> rayon::iter::IntoParallelIterator for &'a SoaView<'_, '_, T>
 where
     T: Soa<'a> + ?Sized,
     T::Context: Sync,
@@ -557,7 +564,7 @@ where
 }
 
 #[cfg(feature = "rayon")]
-impl<'ctx, 'a, T> rayon::iter::IntoParallelIterator for SoaSlices<'ctx, 'a, T>
+impl<'ctx, 'a, T> rayon::iter::IntoParallelIterator for SoaView<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
     T::Context: Sync,
@@ -573,7 +580,7 @@ where
     }
 }
 
-unsafe impl<T> Send for SoaSlices<'_, '_, T>
+unsafe impl<T> Send for SoaView<'_, '_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Sync,
@@ -581,7 +588,7 @@ where
 {
 }
 
-unsafe impl<T> Sync for SoaSlices<'_, '_, T>
+unsafe impl<T> Sync for SoaView<'_, '_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Sync,

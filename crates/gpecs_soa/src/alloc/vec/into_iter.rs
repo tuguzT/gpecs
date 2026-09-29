@@ -7,7 +7,8 @@ use core::{
 
 use crate::{
     alloc::raw_vec::RawSoaVec,
-    slices::{SoaSlices, ToSoaVec},
+    ptrs::{SoaViewMutPtrs, SoaViewPtrs},
+    slices::{SoaView, SoaViewMut, ToSoaVec},
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
         SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaReadOwned,
@@ -39,7 +40,7 @@ where
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
         let ptrs = unsafe { context.nonnull_ptrs_from_mut_ptrs(ptrs) };
-        let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
+        let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'static, T>>(ptrs) };
 
         Self {
             ptrs: wrapper::NonNullPtrs::new(ptrs),
@@ -137,6 +138,58 @@ where
         let (context, ptrs) = self.as_mut_ptrs_with_context();
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
+    }
+
+    #[inline]
+    pub fn as_view_ptrs(&self) -> SoaViewPtrs<'_, T> {
+        let (_, view) = self.as_view_ptrs_with_context();
+        view
+    }
+
+    #[inline]
+    pub fn as_view_ptrs_with_context(&self) -> (&T::Context, SoaViewPtrs<'_, T>) {
+        let (context, slices) = self.as_slice_ptrs_with_context();
+        let view = SoaViewPtrs::new(context, slices);
+        (context, view)
+    }
+
+    #[inline]
+    pub fn as_mut_view_ptrs(&mut self) -> SoaViewMutPtrs<'_, T> {
+        let (_, view) = self.as_mut_view_ptrs_with_context();
+        view
+    }
+
+    #[inline]
+    pub fn as_mut_view_ptrs_with_context(&mut self) -> (&T::Context, SoaViewMutPtrs<'_, T>) {
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
+        let view = SoaViewMutPtrs::new(context, slices);
+        (context, view)
+    }
+
+    #[inline]
+    pub fn as_view(&self) -> SoaView<'_, '_, T> {
+        let (_, view) = self.as_view_with_context();
+        view
+    }
+
+    #[inline]
+    pub fn as_view_with_context(&self) -> (&T::Context, SoaView<'_, '_, T>) {
+        let (context, view) = self.as_view_ptrs_with_context();
+        let view = unsafe { view.as_ref_unchecked() };
+        (context, view)
+    }
+
+    #[inline]
+    pub fn as_mut_view(&mut self) -> SoaViewMut<'_, '_, T> {
+        let (_, view) = self.as_mut_view_with_context();
+        view
+    }
+
+    #[inline]
+    pub fn as_mut_view_with_context(&mut self) -> (&T::Context, SoaViewMut<'_, '_, T>) {
+        let (context, view) = self.as_mut_view_ptrs_with_context();
+        let view = unsafe { view.as_mut_unchecked() };
+        (context, view)
     }
 
     #[inline]
@@ -258,11 +311,7 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let len = self.len();
-        let (context, ptrs) = self.as_ptrs_with_context();
-        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
-
-        let vec = slices.to_vec();
+        let vec = self.as_view().to_vec();
         Self::new(vec)
     }
 }

@@ -131,11 +131,11 @@ where
     T: ConstSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let desc = &self.layout();
+        let layout = &self.layout();
         let buffer = &self.as_buffer();
         let len = &self.len();
-        f.debug_struct("ErasedFieldSlice")
-            .field("desc", desc)
+        f.debug_struct("ErasedSlice")
+            .field("layout", layout)
             .field("buffer", buffer)
             .field("len", len)
             .finish()

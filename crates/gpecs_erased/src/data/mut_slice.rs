@@ -158,6 +158,12 @@ where
     }
 
     #[inline]
+    pub fn into_slice(self) -> ErasedSlice<'a, CastConst<T>> {
+        let ptr = self.as_field_slice_ptr();
+        unsafe { ErasedSlice::from_ptr(ptr) }
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (ErasedMutPtr<T>, usize) {
         let Self { ptr, .. } = self;
         ptr.into_parts()
@@ -169,11 +175,11 @@ where
     T: MutSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let desc = &self.layout();
+        let layout = &self.layout();
         let buffer = &self.as_buffer();
         let len = &self.len();
-        f.debug_struct("ErasedFieldSliceMut")
-            .field("desc", desc)
+        f.debug_struct("ErasedMutSlice")
+            .field("layout", layout)
             .field("buffer", buffer)
             .field("len", len)
             .finish()
@@ -211,16 +217,5 @@ where
         let ptr = ptr::from_mut(slice).try_into()?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
-    }
-}
-
-impl<'a, T> From<ErasedMutSlice<'a, T>> for ErasedSlice<'a, CastConst<T>>
-where
-    T: MutSliceItemPtr,
-{
-    #[inline]
-    fn from(value: ErasedMutSlice<'a, T>) -> Self {
-        let ptr = value.as_field_slice_ptr();
-        unsafe { ErasedSlice::from_ptr(ptr) }
     }
 }

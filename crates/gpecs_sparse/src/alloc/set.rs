@@ -13,6 +13,7 @@ use gpecs_ptr::slice::{
 
 use crate::{
     algo::{check_parts, dense_keys, sparse_item_by_epoch},
+    arena::EpochSparseArena,
     assert::{
         assert_dense_index_bounds, assert_equal_key, assert_key_bounds, unwrap_dense,
         unwrap_dense_index, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item_mut,
@@ -45,7 +46,6 @@ use crate::{
 
 use super::{
     access::TryInsertAccess,
-    arena,
     assert::{try_entry_failed, try_insert_failed, try_push_failed},
     entry::generate_entry_types,
 };
@@ -1130,6 +1130,24 @@ where
     }
 }
 
+impl<K, V, S, P> EpochSparseSet<K, V, S, P>
+where
+    K: Key,
+    V: AllocSoa + ?Sized,
+    P: SliceItemPtrs<Item = K>,
+    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
+{
+    #[inline]
+    pub fn into_arena(self) -> EpochSparseArena<K, V, S, P> {
+        let Self { dense, sparse } = self;
+
+        let Ok(arena) = EpochSparseArena::from_parts(dense, sparse) else {
+            unreachable!("creation of sparse arena from valid parts should not fail")
+        };
+        arena
+    }
+}
+
 impl<K, V, S> EpochSparseSet<K, V, S>
 where
     K: Key,
@@ -2101,20 +2119,6 @@ where
                 unsafe { dst.drop_in_place_then_write(context, value) }
             });
         }
-    }
-}
-
-impl<K, V, S, P> From<arena::EpochSparseArena<K, V, S, P>> for EpochSparseSet<K, V, S, P>
-where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(value: arena::EpochSparseArena<K, V, S, P>) -> Self {
-        let (dense, sparse, _) = value.into_parts();
-        unsafe { Self::from_parts_unchecked(dense, sparse) }
     }
 }
 

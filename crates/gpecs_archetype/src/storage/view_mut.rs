@@ -631,18 +631,6 @@ where
     }
 }
 
-impl<'ctx, 'a, T, S> From<ArchetypeStorageViewMut<'ctx, 'a, T, S>>
-    for ArchetypeStorageView<'ctx, 'a, T, S>
-where
-    T: ErasedArchetypeSoa + ?Sized,
-    S: SparseItem<Index = u32, Epoch = ()>,
-{
-    #[inline]
-    fn from(view: ArchetypeStorageViewMut<'ctx, 'a, T, S>) -> Self {
-        view.into_view()
-    }
-}
-
 type SlicesWithArchetype<'ctx, 'a, T, S> = (
     &'a [Entity],
     ErasedBundles<'ctx, 'a, T>,

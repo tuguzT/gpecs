@@ -62,6 +62,12 @@ where
     }
 
     #[inline]
+    pub fn empty(context: &'ctx V::Context) -> Self {
+        let view = EpochSparseViewPtrs::empty(context);
+        unsafe { view.as_ref_unchecked() }
+    }
+
+    #[inline]
     pub unsafe fn from_parts(
         dense: SoaView<'ctx, 'a, KeyValuePair<K, V, P>>,
         sparse: &'a [S],
@@ -1050,35 +1056,6 @@ where
             .field("dense", dense)
             .field("sparse", sparse)
             .finish()
-    }
-}
-
-impl<'ctx, K, V, S, P> From<&'ctx V::Context> for EpochSparseView<'ctx, '_, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(context: &'ctx V::Context) -> Self {
-        let view_ptr = EpochSparseViewPtrs::empty(context);
-        unsafe { view_ptr.as_ref_unchecked() }
-    }
-}
-
-impl<'ctx, K, V, S, P> Default for EpochSparseView<'ctx, '_, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    &'ctx V::Context: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        let context: &V::Context = Default::default();
-        Self::from(context)
     }
 }
 

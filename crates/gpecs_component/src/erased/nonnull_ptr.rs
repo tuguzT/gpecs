@@ -202,6 +202,28 @@ where
         let Self { field, .. } = self;
         field.as_ptr()
     }
+
+    #[inline]
+    pub fn into_ptr(self) -> ErasedComponentPtr<NonNullAsPtr<T>> {
+        let Self {
+            component_id,
+            field,
+        } = self;
+
+        let field = field.into_ptr();
+        unsafe { ErasedComponentPtr::from_parts(component_id, field) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptr(self) -> ErasedComponentMutPtr<NonNullAsMutPtr<T>> {
+        let Self {
+            component_id,
+            field,
+        } = self;
+
+        let field = field.into_mut_ptr();
+        unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
+    }
 }
 
 impl<T, U> PartialEq<ErasedComponentNonNullPtr<U>> for ErasedComponentNonNullPtr<T> {
@@ -243,29 +265,5 @@ impl<T> Borrow<ComponentId> for ErasedComponentNonNullPtr<T> {
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;
         component_id
-    }
-}
-
-impl<T> From<ErasedComponentNonNullPtr<T>> for ErasedComponentPtr<NonNullAsPtr<T>>
-where
-    T: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptr: ErasedComponentNonNullPtr<T>) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let field = field.into();
-        unsafe { Self::from_parts(component_id, field) }
-    }
-}
-
-impl<T> From<ErasedComponentNonNullPtr<T>> for ErasedComponentMutPtr<NonNullAsMutPtr<T>>
-where
-    T: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptr: ErasedComponentNonNullPtr<T>) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let field = field.into();
-        unsafe { Self::from_parts(component_id, field) }
     }
 }

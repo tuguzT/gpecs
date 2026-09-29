@@ -74,6 +74,12 @@ where
     }
 
     #[inline]
+    pub fn empty(context: &'ctx V::Context) -> Self {
+        let view = EpochSparseViewMutPtrs::empty(context);
+        unsafe { view.as_mut_unchecked() }
+    }
+
+    #[inline]
     pub unsafe fn from_parts(
         dense: SoaViewMut<'ctx, 'a, KeyValuePair<K, V, P>>,
         sparse: &'a mut [S],
@@ -153,6 +159,14 @@ where
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V, S, P> {
         unsafe { self.as_mut_view_ptrs().as_mut_unchecked() }
+    }
+
+    #[inline]
+    pub fn into_view(self) -> EpochSparseView<'ctx, 'a, K, V, S, P> {
+        let Self { dense, sparse } = self;
+
+        let dense = dense.into_view();
+        unsafe { EpochSparseView::from_parts(dense, sparse) }
     }
 
     #[inline]
@@ -2108,35 +2122,6 @@ where
     }
 }
 
-impl<'ctx, K, V, S, P> From<&'ctx V::Context> for EpochSparseViewMut<'ctx, '_, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(context: &'ctx V::Context) -> Self {
-        let view_mut_ptr = EpochSparseViewMutPtrs::empty(context);
-        unsafe { view_mut_ptr.as_mut_unchecked() }
-    }
-}
-
-impl<'ctx, K, V, S, P> Default for EpochSparseViewMut<'ctx, '_, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-    &'ctx V::Context: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        let context: &V::Context = Default::default();
-        Self::from(context)
-    }
-}
-
 impl<'ctx, 'a, K, V, S, P> PartialEq for EpochSparseViewMut<'ctx, 'a, K, V, S, P>
 where
     K: Key,
@@ -2402,21 +2387,5 @@ where
     #[inline]
     fn into_par_iter(self) -> Self::Iter {
         self.into_par_iter()
-    }
-}
-
-impl<'ctx, 'a, K, V, S, P> From<EpochSparseViewMut<'ctx, 'a, K, V, S, P>>
-    for EpochSparseView<'ctx, 'a, K, V, S, P>
-where
-    K: Key,
-    V: RawSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(value: EpochSparseViewMut<'ctx, 'a, K, V, S, P>) -> Self {
-        let (dense, sparse) = value.into_parts();
-        let dense = dense.into_view();
-        unsafe { Self::from_parts(dense, sparse) }
     }
 }

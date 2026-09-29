@@ -121,7 +121,7 @@ where
         let len = bytes_to_items::<T::Item>(layout.size()).cast_signed();
         offset
             .checked_div(len)
-            .expect("erased field pointer should not be a ZST")
+            .expect("erased pointer should not be a ZST")
     }
 
     #[inline]

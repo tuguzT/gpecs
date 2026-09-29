@@ -47,25 +47,25 @@ where
 {
     #[inline]
     pub fn new(ptr: ErasedMutPtr<NonNullAsMutPtr<T>>) -> Option<Self> {
-        let (desc, ptr) = ptr.into_parts();
+        let (layout, ptr) = ptr.into_parts();
 
         let buffer = ptr.slice();
         let buffer = NonNull::new(buffer)?;
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
-        let me = unsafe { Self::from_parts(desc, ptr) };
+        let me = unsafe { Self::from_parts(layout, ptr) };
         Some(me)
     }
 
     #[inline]
     pub unsafe fn new_unchecked(ptr: ErasedMutPtr<NonNullAsMutPtr<T>>) -> Self {
-        let (desc, ptr) = ptr.into_parts();
+        let (layout, ptr) = ptr.into_parts();
 
         let buffer = ptr.slice();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
-        unsafe { Self::from_parts(desc, ptr) }
+        unsafe { Self::from_parts(layout, ptr) }
     }
 
     #[inline]
@@ -139,7 +139,7 @@ where
     pub fn as_buffer(self) -> NonNull<[T::Item]> {
         let Self { layout, ptr } = self;
 
-        let data = ptr.as_raw_ptr().cast();
+        let data = ptr.as_raw_ptr();
         let len = bytes_to_items::<T::Item>(layout.size());
         NonNull::slice_from_raw_parts(data, len)
     }
@@ -147,7 +147,23 @@ where
     #[inline]
     pub fn as_ptr(self) -> NonNull<T::Item> {
         let Self { ptr, .. } = self;
-        ptr.as_raw_ptr().cast()
+        ptr.as_raw_ptr()
+    }
+
+    #[inline]
+    pub fn into_ptr(self) -> ErasedPtr<NonNullAsPtr<T>> {
+        let Self { layout, ptr } = self;
+
+        let ptr = ptr.as_ptr();
+        unsafe { ErasedPtr::from_parts(layout, ptr) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptr(self) -> ErasedMutPtr<NonNullAsMutPtr<T>> {
+        let Self { layout, ptr } = self;
+
+        let ptr = ptr.as_mut_ptr();
+        unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }
 
@@ -180,29 +196,5 @@ where
     #[inline]
     fn try_from(ptr: ErasedNonNullPtr<T>) -> Result<Self, Self::Error> {
         ptr.downcast()
-    }
-}
-
-impl<T> From<ErasedNonNullPtr<T>> for ErasedPtr<NonNullAsPtr<T>>
-where
-    T: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptr: ErasedNonNullPtr<T>) -> Self {
-        let ErasedNonNullPtr { layout, ptr } = ptr;
-        let ptr = ptr.as_ptr();
-        unsafe { ErasedPtr::from_parts(layout, ptr) }
-    }
-}
-
-impl<T> From<ErasedNonNullPtr<T>> for ErasedMutPtr<NonNullAsMutPtr<T>>
-where
-    T: NonNullSliceItemPtr,
-{
-    #[inline]
-    fn from(ptr: ErasedNonNullPtr<T>) -> Self {
-        let ErasedNonNullPtr { layout, ptr } = ptr;
-        let ptr = ptr.as_mut_ptr();
-        unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }

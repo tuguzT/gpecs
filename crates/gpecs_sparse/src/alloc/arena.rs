@@ -30,6 +30,7 @@ use crate::{
         ValueMutPtrs, ValuePtrs, Values, ValuesMut,
     },
     key::{Epoch, Key},
+    set::EpochSparseSet,
     soa::{
         self,
         traits::{
@@ -46,7 +47,6 @@ use super::{
     access::TryInsertAccess,
     assert::{try_entry_failed, try_insert_failed, try_push_failed},
     entry::generate_entry_types,
-    set,
 };
 
 pub type SparseArena<T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
@@ -203,6 +203,12 @@ where
             sparse_vacant_head,
         } = self;
         (dense, sparse, sparse_vacant_head)
+    }
+
+    #[inline]
+    pub fn into_set(self) -> EpochSparseSet<K, V, S, P> {
+        let Self { dense, sparse, .. } = self;
+        unsafe { EpochSparseSet::from_parts_unchecked(dense, sparse) }
     }
 
     #[inline]
@@ -2352,22 +2358,6 @@ where
                 unsafe { dst.drop_in_place_then_write(context, value) }
             });
         }
-    }
-}
-
-impl<K, V, S, P> From<set::EpochSparseSet<K, V, S, P>> for EpochSparseArena<K, V, S, P>
-where
-    K: Key,
-    V: AllocSoa + ?Sized,
-    P: SliceItemPtrs<Item = K>,
-    S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
-{
-    #[inline]
-    fn from(value: set::EpochSparseSet<K, V, S, P>) -> Self {
-        let (dense, sparse) = value.into_parts();
-        Self::from_parts(dense, sparse).unwrap_or_else(|_| {
-            unreachable!("creation of sparse arena from valid parts should not fail")
-        })
     }
 }
 

@@ -109,7 +109,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
         let buffer = &self.as_buffer();
-        f.debug_struct("ErasedFieldRef")
+        f.debug_struct("ErasedRef")
             .field("layout", layout)
             .field("buffer", buffer)
             .finish()

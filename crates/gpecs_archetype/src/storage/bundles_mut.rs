@@ -259,8 +259,8 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let inner = Inner::from(B::CONTEXT);
-        Self { inner }
+        let inner = Inner::empty(B::CONTEXT);
+        unsafe { Self::from_inner(inner) }
     }
 }
 

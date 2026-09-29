@@ -134,6 +134,12 @@ where
         let buffer = ptr.as_mut_buffer();
         unsafe { buffer.as_mut_unchecked() }
     }
+
+    #[inline]
+    pub fn into_ref(self) -> ErasedRef<'a, CastConst<T>> {
+        let ptr = self.as_field_ptr();
+        unsafe { ptr.as_ref_unchecked() }
+    }
 }
 
 impl<T> Debug for ErasedMutRef<'_, T>
@@ -143,7 +149,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
         let buffer = &self.as_buffer();
-        f.debug_struct("ErasedFieldRefMut")
+        f.debug_struct("ErasedMutRef")
             .field("layout", layout)
             .field("buffer", buffer)
             .finish()
@@ -167,16 +173,5 @@ where
     #[inline]
     fn as_mut(&mut self) -> &mut [T::Item] {
         self.as_mut_buffer()
-    }
-}
-
-impl<'a, T> From<ErasedMutRef<'a, T>> for ErasedRef<'a, CastConst<T>>
-where
-    T: MutSliceItemPtr,
-{
-    #[inline]
-    fn from(value: ErasedMutRef<'a, T>) -> Self {
-        let ptr = value.as_field_ptr();
-        unsafe { ErasedRef::from_ptr(ptr) }
     }
 }

@@ -222,6 +222,17 @@ where
         } = self;
         (component_id, fields)
     }
+
+    #[inline]
+    pub fn into_slice(self) -> ErasedComponentSlice<'a, CastConst<T>> {
+        let Self {
+            component_id,
+            fields,
+        } = self;
+
+        let fields = fields.into_slice();
+        unsafe { ErasedComponentSlice::from_parts(component_id, fields) }
+    }
 }
 
 impl<T> Debug for ErasedComponentMutSlice<'_, T>
@@ -307,17 +318,5 @@ where
     #[inline]
     fn as_ref(&self) -> &[T::Item] {
         self.as_buffer()
-    }
-}
-
-impl<'a, T> From<ErasedComponentMutSlice<'a, T>> for ErasedComponentSlice<'a, CastConst<T>>
-where
-    T: MutSliceItemPtr,
-{
-    #[inline]
-    fn from(slice: ErasedComponentMutSlice<'a, T>) -> Self {
-        let (component_id, fields) = slice.into_parts();
-        let fields = fields.into();
-        unsafe { Self::from_parts(component_id, fields) }
     }
 }

@@ -284,11 +284,11 @@ where
     P: SliceItemPtrs,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let desc = &self.layout();
-        let data = &self.as_slice();
-        f.debug_struct("ErasedField")
-            .field("desc", desc)
-            .field("data", data)
+        let layout = &self.layout();
+        let buffer = &self.as_slice();
+        f.debug_struct("Erased")
+            .field("layout", layout)
+            .field("buffer", buffer)
             .finish()
     }
 }

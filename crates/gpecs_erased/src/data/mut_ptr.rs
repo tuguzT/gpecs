@@ -3,7 +3,7 @@ use core::{alloc::Layout, ptr};
 use crate::{
     data::{
         ErasedMutRef, ErasedPtr, ErasedRef,
-        error::{DataError, DowncastError, TryFromPtrError, check_downcast},
+        error::{DataError, DowncastError, UpcastPtrError, check_downcast},
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
@@ -57,6 +57,20 @@ where
         let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
         check_len(buffer_layout.size(), layout.size())?;
 
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+
+        let me = unsafe { Self::from_parts(layout, ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn upcast<V>(ptr: *mut V) -> Result<Self, UpcastPtrError> {
+        let layout = Layout::new::<V>();
+        check_ptr_align(ptr.cast(), layout)?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
+
+        let len = bytes_to_items::<T::Item>(layout.size());
+        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
@@ -192,38 +206,5 @@ where
     pub fn as_mut_ptr(self) -> *mut T::Item {
         let Self { ptr, .. } = self;
         ptr.as_mut_raw_ptr().cast()
-    }
-}
-
-impl<T, V> TryFrom<*mut V> for ErasedMutPtr<T>
-where
-    T: MutSliceItemPtr,
-{
-    type Error = TryFromPtrError;
-
-    #[inline]
-    fn try_from(ptr: *mut V) -> Result<Self, Self::Error> {
-        let layout = Layout::new::<V>();
-        check_ptr_align(ptr.cast(), layout)?;
-        check_sufficient_align(layout, Layout::new::<T::Item>())?;
-
-        let len = bytes_to_items::<T::Item>(layout.size());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
-
-        let me = unsafe { Self::from_parts(layout, ptr) };
-        Ok(me)
-    }
-}
-
-impl<T, V> TryFrom<ErasedMutPtr<T>> for *mut V
-where
-    T: MutSliceItemPtr,
-{
-    type Error = DowncastError<ErasedMutPtr<T>>;
-
-    #[inline]
-    fn try_from(ptr: ErasedMutPtr<T>) -> Result<Self, Self::Error> {
-        ptr.downcast()
     }
 }

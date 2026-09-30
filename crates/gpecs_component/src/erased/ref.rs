@@ -11,7 +11,7 @@ use crate::{
     Component,
     erased::{
         ErasedComponentPtr,
-        error::{DowncastError, NotRegisteredError, TryFromPtrError, check_downcast},
+        error::{DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
         ComponentId, ComponentRegistryView,
@@ -33,10 +33,10 @@ where
     T: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn try_from<C, U>(
+    pub fn upcast<C, U>(
         components: &ComponentRegistryView<impl Sized, U>,
         component: &'a C,
-    ) -> Result<Self, TryFromPtrError>
+    ) -> Result<Self, UpcastPtrError>
     where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -44,7 +44,7 @@ where
         let component_id = components
             .component_id::<C>()
             .ok_or_else(NotRegisteredError::of::<C>)?;
-        let field = ErasedRef::try_from(component)?;
+        let field = ErasedRef::upcast(component)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
         Ok(me)

@@ -2,13 +2,12 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr,
 };
 
 use crate::{
     data::{
         ErasedMutPtr, ErasedMutSlicePtr, ErasedPtr, ErasedSlice, ErasedSlicePtr,
-        error::{DataError, DowncastError, TryFromSlicePtrError},
+        error::{DataError, DowncastError, UpcastSliceError},
     },
     ptr::slice::{CastConst, MutSliceItemPtr},
 };
@@ -28,6 +27,13 @@ where
     #[inline]
     pub fn new(layout: Layout, buffer: &'a mut [T::Item], len: usize) -> Result<Self, DataError> {
         let ptr = ErasedMutSlicePtr::new(layout, buffer, len)?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn upcast<V>(slice: &'a mut [V]) -> Result<Self, UpcastSliceError> {
+        let ptr = ErasedMutSlicePtr::upcast(slice)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }
@@ -203,19 +209,5 @@ where
     #[inline]
     fn as_mut(&mut self) -> &mut [T::Item] {
         self.as_mut_buffer()
-    }
-}
-
-impl<'a, T, V> TryFrom<&'a mut [V]> for ErasedMutSlice<'a, T>
-where
-    T: MutSliceItemPtr,
-{
-    type Error = TryFromSlicePtrError;
-
-    #[inline]
-    fn try_from(slice: &'a mut [V]) -> Result<Self, Self::Error> {
-        let ptr = ptr::from_mut(slice).try_into()?;
-        let me = unsafe { Self::from_ptr(ptr) };
-        Ok(me)
     }
 }

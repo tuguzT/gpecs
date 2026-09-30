@@ -14,9 +14,7 @@ use crate::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentRef,
-        error::{
-            DanglingError, DowncastError, NotRegisteredError, TryFromPtrError, check_downcast,
-        },
+        error::{DanglingError, DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
         ComponentId, ComponentRegistryView,
@@ -82,10 +80,10 @@ where
     }
 
     #[inline]
-    pub fn try_from<C, U>(
+    pub fn upcast<C, U>(
         registry: &ComponentRegistryView<impl Sized, U>,
         component: *const C,
-    ) -> Result<Self, TryFromPtrError>
+    ) -> Result<Self, UpcastPtrError>
     where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -93,7 +91,7 @@ where
         let component_id = registry
             .component_id::<C>()
             .ok_or_else(NotRegisteredError::of::<C>)?;
-        let field = ErasedPtr::try_from(component)?;
+        let field = ErasedPtr::upcast(component)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
         Ok(me)

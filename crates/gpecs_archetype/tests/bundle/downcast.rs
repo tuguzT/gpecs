@@ -3,7 +3,7 @@ use std::ptr;
 use gpecs_archetype::{bundle::Bundle, erased::error::DuplicateComponentError};
 use gpecs_component::erased::{
     ErasedComponentPtr,
-    error::{NotRegisteredError, TryFromPtrError},
+    error::{NotRegisteredError, UpcastPtrError},
 };
 
 use crate::common::{Components, Name, Position, Tag};
@@ -20,16 +20,16 @@ fn ptrs_from_erased() {
     };
 
     let error =
-        ErasedComponentPtr::<*const u8>::try_from(&components.as_view(), ptr::from_ref(&position))
+        ErasedComponentPtr::<*const u8>::upcast(&components.as_view(), ptr::from_ref(&position))
             .expect_err("`Position` component should not be registered yet");
     assert_eq!(
         error,
-        TryFromPtrError::NotRegistered(NotRegisteredError::of::<Position>()),
+        UpcastPtrError::NotRegistered(NotRegisteredError::of::<Position>()),
     );
 
     let position_id = components.register_component::<Position>();
     let erased_position_ptr =
-        ErasedComponentPtr::<*const u8>::try_from(&components.as_view(), ptr::from_ref(&position))
+        ErasedComponentPtr::<*const u8>::upcast(&components.as_view(), ptr::from_ref(&position))
             .expect("pointer of `Position` component should be created successfully");
 
     let erased_ptrs = [erased_position_ptr; 0];
@@ -70,7 +70,7 @@ fn ptrs_from_erased() {
 
     let _tag_id = components.register_component::<Tag>();
     let erased_tag_ptr =
-        ErasedComponentPtr::<*const u8>::try_from(&components.as_view(), ptr::from_ref(&tag))
+        ErasedComponentPtr::<*const u8>::upcast(&components.as_view(), ptr::from_ref(&tag))
             .expect("pointer of `Tag` component should be created successfully");
 
     let erased_ptrs = [erased_tag_ptr];
@@ -101,7 +101,7 @@ fn ptrs_from_erased() {
     let _name_id = components.register_component::<Name>();
 
     let erased_name_ptr =
-        ErasedComponentPtr::<*const u8>::try_from(&components.as_view(), ptr::from_ref(&name))
+        ErasedComponentPtr::<*const u8>::upcast(&components.as_view(), ptr::from_ref(&name))
             .expect("pointer of `Name` component should be created successfully");
 
     let erased_ptrs = [erased_name_ptr];

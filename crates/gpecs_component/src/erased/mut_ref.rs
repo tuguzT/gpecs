@@ -15,7 +15,7 @@ use crate::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentPtr, ErasedComponentRef,
-        error::{DowncastError, NotRegisteredError, TryFromPtrError, check_downcast},
+        error::{DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
         ComponentId, ComponentRegistryView,
@@ -36,10 +36,10 @@ where
     T: MutSliceItemPtr,
 {
     #[inline]
-    pub fn try_from<C, U>(
+    pub fn upcast<C, U>(
         components: &ComponentRegistryView<impl Sized, U>,
         component: &'a mut C,
-    ) -> Result<Self, TryFromPtrError>
+    ) -> Result<Self, UpcastPtrError>
     where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
@@ -47,7 +47,7 @@ where
         let component_id = components
             .component_id::<C>()
             .ok_or_else(NotRegisteredError::of::<C>)?;
-        let field = ErasedMutRef::try_from(component)?;
+        let field = ErasedMutRef::upcast(component)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
         Ok(me)

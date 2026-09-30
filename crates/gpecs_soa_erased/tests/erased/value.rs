@@ -59,7 +59,7 @@ fn value() {
     let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::try_from(&()).unwrap().into_buffer(),
+        ErasedRef::<*const _>::upcast(&()).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.iter().nth(1).unwrap();
@@ -71,7 +71,7 @@ fn value() {
     let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::try_from(&i3).unwrap().into_buffer(),
+        ErasedRef::<*const _>::upcast(&i3).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.iter().nth(2).unwrap();
@@ -83,7 +83,7 @@ fn value() {
     let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::try_from(&i1).unwrap().into_buffer(),
+        ErasedRef::<*const _>::upcast(&i1).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.iter().nth(3).unwrap();
@@ -101,7 +101,7 @@ fn value() {
     let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::try_from(&i2).unwrap().into_buffer(),
+        ErasedRef::<*const _>::upcast(&i2).unwrap().into_buffer(),
     );
 
     let field_refs = [

@@ -2,13 +2,12 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr,
 };
 
 use crate::{
     data::{
         ErasedMutPtr, ErasedPtr, ErasedRef,
-        error::{DataError, DowncastError, TryFromPtrError},
+        error::{DataError, DowncastError, UpcastPtrError},
     },
     ptr::slice::{CastConst, MutSliceItemPtr},
 };
@@ -33,8 +32,8 @@ where
     }
 
     #[inline]
-    pub fn try_from<V>(r#ref: &'a mut V) -> Result<Self, TryFromPtrError> {
-        let ptr = ptr::from_mut(r#ref).try_into()?;
+    pub fn upcast<V>(r#ref: &'a mut V) -> Result<Self, UpcastPtrError> {
+        let ptr = ErasedMutPtr::upcast(r#ref)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }

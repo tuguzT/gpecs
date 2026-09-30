@@ -2,13 +2,12 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr,
 };
 
 use crate::{
     data::{
         ErasedPtr,
-        error::{DataError, DowncastError, TryFromPtrError},
+        error::{DataError, DowncastError, UpcastPtrError},
     },
     ptr::slice::ConstSliceItemPtr,
 };
@@ -33,8 +32,8 @@ where
     }
 
     #[inline]
-    pub fn try_from<V>(r#ref: &'a V) -> Result<Self, TryFromPtrError> {
-        let ptr = ptr::from_ref(r#ref).try_into()?;
+    pub fn upcast<V>(r#ref: &'a V) -> Result<Self, UpcastPtrError> {
+        let ptr = ErasedPtr::upcast(r#ref)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }

@@ -9,7 +9,7 @@ use gpecs_erased::{
     data::error::{
         DowncastError as DataDowncastError, FromStorageError as DataFromStorageError,
         FromStorageErrorKind as DataFromStorageErrorKind, FromValueError, FromValueErrorKind,
-        TryFromPtrError as DataTryFromPtrError, TryFromSlicePtrError as DataTryFromSlicePtrError,
+        UpcastPtrError as DataUpcastPtrError, UpcastSliceError as DataUpcastSliceError,
     },
     error::{InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError},
 };
@@ -147,44 +147,44 @@ impl Error for DanglingError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TryFromPtrError {
+pub enum UpcastPtrError {
     NotRegistered(NotRegisteredError),
     NotAligned(NotAlignedError),
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<NotRegisteredError> for TryFromPtrError {
+impl From<NotRegisteredError> for UpcastPtrError {
     #[inline]
     fn from(error: NotRegisteredError) -> Self {
         Self::NotRegistered(error)
     }
 }
 
-impl From<NotAlignedError> for TryFromPtrError {
+impl From<NotAlignedError> for UpcastPtrError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<InsufficientAlignError> for TryFromPtrError {
+impl From<InsufficientAlignError> for UpcastPtrError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl From<DataTryFromPtrError> for TryFromPtrError {
+impl From<DataUpcastPtrError> for UpcastPtrError {
     #[inline]
-    fn from(error: DataTryFromPtrError) -> Self {
+    fn from(error: DataUpcastPtrError) -> Self {
         match error {
-            DataTryFromPtrError::NotAligned(error) => Self::NotAligned(error),
-            DataTryFromPtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
+            DataUpcastPtrError::NotAligned(error) => Self::NotAligned(error),
+            DataUpcastPtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
         }
     }
 }
 
-impl Display for TryFromPtrError {
+impl Display for UpcastPtrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotRegistered(error) => Display::fmt(error, f),
@@ -194,7 +194,7 @@ impl Display for TryFromPtrError {
     }
 }
 
-impl Error for TryFromPtrError {
+impl Error for UpcastPtrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotRegistered(error) => Some(error),
@@ -205,53 +205,53 @@ impl Error for TryFromPtrError {
 }
 
 #[derive(Debug, Clone)]
-pub enum TryFromSlicePtrError {
+pub enum UpcastSliceError {
     NotRegistered(NotRegisteredError),
     InvalidLayout(LayoutError),
     NotAligned(NotAlignedError),
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<NotRegisteredError> for TryFromSlicePtrError {
+impl From<NotRegisteredError> for UpcastSliceError {
     #[inline]
     fn from(error: NotRegisteredError) -> Self {
         Self::NotRegistered(error)
     }
 }
 
-impl From<LayoutError> for TryFromSlicePtrError {
+impl From<LayoutError> for UpcastSliceError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<NotAlignedError> for TryFromSlicePtrError {
+impl From<NotAlignedError> for UpcastSliceError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<InsufficientAlignError> for TryFromSlicePtrError {
+impl From<InsufficientAlignError> for UpcastSliceError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl From<DataTryFromSlicePtrError> for TryFromSlicePtrError {
+impl From<DataUpcastSliceError> for UpcastSliceError {
     #[inline]
-    fn from(error: DataTryFromSlicePtrError) -> Self {
+    fn from(error: DataUpcastSliceError) -> Self {
         match error {
-            DataTryFromSlicePtrError::InvalidLayout(error) => Self::InvalidLayout(error),
-            DataTryFromSlicePtrError::NotAligned(error) => Self::NotAligned(error),
-            DataTryFromSlicePtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
+            DataUpcastSliceError::InvalidLayout(error) => Self::InvalidLayout(error),
+            DataUpcastSliceError::NotAligned(error) => Self::NotAligned(error),
+            DataUpcastSliceError::InsufficientAlign(error) => Self::InsufficientAlign(error),
         }
     }
 }
 
-impl Display for TryFromSlicePtrError {
+impl Display for UpcastSliceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotRegistered(error) => Display::fmt(error, f),
@@ -262,7 +262,7 @@ impl Display for TryFromSlicePtrError {
     }
 }
 
-impl Error for TryFromSlicePtrError {
+impl Error for UpcastSliceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotRegistered(error) => Some(error),

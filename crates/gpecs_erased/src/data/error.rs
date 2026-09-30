@@ -128,26 +128,26 @@ pub(super) fn check_downcast<T, U>(layout: Layout, value: U) -> Result<U, Downca
 }
 
 #[derive(Debug, Clone)]
-pub enum TryFromPtrError {
+pub enum UpcastPtrError {
     NotAligned(NotAlignedError),
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<NotAlignedError> for TryFromPtrError {
+impl From<NotAlignedError> for UpcastPtrError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<InsufficientAlignError> for TryFromPtrError {
+impl From<InsufficientAlignError> for UpcastPtrError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl Display for TryFromPtrError {
+impl Display for UpcastPtrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotAligned(error) => Display::fmt(error, f),
@@ -156,7 +156,7 @@ impl Display for TryFromPtrError {
     }
 }
 
-impl Error for TryFromPtrError {
+impl Error for UpcastPtrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotAligned(error) => Some(error),
@@ -166,34 +166,34 @@ impl Error for TryFromPtrError {
 }
 
 #[derive(Debug, Clone)]
-pub enum TryFromSlicePtrError {
+pub enum UpcastSliceError {
     InvalidLayout(LayoutError),
     NotAligned(NotAlignedError),
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<LayoutError> for TryFromSlicePtrError {
+impl From<LayoutError> for UpcastSliceError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<NotAlignedError> for TryFromSlicePtrError {
+impl From<NotAlignedError> for UpcastSliceError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<InsufficientAlignError> for TryFromSlicePtrError {
+impl From<InsufficientAlignError> for UpcastSliceError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl Display for TryFromSlicePtrError {
+impl Display for UpcastSliceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidLayout(error) => Display::fmt(error, f),
@@ -203,7 +203,7 @@ impl Display for TryFromSlicePtrError {
     }
 }
 
-impl Error for TryFromSlicePtrError {
+impl Error for UpcastSliceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::InvalidLayout(error) => Some(error),

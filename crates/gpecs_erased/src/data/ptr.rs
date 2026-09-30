@@ -3,7 +3,7 @@ use core::{alloc::Layout, ptr};
 use crate::{
     data::{
         ErasedMutPtr, ErasedRef,
-        error::{DataError, DowncastError, TryFromPtrError, check_downcast},
+        error::{DataError, DowncastError, UpcastPtrError, check_downcast},
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
@@ -57,6 +57,20 @@ where
         let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
         check_len(buffer_layout.size(), layout.size())?;
 
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+
+        let me = unsafe { Self::from_parts(layout, ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn upcast<V>(ptr: *const V) -> Result<Self, UpcastPtrError> {
+        let layout = Layout::new::<V>();
+        check_ptr_align(ptr.cast(), layout)?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
+
+        let len = bytes_to_items::<T::Item>(layout.size());
+        let buffer = ptr::slice_from_raw_parts(ptr.cast(), len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
@@ -132,38 +146,5 @@ where
     pub fn as_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
         ptr.as_raw_ptr()
-    }
-}
-
-impl<T, V> TryFrom<*const V> for ErasedPtr<T>
-where
-    T: ConstSliceItemPtr,
-{
-    type Error = TryFromPtrError;
-
-    #[inline]
-    fn try_from(ptr: *const V) -> Result<Self, Self::Error> {
-        let layout = Layout::new::<V>();
-        check_ptr_align(ptr.cast(), layout)?;
-        check_sufficient_align(layout, Layout::new::<T::Item>())?;
-
-        let len = bytes_to_items::<T::Item>(layout.size());
-        let buffer = ptr::slice_from_raw_parts(ptr.cast(), len);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
-
-        let me = unsafe { Self::from_parts(layout, ptr) };
-        Ok(me)
-    }
-}
-
-impl<T, V> TryFrom<ErasedPtr<T>> for *const V
-where
-    T: ConstSliceItemPtr,
-{
-    type Error = DowncastError<ErasedPtr<T>>;
-
-    #[inline]
-    fn try_from(ptr: ErasedPtr<T>) -> Result<Self, Self::Error> {
-        ptr.downcast()
     }
 }

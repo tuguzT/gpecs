@@ -26,6 +26,9 @@ cargo base package binary profile toolchain args $MIRIFLAGS:
         {{ if profile == "" { "" } else { " --profile " + quote(profile) } }}\
         {{ if args == "" { "" } else { " " + args } }}
 
+[group("clean")]
+clean: (cargo "clean" "" "" "" "" "" "")
+
 [group("update")]
 update: (cargo "update" "" "" "" "" "--verbose" "")
 

@@ -6,14 +6,14 @@ use core::{
 };
 
 use crate::soa::{
-    traits::{MutPtrs, RawSoa, RawSoaContext, RefsMut, Soa, SoaContext, SoaWrite, WriteSoaContext},
+    traits::{MutPtrs, RefsMut, Soa, SoaContext, SoaRaw, SoaRawContext, SoaWrite, SoaWriteContext},
     wrapper,
 };
 
 #[repr(transparent)]
 pub struct ReadWriteAccess<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ptrs: wrapper::MutPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
@@ -21,7 +21,7 @@ where
 
 impl<'ctx, T> ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub unsafe fn from_ptrs(ptrs: MutPtrs<'ctx, T>) -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<'ctx, T> Debug for ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -80,7 +80,7 @@ where
 
 impl<'ctx, T> PartialEq for ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -91,14 +91,14 @@ where
 
 impl<'ctx, T> Eq for ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Eq,
 {
 }
 
 impl<'ctx, T> PartialOrd for ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -109,7 +109,7 @@ where
 
 impl<'ctx, T> Ord for ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -120,7 +120,7 @@ where
 
 impl<'ctx, T> Hash for ReadWriteAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -131,7 +131,7 @@ where
 
 pub enum TryInsertAccess<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ReadWrite(ReadWriteAccess<'ctx, 'a, T>),
     WriteOnly(wrapper::MutPtrs<'ctx, T>),
@@ -139,7 +139,7 @@ where
 
 impl<'ctx, T> TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub fn write_only(ptrs: MutPtrs<'ctx, T>) -> Self {
@@ -215,7 +215,7 @@ where
 
 impl<'ctx, T> Debug for TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -228,7 +228,7 @@ where
 
 impl<'ctx, T> PartialEq for TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -242,14 +242,14 @@ where
 
 impl<'ctx, T> Eq for TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Eq,
 {
 }
 
 impl<'ctx, T> PartialOrd for TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -264,7 +264,7 @@ where
 
 impl<'ctx, T> Ord for TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -279,7 +279,7 @@ where
 
 impl<'ctx, T> Hash for TryInsertAccess<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

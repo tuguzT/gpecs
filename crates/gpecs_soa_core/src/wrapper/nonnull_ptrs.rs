@@ -7,16 +7,16 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{RawSoa, RawSoaContext};
+use crate::traits::{SoaRaw, SoaRawContext};
 
 type Inner<'ctx, T> = crate::traits::NonNullPtrs<'ctx, T>;
 
-/// Type wrapper for [non-null pointers](RawSoaContext::NonNullPtrs)
+/// Type wrapper for [non-null pointers](SoaRawContext::NonNullPtrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     inner: Inner<'static, T>,
     marker: PhantomData<&'ctx ()>,
@@ -24,9 +24,9 @@ where
 
 impl<'ctx, T> NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
-    /// Creates self from the [non-null pointers](RawSoaContext::NonNullPtrs).
+    /// Creates self from the [non-null pointers](SoaRawContext::NonNullPtrs).
     #[inline]
     pub fn new(inner: Inner<'ctx, T>) -> Self {
         // SAFETY: internal layout should not change even if lifetime changes: https://github.com/rust-lang/rust/pull/101520#issuecomment-1252016235
@@ -35,21 +35,21 @@ where
         Self { inner, marker }
     }
 
-    /// Retrieves a reference of [non-null pointers](RawSoaContext::NonNullPtrs).
+    /// Retrieves a reference of [non-null pointers](SoaRawContext::NonNullPtrs).
     #[inline]
     pub fn as_inner(&self) -> &Inner<'ctx, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [non-null pointers](RawSoaContext::NonNullPtrs).
+    /// Retrieves a mutable reference of [non-null pointers](SoaRawContext::NonNullPtrs).
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut Inner<'ctx, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [non-null pointers](RawSoaContext::NonNullPtrs).
+    /// Retrieves the [non-null pointers](SoaRawContext::NonNullPtrs).
     #[inline]
     pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
@@ -59,7 +59,7 @@ where
 
 impl<'ctx, T> Debug for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -70,7 +70,7 @@ where
 
 impl<'ctx, T> Default for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: Default,
 {
     #[inline]
@@ -82,7 +82,7 @@ where
 
 impl<T> Clone for NonNullPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -100,14 +100,14 @@ where
 
 impl<T> Copy for NonNullPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'static, T>: Copy,
 {
 }
 
 impl<'ctx, T> PartialEq for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -119,14 +119,14 @@ where
 
 impl<'ctx, T> Eq for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: Eq,
 {
 }
 
 impl<'ctx, T> PartialOrd for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -138,7 +138,7 @@ where
 
 impl<'ctx, T> Ord for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -150,7 +150,7 @@ where
 
 impl<'ctx, T> Hash for NonNullPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

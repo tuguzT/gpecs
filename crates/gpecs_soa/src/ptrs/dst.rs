@@ -1,4 +1,4 @@
-use crate::{slices::SoaSlice, traits::AllocSoaTrusted};
+use crate::{slices::SoaSlice, traits::SoaAllocTrusted};
 
 #[inline]
 #[track_caller]
@@ -8,7 +8,7 @@ pub unsafe fn slice_from_raw_parts<T>(
     capacity: usize,
 ) -> *const SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     unsafe { SoaSlice::ptr_from_raw_parts(data, len, capacity) }
 }
@@ -21,14 +21,14 @@ pub unsafe fn slice_from_raw_parts_mut<T>(
     capacity: usize,
 ) -> *mut SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     unsafe { SoaSlice::ptr_from_raw_parts_mut(data, len, capacity) }
 }
 
 pub trait SoaSlicePtr<T>: Copy + private::Sealed
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     fn as_ptr(self) -> *const u8;
 
@@ -44,7 +44,7 @@ where
 
 impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     fn as_ptr(self) -> *const u8 {
@@ -64,7 +64,7 @@ where
 
 impl<T> SoaSlicePtr<T> for *mut SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     fn as_ptr(self) -> *const u8 {
@@ -84,14 +84,14 @@ where
 
 pub trait SoaSlicePtrMut<T>: SoaSlicePtr<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     fn as_mut_ptr(self) -> *mut u8;
 }
 
 impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     fn as_mut_ptr(self) -> *mut u8 {
@@ -100,10 +100,10 @@ where
 }
 
 mod private {
-    use crate::{slices::SoaSlice, traits::AllocSoaTrusted};
+    use crate::{slices::SoaSlice, traits::SoaAllocTrusted};
 
     pub trait Sealed {}
 
-    impl<T> Sealed for *const SoaSlice<T> where T: AllocSoaTrusted + ?Sized {}
-    impl<T> Sealed for *mut SoaSlice<T> where T: AllocSoaTrusted + ?Sized {}
+    impl<T> Sealed for *const SoaSlice<T> where T: SoaAllocTrusted + ?Sized {}
+    impl<T> Sealed for *mut SoaSlice<T> where T: SoaAllocTrusted + ?Sized {}
 }

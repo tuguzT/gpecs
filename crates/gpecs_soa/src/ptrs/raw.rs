@@ -1,4 +1,4 @@
-use crate::traits::{AllocSoa, AllocSoaContext, MutPtrs, Ptrs};
+use crate::traits::{MutPtrs, Ptrs, SoaAlloc, SoaAllocContext};
 
 #[inline]
 pub unsafe fn from_buffer<T>(
@@ -7,7 +7,7 @@ pub unsafe fn from_buffer<T>(
     capacity: usize,
 ) -> Ptrs<'_, T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     unsafe { context.ptrs_from_buffer(buffer, capacity) }
 }
@@ -19,7 +19,7 @@ pub unsafe fn from_buffer_mut<T>(
     capacity: usize,
 ) -> MutPtrs<'_, T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     unsafe { context.mut_ptrs_from_buffer(buffer, capacity) }
 }
@@ -31,7 +31,7 @@ pub unsafe fn copy_forward<T>(
     dst: MutPtrs<'_, T>,
     count: usize,
 ) where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     unsafe { context.ptrs_copy_forward(src, dst, count) }
 }
@@ -43,7 +43,7 @@ pub unsafe fn copy_backward<T>(
     dst: MutPtrs<'_, T>,
     count: usize,
 ) where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     unsafe { context.ptrs_copy_backward(src, dst, count) }
 }

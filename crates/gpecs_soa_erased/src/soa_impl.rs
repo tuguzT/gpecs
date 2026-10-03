@@ -9,13 +9,13 @@ use crate::{
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::{
-            AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+            SoaAllocContext, SoaContext, SoaRaw, SoaRawContext, SoaReadContext, SoaWriteContext,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
-unsafe impl<T, D, P> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+unsafe impl<T, D, P> SoaRawContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>
         + ?Sized,
@@ -223,7 +223,7 @@ where
     }
 }
 
-unsafe impl<T, D, P> RawSoa for ErasedSoa<T, D, P>
+unsafe impl<T, D, P> SoaRaw for ErasedSoa<T, D, P>
 where
     D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>
         + ?Sized,
@@ -234,7 +234,7 @@ where
 }
 
 unsafe impl<'a, T, D, P>
-    ReadSoaContext<'a, ErasedSoa<T, D, P>, ErasedSoa<T, FieldLayoutsOutput<'a, D>, P>>
+    SoaReadContext<'a, ErasedSoa<T, D, P>, ErasedSoa<T, FieldLayoutsOutput<'a, D>, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
@@ -251,7 +251,7 @@ where
     }
 }
 
-unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, D, P>, ErasedSoa<T, N, P>>
+unsafe impl<T, D, N, P> SoaWriteContext<ErasedSoa<T, D, P>, ErasedSoa<T, N, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorage,
@@ -293,7 +293,7 @@ where
     }
 }
 
-unsafe impl<T, D, P> AllocSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+unsafe impl<T, D, P> SoaAllocContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldLayouts<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone>,
     P: SliceItemPtrs,

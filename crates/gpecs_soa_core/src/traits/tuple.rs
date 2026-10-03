@@ -4,12 +4,12 @@ use core::{
 };
 
 use crate::traits::{
-    CloneToUninitSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+    SoaCloneToUninitContext, SoaContext, SoaRaw, SoaRawContext, SoaReadContext, SoaWriteContext,
 };
 
 macro_rules! tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
-        unsafe impl<$($types,)*> RawSoaContext<($($types,)*)> for () {
+        unsafe impl<$($types,)*> SoaRawContext<($($types,)*)> for () {
             type Ptrs<'a> = ($(*const $types,)*);
 
             #[inline]
@@ -238,12 +238,12 @@ macro_rules! tuple_impl {
             }
         }
 
-        unsafe impl<$($types,)*> RawSoa for ($($types,)*) {
+        unsafe impl<$($types,)*> SoaRaw for ($($types,)*) {
             type Context = ();
             type Fields = ($($types,)*);
         }
 
-        unsafe impl<$($types,)*> CloneToUninitSoaContext<($($types,)*)> for ()
+        unsafe impl<$($types,)*> SoaCloneToUninitContext<($($types,)*)> for ()
         where
             $($types: Clone,)*
         {
@@ -254,14 +254,14 @@ macro_rules! tuple_impl {
             }
         }
 
-        unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*)> for () {
+        unsafe impl<'a, $($types,)*> SoaReadContext<'a, ($($types,)*)> for () {
             #[inline]
             unsafe fn ptrs_read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }
 
-        unsafe impl<$($types,)*> WriteSoaContext<($($types,)*)> for () {
+        unsafe impl<$($types,)*> SoaWriteContext<($($types,)*)> for () {
             #[inline]
             unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: ($($types,)*)) {
                 unsafe { $(ptr::write(dst.$indices, value.$indices);)* }

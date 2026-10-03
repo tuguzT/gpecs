@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_ptr::slice::{CastMut, ConstSliceItemPtr};
 use gpecs_soa::{
-    traits::{RawSoa, RawSoaContext, SlicePtrs, Soa, SoaContext},
+    traits::{SlicePtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
 };
 
@@ -15,7 +15,7 @@ use crate::{KeyValueMutSlicePtrs, KeyValuePtrs, KeyValueSlices};
 
 pub struct KeyValueSlicePtrs<'ctx, K, V, P = *const K>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K>,
 {
     key: P,
@@ -25,7 +25,7 @@ where
 
 impl<'ctx, K, V, P> KeyValueSlicePtrs<'ctx, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
@@ -122,7 +122,7 @@ where
 
 impl<K, V, P> Debug for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Debug,
 {
@@ -143,7 +143,7 @@ where
 
 impl<K, V, P> PartialEq for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K> + PartialEq,
     for<'ctx> SlicePtrs<'ctx, V>: PartialEq,
 {
@@ -157,7 +157,7 @@ where
 
 impl<K, V, P> Eq for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K> + Eq,
     for<'ctx> SlicePtrs<'ctx, V>: Eq,
 {
@@ -165,7 +165,7 @@ where
 
 impl<K, V, P> PartialOrd for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K> + PartialOrd,
     for<'ctx> SlicePtrs<'ctx, V>: PartialOrd,
 {
@@ -179,7 +179,7 @@ where
 
 impl<K, V, P> Ord for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K> + Ord,
     for<'ctx> SlicePtrs<'ctx, V>: Ord,
 {
@@ -193,7 +193,7 @@ where
 
 impl<K, V, P> Hash for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K> + Hash,
     for<'ctx> SlicePtrs<'ctx, V>: Hash,
 {
@@ -205,7 +205,7 @@ where
 
 impl<K, V, P> Clone for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K>,
 {
     #[inline]
@@ -223,7 +223,7 @@ where
 
 impl<K, V, P> Copy for KeyValueSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: ConstSliceItemPtr<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Copy,
 {

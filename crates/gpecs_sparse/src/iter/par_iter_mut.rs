@@ -11,7 +11,7 @@ use crate::{
     iter::IterMut,
     soa::{
         slices,
-        traits::{RawSoa, RefsMut, Slices, SlicesMut, Soa, SoaOwned},
+        traits::{RefsMut, Slices, SlicesMut, Soa, SoaOwned, SoaRaw},
     },
 };
 
@@ -19,7 +19,7 @@ type Inner<'ctx, 'a, K, V, P> = slices::ParIterMut<'ctx, 'a, KeyValuePair<K, V, 
 
 pub struct ParIterMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where
-    V: RawSoa<Context: 'ctx> + ?Sized,
+    V: SoaRaw<Context: 'ctx> + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     inner: Inner<'ctx, 'a, K, V, P>,
@@ -27,7 +27,7 @@ where
 
 impl<'ctx, 'a, K, V, P> ParIterMut<'ctx, 'a, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     pub(crate) fn new(inner: Inner<'ctx, 'a, K, V, P>) -> Self {

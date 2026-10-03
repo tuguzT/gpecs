@@ -2,25 +2,25 @@ mod identity;
 mod tuple;
 mod unit;
 
-/// This trait is used to perform all raw pointer arithmetics for [SoA](RawSoa) types.
-pub unsafe trait RawSoaContext<T>
+/// This trait is used to perform all raw pointer arithmetics for [SoA](SoaRaw) types.
+pub unsafe trait SoaRawContext<T>
 where
     T: ?Sized,
 {
     /// Collection of pointers to each stored field.
     type Ptrs<'a>: Clone;
 
-    /// Restricts [pointers](RawSoaContext::Ptrs) to each stored field
+    /// Restricts [pointers](SoaRawContext::Ptrs) to each stored field
     /// to be covariant over generic lifetime.
     fn ptrs_upcast<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
-    /// Returns dangling [pointers](RawSoaContext::Ptrs) to each stored field.
+    /// Returns dangling [pointers](SoaRawContext::Ptrs) to each stored field.
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         let ptrs = self.nonnull_ptrs_dangling();
         self.nonnull_ptrs_as_ptrs(ptrs)
     }
 
-    /// Adds an unsigned offset to each [pointer](RawSoaContext::Ptrs) of each stored field.
+    /// Adds an unsigned offset to each [pointer](SoaRawContext::Ptrs) of each stored field.
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -28,7 +28,7 @@ where
     /// [`pointer::add()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.add
     unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, count: usize) -> Self::Ptrs<'a>;
 
-    /// Calculates the distance between two [pointers](RawSoaContext::Ptrs)
+    /// Calculates the distance between two [pointers](SoaRawContext::Ptrs)
     /// to each stored field within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -43,17 +43,17 @@ where
     /// Collection of mutable pointers to each stored field.
     type MutPtrs<'a>: Clone;
 
-    /// Restricts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
+    /// Restricts [mutable pointers](SoaRawContext::MutPtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn mut_ptrs_upcast<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
-    /// Returns mutable dangling [pointers](RawSoaContext::MutPtrs) to each stored field.
+    /// Returns mutable dangling [pointers](SoaRawContext::MutPtrs) to each stored field.
     fn mut_ptrs_dangling(&self) -> Self::MutPtrs<'_> {
         let ptrs = self.nonnull_ptrs_dangling();
         self.nonnull_ptrs_as_mut_ptrs(ptrs)
     }
 
-    /// Adds an unsigned offset to each [mutable pointer](RawSoaContext::MutPtrs) of each stored field.
+    /// Adds an unsigned offset to each [mutable pointer](SoaRawContext::MutPtrs) of each stored field.
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -69,7 +69,7 @@ where
         self.ptrs_cast_mut(ptrs)
     }
 
-    /// Calculates the distance between two [mutable pointers](RawSoaContext::MutPtrs)
+    /// Calculates the distance between two [mutable pointers](SoaRawContext::MutPtrs)
     /// to each stored field within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -89,15 +89,15 @@ where
         unsafe { self.ptrs_offset_from(ptrs, origin) }
     }
 
-    /// Converts [pointers](RawSoaContext::Ptrs) of each stored field
-    /// to the [mutable ones](RawSoaContext::MutPtrs).
+    /// Converts [pointers](SoaRawContext::Ptrs) of each stored field
+    /// to the [mutable ones](SoaRawContext::MutPtrs).
     fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a>;
 
-    /// Converts [mutable pointers](RawSoaContext::MutPtrs) of each stored field
-    /// to the [const ones](RawSoaContext::Ptrs).
+    /// Converts [mutable pointers](SoaRawContext::MutPtrs) of each stored field
+    /// to the [const ones](SoaRawContext::Ptrs).
     fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a>;
 
-    /// Swaps `count * size_of::<fields[0]>() + ...` bytes between the two [mutable regions](RawSoaContext::MutPtrs)
+    /// Swaps `count * size_of::<fields[0]>() + ...` bytes between the two [mutable regions](SoaRawContext::MutPtrs)
     /// of memory beginning at `x` and `y` for each stored field.
     ///
     /// The regions, as well as all the field pointers, must not overlap.
@@ -112,7 +112,7 @@ where
         count: usize,
     );
 
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::Ptrs) to [dst](SoaRawContext::MutPtrs)
     /// for each stored field.
     ///
     /// The source and destination, as well as all the field pointers, must not overlap.
@@ -127,7 +127,7 @@ where
         count: usize,
     );
 
-    /// Executes the destructors (if any) for the each stored field located at input [pointers](RawSoaContext::Ptrs).
+    /// Executes the destructors (if any) for the each stored field located at input [pointers](SoaRawContext::Ptrs).
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each pointer
@@ -137,16 +137,16 @@ where
     /// Collection of non-null pointers to each stored field.
     type NonNullPtrs<'a>: Clone;
 
-    /// Restricts [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field
+    /// Restricts [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn nonnull_ptrs_upcast<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short>;
 
-    /// Returns dangling [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field.
+    /// Returns dangling [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field.
     fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_>;
 
-    /// Creates [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field.
+    /// Creates [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field.
     ///
     /// All the safety requirements resulting from applying
     /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
@@ -156,28 +156,28 @@ where
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a>;
 
-    /// Acquires the underlying [pointers](RawSoaContext::Ptrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
+    /// Acquires the underlying [pointers](SoaRawContext::Ptrs) from [non-null pointers](SoaRawContext::NonNullPtrs)
     /// to each stored field.
     fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
         let ptrs = self.nonnull_ptrs_as_mut_ptrs(ptrs);
         self.ptrs_cast_const(ptrs)
     }
 
-    /// Acquires the underlying [mutable pointers](RawSoaContext::MutPtrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
+    /// Acquires the underlying [mutable pointers](SoaRawContext::MutPtrs) from [non-null pointers](SoaRawContext::NonNullPtrs)
     /// to each stored field.
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
 
     /// Collection of slice pointers to each stored field.
     type SlicePtrs<'a>: Clone;
 
-    /// Restricts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
+    /// Restricts [slice pointers](SoaRawContext::SlicePtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short>;
 
-    /// Forms [slice pointers](RawSoaContext::SlicePtrs) to each stored field
-    /// from [pointers](RawSoaContext::Ptrs) to each field and a length.
+    /// Forms [slice pointers](SoaRawContext::SlicePtrs) to each stored field
+    /// from [pointers](SoaRawContext::Ptrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     fn slice_ptrs_from_raw_parts<'a>(
@@ -186,28 +186,28 @@ where
         len: usize,
     ) -> Self::SlicePtrs<'a>;
 
-    /// Returns the number of elements in slices to each [slice pointer](RawSoaContext::SlicePtrs) of stored fields,
+    /// Returns the number of elements in slices to each [slice pointer](SoaRawContext::SlicePtrs) of stored fields,
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slice pointers,
     /// or else this method could panic.
     fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize;
 
-    /// Returns [pointers](RawSoaContext::Ptrs) to the slice's buffer
-    /// of each [slice pointer](RawSoaContext::SlicePtrs) of stored fields.
+    /// Returns [pointers](SoaRawContext::Ptrs) to the slice's buffer
+    /// of each [slice pointer](SoaRawContext::SlicePtrs) of stored fields.
     fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a>;
 
     /// Collection of mutable slice pointers to each stored field.
     type SliceMutPtrs<'a>: Clone;
 
-    /// Restricts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
+    /// Restricts [mutable slice pointers](SoaRawContext::SliceMutPtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn mut_slice_ptrs_upcast<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short>;
 
-    /// Forms [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
-    /// from [mutable pointers](RawSoaContext::MutPtrs) to each field and a length.
+    /// Forms [mutable slice pointers](SoaRawContext::SliceMutPtrs) to each stored field
+    /// from [mutable pointers](SoaRawContext::MutPtrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     fn mut_slice_ptrs_from_raw_parts<'a>(
@@ -216,37 +216,37 @@ where
         len: usize,
     ) -> Self::SliceMutPtrs<'a>;
 
-    /// Returns the number of elements in slices to each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields,
+    /// Returns the number of elements in slices to each [mutable slice pointer](SoaRawContext::SliceMutPtrs) of stored fields,
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slice pointers,
     /// or else this method could panic.
     fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
-    /// Returns [pointers](RawSoaContext::Ptrs) to the slice's buffer
-    /// of each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields.
+    /// Returns [pointers](SoaRawContext::Ptrs) to the slice's buffer
+    /// of each [mutable slice pointer](SoaRawContext::SliceMutPtrs) of stored fields.
     fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
         let ptrs = self.mut_slice_ptrs_as_mut_ptrs(slices);
         self.ptrs_cast_const(ptrs)
     }
 
-    /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
-    /// of each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields.
+    /// Returns [mutable pointers](SoaRawContext::MutPtrs) to the slice's buffer
+    /// of each [mutable slice pointer](SoaRawContext::SliceMutPtrs) of stored fields.
     fn mut_slice_ptrs_as_mut_ptrs<'a>(
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::MutPtrs<'a>;
 
-    /// Converts [slice pointers](RawSoaContext::SlicePtrs) of each field of stored fields
-    /// to the [mutable ones](RawSoaContext::SliceMutPtrs).
+    /// Converts [slice pointers](SoaRawContext::SlicePtrs) of each field of stored fields
+    /// to the [mutable ones](SoaRawContext::SliceMutPtrs).
     fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
         let len = self.mut_slice_ptrs_len(&slices);
         let data = self.mut_slice_ptrs_as_ptrs(slices);
         self.slice_ptrs_from_raw_parts(data, len)
     }
 
-    /// Converts [mutable slice pointers](RawSoaContext::SliceMutPtrs) of each field of stored fields
-    /// to the [const ones](RawSoaContext::SlicePtrs).
+    /// Converts [mutable slice pointers](SoaRawContext::SliceMutPtrs) of each field of stored fields
+    /// to the [const ones](SoaRawContext::SlicePtrs).
     fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
         let len = self.slice_ptrs_len(&slices);
         let ptrs = self.slice_ptrs_as_ptrs(slices);
@@ -254,7 +254,7 @@ where
         self.mut_slice_ptrs_from_raw_parts(data, len)
     }
 
-    /// Executes the destructors (if any) for the each [slice](RawSoaContext::SliceMutPtrs) of stored fields.
+    /// Executes the destructors (if any) for the each [slice](SoaRawContext::SliceMutPtrs) of stored fields.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each slice pointer
@@ -272,37 +272,37 @@ where
     }
 }
 
-/// Alias for the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type Context<T> = <T as RawSoa>::Context;
+/// Alias for the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type Context<T> = <T as SoaRaw>::Context;
 
-/// Alias for the [`Ptrs`](RawSoaContext::Ptrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type Ptrs<'a, T> = <Context<T> as RawSoaContext<T>>::Ptrs<'a>;
+/// Alias for the [`Ptrs`](SoaRawContext::Ptrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type Ptrs<'a, T> = <Context<T> as SoaRawContext<T>>::Ptrs<'a>;
 
-/// Alias for the [`MutPtrs`](RawSoaContext::MutPtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type MutPtrs<'a, T> = <Context<T> as RawSoaContext<T>>::MutPtrs<'a>;
+/// Alias for the [`MutPtrs`](SoaRawContext::MutPtrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type MutPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::MutPtrs<'a>;
 
-/// Alias for the [`NonNullPtrs`](RawSoaContext::NonNullPtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type NonNullPtrs<'a, T> = <Context<T> as RawSoaContext<T>>::NonNullPtrs<'a>;
+/// Alias for the [`NonNullPtrs`](SoaRawContext::NonNullPtrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type NonNullPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::NonNullPtrs<'a>;
 
-/// Alias for the [`SlicePtrs`](RawSoaContext::SlicePtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type SlicePtrs<'a, T> = <Context<T> as RawSoaContext<T>>::SlicePtrs<'a>;
+/// Alias for the [`SlicePtrs`](SoaRawContext::SlicePtrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type SlicePtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SlicePtrs<'a>;
 
-/// Alias for the [`SliceMutPtrs`](RawSoaContext::SliceMutPtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type SliceMutPtrs<'a, T> = <Context<T> as RawSoaContext<T>>::SliceMutPtrs<'a>;
+/// Alias for the [`SliceMutPtrs`](SoaRawContext::SliceMutPtrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type SliceMutPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SliceMutPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern, or SoA.
-pub unsafe trait RawSoa {
-    /// Type of SoA [context](RawSoaContext).
+pub unsafe trait SoaRaw {
+    /// Type of SoA [context](SoaRawContext).
     ///
     /// Most of the time, this should be zero-sized type.
     /// This is true for all the SoA types with stored fields' size and alignment known at compile-time.
-    type Context: RawSoaContext<Self> + ?Sized;
+    type Context: SoaRawContext<Self> + ?Sized;
 
     /// Special type containing all the fields which are stored inside of a buffer.
     ///
@@ -314,37 +314,37 @@ pub unsafe trait RawSoa {
     type Fields: ?Sized;
 }
 
-/// An extension of [SoA context](RawSoaContext) type which allows to perform copy-assignment of each stored field.
+/// An extension of [SoA context](SoaRawContext) type which allows to perform copy-assignment of each stored field.
 ///
 /// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
-pub unsafe trait CloneToUninitSoaContext<T>: RawSoaContext<T>
+pub unsafe trait SoaCloneToUninitContext<T>: SoaRawContext<T>
 where
     T: ?Sized,
 {
-    /// Performs copy-assignment of each stored field from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs).
+    /// Performs copy-assignment of each stored field from [src](SoaRawContext::Ptrs) to [dst](SoaRawContext::MutPtrs).
     /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
     unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>);
 }
 
-/// A generalization of [`Clone`] specifically for [SoA](RawSoa) type.
+/// A generalization of [`Clone`] specifically for [SoA](SoaRaw) type.
 ///
 /// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
-pub unsafe trait SoaCloneToUninit: RawSoa<Context: CloneToUninitSoaContext<Self>> {}
+pub unsafe trait SoaCloneToUninit: SoaRaw<Context: SoaCloneToUninitContext<Self>> {}
 
 unsafe impl<T> SoaCloneToUninit for T
 where
-    T: RawSoa + ?Sized,
-    T::Context: CloneToUninitSoaContext<T>,
+    T: SoaRaw + ?Sized,
+    T::Context: SoaCloneToUninitContext<T>,
 {
 }
 
-/// An extension of [SoA context](RawSoaContext) type which allows to read a value borrowed from self
-/// from [pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait ReadSoaContext<'a, T, R = T>: RawSoaContext<T>
+/// An extension of [SoA context](SoaRawContext) type which allows to read a value borrowed from self
+/// from [pointers](SoaRawContext::Ptrs) to each stored field.
+pub unsafe trait SoaReadContext<'a, T, R = T>: SoaRawContext<T>
 where
     T: ?Sized,
 {
-    /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
+    /// Constructs the value from reading each field to which [src](SoaRawContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
     ///
     /// All the safety requirements resulting from applying
@@ -353,33 +353,33 @@ where
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> R;
 }
 
-/// An extension of [SoA](RawSoa) type which allows to read a value borrowed from the context
-/// from [pointers](RawSoaContext::Ptrs) to each stored field.
+/// An extension of [SoA](SoaRaw) type which allows to read a value borrowed from the context
+/// from [pointers](SoaRawContext::Ptrs) to each stored field.
 pub unsafe trait SoaRead<'a, R = Self>:
-    RawSoa<Context: ReadSoaContext<'a, Self, R>>
+    SoaRaw<Context: SoaReadContext<'a, Self, R>>
 {
 }
 
 unsafe impl<'a, T, R> SoaRead<'a, R> for T
 where
-    T: RawSoa + ?Sized,
-    T::Context: ReadSoaContext<'a, T, R>,
+    T: SoaRaw + ?Sized,
+    T::Context: SoaReadContext<'a, T, R>,
 {
 }
 
-/// An extension of [SoA](RawSoa) type which allows to read a value of *any* lifetime
-/// from [pointers](RawSoaContext::Ptrs) to each stored field.
+/// An extension of [SoA](SoaRaw) type which allows to read a value of *any* lifetime
+/// from [pointers](SoaRawContext::Ptrs) to each stored field.
 pub unsafe trait SoaReadOwned<R = Self>: for<'a> SoaRead<'a, R> {}
 
 unsafe impl<T, R> SoaReadOwned<R> for T where T: for<'a> SoaRead<'a, R> + ?Sized {}
 
-/// An extension of [SoA context](RawSoaContext) type which allows to write a value
-/// into [mutale pointers](RawSoaContext::MutPtrs) to each stored field.
-pub unsafe trait WriteSoaContext<T, W = T>: RawSoaContext<T>
+/// An extension of [SoA context](SoaRawContext) type which allows to write a value
+/// into [mutale pointers](SoaRawContext::MutPtrs) to each stored field.
+pub unsafe trait SoaWriteContext<T, W = T>: SoaRawContext<T>
 where
     T: ?Sized,
 {
-    /// Overwrites a memory [location](RawSoaContext::MutPtrs) of each stored field
+    /// Overwrites a memory [location](SoaRawContext::MutPtrs) of each stored field
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
@@ -388,20 +388,20 @@ where
     unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: W);
 }
 
-/// An extension of [SoA](RawSoa) type which allows to write given value
-/// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaWrite<W = Self>: RawSoa<Context: WriteSoaContext<Self, W>> {}
+/// An extension of [SoA](SoaRaw) type which allows to write given value
+/// into [mutable pointers](SoaRawContext::Ptrs) to each stored field.
+pub unsafe trait SoaWrite<W = Self>: SoaRaw<Context: SoaWriteContext<Self, W>> {}
 
 unsafe impl<T, W> SoaWrite<W> for T
 where
-    T: RawSoa + ?Sized,
-    T::Context: WriteSoaContext<T, W>,
+    T: SoaRaw + ?Sized,
+    T::Context: SoaWriteContext<T, W>,
 {
 }
 
-/// An extension of [SoA context](RawSoaContext) type which provides
+/// An extension of [SoA context](SoaRawContext) type which provides
 /// reference and slice types of specific lifetime to each stored field.
-pub unsafe trait SoaContext<'data, T>: RawSoaContext<T>
+pub unsafe trait SoaContext<'data, T>: SoaRawContext<T>
 where
     T: ?Sized,
 {
@@ -412,7 +412,7 @@ where
     /// to be covariant over generic lifetime.
     fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short>;
 
-    /// Converts [pointers](RawSoaContext::Ptrs) to each stored field
+    /// Converts [pointers](SoaRawContext::Ptrs) to each stored field
     /// to their [references](SoaContext::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -420,7 +420,7 @@ where
     unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a>;
 
     /// Converts [references](SoaContext::Refs) to each stored field
-    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
     fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a>;
 
     /// Collection of mutable references to each stored field.
@@ -430,7 +430,7 @@ where
     /// to be covariant over generic lifetime.
     fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short>;
 
-    /// Converts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
+    /// Converts [mutable pointers](SoaRawContext::MutPtrs) to each stored field
     /// to their [mutable references](SoaContext::RefsMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -438,14 +438,14 @@ where
     unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
-    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
     fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
         let ptrs = self.mut_refs_as_mut_ptrs(refs);
         self.ptrs_cast_const(ptrs)
     }
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
-    /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
+    /// to their [mutable pointers](SoaRawContext::MutPtrs) by taking the pointer of each one of them.
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
@@ -462,7 +462,7 @@ where
     /// to be covariant over generic lifetime.
     fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short>;
 
-    /// Converts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
+    /// Converts [slice pointers](SoaRawContext::SlicePtrs) to each stored field
     /// to their [slices](SoaContext::Slices) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
@@ -471,7 +471,7 @@ where
     -> Self::Slices<'a>;
 
     /// Forms [slices](SoaContext::Slices) to each stored field
-    /// from [pointers](RawSoaContext::Ptrs) to each field and a length.
+    /// from [pointers](SoaRawContext::Ptrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     ///
@@ -488,11 +488,11 @@ where
     }
 
     /// Converts [slices](SoaContext::Slices) to each stored field
-    /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
+    /// to their [slice pointers](SoaRawContext::SlicePtrs) by taking the pointer of each one of them.
     fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a>;
 
     /// Converts [slices](SoaContext::Slices) to each stored field
-    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
     fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
         let slices = self.slices_as_slice_ptrs(slices);
         self.slice_ptrs_as_ptrs(slices)
@@ -514,7 +514,7 @@ where
         from: Self::SlicesMut<'long>,
     ) -> Self::SlicesMut<'short>;
 
-    /// Converts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
+    /// Converts [mutable slice pointers](SoaRawContext::SliceMutPtrs) to each stored field
     /// to their [mutable slices](SoaContext::SlicesMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
@@ -525,7 +525,7 @@ where
     ) -> Self::SlicesMut<'a>;
 
     /// Forms [mutable slices](SoaContext::SlicesMut) to each stored field
-    /// from [mutable pointers](RawSoaContext::MutPtrs) to each field and a length.
+    /// from [mutable pointers](SoaRawContext::MutPtrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     ///
@@ -542,28 +542,28 @@ where
     }
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
-    /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
+    /// to their [slice pointers](SoaRawContext::SlicePtrs) by taking the pointer of each one of them.
     fn mut_slices_as_slice_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::SlicePtrs<'a> {
         let slices = self.mut_slices_as_mut_slice_ptrs(slices);
         self.slice_ptrs_cast_const(slices)
     }
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
-    /// to their [mutable slice pointers](RawSoaContext::SliceMutPtrs) by taking the pointer of each one of them.
+    /// to their [mutable slice pointers](SoaRawContext::SliceMutPtrs) by taking the pointer of each one of them.
     fn mut_slices_as_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a>;
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
-    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
+    /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
     fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
         let slices = self.mut_slices_as_slice_ptrs(slices);
         self.slice_ptrs_as_ptrs(slices)
     }
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
-    /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
+    /// to their [mutable pointers](SoaRawContext::MutPtrs) by taking the pointer of each one of them.
     fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
         let slices = self.mut_slices_as_mut_slice_ptrs(slices);
         self.mut_slice_ptrs_as_mut_ptrs(slices)
@@ -585,33 +585,33 @@ where
 }
 
 /// Alias for the [`Refs`](SoaContext::Refs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](Soa) type.
 pub type Refs<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::Refs<'a>;
 
 /// Alias for the [`RefsMut`](SoaContext::RefsMut) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](Soa) type.
 pub type RefsMut<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::RefsMut<'a>;
 
 /// Alias for the [`Slices`](SoaContext::Slices) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](Soa) type.
 pub type Slices<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::Slices<'a>;
 
 /// Alias for the [`SlicesMut`](SoaContext::SlicesMut) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](Soa) type.
 pub type SlicesMut<'a, 'data, T> = <Context<T> as SoaContext<'data, T>>::SlicesMut<'a>;
 
-/// An extension of [SoA](RawSoa) type which allows to access
+/// An extension of [SoA](SoaRaw) type which allows to access
 /// each stored field by their reference types of specific lifetime.
-pub unsafe trait Soa<'a>: RawSoa<Context: SoaContext<'a, Self>> {}
+pub unsafe trait Soa<'a>: SoaRaw<Context: SoaContext<'a, Self>> {}
 
 unsafe impl<'a, T> Soa<'a> for T
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: SoaContext<'a, T>,
 {
 }
 
-/// An extension of [SoA](RawSoa) type which allows to access
+/// An extension of [SoA](SoaRaw) type which allows to access
 /// each stored field by their reference types of **any** lifetime.
 pub trait SoaOwned: for<'a> Soa<'a> {}
 

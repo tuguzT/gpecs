@@ -18,7 +18,7 @@ use crate::{
             buffer_layout,
         },
         layout::WithLayout,
-        traits::AllocSoa,
+        traits::SoaAlloc,
     },
 };
 
@@ -95,7 +95,7 @@ where
     #[inline]
     pub fn of<'a, T>(context: &'a T::Context) -> Result<Self, InsufficientAlignError>
     where
-        T: AllocSoa + ?Sized,
+        T: SoaAlloc + ?Sized,
         D: FromIterator<FieldLayoutsItem<'a, T::Context, T>>,
     {
         let layouts = context

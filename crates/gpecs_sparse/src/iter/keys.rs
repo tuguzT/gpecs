@@ -4,11 +4,11 @@ use core::{
     slice,
 };
 
-use crate::{iter::KeyPtrs, soa::traits::RawSoa};
+use crate::{iter::KeyPtrs, soa::traits::SoaRaw};
 
 pub struct Keys<'ctx, 'a, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     context: &'ctx V::Context,
     keys: slice::Iter<'a, K>,
@@ -16,7 +16,7 @@ where
 
 impl<'ctx, 'a, K, V> Keys<'ctx, 'a, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     pub(super) fn new(context: &'ctx V::Context, keys: &'a [K]) -> Self {
@@ -132,7 +132,7 @@ where
 impl<K, V> Debug for Keys<'_, '_, K, V>
 where
     K: Debug,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
@@ -142,7 +142,7 @@ where
 
 impl<K, V> Clone for Keys<'_, '_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -155,7 +155,7 @@ where
 
 impl<K, V> AsRef<[K]> for Keys<'_, '_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[K] {
@@ -165,7 +165,7 @@ where
 
 impl<'a, K, V> Iterator for Keys<'_, 'a, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     type Item = &'a K;
 
@@ -184,7 +184,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Keys<'_, '_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -195,7 +195,7 @@ where
 
 impl<K, V> ExactSizeIterator for Keys<'_, '_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -203,4 +203,4 @@ where
     }
 }
 
-impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: RawSoa + ?Sized {}
+impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: SoaRaw + ?Sized {}

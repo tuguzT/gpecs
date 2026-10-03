@@ -6,12 +6,12 @@ use crate::{
     buffer::{
         BufferPrefix, buffer_align, buffer_layout_dangling, buffer_layout_inner, capacity_from,
     },
-    traits::AllocSoa,
+    traits::SoaAlloc,
 };
 
 fn buffer_size<T>(context: &T::Context, capacity: usize) -> usize
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let layout = buffer_layout_inner::<T>(&context, capacity).unwrap();
     layout.size()
@@ -19,7 +19,7 @@ where
 
 fn prefix_size<T>(context: &T::Context) -> usize
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let next = buffer_layout_dangling::<T>(context);
     let (_, size) = Layout::new::<BufferPrefix<T>>().extend(next).unwrap();
@@ -28,7 +28,7 @@ where
 
 fn capacity_from_size<T>(context: &T::Context, buffer_size: usize) -> usize
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_align = buffer_align::<T>(&context);
     let buffer_layout = Layout::from_size_align(buffer_size, buffer_align).unwrap();

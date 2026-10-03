@@ -10,22 +10,22 @@ use crate::{
     ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaViewMutPtrs, SoaViewPtrs},
     slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SlicesIndex, SoaView, SoaViewMut},
     traits::{
-        AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
-        Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
+        MutPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+        SoaAllocTrusted, SoaCloneToUninit, SoaContext, SoaOwned, SoaRawContext,
     },
 };
 
 #[repr(transparent)]
 pub struct SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     buffer: DstBuffer<T>,
 }
 
 impl<T> SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     pub(crate) unsafe fn ptr_from_raw_parts(
         data: *const u8,
@@ -323,7 +323,7 @@ where
 
 impl<'a, T> SoaSlice<T>
 where
-    T: Soa<'a> + AllocSoaTrusted + ?Sized,
+    T: Soa<'a> + SoaAllocTrusted + ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
@@ -460,7 +460,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
 {
     #[inline]
     pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
@@ -496,7 +496,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
+    T: SoaAllocTrusted + SoaCloneToUninit + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -508,7 +508,7 @@ where
 
 impl<T> Debug for SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -519,7 +519,7 @@ where
 
 impl<T> AsRef<Self> for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -529,7 +529,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
     for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, T, Slices<'ctx> = &'a [U]>>,
 {
     #[inline]
@@ -540,7 +540,7 @@ where
 
 impl<T> AsMut<Self> for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -550,7 +550,7 @@ where
 
 impl<T, U> AsMut<[U]> for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
     for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, T, SlicesMut<'ctx> = &'a mut [U]>>,
 {
     #[inline]
@@ -561,14 +561,14 @@ where
 
 impl<T> Eq for SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
@@ -581,7 +581,7 @@ where
 
 impl<T> Hash for SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
@@ -593,7 +593,7 @@ where
 
 impl<T> Drop for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     fn drop(&mut self) {
@@ -608,7 +608,7 @@ where
 
 impl<T, U, I> Index<I> for SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
     U: ?Sized,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
@@ -622,7 +622,7 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
     U: ?Sized,
     for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
@@ -634,7 +634,7 @@ where
 
 impl<'a, T> IntoIterator for &'a SoaSlice<T>
 where
-    T: Soa<'a> + AllocSoaTrusted + ?Sized,
+    T: Soa<'a> + SoaAllocTrusted + ?Sized,
 {
     type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
@@ -647,7 +647,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut SoaSlice<T>
 where
-    T: Soa<'a> + AllocSoaTrusted + ?Sized,
+    T: Soa<'a> + SoaAllocTrusted + ?Sized,
 {
     type Item = RefsMut<'a, 'a, T>;
     type IntoIter = IterMut<'a, 'a, T>;
@@ -660,7 +660,7 @@ where
 
 unsafe impl<T> Send for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
     T::Context: Send,
     T::Fields: Send,
 {
@@ -668,7 +668,7 @@ where
 
 unsafe impl<T> Sync for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {

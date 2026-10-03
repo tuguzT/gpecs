@@ -7,13 +7,13 @@ use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 
 use crate::{
     iter::{Iter, ValuePtrs},
-    soa::traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaOwned},
+    soa::traits::{Ptrs, Refs, SlicePtrs, Slices, Soa, SoaOwned, SoaRaw},
 };
 
 #[repr(transparent)]
 pub struct Values<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     inner: Iter<'ctx, 'a, K, V, P>,
@@ -21,7 +21,7 @@ where
 
 impl<'ctx, 'a, K, V, P> Values<'ctx, 'a, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -162,7 +162,7 @@ where
 
 impl<K, V, P> Clone for Values<'_, '_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]

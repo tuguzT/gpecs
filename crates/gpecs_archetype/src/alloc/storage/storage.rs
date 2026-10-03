@@ -15,9 +15,9 @@ use gpecs_soa_erased::{
         field::FieldLayouts,
         layout::WithLayout,
         traits::{
-            RawSoaContext, ReadSoaContext, Refs as ErasedBundleRefs,
-            RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles, SlicesMut as ErasedBundlesMut,
-            SoaRead, SoaWrite, WriteSoaContext,
+            Refs as ErasedBundleRefs, RefsMut as ErasedBundleRefsMut, Slices as ErasedBundles,
+            SlicesMut as ErasedBundlesMut, SoaRawContext, SoaRead, SoaReadContext, SoaWrite,
+            SoaWriteContext,
         },
     },
     storage::AlignedStorage,

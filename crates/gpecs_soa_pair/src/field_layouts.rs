@@ -6,7 +6,7 @@ use core::{
 use gpecs_soa::{
     field::{FieldLayouts, IntoFieldLayouts, IntoFieldLayoutsIter},
     layout::WithLayout,
-    traits::RawSoa,
+    traits::SoaRaw,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -22,7 +22,7 @@ impl<T> KeyValueFieldLayouts<T> {
     #[inline]
     pub fn new<'a, K, V>(context: &'a V::Context) -> Self
     where
-        V: RawSoa + ?Sized,
+        V: SoaRaw + ?Sized,
         V::Context: FieldLayouts<'a, V, Output = T>,
     {
         let key = Layout::new::<K>();

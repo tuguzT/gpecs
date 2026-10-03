@@ -2,12 +2,12 @@ use core::ops;
 
 use crate::{
     ptrs::{get, get_mut, get_unchecked, get_unchecked_mut, index, index_mut},
-    traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
+    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, SoaRaw, SoaRawContext},
 };
 
 pub unsafe trait SlicePtrsIndex<T>: private::Sealed
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a>;
 
@@ -48,7 +48,7 @@ where
 
 unsafe impl<T> SlicePtrsIndex<T> for usize
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = Ptrs<'a, T>;
 
@@ -129,7 +129,7 @@ where
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::Range<usize>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -230,7 +230,7 @@ where
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeTo<usize>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -295,7 +295,7 @@ where
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeFrom<usize>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -376,7 +376,7 @@ where
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeFull
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -452,7 +452,7 @@ fn range_into_slice_range(range: ops::RangeInclusive<usize>) -> ops::Range<usize
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeInclusive<usize>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -543,7 +543,7 @@ where
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeToInclusive<usize>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -688,7 +688,7 @@ fn into_slice_range(
 
 unsafe impl<T> SlicePtrsIndex<T> for (ops::Bound<usize>, ops::Bound<usize>)
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Ptrs<'a> = SlicePtrs<'a, T>;
 
@@ -786,7 +786,7 @@ unsafe fn get_offset_unchecked<'a, T>(
     offset: usize,
 ) -> Ptrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     let ptrs = context.slice_ptrs_as_ptrs(slices);
     unsafe { context.ptrs_add(ptrs, offset) }
@@ -799,7 +799,7 @@ unsafe fn get_offset_unchecked_mut<'a, T>(
     offset: usize,
 ) -> MutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     let ptrs = context.mut_slice_ptrs_as_mut_ptrs(slices);
     unsafe { context.mut_ptrs_add(ptrs, offset) }
@@ -814,7 +814,7 @@ unsafe fn get_offset_len_unchecked<'a, T>(
     len: usize,
 ) -> SlicePtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     let data = unsafe { get_offset_unchecked::<T>(context, slices, offset) };
     context.slice_ptrs_from_raw_parts(data, len)
@@ -829,7 +829,7 @@ unsafe fn get_offset_len_unchecked_mut<'a, T>(
     len: usize,
 ) -> SliceMutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     let data = unsafe { get_offset_unchecked_mut::<T>(context, slices, offset) };
     context.mut_slice_ptrs_from_raw_parts(data, len)

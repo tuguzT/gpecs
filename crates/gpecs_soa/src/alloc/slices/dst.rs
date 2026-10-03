@@ -3,13 +3,13 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slices::{Iter, IterMut, SoaSlice, ToSoaVec},
-    traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaOwned, SoaReadOwned},
+    traits::{Refs, RefsMut, Soa, SoaAllocTrusted, SoaCloneToUninit, SoaOwned, SoaReadOwned},
     vec::{IntoIter, SoaVec},
 };
 
 impl<T> SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -23,7 +23,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: SoaOwned + AllocSoaTrusted + ?Sized,
+    T: SoaOwned + SoaAllocTrusted + ?Sized,
 {
     #[inline]
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
@@ -128,7 +128,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
+    T: SoaAllocTrusted + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -139,7 +139,7 @@ where
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
+    T: SoaAllocTrusted + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     type Owned = SoaVec<T>;
@@ -161,7 +161,7 @@ where
 
 impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
-    T: Soa<'a> + AllocSoaTrusted + ?Sized,
+    T: Soa<'a> + SoaAllocTrusted + ?Sized,
 {
     type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
@@ -174,7 +174,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
-    T: Soa<'a> + AllocSoaTrusted + ?Sized,
+    T: Soa<'a> + SoaAllocTrusted + ?Sized,
 {
     type Item = RefsMut<'a, 'a, T>;
     type IntoIter = IterMut<'a, 'a, T>;
@@ -187,7 +187,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: AllocSoaTrusted + SoaReadOwned<T>,
+    T: SoaAllocTrusted + SoaReadOwned<T>,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

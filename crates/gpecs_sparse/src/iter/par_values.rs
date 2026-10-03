@@ -8,13 +8,13 @@ use rayon::iter::{
 
 use crate::{
     iter::{ParIter, Values},
-    soa::traits::{RawSoa, Refs, Slices, Soa, SoaOwned},
+    soa::traits::{Refs, Slices, Soa, SoaOwned, SoaRaw},
 };
 
 #[repr(transparent)]
 pub struct ParValues<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     inner: ParIter<'ctx, 'a, K, V, P>,
@@ -22,7 +22,7 @@ where
 
 impl<'ctx, 'a, K, V, P> ParValues<'ctx, 'a, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -65,7 +65,7 @@ where
 
 impl<K, V, P> Clone for ParValues<'_, '_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]

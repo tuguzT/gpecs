@@ -1,19 +1,19 @@
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slices::{SoaView, SoaViewMut},
-    traits::{AllocSoa, CloneToUninitSoaContext, RawSoaContext, SoaCloneToUninit},
+    traits::{SoaAlloc, SoaCloneToUninit, SoaCloneToUninitContext, SoaRawContext},
     vec::SoaVec,
 };
 
 pub trait ToSoaVec {
-    type Soa: AllocSoa<Context: Clone> + SoaCloneToUninit + ?Sized;
+    type Soa: SoaAlloc<Context: Clone> + SoaCloneToUninit + ?Sized;
 
     fn to_vec(&self) -> SoaVec<Self::Soa>;
 }
 
 impl<T> ToSoaVec for SoaView<'_, '_, T>
 where
-    T: AllocSoa + SoaCloneToUninit + ?Sized,
+    T: SoaAlloc + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     type Soa = T;
@@ -50,7 +50,7 @@ where
 
 impl<T> ToSoaVec for SoaViewMut<'_, '_, T>
 where
-    T: AllocSoa + SoaCloneToUninit + ?Sized,
+    T: SoaAlloc + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     type Soa = T;

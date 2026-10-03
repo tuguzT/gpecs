@@ -17,7 +17,7 @@ use gpecs_soa_erased::{
     ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
-        traits::RawSoaContext,
+        traits::SoaRawContext,
     },
 };
 

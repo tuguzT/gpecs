@@ -7,20 +7,20 @@ use rayon::iter::{
 
 use crate::{
     slices::{IterMut, SoaView, SoaViewMut},
-    traits::{RawSoa, RefsMut, Slices, Soa, SoaOwned},
+    traits::{RefsMut, Slices, Soa, SoaOwned, SoaRaw},
 };
 
 #[repr(transparent)]
 pub struct ParIterMut<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     view: SoaViewMut<'ctx, 'a, T>,
 }
 
 impl<'ctx, 'a, T> ParIterMut<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub fn new(view: SoaViewMut<'ctx, 'a, T>) -> Self {

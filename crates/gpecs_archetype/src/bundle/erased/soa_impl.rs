@@ -8,7 +8,7 @@ use gpecs_soa_erased::{
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         traits::{
-            AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+            SoaAllocContext, SoaContext, SoaRaw, SoaRawContext, SoaReadContext, SoaWriteContext,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -25,7 +25,7 @@ use crate::{
     erased::{ErasedArchetypeView, Iter},
 };
 
-unsafe impl<'view, T, D, S, P> RawSoaContext<ErasedBundleKind<T, D, S, P>>
+unsafe impl<'view, T, D, S, P> SoaRawContext<ErasedBundleKind<T, D, S, P>>
     for ErasedSoaContext<ErasedArchetypeView<'view, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
@@ -247,7 +247,7 @@ where
     }
 }
 
-unsafe impl<'a, Meta, D, S, P> RawSoa for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
+unsafe impl<'a, Meta, D, S, P> SoaRaw for ErasedBorrowedViewBundle<'a, Meta, D, S, P>
 where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
@@ -259,7 +259,7 @@ where
 }
 
 unsafe impl<'me, 'a, T, D, S, P>
-    ReadSoaContext<
+    SoaReadContext<
         'me,
         ErasedBundleKind<T, D, S, P>,
         ErasedBorrowedViewBundle<'a, T::Meta, D, S, P>,
@@ -280,7 +280,7 @@ where
 }
 
 unsafe impl<T, W, D, N, S, U, P>
-    WriteSoaContext<ErasedBundleKind<T, D, S, P>, ErasedBundleKind<W, N, U, P>>
+    SoaWriteContext<ErasedBundleKind<T, D, S, P>, ErasedBundleKind<W, N, U, P>>
     for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
@@ -331,7 +331,7 @@ where
     }
 }
 
-unsafe impl<T, D, S, P> AllocSoaContext<ErasedBundleKind<T, D, S, P>>
+unsafe impl<T, D, S, P> SoaAllocContext<ErasedBundleKind<T, D, S, P>>
     for ErasedSoaContext<ErasedArchetypeView<'_, T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,

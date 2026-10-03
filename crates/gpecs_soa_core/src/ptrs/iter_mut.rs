@@ -6,13 +6,13 @@ use core::{
 use crate::{
     ptrs::IterPtrs,
     slices::{Iter, IterMut},
-    traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
+    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, SoaRaw, SoaRawContext},
     wrapper,
 };
 
 pub struct IterMutPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ptrs: wrapper::MutPtrs<'ctx, T>,
     context: &'ctx T::Context,
@@ -22,7 +22,7 @@ where
 
 impl<'ctx, T> IterMutPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub fn new(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
@@ -276,7 +276,7 @@ where
 
 impl<T> Debug for IterMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -287,7 +287,7 @@ where
 
 impl<T> Clone for IterMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -310,7 +310,7 @@ where
 #[expect(clippy::while_let_on_iterator)]
 impl<'ctx, T> Iterator for IterMutPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Item = MutPtrs<'ctx, T>;
 
@@ -520,7 +520,7 @@ where
 
 impl<T> DoubleEndedIterator for IterMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -562,7 +562,7 @@ where
 
 impl<T> ExactSizeIterator for IterMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -570,4 +570,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IterMutPtrs<'_, T> where T: RawSoa + ?Sized {}
+impl<T> FusedIterator for IterMutPtrs<'_, T> where T: SoaRaw + ?Sized {}

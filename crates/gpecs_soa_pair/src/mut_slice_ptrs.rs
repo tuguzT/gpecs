@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_ptr::slice::{CastConst, MutSliceItemPtr};
 use gpecs_soa::{
-    traits::{RawSoa, RawSoaContext, SliceMutPtrs, Soa, SoaContext},
+    traits::{SliceMutPtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
 };
 
@@ -15,7 +15,7 @@ use crate::{KeyValueMutPtrs, KeyValueMutSlices, KeyValuePtrs, KeyValueSlicePtrs,
 
 pub struct KeyValueMutSlicePtrs<'ctx, K, V, P = *mut K>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K>,
 {
     key: P,
@@ -25,7 +25,7 @@ where
 
 impl<'ctx, K, V, P> KeyValueMutSlicePtrs<'ctx, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K>,
 {
     #[inline]
@@ -152,7 +152,7 @@ where
 
 impl<K, V, P> Debug for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K>,
     for<'ctx> SliceMutPtrs<'ctx, V>: Debug,
 {
@@ -173,7 +173,7 @@ where
 
 impl<K, V, P> PartialEq for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K> + PartialEq,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialEq,
 {
@@ -187,7 +187,7 @@ where
 
 impl<K, V, P> Eq for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K> + Eq,
     for<'ctx> SliceMutPtrs<'ctx, V>: Eq,
 {
@@ -195,7 +195,7 @@ where
 
 impl<K, V, P> PartialOrd for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K> + PartialOrd,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialOrd,
 {
@@ -209,7 +209,7 @@ where
 
 impl<K, V, P> Ord for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K> + Ord,
     for<'ctx> SliceMutPtrs<'ctx, V>: Ord,
 {
@@ -223,7 +223,7 @@ where
 
 impl<K, V, P> Hash for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K> + Hash,
     for<'ctx> SliceMutPtrs<'ctx, V>: Hash,
 {
@@ -235,7 +235,7 @@ where
 
 impl<K, V, P> Clone for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K>,
 {
     #[inline]
@@ -253,7 +253,7 @@ where
 
 impl<K, V, P> Copy for KeyValueMutSlicePtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: MutSliceItemPtr<Item = K>,
     for<'ctx> SliceMutPtrs<'ctx, V>: Copy,
 {

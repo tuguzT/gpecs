@@ -10,15 +10,15 @@ use crate::{
     ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaViewMutPtrs, SoaViewPtrs},
     slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SlicesIndex, SoaView},
     traits::{
-        CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
-        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
+        MutPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+        SoaCloneToUninit, SoaCloneToUninitContext, SoaContext, SoaOwned, SoaRaw, SoaRawContext,
     },
 };
 
 #[repr(transparent)]
 pub struct SoaViewMut<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ptrs: SoaViewMutPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
@@ -26,7 +26,7 @@ where
 
 impl<'ctx, 'a, T> SoaViewMut<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub unsafe fn from_view_ptrs(ptrs: SoaViewMutPtrs<'ctx, T>) -> Self {
@@ -1043,7 +1043,7 @@ where
 
 impl<T> AsRef<Self> for SoaViewMut<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -1064,7 +1064,7 @@ where
 
 impl<T> AsMut<Self> for SoaViewMut<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -1234,7 +1234,7 @@ where
 
 unsafe impl<T> Send for SoaViewMut<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Sync,
     T::Fields: Send,
 {
@@ -1242,7 +1242,7 @@ where
 
 unsafe impl<T> Sync for SoaViewMut<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {

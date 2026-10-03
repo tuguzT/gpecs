@@ -8,8 +8,8 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
     soa::traits::{
-        AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, SoaOwned, SoaReadOwned, SoaWrite,
+        MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut,
+        SoaAlloc, SoaOwned, SoaReadOwned, SoaWrite,
     },
 };
 
@@ -33,7 +33,7 @@ pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 
 /// Non-empty collection of [components](gpecs_component::Component).
 pub unsafe trait Bundle:
-    SoaOwned + AllocSoa + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
+    SoaOwned + SoaAlloc + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
 {
     /// Static [SoA context](gpecs_soa_erased::soa::traits::SoaContext) instance of this bundle.
     ///

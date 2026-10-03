@@ -9,8 +9,8 @@ use gpecs_soa::{
     field::{FieldLayouts, IntoFieldLayouts},
     identity::Identity,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
-        ReadSoaContext, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite, WriteSoaContext,
+        SoaAllocContext, SoaAllocTrusted, SoaCloneToUninit, SoaCloneToUninitContext, SoaContext,
+        SoaRaw, SoaRawContext, SoaRead, SoaReadContext, SoaWrite, SoaWriteContext,
     },
 };
 
@@ -20,9 +20,9 @@ use crate::{
     KeyValueSlicePtrs, KeyValueSlices,
 };
 
-unsafe impl<K, V, P> RawSoaContext<KeyValuePair<K, V, P>> for Identity<V::Context>
+unsafe impl<K, V, P> SoaRawContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     type Ptrs<'a> = KeyValuePtrs<'a, K, V, P::Const>;
@@ -233,16 +233,16 @@ where
     }
 }
 
-unsafe impl<K, V, P> RawSoa for KeyValuePair<K, V, P>
+unsafe impl<K, V, P> SoaRaw for KeyValuePair<K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     type Context = Identity<V::Context>;
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V, P> CloneToUninitSoaContext<KeyValuePair<K, V, P>> for Identity<V::Context>
+unsafe impl<K, V, P> SoaCloneToUninitContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
@@ -254,7 +254,7 @@ where
     }
 }
 
-unsafe impl<'a, K, V, P, R> ReadSoaContext<'a, KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>
+unsafe impl<'a, K, V, P, R> SoaReadContext<'a, KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>
     for Identity<V::Context>
 where
     V: SoaRead<'a, R> + ?Sized,
@@ -266,7 +266,7 @@ where
     }
 }
 
-unsafe impl<K, V, P, W> WriteSoaContext<KeyValuePair<K, V, P>, KeyValuePair<K, W, P>>
+unsafe impl<K, V, P, W> SoaWriteContext<KeyValuePair<K, V, P>, KeyValuePair<K, W, P>>
     for Identity<V::Context>
 where
     V: SoaWrite<W>,
@@ -280,7 +280,7 @@ where
 
 impl<'a, K, V, P, C> FieldLayouts<'a, KeyValuePair<K, V, P>> for Identity<C>
 where
-    V: RawSoa<Context = C> + ?Sized,
+    V: SoaRaw<Context = C> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     C: FieldLayouts<'a, V>,
 {
@@ -295,9 +295,9 @@ where
     }
 }
 
-unsafe impl<K, V, P> AllocSoaContext<KeyValuePair<K, V, P>> for Identity<V::Context>
+unsafe impl<K, V, P> SoaAllocContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
-    V: RawSoa<Context: AllocSoaContext<V>> + ?Sized,
+    V: SoaRaw<Context: SoaAllocContext<V>> + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -353,9 +353,9 @@ where
     }
 }
 
-unsafe impl<K, V, P> AllocSoaTrusted for KeyValuePair<K, V, P>
+unsafe impl<K, V, P> SoaAllocTrusted for KeyValuePair<K, V, P>
 where
-    V: AllocSoaTrusted,
+    V: SoaAllocTrusted,
     P: SliceItemPtrs<Item = K>,
 {
 }
@@ -363,7 +363,7 @@ where
 unsafe impl<'data, K, V, P> SoaContext<'data, KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     K: 'data,
-    V: RawSoa<Context: SoaContext<'data, V>> + ?Sized,
+    V: SoaRaw<Context: SoaContext<'data, V>> + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     type Refs<'a> = KeyValueRefs<'a, 'data, K, V, P::Const>;

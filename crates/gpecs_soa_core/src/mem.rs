@@ -1,6 +1,6 @@
 use crate::{
     ptrs,
-    traits::{RawSoaContext, RefsMut, Soa, SoaContext, SoaRead, SoaWrite},
+    traits::{RefsMut, Soa, SoaContext, SoaRawContext, SoaRead, SoaWrite},
 };
 
 /// Version of [`core::mem::replace()`] but for [SoA](Soa) types.

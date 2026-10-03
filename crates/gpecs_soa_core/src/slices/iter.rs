@@ -6,13 +6,13 @@ use core::{
 
 use crate::{
     ptrs::IterPtrs,
-    traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
+    traits::{Ptrs, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned, SoaRaw},
 };
 
 #[repr(transparent)]
 pub struct Iter<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     inner: IterPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
@@ -20,7 +20,7 @@ where
 
 impl<'ctx, T> Iter<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub unsafe fn from_iter_ptrs(iter: IterPtrs<'ctx, T>) -> Self {
@@ -185,7 +185,7 @@ where
 
 impl<T> Clone for Iter<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -246,7 +246,7 @@ impl<'a, T> FusedIterator for Iter<'_, 'a, T> where T: Soa<'a> + ?Sized {}
 
 unsafe impl<T> Send for Iter<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {
@@ -254,7 +254,7 @@ where
 
 unsafe impl<T> Sync for Iter<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {

@@ -8,14 +8,14 @@ use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
 use crate::{
     iter::{IterMut, ValueMutPtrs, ValuePtrs},
     soa::traits::{
-        MutPtrs, Ptrs, RawSoa, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaOwned,
+        MutPtrs, Ptrs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaOwned, SoaRaw,
     },
 };
 
 #[repr(transparent)]
 pub struct ValuesMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     inner: IterMut<'ctx, 'a, K, V, P>,
@@ -23,7 +23,7 @@ where
 
 impl<'ctx, 'a, K, V, P> ValuesMut<'ctx, 'a, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]

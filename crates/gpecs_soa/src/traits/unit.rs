@@ -3,7 +3,7 @@ use core::{
     array, ptr,
 };
 
-use crate::traits::{AllocSoaContext, AllocSoaTrusted, FieldLayouts};
+use crate::traits::{FieldLayouts, SoaAllocContext, SoaAllocTrusted};
 
 impl<'a> FieldLayouts<'a> for () {
     type Output = [Layout; 0];
@@ -16,7 +16,7 @@ impl<'a> FieldLayouts<'a> for () {
     }
 }
 
-unsafe impl AllocSoaContext<()> for () {
+unsafe impl SoaAllocContext<()> for () {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<()>(capacity)
@@ -58,4 +58,4 @@ unsafe impl AllocSoaContext<()> for () {
     }
 }
 
-unsafe impl AllocSoaTrusted for () {}
+unsafe impl SoaAllocTrusted for () {}

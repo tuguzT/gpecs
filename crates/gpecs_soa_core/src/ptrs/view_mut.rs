@@ -7,13 +7,13 @@ use core::{
 use crate::{
     ptrs::{IterMutPtrs, IterPtrs, SlicePtrsIndex, SoaViewPtrs, get_unchecked_mut, index_mut},
     slices::{SoaView, SoaViewMut},
-    traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs},
+    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, SoaRaw, SoaRawContext},
     wrapper,
 };
 
 pub struct SoaViewMutPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ptrs: wrapper::MutPtrs<'ctx, T>,
     context: &'ctx T::Context,
@@ -22,7 +22,7 @@ where
 
 impl<'ctx, T> SoaViewMutPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub fn new(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
@@ -387,7 +387,7 @@ where
 
 impl<T> Debug for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -398,7 +398,7 @@ where
 
 impl<T> Clone for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -415,14 +415,14 @@ where
 
 impl<T> Copy for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: PartialEq,
     for<'ctx> MutPtrs<'ctx, T>: PartialEq,
 {
@@ -437,7 +437,7 @@ where
 
 impl<T> Eq for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Eq,
     for<'ctx> MutPtrs<'ctx, T>: Eq,
 {
@@ -445,7 +445,7 @@ where
 
 impl<T> PartialOrd for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: PartialOrd,
     for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
 {
@@ -460,7 +460,7 @@ where
 
 impl<T> Ord for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Ord,
     for<'ctx> MutPtrs<'ctx, T>: Ord,
 {
@@ -475,7 +475,7 @@ where
 
 impl<T> Hash for SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Hash,
     for<'ctx> MutPtrs<'ctx, T>: Hash,
 {
@@ -487,7 +487,7 @@ where
 
 impl<'a, T> IntoIterator for &'a SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Item = Ptrs<'a, T>;
     type IntoIter = IterPtrs<'a, T>;
@@ -500,7 +500,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut SoaViewMutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Item = MutPtrs<'a, T>;
     type IntoIter = IterMutPtrs<'a, T>;
@@ -513,7 +513,7 @@ where
 
 impl<'ctx, T> IntoIterator for SoaViewMutPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Item = MutPtrs<'ctx, T>;
     type IntoIter = IterMutPtrs<'ctx, T>;

@@ -21,7 +21,7 @@ use gpecs_soa_erased::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput},
-        traits::ReadSoaContext,
+        traits::SoaReadContext,
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };

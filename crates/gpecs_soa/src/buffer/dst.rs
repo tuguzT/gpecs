@@ -6,20 +6,20 @@ use crate::{
         ptr_to_buffer_context, ptr_to_buffer_prefix_unchecked, ptrs_from_buffer,
         ptrs_from_buffer_mut,
     },
-    traits::{AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs},
+    traits::{MutPtrs, Ptrs, SoaAllocContext, SoaAllocTrusted},
 };
 
 #[repr(transparent)]
 pub struct DstBuffer<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     inner: [BufferData<T>],
 }
 
 impl<T> DstBuffer<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     pub unsafe fn ptr_from_raw_parts(data: *const u8, len: usize, capacity: usize) -> *const Self {
@@ -59,7 +59,7 @@ where
         assert!(
             packed_size_of_fields <= size_of_fields,
             "sum of sizes of field layouts (is {packed_size_of_fields}) \
-            should be less or equal to the size of `RawSoa::Fields` (is {size_of_fields})"
+            should be less or equal to the size of `SoaRaw::Fields` (is {size_of_fields})"
         );
 
         let buffer_align = context.buffer_align();
@@ -67,7 +67,7 @@ where
         assert!(
             buffer_align <= align_of_fields,
             "each alignment from field layouts (largest is {buffer_align}) \
-            should be less or equal to the alignment of `RawSoa::Fields` (is {align_of_fields})"
+            should be less or equal to the alignment of `SoaRaw::Fields` (is {align_of_fields})"
         );
     }
 

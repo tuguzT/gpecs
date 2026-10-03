@@ -17,7 +17,7 @@ use crate::{
     soa::{
         ptrs::{SoaViewMutPtrs, SoaViewPtrs},
         slices::SoaView,
-        traits::{MutPtrs, Ptrs, RawSoa},
+        traits::{MutPtrs, Ptrs, SoaRaw},
     },
 };
 
@@ -116,7 +116,7 @@ pub unsafe fn sparse_get_unchecked<K, V, S>(
 ) -> (&V::Context, Ptrs<'_, V>)
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     S: SparseItem<Index = K::SparseIndex>,
 {
     let sparse_item = unsafe { sparse_item_unchecked::<K, S>(sparse, sparse_index).read() };
@@ -132,7 +132,7 @@ pub unsafe fn sparse_get_unchecked_mut<K, V, S>(
 ) -> (&V::Context, MutPtrs<'_, V>)
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     S: SparseItem<Index = K::SparseIndex>,
 {
     let sparse_item = unsafe { sparse_item_unchecked::<K, S>(sparse, sparse_index).read() };
@@ -247,7 +247,7 @@ where
 #[inline]
 pub fn dense_keys<'a, K, V, P>(dense: SoaView<'_, 'a, KeyValuePair<K, V, P>>) -> &'a [K]
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     let (_, keys) = dense_keys_with_context(dense);
@@ -259,7 +259,7 @@ pub fn dense_keys_with_context<'ctx, 'a, K, V, P>(
     dense: SoaView<'ctx, 'a, KeyValuePair<K, V, P>>,
 ) -> (&'ctx V::Context, &'a [K])
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     let (context, slices) = dense.into_slice_ptrs_with_context();
@@ -276,7 +276,7 @@ pub fn check_parts<'a, K, V, P, S>(
 ) -> Result<(), FromPartsError<K>>
 where
     K: Key + 'a,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {

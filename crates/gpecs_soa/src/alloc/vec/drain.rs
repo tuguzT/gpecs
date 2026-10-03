@@ -9,8 +9,8 @@ use core::{
 use crate::{
     ptrs::{IterPtrs, range},
     traits::{
-        AllocSoa, AllocSoaContext, Ptrs, RawSoaContext, ReadSoaContext, SlicePtrs, Slices, Soa,
-        SoaContext, SoaOwned, SoaRead,
+        Ptrs, SlicePtrs, Slices, Soa, SoaAlloc, SoaAllocContext, SoaContext, SoaOwned,
+        SoaRawContext, SoaRead, SoaReadContext,
     },
 };
 
@@ -18,7 +18,7 @@ use super::SoaVec;
 
 pub struct Drain<'a, T, R = T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     R: ?Sized,
 {
     /// Index of tail to preserve
@@ -33,7 +33,7 @@ where
 
 impl<'a, T, R> Drain<'a, T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     R: ?Sized,
 {
     #[inline]
@@ -114,7 +114,7 @@ where
 
 impl<'a, T, R> Drain<'_, T, R>
 where
-    T: AllocSoa + Soa<'a> + ?Sized,
+    T: SoaAlloc + Soa<'a> + ?Sized,
     R: ?Sized,
 {
     #[inline]
@@ -135,7 +135,7 @@ where
 
 unsafe impl<T, R> Send for Drain<'_, T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Sync,
     T::Fields: Send,
     R: ?Sized,
@@ -144,7 +144,7 @@ where
 
 unsafe impl<T, R> Sync for Drain<'_, T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
     R: ?Sized,
@@ -153,7 +153,7 @@ where
 
 impl<T, U, R> AsRef<[U]> for Drain<'_, T, R>
 where
-    T: SoaOwned + AllocSoa + ?Sized,
+    T: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
@@ -164,7 +164,7 @@ where
 
 impl<T, R> Debug for Drain<'_, T, R>
 where
-    T: SoaOwned + AllocSoa + ?Sized,
+    T: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
@@ -176,7 +176,7 @@ where
 
 impl<'a, T, R> Iterator for Drain<'a, T, R>
 where
-    T: AllocSoa + SoaRead<'a, R> + ?Sized,
+    T: SoaAlloc + SoaRead<'a, R> + ?Sized,
 {
     type Item = R;
 
@@ -197,7 +197,7 @@ where
 
 impl<'a, T, R> DoubleEndedIterator for Drain<'a, T, R>
 where
-    T: AllocSoa + SoaRead<'a, R> + ?Sized,
+    T: SoaAlloc + SoaRead<'a, R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -210,7 +210,7 @@ where
 
 impl<'a, T, R> ExactSizeIterator for Drain<'a, T, R>
 where
-    T: AllocSoa + SoaRead<'a, R> + ?Sized,
+    T: SoaAlloc + SoaRead<'a, R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -218,23 +218,23 @@ where
     }
 }
 
-impl<'a, T, R> FusedIterator for Drain<'a, T, R> where T: AllocSoa + SoaRead<'a, R> + ?Sized {}
+impl<'a, T, R> FusedIterator for Drain<'a, T, R> where T: SoaAlloc + SoaRead<'a, R> + ?Sized {}
 
 impl<T, R> Drop for Drain<'_, T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     R: ?Sized,
 {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
         struct DropGuard<'r, 'a, T, R>(&'r mut Drain<'a, T, R>)
         where
-            T: AllocSoa + ?Sized,
+            T: SoaAlloc + ?Sized,
             R: ?Sized;
 
         impl<T, R> Drop for DropGuard<'_, '_, T, R>
         where
-            T: AllocSoa + ?Sized,
+            T: SoaAlloc + ?Sized,
             R: ?Sized,
         {
             fn drop(&mut self) {

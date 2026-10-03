@@ -19,7 +19,7 @@ use crate::{
         field::{
             FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
-        traits::{AllocSoa, RawSoaContext, SliceMutPtrs},
+        traits::{SliceMutPtrs, SoaAlloc, SoaRawContext},
     },
 };
 
@@ -140,7 +140,7 @@ where
         context: &T::Context,
     ) -> Result<SliceMutPtrs<'_, T>, DowncastError<Self>>
     where
-        T: AllocSoa + ?Sized,
+        T: SoaAlloc + ?Sized,
     {
         let Self { ptrs, len } = self;
 

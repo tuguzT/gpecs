@@ -6,7 +6,7 @@ use core::{
     mem::{ManuallyDrop, offset_of},
 };
 
-use crate::traits::{AllocSoa, AllocSoaContext, MutPtrs, Ptrs, RawSoaContext};
+use crate::traits::{MutPtrs, Ptrs, SoaAlloc, SoaAllocContext, SoaRawContext};
 
 pub mod dst;
 
@@ -16,11 +16,11 @@ mod tests;
 #[repr(transparent)]
 pub struct BufferDropCheck<T>(PhantomData<(T::Fields, T::Context)>)
 where
-    T: AllocSoa + ?Sized;
+    T: SoaAlloc + ?Sized;
 
 impl<T> Default for BufferDropCheck<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -31,7 +31,7 @@ where
 #[repr(C)]
 pub struct BufferPrefix<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     pub context: T::Context,
     pub len: usize,
@@ -40,7 +40,7 @@ where
 
 union BufferData<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     _align: ManuallyDrop<BufferAlign<T>>,
     _fields: ManuallyDrop<T::Fields>,
@@ -51,7 +51,7 @@ where
 #[repr(C)]
 struct BufferAlign<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     _fields: [T::Fields; 0],
     _context: [T::Context; 0],
@@ -72,7 +72,7 @@ pub fn layout_is_dangling(layout: Layout) -> bool {
 #[inline]
 pub fn buffer_align<T>(context: &T::Context) -> usize
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     context.buffer_align().max(align_of::<BufferAlign<T>>())
 }
@@ -80,7 +80,7 @@ where
 #[inline]
 pub fn buffer_layout_dangling<T>(context: &T::Context) -> Layout
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let align = buffer_align::<T>(context);
     layout_dangling(align).expect("SoA buffer alignment should be valid")
@@ -89,7 +89,7 @@ where
 #[inline]
 pub fn capacity_from_dangling<T>(context: &T::Context) -> usize
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_layout = buffer_layout_dangling::<T>(context);
     context.capacity_from(buffer_layout)
@@ -98,7 +98,7 @@ where
 #[inline]
 pub fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let layout = buffer_layout_inner::<T>(context, capacity)?;
 
@@ -111,7 +111,7 @@ where
 
 fn buffer_layout_inner<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_layout = context.buffer_layout(capacity)?;
     let prefix = Layout::new::<BufferPrefix<T>>();
@@ -169,7 +169,7 @@ fn buffer_layout_with_prefix(
 #[inline]
 pub fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let prefix = Layout::new::<BufferPrefix<T>>();
     let align = context.buffer_align();
@@ -204,7 +204,7 @@ pub fn buffer_layout_capacity<T>(
     capacity: usize,
 ) -> Result<(Layout, usize), LayoutError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_layout = buffer_layout::<T>(context, capacity)?;
     let capacity = capacity_from::<T>(context, buffer_layout);
@@ -214,7 +214,7 @@ where
 #[inline]
 pub const unsafe fn ptr_to_buffer_context<T>(buffer: *const u8) -> *const T::Context
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     const { assert_buffer_context::<T>() }
     buffer.cast()
@@ -224,7 +224,7 @@ where
 #[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub const unsafe fn ptr_to_buffer_context_mut<T>(buffer: *mut u8) -> *mut T::Context
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     const { assert_buffer_context::<T>() }
     buffer.cast()
@@ -232,7 +232,7 @@ where
 
 const fn assert_buffer_context<T>()
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     assert!(
         offset_of!(BufferPrefix<T>, context) == 0,
@@ -248,7 +248,7 @@ pub unsafe fn ptr_to_buffer_prefix<T>(
     buffer: *const u8,
 ) -> Result<Option<*const BufferPrefix<T>>, LayoutError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_layout = buffer_layout::<T>(context, capacity)?;
     if layout_is_dangling(buffer_layout) {
@@ -267,7 +267,7 @@ pub unsafe fn ptr_to_buffer_prefix_mut<T>(
     buffer: *mut u8,
 ) -> Result<Option<*mut BufferPrefix<T>>, LayoutError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_layout = buffer_layout::<T>(context, capacity)?;
     if layout_is_dangling(buffer_layout) {
@@ -281,7 +281,7 @@ where
 #[inline]
 pub const unsafe fn ptr_to_buffer_prefix_unchecked<T>(buffer: *const u8) -> *const BufferPrefix<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     buffer.cast()
 }
@@ -289,7 +289,7 @@ where
 #[inline]
 pub const unsafe fn ptr_to_buffer_prefix_unchecked_mut<T>(buffer: *mut u8) -> *mut BufferPrefix<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     buffer.cast()
 }
@@ -301,7 +301,7 @@ pub unsafe fn ptrs_from_buffer<T>(
     capacity: usize,
 ) -> Ptrs<'_, T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer = unsafe { ptr_to_buffer_data::<T>(context, ptr, capacity) };
     let Ok(buffer) = buffer else {
@@ -318,7 +318,7 @@ pub unsafe fn ptrs_from_buffer_mut<T>(
     capacity: usize,
 ) -> MutPtrs<'_, T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer = unsafe { ptr_to_buffer_data_mut::<T>(context, ptr, capacity) };
     let Ok(buffer) = buffer else {
@@ -335,7 +335,7 @@ pub unsafe fn ptr_to_buffer_data<T>(
     capacity: usize,
 ) -> Result<*const u8, PtrToDataError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let offset = offset_to_buffer_data::<T>(context, capacity)?;
     let data = unsafe { ptr.add(offset) };
@@ -349,7 +349,7 @@ pub unsafe fn ptr_to_buffer_data_mut<T>(
     capacity: usize,
 ) -> Result<*mut u8, PtrToDataError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let offset = offset_to_buffer_data::<T>(context, capacity)?;
     let data = unsafe { ptr.add(offset) };
@@ -358,7 +358,7 @@ where
 
 fn offset_to_buffer_data<T>(context: &T::Context, capacity: usize) -> Result<usize, PtrToDataError>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     let buffer_layout = context.buffer_layout(capacity)?;
     let prefix = Layout::new::<BufferPrefix<T>>();

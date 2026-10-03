@@ -6,12 +6,12 @@ use core::{
 };
 
 use crate::{
-    alloc::raw_vec::RawSoaVec,
+    alloc::raw_vec::RawVec,
     ptrs::{SoaViewMutPtrs, SoaViewPtrs},
     slices::{SoaView, SoaViewMut, ToSoaVec},
     traits::{
-        AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
-        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaReadOwned,
+        MutPtrs, NonNullPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaAlloc,
+        SoaCloneToUninit, SoaContext, SoaOwned, SoaRawContext, SoaReadContext, SoaReadOwned,
     },
     vec::SoaVec,
     wrapper,
@@ -19,11 +19,11 @@ use crate::{
 
 pub struct IntoIter<T, R = T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     R: ?Sized,
 {
     ptrs: wrapper::NonNullPtrs<'static, T>,
-    buffer: RawSoaVec<T>,
+    buffer: RawVec<T>,
     start: usize,
     end: usize,
     phantom: PhantomData<fn() -> R>,
@@ -31,7 +31,7 @@ where
 
 impl<T, R> IntoIter<T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     R: ?Sized,
 {
     #[inline]
@@ -218,7 +218,7 @@ where
 
 impl<'a, T, R> IntoIter<T, R>
 where
-    T: AllocSoa + Soa<'a> + ?Sized,
+    T: SoaAlloc + Soa<'a> + ?Sized,
     R: ?Sized,
 {
     #[inline]
@@ -250,7 +250,7 @@ where
 
 unsafe impl<T, R> Send for IntoIter<T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Send,
     T::Fields: Send,
     R: ?Sized,
@@ -259,7 +259,7 @@ where
 
 unsafe impl<T, R> Sync for IntoIter<T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
     R: ?Sized,
@@ -268,7 +268,7 @@ where
 
 impl<T, U, R> AsRef<[U]> for IntoIter<T, R>
 where
-    T: SoaOwned + AllocSoa + ?Sized,
+    T: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
@@ -280,7 +280,7 @@ where
 
 impl<T, R> Debug for IntoIter<T, R>
 where
-    T: SoaOwned + AllocSoa + ?Sized,
+    T: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
@@ -292,7 +292,7 @@ where
 
 impl<T, R> Default for IntoIter<T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Default,
     R: ?Sized,
 {
@@ -305,7 +305,7 @@ where
 
 impl<T, R> Clone for IntoIter<T, R>
 where
-    T: AllocSoa + SoaCloneToUninit + ?Sized,
+    T: SoaAlloc + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
     R: ?Sized,
 {
@@ -318,7 +318,7 @@ where
 
 impl<T, R> Drop for IntoIter<T, R>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     R: ?Sized,
 {
     fn drop(&mut self) {
@@ -334,7 +334,7 @@ where
 #[expect(clippy::while_let_on_iterator)]
 impl<T, R> Iterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaReadOwned<R> + ?Sized,
+    T: SoaAlloc + SoaReadOwned<R> + ?Sized,
 {
     type Item = R;
 
@@ -555,7 +555,7 @@ where
 
 impl<T, R> DoubleEndedIterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaReadOwned<R> + ?Sized,
+    T: SoaAlloc + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -605,7 +605,7 @@ where
 
 impl<T, R> ExactSizeIterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaReadOwned<R> + ?Sized,
+    T: SoaAlloc + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -613,4 +613,4 @@ where
     }
 }
 
-impl<T, R> FusedIterator for IntoIter<T, R> where T: AllocSoa + SoaReadOwned<R> + ?Sized {}
+impl<T, R> FusedIterator for IntoIter<T, R> where T: SoaAlloc + SoaReadOwned<R> + ?Sized {}

@@ -23,7 +23,7 @@ use crate::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
             buffer_offsets,
         },
-        traits::{AllocSoa, AllocSoaContext, MutPtrs, RawSoaContext},
+        traits::{MutPtrs, SoaAlloc, SoaAllocContext, SoaRawContext},
     },
     storage::AlignedStorage,
 };
@@ -166,7 +166,7 @@ where
         context: &T::Context,
     ) -> Result<MutPtrs<'_, T>, DowncastError<Self>>
     where
-        T: AllocSoa + ?Sized,
+        T: SoaAlloc + ?Sized,
     {
         let Self {
             ref layouts,

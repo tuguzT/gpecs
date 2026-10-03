@@ -4,16 +4,16 @@ use crate::{
     ptrs::SlicePtrsIndex,
     refs, slices,
     traits::{
-        CloneToUninitSoaContext, MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, ReadSoaContext,
-        Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaRead,
-        SoaWrite, WriteSoaContext,
+        MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+        SoaCloneToUninit, SoaCloneToUninitContext, SoaRaw, SoaRawContext, SoaRead, SoaReadContext,
+        SoaWrite, SoaWriteContext,
     },
 };
 
 #[inline]
 pub fn upcast<'short, 'long: 'short, T>(from: Ptrs<'long, T>) -> Ptrs<'short, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     T::Context::ptrs_upcast(from)
 }
@@ -21,7 +21,7 @@ where
 #[inline]
 pub fn dangling<T>(context: &T::Context) -> Ptrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.ptrs_dangling()
 }
@@ -29,7 +29,7 @@ where
 #[inline]
 pub unsafe fn add<'a, T>(context: &'a T::Context, ptrs: Ptrs<'a, T>, count: usize) -> Ptrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.ptrs_add(ptrs, count) }
 }
@@ -37,7 +37,7 @@ where
 #[inline]
 pub unsafe fn offset_from<T>(context: &T::Context, ptrs: Ptrs<'_, T>, origin: Ptrs<'_, T>) -> isize
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.ptrs_offset_from(ptrs, origin) }
 }
@@ -45,7 +45,7 @@ where
 #[inline]
 pub fn upcast_mut<'short, 'long: 'short, T>(from: MutPtrs<'long, T>) -> MutPtrs<'short, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     T::Context::mut_ptrs_upcast(from)
 }
@@ -53,7 +53,7 @@ where
 #[inline]
 pub fn dangling_mut<T>(context: &T::Context) -> MutPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.mut_ptrs_dangling()
 }
@@ -65,7 +65,7 @@ pub unsafe fn add_mut<'a, T>(
     count: usize,
 ) -> MutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.mut_ptrs_add(ptrs, count) }
 }
@@ -77,7 +77,7 @@ pub unsafe fn offset_from_mut<T>(
     origin: Ptrs<'_, T>,
 ) -> isize
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.mut_ptrs_offset_from(ptrs, origin) }
 }
@@ -85,7 +85,7 @@ where
 #[inline]
 pub fn cast_const<'a, T>(context: &'a T::Context, ptrs: MutPtrs<'a, T>) -> Ptrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.ptrs_cast_const(ptrs)
 }
@@ -93,7 +93,7 @@ where
 #[inline]
 pub fn cast_mut<'a, T>(context: &'a T::Context, ptrs: Ptrs<'a, T>) -> MutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.ptrs_cast_mut(ptrs)
 }
@@ -105,7 +105,7 @@ pub unsafe fn swap_nonoverlapping<T>(
     y: MutPtrs<'_, T>,
     count: usize,
 ) where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.ptrs_swap_nonoverlapping(x, y, count) }
 }
@@ -117,7 +117,7 @@ pub unsafe fn copy_nonoverlapping<T>(
     dst: MutPtrs<'_, T>,
     count: usize,
 ) where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.ptrs_copy_nonoverlapping(src, dst, count) }
 }
@@ -125,7 +125,7 @@ pub unsafe fn copy_nonoverlapping<T>(
 #[inline]
 pub unsafe fn drop_in_place<T>(context: &T::Context, to_drop: MutPtrs<'_, T>)
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.ptrs_drop_in_place(to_drop) }
 }
@@ -135,7 +135,7 @@ pub fn upcast_nonnull<'short, 'long: 'short, T>(
     from: NonNullPtrs<'long, T>,
 ) -> NonNullPtrs<'short, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     T::Context::nonnull_ptrs_upcast(from)
 }
@@ -143,7 +143,7 @@ where
 #[inline]
 pub fn dangling_nonnull<T>(context: &T::Context) -> NonNullPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.nonnull_ptrs_dangling()
 }
@@ -154,7 +154,7 @@ pub unsafe fn nonnull_from_mut<'a, T>(
     ptrs: MutPtrs<'a, T>,
 ) -> NonNullPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.nonnull_ptrs_from_mut_ptrs(ptrs) }
 }
@@ -162,7 +162,7 @@ where
 #[inline]
 pub fn nonnull_as_ptrs<'a, T>(context: &'a T::Context, ptrs: NonNullPtrs<'a, T>) -> Ptrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.nonnull_ptrs_as_ptrs(ptrs)
 }
@@ -173,7 +173,7 @@ pub fn nonnull_as_mut_ptrs<'a, T>(
     ptrs: NonNullPtrs<'a, T>,
 ) -> MutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.nonnull_ptrs_as_mut_ptrs(ptrs)
 }
@@ -181,7 +181,7 @@ where
 #[inline]
 pub fn upcast_slices<'short, 'long: 'short, T>(from: SlicePtrs<'long, T>) -> SlicePtrs<'short, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     T::Context::slice_ptrs_upcast(from)
 }
@@ -193,7 +193,7 @@ pub fn slices_from_raw_parts<'a, T>(
     len: usize,
 ) -> SlicePtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.slice_ptrs_from_raw_parts(data, len)
 }
@@ -201,7 +201,7 @@ where
 #[inline]
 pub fn slices_len<T>(context: &T::Context, slices: &SlicePtrs<'_, T>) -> usize
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.slice_ptrs_len(slices)
 }
@@ -209,7 +209,7 @@ where
 #[inline]
 pub fn slices_as_ptrs<'a, T>(context: &'a T::Context, slices: SlicePtrs<'a, T>) -> Ptrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.slice_ptrs_as_ptrs(slices)
 }
@@ -219,7 +219,7 @@ pub fn upcast_slices_mut<'short, 'long: 'short, T>(
     from: SliceMutPtrs<'long, T>,
 ) -> SliceMutPtrs<'short, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     T::Context::mut_slice_ptrs_upcast(from)
 }
@@ -231,7 +231,7 @@ pub fn slices_from_raw_parts_mut<'a, T>(
     len: usize,
 ) -> SliceMutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.mut_slice_ptrs_from_raw_parts(data, len)
 }
@@ -239,7 +239,7 @@ where
 #[inline]
 pub fn slices_len_mut<T>(context: &T::Context, slices: &SliceMutPtrs<'_, T>) -> usize
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.mut_slice_ptrs_len(slices)
 }
@@ -250,7 +250,7 @@ pub fn mut_slices_as_ptrs<'a, T>(
     slices: SliceMutPtrs<'a, T>,
 ) -> Ptrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.mut_slice_ptrs_as_ptrs(slices)
 }
@@ -261,7 +261,7 @@ pub fn mut_slices_as_mut_ptrs<'a, T>(
     slices: SliceMutPtrs<'a, T>,
 ) -> MutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.mut_slice_ptrs_as_mut_ptrs(slices)
 }
@@ -272,7 +272,7 @@ pub fn slices_cast_const<'a, T>(
     slices: SliceMutPtrs<'a, T>,
 ) -> SlicePtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.slice_ptrs_cast_const(slices)
 }
@@ -283,7 +283,7 @@ pub fn slices_cast_mut<'a, T>(
     slices: SlicePtrs<'a, T>,
 ) -> SliceMutPtrs<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     context.slice_ptrs_cast_mut(slices)
 }
@@ -291,7 +291,7 @@ where
 #[inline]
 pub unsafe fn slices_drop_in_place<T>(context: &T::Context, slices_to_drop: SliceMutPtrs<'_, T>)
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     unsafe { context.slices_drop_in_place(slices_to_drop) }
 }
@@ -364,7 +364,7 @@ where
     unsafe { context.ptrs_write(dst, value) }
 }
 
-/// Version of [`core::ptr::replace()`] but for [SoA](RawSoa) types.
+/// Version of [`core::ptr::replace()`] but for [SoA](SoaRaw) types.
 pub unsafe fn replace<'a, T, R, W>(context: &'a T::Context, dst: MutPtrs<'a, T>, src: W) -> R
 where
     T: SoaRead<'a, R> + SoaWrite<W> + ?Sized,
@@ -386,7 +386,7 @@ pub unsafe fn get_unchecked<'a, T, I>(
     index: I,
 ) -> I::Ptrs<'a>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     I: SlicePtrsIndex<T>,
 {
     unsafe { index.get_unchecked(context, slices) }
@@ -399,7 +399,7 @@ pub fn get<'a, T, I>(
     index: I,
 ) -> Option<I::Ptrs<'a>>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     I: SlicePtrsIndex<T>,
 {
     index.get_ptrs(context, slices)
@@ -408,7 +408,7 @@ where
 #[inline]
 pub fn index<'a, T, I>(context: &'a T::Context, slices: SlicePtrs<'a, T>, index: I) -> I::Ptrs<'a>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     I: SlicePtrsIndex<T>,
 {
     index.index_ptrs(context, slices)
@@ -421,7 +421,7 @@ pub unsafe fn get_unchecked_mut<'a, T, I>(
     index: I,
 ) -> I::MutPtrs<'a>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     I: SlicePtrsIndex<T>,
 {
     unsafe { index.get_unchecked_mut(context, slices) }
@@ -434,7 +434,7 @@ pub fn get_mut<'a, T, I>(
     index: I,
 ) -> Option<I::MutPtrs<'a>>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     I: SlicePtrsIndex<T>,
 {
     index.get_mut_ptrs(context, slices)
@@ -447,7 +447,7 @@ pub fn index_mut<'a, T, I>(
     index: I,
 ) -> I::MutPtrs<'a>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     I: SlicePtrsIndex<T>,
 {
     index.index_mut_ptrs(context, slices)

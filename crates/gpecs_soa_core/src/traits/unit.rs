@@ -4,10 +4,10 @@ use core::{
 };
 
 use crate::traits::{
-    CloneToUninitSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+    SoaCloneToUninitContext, SoaContext, SoaRaw, SoaRawContext, SoaReadContext, SoaWriteContext,
 };
 
-unsafe impl RawSoaContext<()> for () {
+unsafe impl SoaRawContext<()> for () {
     type Ptrs<'a> = *const ();
 
     #[inline]
@@ -210,24 +210,24 @@ unsafe impl RawSoaContext<()> for () {
     }
 }
 
-unsafe impl RawSoa for () {
+unsafe impl SoaRaw for () {
     type Context = ();
     type Fields = ();
 }
 
-unsafe impl CloneToUninitSoaContext<()> for () {
+unsafe impl SoaCloneToUninitContext<()> for () {
     #[inline]
     unsafe fn ptrs_clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
 }
 
-unsafe impl<'a> ReadSoaContext<'a, ()> for () {
+unsafe impl<'a> SoaReadContext<'a, ()> for () {
     #[inline]
     unsafe fn ptrs_read(&'a self, ptrs: Self::Ptrs<'a>) {
         unsafe { ptr::read(ptrs) }
     }
 }
 
-unsafe impl WriteSoaContext<(), ()> for () {
+unsafe impl SoaWriteContext<(), ()> for () {
     #[inline]
     unsafe fn ptrs_write(&self, ptrs: Self::MutPtrs<'_>, value: ()) {
         unsafe { ptr::write(ptrs, value) }

@@ -6,7 +6,7 @@ use core::{
 use crate::{
     field::FieldLayouts,
     identity::Identity,
-    traits::{AllocSoaContext, AllocSoaTrusted},
+    traits::{SoaAllocContext, SoaAllocTrusted},
 };
 
 impl<'a, T> FieldLayouts<'a, Identity<T>> for () {
@@ -20,7 +20,7 @@ impl<'a, T> FieldLayouts<'a, Identity<T>> for () {
     }
 }
 
-unsafe impl<T> AllocSoaContext<Identity<T>> for () {
+unsafe impl<T> SoaAllocContext<Identity<T>> for () {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<T>(capacity)
@@ -65,4 +65,4 @@ unsafe impl<T> AllocSoaContext<Identity<T>> for () {
     }
 }
 
-unsafe impl<T> AllocSoaTrusted for Identity<T> {}
+unsafe impl<T> SoaAllocTrusted for Identity<T> {}

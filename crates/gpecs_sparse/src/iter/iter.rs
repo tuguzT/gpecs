@@ -13,7 +13,7 @@ use crate::{
     soa::{
         self,
         identity::Identity,
-        traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaOwned},
+        traits::{Ptrs, Refs, SlicePtrs, Slices, Soa, SoaOwned, SoaRaw},
     },
 };
 
@@ -23,7 +23,7 @@ type Inner<'ctx, 'a, K, V, P> = soa::slices::Iter<'ctx, 'a, KeyValuePair<K, V, P
 pub struct Iter<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
 where
     K: 'a,
-    V: RawSoa<Context: 'ctx> + ?Sized,
+    V: SoaRaw<Context: 'ctx> + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     inner: Inner<'ctx, 'a, K, V, P>,
@@ -31,7 +31,7 @@ where
 
 impl<'ctx, 'a, K, V, P> Iter<'ctx, 'a, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -224,7 +224,7 @@ where
 
 impl<K, V, P> Clone for Iter<'_, '_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]

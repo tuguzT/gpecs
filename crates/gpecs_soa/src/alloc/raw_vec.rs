@@ -21,7 +21,7 @@ use crate::{
     },
     ptrs::slice_from_raw_parts_mut,
     slices::SoaSlice,
-    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs},
+    traits::{MutPtrs, SoaAlloc, SoaAllocContext, SoaAllocTrusted},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -32,18 +32,18 @@ enum AllocInit {
     Zeroed,
 }
 
-pub struct RawSoaVec<T>
+pub struct RawVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     ptr: NonNull<u8>,
     capacity: usize,
     _marker: BufferDropCheck<T>,
 }
 
-impl<T> RawSoaVec<T>
+impl<T> RawVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     // Tiny Vecs are dumb. Skip to:
     // - 8 if the element size is 1, because any heap allocators is likely
@@ -247,9 +247,9 @@ where
         // handle_reserve behind a call, while making sure that this function is likely to be
         // inlined as just a comparison and a call if the comparison fails.
         #[cold]
-        fn do_reserve_and_handle<T>(this: &mut RawSoaVec<T>, len: usize, additional: usize)
+        fn do_reserve_and_handle<T>(this: &mut RawVec<T>, len: usize, additional: usize)
         where
-            T: AllocSoa + ?Sized,
+            T: SoaAlloc + ?Sized,
         {
             if let Err(err) = this.grow_amortized(len, additional) {
                 handle_error(err);
@@ -378,9 +378,9 @@ where
     }
 }
 
-impl<T> RawSoaVec<T>
+impl<T> RawVec<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaAllocTrusted + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -396,9 +396,9 @@ where
     }
 }
 
-impl<T> Drop for RawSoaVec<T>
+impl<T> Drop for RawVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
 {
     #[inline]
     fn drop(&mut self) {
@@ -406,17 +406,17 @@ where
     }
 }
 
-unsafe impl<T> Send for RawSoaVec<T>
+unsafe impl<T> Send for RawVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Send,
     T::Fields: Send,
 {
 }
 
-unsafe impl<T> Sync for RawSoaVec<T>
+unsafe impl<T> Sync for RawVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaAlloc + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {

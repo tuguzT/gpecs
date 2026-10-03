@@ -7,20 +7,20 @@ use rayon::iter::{
 
 use crate::{
     slices::{Iter, SoaView},
-    traits::{RawSoa, Refs, Slices, Soa, SoaOwned},
+    traits::{Refs, Slices, Soa, SoaOwned, SoaRaw},
 };
 
 #[repr(transparent)]
 pub struct ParIter<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     view: SoaView<'ctx, 'a, T>,
 }
 
 impl<'ctx, 'a, T> ParIter<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub fn new(view: SoaView<'ctx, 'a, T>) -> Self {
@@ -61,7 +61,7 @@ where
 
 impl<T> Clone for ParIter<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {

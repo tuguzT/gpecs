@@ -8,11 +8,11 @@ use rayon::iter::{
     plumbing::{Consumer, Producer, ProducerCallback, UnindexedConsumer, bridge},
 };
 
-use crate::soa::traits::RawSoa;
+use crate::soa::traits::SoaRaw;
 
 pub struct ParKeys<'ctx, 'a, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     context: &'ctx V::Context,
     keys: &'a [K],
@@ -20,7 +20,7 @@ where
 
 impl<'ctx, 'a, K, V> ParKeys<'ctx, 'a, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     pub(crate) fn new(context: &'ctx V::Context, keys: &'a [K]) -> Self {
@@ -49,7 +49,7 @@ where
 impl<K, V> Debug for ParKeys<'_, '_, K, V>
 where
     K: Debug,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     V::Context: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -63,7 +63,7 @@ where
 
 impl<K, V> Clone for ParKeys<'_, '_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -75,7 +75,7 @@ where
 impl<'a, K, V> ParallelIterator for ParKeys<'_, 'a, K, V>
 where
     K: Sync,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     V::Context: Sync,
 {
     type Item = &'a K;
@@ -95,7 +95,7 @@ where
 impl<K, V> IndexedParallelIterator for ParKeys<'_, '_, K, V>
 where
     K: Sync,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     V::Context: Sync,
 {
     fn len(&self) -> usize {
@@ -121,7 +121,7 @@ where
 impl<'a, K, V> Producer for ParKeys<'_, 'a, K, V>
 where
     K: Sync,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     V::Context: Sync,
 {
     type Item = &'a K;

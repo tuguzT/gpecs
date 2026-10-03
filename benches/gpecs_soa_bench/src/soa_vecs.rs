@@ -5,7 +5,7 @@ use gpecs_soa_erased::soa::{field::FieldLayoutsOwned, prelude::*};
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
 
 pub trait SoaVecs:
-    SoaOwned + AllocSoa<Context: FieldLayoutsOwned<Self, Output: IntoIterator<Item = Layout>>>
+    SoaOwned + SoaAlloc<Context: FieldLayoutsOwned<Self, Output: IntoIterator<Item = Layout>>>
 {
     type Vecs;
 }

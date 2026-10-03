@@ -8,7 +8,7 @@ use gpecs_soa_erased::{
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         traits::{
-            AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+            SoaAllocContext, SoaContext, SoaRaw, SoaRawContext, SoaReadContext, SoaWriteContext,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -26,7 +26,7 @@ use crate::{
     erased::{ErasedArchetype, Iter},
 };
 
-unsafe impl<T, D, S, P> RawSoaContext<ErasedBundleKind<T, D, S, P>>
+unsafe impl<T, D, S, P> SoaRawContext<ErasedBundleKind<T, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<T::Meta>, P>
 where
     T: ErasedArchetypeKind + ?Sized,
@@ -248,7 +248,7 @@ where
     }
 }
 
-unsafe impl<Meta, D, S, P> RawSoa for ErasedBundle<Meta, D, S, P>
+unsafe impl<Meta, D, S, P> SoaRaw for ErasedBundle<Meta, D, S, P>
 where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
@@ -260,7 +260,7 @@ where
 }
 
 unsafe impl<'a, Meta, D, S, P>
-    ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBorrowedBundle<'a, Meta, D, S, P>>
+    SoaReadContext<'a, ErasedBundle<Meta, D, S, P>, ErasedBorrowedBundle<'a, Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta,
@@ -274,7 +274,7 @@ where
     }
 }
 
-unsafe impl<'a, Meta, D, S, P> ReadSoaContext<'a, ErasedBundle<Meta, D, S, P>>
+unsafe impl<'a, Meta, D, S, P> SoaReadContext<'a, ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta + Clone,
@@ -290,7 +290,7 @@ where
 }
 
 unsafe impl<Meta, W, D, N, S, U, P>
-    WriteSoaContext<ErasedBundle<Meta, D, S, P>, ErasedBundleKind<W, N, U, P>>
+    SoaWriteContext<ErasedBundle<Meta, D, S, P>, ErasedBundleKind<W, N, U, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta + Clone,
@@ -341,7 +341,7 @@ where
     }
 }
 
-unsafe impl<Meta, D, S, P> AllocSoaContext<ErasedBundle<Meta, D, S, P>>
+unsafe impl<Meta, D, S, P> SoaAllocContext<ErasedBundle<Meta, D, S, P>>
     for ErasedSoaContext<ErasedArchetype<Meta>, P>
 where
     Meta: ErasedArchetypeMeta,

@@ -10,7 +10,7 @@ use crate::{
     iter::{IterMut, IterMutPtrs, ValuePtrs, Values, ValuesMut},
     soa::{
         self,
-        traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs},
+        traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, SoaRaw},
     },
 };
 
@@ -19,7 +19,7 @@ type Inner<'ctx, K, V, P> = soa::ptrs::IterMutPtrs<'ctx, KeyValuePair<K, V, P>>;
 #[repr(transparent)]
 pub struct ValueMutPtrs<'ctx, K, V, P = CoreSliceItemPtrs<K>>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     inner: IterMutPtrs<'ctx, K, V, P>,
@@ -27,7 +27,7 @@ where
 
 impl<'ctx, K, V, P> ValueMutPtrs<'ctx, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -192,7 +192,7 @@ where
 
 impl<K, V, P> Debug for ValueMutPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Debug,
 {
@@ -204,7 +204,7 @@ where
 
 impl<K, V, P> Clone for ValueMutPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -218,7 +218,7 @@ where
 
 impl<'ctx, K, V, P> Iterator for ValueMutPtrs<'ctx, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     type Item = MutPtrs<'ctx, V>;
@@ -238,7 +238,7 @@ where
 
 impl<K, V, P> DoubleEndedIterator for ValueMutPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -250,7 +250,7 @@ where
 
 impl<K, V, P> ExactSizeIterator for ValueMutPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
     #[inline]
@@ -261,7 +261,7 @@ where
 
 impl<K, V, P> FusedIterator for ValueMutPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
 }

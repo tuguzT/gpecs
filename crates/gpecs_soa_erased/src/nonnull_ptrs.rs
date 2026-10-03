@@ -16,7 +16,7 @@ use crate::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
         },
-        traits::{AllocSoa, AllocSoaContext, NonNullPtrs, RawSoaContext},
+        traits::{NonNullPtrs, SoaAlloc, SoaAllocContext, SoaRawContext},
     },
 };
 
@@ -148,7 +148,7 @@ where
         context: &T::Context,
     ) -> Result<NonNullPtrs<'_, T>, DowncastError<Self>>
     where
-        T: AllocSoa + ?Sized,
+        T: SoaAlloc + ?Sized,
     {
         let Self {
             ref layouts,

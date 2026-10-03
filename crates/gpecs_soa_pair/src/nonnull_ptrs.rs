@@ -9,7 +9,7 @@ use gpecs_ptr::slice::{
     MutSliceItemPtr, NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr, SliceItemPtr,
 };
 use gpecs_soa::{
-    traits::{MutPtrs, NonNullPtrs, RawSoa, RawSoaContext},
+    traits::{MutPtrs, NonNullPtrs, SoaRaw, SoaRawContext},
     wrapper,
 };
 
@@ -17,7 +17,7 @@ use crate::{KeyValueMutPtrs, KeyValuePtrs};
 
 pub struct KeyValueNonNullPtrs<'ctx, K, V, P = NonNull<K>>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K>,
 {
     key: P,
@@ -26,7 +26,7 @@ where
 
 impl<'ctx, K, V, P> KeyValueNonNullPtrs<'ctx, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K>,
 {
     #[inline]
@@ -83,7 +83,7 @@ where
 
 impl<K, V, P> Debug for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K> + Debug,
     for<'ctx> NonNullPtrs<'ctx, V>: Debug,
 {
@@ -99,7 +99,7 @@ where
 
 impl<K, V, P> PartialEq for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K> + PartialEq,
     for<'ctx> NonNullPtrs<'ctx, V>: PartialEq,
 {
@@ -113,7 +113,7 @@ where
 
 impl<K, V, P> Eq for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K> + Eq,
     for<'ctx> NonNullPtrs<'ctx, V>: Eq,
 {
@@ -121,7 +121,7 @@ where
 
 impl<K, V, P> PartialOrd for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K> + PartialOrd,
     for<'ctx> NonNullPtrs<'ctx, V>: PartialOrd,
 {
@@ -135,7 +135,7 @@ where
 
 impl<K, V, P> Ord for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K> + Ord,
     for<'ctx> NonNullPtrs<'ctx, V>: Ord,
 {
@@ -149,7 +149,7 @@ where
 
 impl<K, V, P> Hash for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K> + Hash,
     for<'ctx> NonNullPtrs<'ctx, V>: Hash,
 {
@@ -161,7 +161,7 @@ where
 
 impl<K, V, P> Clone for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K>,
 {
     #[inline]
@@ -175,7 +175,7 @@ where
 
 impl<K, V, P> Copy for KeyValueNonNullPtrs<'_, K, V, P>
 where
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: NonNullSliceItemPtr<Item = K>,
     for<'ctx> NonNullPtrs<'ctx, V>: Copy,
 {

@@ -13,7 +13,7 @@ use crate::{
     ptr::slice::ConstSliceItemPtr,
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
-        traits::{AllocSoa, Slices, Soa, SoaContext},
+        traits::{Slices, Soa, SoaAlloc, SoaContext},
     },
 };
 
@@ -113,7 +113,7 @@ where
         context: &T::Context,
     ) -> Result<Slices<'_, 'a, T>, DowncastError<Self>>
     where
-        T: AllocSoa + Soa<'a> + ?Sized,
+        T: SoaAlloc + Soa<'a> + ?Sized,
     {
         let Self { ptrs, .. } = self;
 

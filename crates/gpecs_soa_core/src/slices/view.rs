@@ -9,13 +9,13 @@ use core::{
 use crate::{
     ptrs::{IterPtrs, SlicePtrsIndex, SoaViewPtrs},
     slices::{IndexHelper, Iter, SlicesIndex},
-    traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
+    traits::{Ptrs, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned, SoaRaw},
 };
 
 #[repr(transparent)]
 pub struct SoaView<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ptrs: SoaViewPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
@@ -23,7 +23,7 @@ where
 
 impl<'ctx, T> SoaView<'ctx, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub unsafe fn from_view_ptrs(ptrs: SoaViewPtrs<'ctx, T>) -> Self {
@@ -434,7 +434,7 @@ where
 
 impl<T> AsRef<Self> for SoaView<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -487,7 +487,7 @@ where
 
 impl<T> Clone for SoaView<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -500,7 +500,7 @@ where
 
 impl<T> Copy for SoaView<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     for<'a> Ptrs<'a, T>: Copy,
 {
 }
@@ -582,7 +582,7 @@ where
 
 unsafe impl<T> Send for SoaView<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {
@@ -590,7 +590,7 @@ where
 
 unsafe impl<T> Sync for SoaView<'_, '_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {

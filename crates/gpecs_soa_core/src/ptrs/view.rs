@@ -7,13 +7,13 @@ use core::{
 use crate::{
     ptrs::{IterPtrs, SlicePtrsIndex, SoaViewMutPtrs},
     slices::SoaView,
-    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs},
+    traits::{Ptrs, SlicePtrs, SoaRaw, SoaRawContext},
     wrapper,
 };
 
 pub struct SoaViewPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     ptrs: wrapper::Ptrs<'ctx, T>,
     context: &'ctx T::Context,
@@ -22,7 +22,7 @@ where
 
 impl<'ctx, T> SoaViewPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     pub fn new(context: &'ctx T::Context, slices: SlicePtrs<'ctx, T>) -> Self {
@@ -217,7 +217,7 @@ where
 
 impl<T> Debug for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -228,7 +228,7 @@ where
 
 impl<T> Clone for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -245,14 +245,14 @@ where
 
 impl<T> Copy for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     for<'ctx> Ptrs<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: PartialEq,
     for<'ctx> Ptrs<'ctx, T>: PartialEq,
 {
@@ -267,7 +267,7 @@ where
 
 impl<T> Eq for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Eq,
     for<'ctx> Ptrs<'ctx, T>: Eq,
 {
@@ -275,7 +275,7 @@ where
 
 impl<T> PartialOrd for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: PartialOrd,
     for<'ctx> Ptrs<'ctx, T>: PartialOrd,
 {
@@ -290,7 +290,7 @@ where
 
 impl<T> Ord for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Ord,
     for<'ctx> Ptrs<'ctx, T>: Ord,
 {
@@ -305,7 +305,7 @@ where
 
 impl<T> Hash for SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
     T::Context: Hash,
     for<'ctx> Ptrs<'ctx, T>: Hash,
 {
@@ -317,7 +317,7 @@ where
 
 impl<'a, T> IntoIterator for &'a SoaViewPtrs<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Item = Ptrs<'a, T>;
     type IntoIter = IterPtrs<'a, T>;
@@ -330,7 +330,7 @@ where
 
 impl<'ctx, T> IntoIterator for SoaViewPtrs<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: SoaRaw + ?Sized,
 {
     type Item = Ptrs<'ctx, T>;
     type IntoIter = IterPtrs<'ctx, T>;

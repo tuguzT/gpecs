@@ -31,8 +31,8 @@ use crate::{
             FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
         },
         traits::{
-            AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
-            WriteSoaContext,
+            Refs, RefsMut, Soa, SoaAlloc, SoaAllocContext, SoaRead, SoaReadContext, SoaWrite,
+            SoaWriteContext,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -160,7 +160,7 @@ where
         context: &'a V::Context,
     ) -> Result<R, DowncastError<Self>>
     where
-        V: AllocSoa + SoaRead<'a, R> + ?Sized,
+        V: SoaAlloc + SoaRead<'a, R> + ?Sized,
     {
         let Self {
             ref layouts,
@@ -302,7 +302,7 @@ where
         context: &'ctx V::Context,
     ) -> Result<Refs<'ctx, 'a, V>, DowncastError<&'a Self>>
     where
-        V: AllocSoa + Soa<'a> + ?Sized,
+        V: SoaAlloc + Soa<'a> + ?Sized,
     {
         let into_self = |_| self;
 
@@ -318,7 +318,7 @@ where
         context: &'ctx V::Context,
     ) -> Result<RefsMut<'ctx, 'a, V>, DowncastError<&'a mut Self>>
     where
-        V: AllocSoa + Soa<'a> + ?Sized,
+        V: SoaAlloc + Soa<'a> + ?Sized,
     {
         let ptr = ptr::from_mut(self);
         let into_self = |_| unsafe { ptr.as_mut_unchecked() };
@@ -391,7 +391,7 @@ where
         value: W,
     ) -> Result<Self, FromStorageValueError<W>>
     where
-        V: AllocSoa + SoaWrite<W> + ?Sized,
+        V: SoaAlloc + SoaWrite<W> + ?Sized,
         D: FromIterator<FieldLayoutsItem<'a, V::Context, V>>,
     {
         let check = || {
@@ -427,7 +427,7 @@ where
         value: W,
     ) -> Result<Self, FromLayoutsValueError<W, T::Error>>
     where
-        V: AllocSoa + SoaWrite<W> + ?Sized,
+        V: SoaAlloc + SoaWrite<W> + ?Sized,
     {
         let f = || {
             let mut offsets = buffer_offsets(layouts.field_layouts(), 1);
@@ -475,7 +475,7 @@ where
         value: W,
     ) -> Result<Self, FromValueError<W, T::Error>>
     where
-        V: AllocSoa + SoaWrite<W> + ?Sized,
+        V: SoaAlloc + SoaWrite<W> + ?Sized,
         D: FromIterator<FieldLayoutsItem<'a, V::Context, V>>,
     {
         let f = || {

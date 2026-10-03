@@ -5,7 +5,7 @@ use core::{
     ptr,
 };
 
-use crate::traits::{AllocSoaContext, AllocSoaTrusted, FieldLayouts};
+use crate::traits::{FieldLayouts, SoaAllocContext, SoaAllocTrusted};
 
 // https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
 #[macro_export]
@@ -26,7 +26,7 @@ macro_rules! count_idents {
 #[doc(hidden)]
 pub use count_idents;
 
-/// Helper type for [SoA](super::RawSoa) implementation of [tuples](prim@tuple).
+/// Helper type for [SoA](super::SoaRaw) implementation of [tuples](prim@tuple).
 pub struct TupleHelper<T>(PhantomData<fn() -> T>);
 
 impl<A> TupleHelper<(A,)> {
@@ -46,7 +46,7 @@ impl<'a, A> FieldLayouts<'a, (A,)> for () {
     }
 }
 
-unsafe impl<A> AllocSoaContext<(A,)> for () {
+unsafe impl<A> SoaAllocContext<(A,)> for () {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<A>(capacity)
@@ -91,7 +91,7 @@ unsafe impl<A> AllocSoaContext<(A,)> for () {
     }
 }
 
-unsafe impl<A> AllocSoaTrusted for (A,) {}
+unsafe impl<A> SoaAllocTrusted for (A,) {}
 
 #[inline]
 #[must_use]
@@ -149,7 +149,7 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        unsafe impl<$($types,)*> AllocSoaContext<($($types,)*)> for () {
+        unsafe impl<$($types,)*> SoaAllocContext<($($types,)*)> for () {
             #[inline]
             fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
@@ -230,7 +230,7 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        unsafe impl<$($types,)*> AllocSoaTrusted for ($($types,)*) {}
+        unsafe impl<$($types,)*> SoaAllocTrusted for ($($types,)*) {}
     };
 }
 

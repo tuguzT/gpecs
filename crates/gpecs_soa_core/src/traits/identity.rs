@@ -6,11 +6,11 @@ use core::{
 use crate::{
     identity::Identity,
     traits::{
-        CloneToUninitSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
+        SoaCloneToUninitContext, SoaContext, SoaRaw, SoaRawContext, SoaReadContext, SoaWriteContext,
     },
 };
 
-unsafe impl<T> RawSoaContext<Identity<T>> for () {
+unsafe impl<T> SoaRawContext<Identity<T>> for () {
     type Ptrs<'a> = *const Identity<T>;
 
     #[inline]
@@ -210,12 +210,12 @@ unsafe impl<T> RawSoaContext<Identity<T>> for () {
     }
 }
 
-unsafe impl<T> RawSoa for Identity<T> {
+unsafe impl<T> SoaRaw for Identity<T> {
     type Context = ();
     type Fields = Identity<T>;
 }
 
-unsafe impl<T> CloneToUninitSoaContext<Identity<T>> for ()
+unsafe impl<T> SoaCloneToUninitContext<Identity<T>> for ()
 where
     T: Clone,
 {
@@ -226,14 +226,14 @@ where
     }
 }
 
-unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>> for () {
+unsafe impl<'a, T> SoaReadContext<'a, Identity<T>> for () {
     #[inline]
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
         unsafe { ptr::read(src) }
     }
 }
 
-unsafe impl<T> WriteSoaContext<Identity<T>, Identity<T>> for () {
+unsafe impl<T> SoaWriteContext<Identity<T>, Identity<T>> for () {
     #[inline]
     unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: Identity<T>) {
         unsafe { ptr::write(dst, value) }

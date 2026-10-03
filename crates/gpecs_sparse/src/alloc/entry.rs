@@ -12,7 +12,7 @@ use crate::{
         ptrs::{SoaViewMutPtrs, SoaViewPtrs},
         slices::{SoaView, SoaViewMut},
         traits::{
-            AllocSoa, Context, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaOwned,
+            Context, MutPtrs, Ptrs, Refs, RefsMut, Soa, SoaAlloc, SoaContext, SoaOwned, SoaRaw,
             SoaRead, SoaReadOwned, SoaWrite,
         },
     },
@@ -347,7 +347,7 @@ fn unwrap_entry_value<T>(value: Option<T>) -> T {
 
 pub trait EpochSparseContainer {
     type Key: Key;
-    type Value: RawSoa + ?Sized;
+    type Value: SoaRaw + ?Sized;
 
     fn context(&self) -> &Context<Self::Value>;
 
@@ -375,14 +375,14 @@ pub trait EpochSparseContainer {
 impl<K, V, S> EpochSparseContainer for EpochSparseSet<K, V, S>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Key = K;
     type Value = V;
 
     #[inline]
-    fn context(&self) -> &<V as RawSoa>::Context {
+    fn context(&self) -> &<V as SoaRaw>::Context {
         Self::context(self)
     }
 
@@ -436,14 +436,14 @@ where
 impl<K, V, S> EpochSparseContainer for EpochSparseArena<K, V, S>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Key = K;
     type Value = V;
 
     #[inline]
-    fn context(&self) -> &<V as RawSoa>::Context {
+    fn context(&self) -> &<V as SoaRaw>::Context {
         Self::context(self)
     }
 
@@ -499,7 +499,7 @@ macro_rules! generate_entry_types {
         pub enum Entry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             Occupied(OccupiedEntry<'a, K, V, S>),
@@ -509,7 +509,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> Entry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -655,7 +655,7 @@ macro_rules! generate_entry_types {
         impl<K, V, S> Entry<'_, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::SoaOwned + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + $crate::soa::traits::SoaOwned + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -678,7 +678,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> Entry<'_, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + $crate::soa::traits::Soa<'a> + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -726,7 +726,7 @@ macro_rules! generate_entry_types {
         impl<K, V, S> core::fmt::Debug for Entry<'_, K, V, S>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
             for<'ctx, 'a> $crate::soa::traits::Refs<'ctx, 'a, V>: Debug,
         {
@@ -742,7 +742,7 @@ macro_rules! generate_entry_types {
         pub struct OccupiedEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             inner: $crate::alloc::entry::OccupiedEntry<'a, $container>,
@@ -751,7 +751,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> OccupiedEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -870,7 +870,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> OccupiedEntry<'_, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + $crate::soa::traits::Soa<'a> + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -905,7 +905,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> OccupiedEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + $crate::soa::traits::Soa<'a> + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -926,7 +926,7 @@ macro_rules! generate_entry_types {
         impl<K, V, S> core::fmt::Debug for OccupiedEntry<'_, K, V, S>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
             for<'ctx, 'a> $crate::soa::traits::Refs<'ctx, 'a, V>: Debug,
         {
@@ -940,7 +940,7 @@ macro_rules! generate_entry_types {
         pub struct VacantEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             inner: $crate::alloc::entry::VacantEntry<'a, $container>,
@@ -949,7 +949,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> VacantEntry<'a, K, V, S>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             #[inline]
@@ -990,7 +990,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V, S> core::fmt::Debug for VacantEntry<'a, K, V, S>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::SoaAlloc + ?Sized,
             S: $sparse_item_bound,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

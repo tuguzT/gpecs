@@ -15,7 +15,7 @@ use crate::{
     soa::{
         identity::Identity,
         ptrs::SoaViewPtrs,
-        traits::{Ptrs, RawSoa, SlicePtrs},
+        traits::{Ptrs, SlicePtrs, SoaRaw},
     },
     view::{EpochSparseView, EpochSparseViewMutPtrs},
 };
@@ -26,7 +26,7 @@ pub type SparseViewPtrs<'ctx, T, S = DefaultSparseItem<usize>, P = CoreSliceItem
 pub struct EpochSparseViewPtrs<'ctx, K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
 where
     K: Key,
-    V: RawSoa<Context: 'ctx> + ?Sized,
+    V: SoaRaw<Context: 'ctx> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -37,7 +37,7 @@ where
 impl<'ctx, K, V, S, P> EpochSparseViewPtrs<'ctx, K, V, S, P>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -569,7 +569,7 @@ where
 impl<K, V, S, P> Debug for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> SlicePtrs<'ctx, V>: Debug,
@@ -587,7 +587,7 @@ where
 impl<K, V, S, P> Clone for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -603,7 +603,7 @@ where
 impl<K, V, S, P> Copy for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> Ptrs<'ctx, V>: Copy,
@@ -613,7 +613,7 @@ where
 impl<K, V, S, P> PartialEq for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa<Context: PartialEq> + ?Sized,
+    V: SoaRaw<Context: PartialEq> + ?Sized,
     P: SliceItemPtrs<Item = K, Const: PartialEq>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> Ptrs<'ctx, V>: PartialEq,
@@ -629,7 +629,7 @@ where
 impl<K, V, S, P> Eq for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa<Context: Eq> + ?Sized,
+    V: SoaRaw<Context: Eq> + ?Sized,
     P: SliceItemPtrs<Item = K, Const: Eq>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> Ptrs<'ctx, V>: Eq,
@@ -639,7 +639,7 @@ where
 impl<K, V, S, P> PartialOrd for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa<Context: PartialOrd> + ?Sized,
+    V: SoaRaw<Context: PartialOrd> + ?Sized,
     P: SliceItemPtrs<Item = K, Const: PartialOrd>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> Ptrs<'ctx, V>: PartialOrd,
@@ -655,7 +655,7 @@ where
 impl<K, V, S, P> Ord for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa<Context: Ord> + ?Sized,
+    V: SoaRaw<Context: Ord> + ?Sized,
     P: SliceItemPtrs<Item = K, Const: Ord>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> Ptrs<'ctx, V>: Ord,
@@ -671,7 +671,7 @@ where
 impl<K, V, S, P> Hash for EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa<Context: Hash> + ?Sized,
+    V: SoaRaw<Context: Hash> + ?Sized,
     P: SliceItemPtrs<Item = K, Const: Hash>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx> Ptrs<'ctx, V>: Hash,
@@ -685,7 +685,7 @@ where
 impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseViewPtrs<'_, K, V, S, P>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -701,7 +701,7 @@ where
 impl<'ctx, K, V, S, P> IntoIterator for EpochSparseViewPtrs<'ctx, K, V, S, P>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: SoaRaw + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {

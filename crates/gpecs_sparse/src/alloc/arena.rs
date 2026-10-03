@@ -34,9 +34,9 @@ use crate::{
     soa::{
         self,
         traits::{
-            AllocSoa, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext, Refs, RefsMut, SliceMutPtrs,
-            SlicePtrs, Slices, SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaReadOwned,
-            SoaWrite, WriteSoaContext,
+            MutPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+            SoaAlloc, SoaContext, SoaOwned, SoaRawContext, SoaRead, SoaReadContext, SoaReadOwned,
+            SoaWrite, SoaWriteContext,
         },
         vec::SoaVec,
     },
@@ -55,7 +55,7 @@ pub type SparseArena<T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usiz
 pub struct EpochSparseArena<K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -67,7 +67,7 @@ where
 impl<K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -1345,7 +1345,7 @@ where
 impl<K, V, S> EpochSparseArena<K, V, S>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -1381,7 +1381,7 @@ where
 impl<K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -1526,7 +1526,7 @@ where
 impl<'a, K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + Soa<'a> + ?Sized,
+    V: SoaAlloc + Soa<'a> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -1854,7 +1854,7 @@ where
 impl<K, V, S, P> EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: SoaOwned + AllocSoa + ?Sized,
+    V: SoaOwned + SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -1978,7 +1978,7 @@ where
 impl<K, V, S, P> Debug for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Debug,
     SoaVec<KeyValuePair<K, V, P>>: Debug,
@@ -2001,7 +2001,7 @@ where
 impl<K, V, S, P> Default for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Default,
@@ -2015,7 +2015,7 @@ where
 impl<K, V, S, P> PartialEq for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + PartialEq,
     SoaVec<KeyValuePair<K, V, P>>: PartialEq,
@@ -2035,7 +2035,7 @@ where
 impl<K, V, S, P> Eq for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Eq,
     SoaVec<KeyValuePair<K, V, P>>: Eq,
@@ -2045,7 +2045,7 @@ where
 impl<K, V, S, P> PartialOrd for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + PartialOrd,
     SoaVec<KeyValuePair<K, V, P>>: PartialOrd,
@@ -2065,7 +2065,7 @@ where
 impl<K, V, S, P> Ord for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Ord,
     SoaVec<KeyValuePair<K, V, P>>: Ord,
@@ -2085,7 +2085,7 @@ where
 impl<K, V, S, P> Hash for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Hash,
     SoaVec<KeyValuePair<K, V, P>>: Hash,
@@ -2103,7 +2103,7 @@ where
 impl<K, V, S, P> Clone for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     SoaVec<KeyValuePair<K, V, P>>: Clone,
@@ -2143,7 +2143,7 @@ where
 impl<T, K, V, S, P> Index<K> for EpochSparseArena<K, V, S, P>
 where
     K: Key + Debug,
-    V: SoaOwned + AllocSoa + ?Sized,
+    V: SoaOwned + SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T>,
@@ -2159,7 +2159,7 @@ where
 impl<T, K, V, S, P> IndexMut<K> for EpochSparseArena<K, V, S, P>
 where
     K: Key + Debug,
-    V: SoaOwned + AllocSoa + ?Sized,
+    V: SoaOwned + SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>,
@@ -2173,7 +2173,7 @@ where
 impl<T, K, V, S, P> AsRef<[T]> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: SoaOwned + AllocSoa + ?Sized,
+    V: SoaOwned + SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
@@ -2187,7 +2187,7 @@ where
 impl<T, K, V, S, P> AsMut<[T]> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: SoaOwned + AllocSoa + ?Sized,
+    V: SoaOwned + SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
@@ -2201,7 +2201,7 @@ where
 impl<K, V, S, P> AsRef<Self> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -2214,7 +2214,7 @@ where
 impl<K, V, S, P> AsMut<Self> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
+    V: SoaAlloc + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -2227,7 +2227,7 @@ where
 impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + Soa<'a> + ?Sized,
+    V: SoaAlloc + Soa<'a> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -2243,7 +2243,7 @@ where
 impl<'a, K, V, S, P> IntoIterator for &'a mut EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + Soa<'a> + ?Sized,
+    V: SoaAlloc + Soa<'a> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -2259,7 +2259,7 @@ where
 impl<K, V, S, P> IntoIterator for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + SoaReadOwned<V>,
+    V: SoaAlloc + SoaReadOwned<V>,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
@@ -2276,7 +2276,7 @@ where
 impl<'a, K, V, S, P> rayon::iter::IntoParallelIterator for &'a EpochSparseArena<K, V, S, P>
 where
     K: Key + Sync,
-    V: AllocSoa + Soa<'a> + ?Sized,
+    V: SoaAlloc + Soa<'a> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Sync,
@@ -2296,7 +2296,7 @@ where
 impl<'a, K, V, S, P> rayon::iter::IntoParallelIterator for &'a mut EpochSparseArena<K, V, S, P>
 where
     K: Key + Send + Sync,
-    V: AllocSoa + Soa<'a> + ?Sized,
+    V: SoaAlloc + Soa<'a> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Sync,
@@ -2315,7 +2315,7 @@ where
 impl<K, V, S, P, W> FromIterator<(K, W)> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + SoaWrite<W> + ?Sized,
+    V: SoaAlloc + SoaWrite<W> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Default,
@@ -2342,7 +2342,7 @@ where
 impl<K, V, S, P, W> Extend<(K, W)> for EpochSparseArena<K, V, S, P>
 where
     K: Key,
-    V: AllocSoa + SoaWrite<W> + ?Sized,
+    V: SoaAlloc + SoaWrite<W> + ?Sized,
     P: SliceItemPtrs<Item = K>,
     S: ArenaSparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {

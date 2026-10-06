@@ -46,7 +46,7 @@ where
     #[inline]
     pub fn len(&self) -> usize {
         let Self { start, end, .. } = *self;
-        end - start
+        unsafe { end.unchecked_sub(start) }
     }
 
     #[inline]
@@ -150,17 +150,8 @@ where
 
     #[inline]
     pub fn as_slice_ptrs_with_context(&self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
-        let Self {
-            ref ptrs,
-            context,
-            start,
-            ..
-        } = *self;
-
         let len = self.len();
-        let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.ptrs_cast_const(ptrs);
-        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        let (context, ptrs) = self.as_ptrs_with_context();
         let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -173,16 +164,8 @@ where
 
     #[inline]
     pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&'ctx T::Context, SliceMutPtrs<'ctx, T>) {
-        let Self {
-            ref ptrs,
-            context,
-            start,
-            ..
-        } = *self;
-
         let len = self.len();
-        let ptrs = ptrs.clone().into_inner();
-        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -196,16 +179,7 @@ where
     #[inline]
     pub fn into_slice_ptrs_with_context(self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
         let len = self.len();
-        let Self {
-            ptrs,
-            context,
-            start,
-            ..
-        } = self;
-
-        let ptrs = ptrs.into_inner();
-        let ptrs = context.ptrs_cast_const(ptrs);
-        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        let (context, ptrs) = self.into_ptrs_with_context();
         let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -217,18 +191,9 @@ where
     }
 
     #[inline]
-    #[doc(alias = "into_parts")]
     pub fn into_mut_slice_ptrs_with_context(self) -> (&'ctx T::Context, SliceMutPtrs<'ctx, T>) {
         let len = self.len();
-        let Self {
-            ptrs,
-            context,
-            start,
-            ..
-        } = self;
-
-        let ptrs = ptrs.into_inner();
-        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
+        let (context, ptrs) = self.into_mut_ptrs_with_context();
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -258,7 +223,7 @@ where
         offset: usize,
     ) -> MutPtrs<'b, T> {
         let old_start = *start;
-        *start += offset;
+        *start = unsafe { start.unchecked_add(offset) };
         unsafe { context.mut_ptrs_add(ptrs, old_start) }
     }
 
@@ -269,7 +234,7 @@ where
         context: &'b T::Context,
         offset: usize,
     ) -> MutPtrs<'b, T> {
-        *end -= offset;
+        *end = unsafe { end.unchecked_sub(offset) };
         unsafe { context.mut_ptrs_add(ptrs, *end) }
     }
 }
@@ -326,6 +291,7 @@ where
             ref mut start,
             ..
         } = *self;
+
         let ptrs = ptrs.clone().into_inner();
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
         Some(ptrs)
@@ -358,10 +324,9 @@ where
             ref mut start,
             ..
         } = *self;
+
         let ptrs = ptrs.clone().into_inner();
-        unsafe {
-            Self::post_inc_start(start, ptrs, context, n);
-        }
+        unsafe { Self::post_inc_start(start, ptrs, context, n) };
         self.next()
     }
 
@@ -382,6 +347,13 @@ where
             return init;
         }
 
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            end,
+        } = self;
+
         // this implementation consists of the following optimizations compared to the
         // default implementation:
         // - do-while loop, as is llvm's preferred loop shape,
@@ -389,12 +361,6 @@ where
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        let Self {
-            ref ptrs,
-            context,
-            start,
-            end,
-        } = self;
         let mut acc = init;
         let mut i = start;
         loop {
@@ -494,7 +460,7 @@ where
                 assert!(i < n);
                 return Some(i);
             }
-            i += 1;
+            i = unsafe { i.unchecked_add(1) };
         }
         None
     }
@@ -508,7 +474,7 @@ where
         let n = IterMutPtrs::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
-            i -= 1;
+            i = unsafe { i.unchecked_sub(1) };
             if predicate(x) {
                 assert!(i < n);
                 return Some(i);
@@ -534,6 +500,7 @@ where
             ref mut end,
             ..
         } = *self;
+
         let ptrs = ptrs.clone().into_inner();
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
         Some(ptrs)
@@ -552,10 +519,9 @@ where
             ref mut end,
             ..
         } = *self;
+
         let ptrs = ptrs.clone().into_inner();
-        unsafe {
-            Self::pre_dec_end(end, ptrs, context, n);
-        }
+        unsafe { Self::pre_dec_end(end, ptrs, context, n) };
         self.next_back()
     }
 }

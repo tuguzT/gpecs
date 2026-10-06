@@ -256,9 +256,7 @@ where
 
     #[inline]
     pub fn into_slices_with_context(self) -> (&'ctx T::Context, Slices<'ctx, 'a, T>) {
-        let Self { ptrs, .. } = self;
-
-        let (context, slices) = ptrs.into_slice_ptrs_with_context();
+        let (context, slices) = self.into_slice_ptrs_with_context();
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
@@ -338,9 +336,7 @@ where
 
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
-        let Self { ptrs, .. } = self;
-
-        let (context, slices) = ptrs.as_slice_ptrs_with_context();
+        let (context, slices) = self.as_slice_ptrs_with_context();
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
@@ -416,8 +412,7 @@ where
     where
         Refs<'a, 'a, T>: PartialEq<V>,
     {
-        let mut iter = self.into_iter();
-        iter.any(move |item| item.eq(&value))
+        self.iter().any(move |item| item.eq(&value))
     }
 }
 
@@ -491,10 +486,10 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref ptrs, phantom } = *self;
+        let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.clone();
-        Self { ptrs, phantom }
+        unsafe { Self::from_view_ptrs(ptrs) }
     }
 }
 

@@ -205,7 +205,6 @@ where
     pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
         let len = self.len();
         let (context, ptrs) = self.as_ptrs_with_context();
-
         let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -220,7 +219,6 @@ where
     pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
         let len = self.len();
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -303,11 +301,11 @@ where
             return;
         }
 
+        let len = self.len();
         let ptr = self.as_mut_ptr();
         let (context, old_ptrs) = self.as_ptrs_with_context();
         let new_ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, new_capacity) };
 
-        let len = self.len();
         unsafe { context.ptrs_copy_forward(old_ptrs, new_ptrs, len) }
     }
 
@@ -962,9 +960,7 @@ where
                     }
                 }
                 // SAFETY: After filling holes, all items are in contiguous memory.
-                unsafe {
-                    v.set_len(original_len - deleted_cnt);
-                }
+                unsafe { v.set_len(original_len - deleted_cnt) }
             }
         }
 

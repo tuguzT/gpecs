@@ -54,7 +54,7 @@ where
     #[inline]
     pub fn len(&self) -> usize {
         let Self { start, end, .. } = *self;
-        end - start
+        unsafe { end.unchecked_sub(start) }
     }
 
     #[inline]
@@ -200,7 +200,7 @@ where
         offset: usize,
     ) -> Ptrs<'a, T> {
         let old_start = *start;
-        *start += offset;
+        *start = unsafe { start.unchecked_add(offset) };
         unsafe { context.ptrs_add(ptrs, old_start) }
     }
 
@@ -211,7 +211,7 @@ where
         context: &'a T::Context,
         offset: usize,
     ) -> Ptrs<'a, T> {
-        *end -= offset;
+        *end = unsafe { end.unchecked_sub(offset) };
         unsafe { context.ptrs_add(ptrs, *end) }
     }
 }
@@ -391,9 +391,7 @@ where
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
-        unsafe {
-            Self::post_inc_start(start, ptrs, context, n);
-        }
+        unsafe { Self::post_inc_start(start, ptrs, context, n) };
         self.next()
     }
 
@@ -414,6 +412,13 @@ where
             return init;
         }
 
+        let Self {
+            ref ptrs,
+            start,
+            end,
+            ..
+        } = self;
+
         // this implementation consists of the following optimizations compared to the
         // default implementation:
         // - do-while loop, as is llvm's preferred loop shape,
@@ -421,12 +426,6 @@ where
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        let Self {
-            ref ptrs,
-            start,
-            end,
-            ..
-        } = self;
         let context = self.context();
         let mut acc = init;
         let mut i = start;
@@ -529,7 +528,7 @@ where
                 assert!(i < n);
                 return Some(i);
             }
-            i += 1;
+            i = unsafe { i.unchecked_add(1) };
         }
         None
     }
@@ -543,7 +542,7 @@ where
         let n = self.len();
         let mut i = n;
         while let Some(x) = self.next_back() {
-            i -= 1;
+            i = unsafe { i.unchecked_sub(1) };
             if predicate(x) {
                 assert!(i < n);
                 return Some(i);
@@ -596,9 +595,7 @@ where
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
-        unsafe {
-            Self::pre_dec_end(end, ptrs, context, n);
-        }
+        unsafe { Self::pre_dec_end(end, ptrs, context, n) };
         self.next_back()
     }
 }

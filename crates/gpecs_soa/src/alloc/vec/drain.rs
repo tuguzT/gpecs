@@ -125,9 +125,7 @@ where
 
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
-        let Self { iter, .. } = self;
-
-        let (context, slices) = iter.as_slice_ptrs_with_context();
+        let (context, slices) = self.as_slice_ptrs_with_context();
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
@@ -183,9 +181,10 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
+        let context = iter.context();
 
-        iter.next()
-            .map(|src| unsafe { iter.context().ptrs_read(src) })
+        let f = |src| unsafe { context.ptrs_read(src) };
+        iter.next().map(f)
     }
 
     #[inline]
@@ -202,9 +201,10 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
+        let context = iter.context();
 
-        iter.next_back()
-            .map(|src| unsafe { iter.context().ptrs_read(src) })
+        let f = |src| unsafe { context.ptrs_read(src) };
+        iter.next_back().map(f)
     }
 }
 

@@ -238,8 +238,8 @@ where
             len,
         } = *self;
 
-        let ptrs = ptrs.clone();
-        Self { ptrs, context, len }
+        let ptrs = ptrs.clone().into_inner();
+        unsafe { Self::from_parts(context, ptrs, len) }
     }
 }
 

@@ -453,8 +453,7 @@ where
     where
         Refs<'a, 'a, T>: PartialEq<V>,
     {
-        let mut iter = self.into_iter();
-        iter.any(move |item| item.eq(&value))
+        self.iter().any(move |item| item.eq(&value))
     }
 }
 

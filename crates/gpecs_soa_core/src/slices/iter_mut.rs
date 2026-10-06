@@ -187,11 +187,8 @@ where
     }
 
     #[inline]
-    #[doc(alias = "into_parts")]
     pub fn into_slices_with_context(self) -> (&'ctx T::Context, SlicesMut<'ctx, 'a, T>) {
-        let Self { inner, .. } = self;
-
-        let (context, slices) = inner.into_mut_slice_ptrs_with_context();
+        let (context, slices) = self.into_mut_slice_ptrs_with_context();
         let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
         (context, slices)
     }
@@ -209,11 +206,8 @@ where
 
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
-        let Self { inner, .. } = self;
-
-        let (context, slices) = inner.as_slice_ptrs_with_context();
+        let (context, slices) = self.as_slice_ptrs_with_context();
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };
-        let slices = T::Context::slices_upcast(slices);
         (context, slices)
     }
 }

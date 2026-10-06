@@ -130,11 +130,8 @@ where
     }
 
     #[inline]
-    #[doc(alias = "into_parts")]
     pub fn into_slices_with_context(self) -> (&'ctx T::Context, Slices<'ctx, 'a, T>) {
-        let Self { inner, .. } = self;
-
-        let (context, slices) = inner.into_slice_ptrs_with_context();
+        let (context, slices) = self.into_slice_ptrs_with_context();
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };
         (context, slices)
     }
@@ -152,11 +149,8 @@ where
 
     #[inline]
     pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
-        let Self { inner, .. } = self;
-
-        let (context, slices) = inner.as_slice_ptrs_with_context();
+        let (context, slices) = self.as_slice_ptrs_with_context();
         let slices = unsafe { context.slices_from_slice_ptrs(slices) };
-        let slices = T::Context::slices_upcast(slices);
         (context, slices)
     }
 }
@@ -189,10 +183,10 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref inner, phantom } = *self;
+        let Self { inner, .. } = self;
 
-        let inner = inner.clone();
-        Self { inner, phantom }
+        let iter = inner.clone();
+        unsafe { Self::from_iter_ptrs(iter) }
     }
 }
 

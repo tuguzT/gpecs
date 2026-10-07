@@ -149,6 +149,17 @@ where
 }
 
 #[inline]
+pub unsafe fn nonnull_from_const<'a, T>(
+    context: &'a T::Context,
+    ptrs: Ptrs<'a, T>,
+) -> NonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_from_ptrs(ptrs) }
+}
+
+#[inline]
 pub unsafe fn nonnull_from_mut<'a, T>(
     context: &'a T::Context,
     ptrs: MutPtrs<'a, T>,
@@ -157,6 +168,30 @@ where
     T: SoaRaw + ?Sized,
 {
     unsafe { context.nonnull_ptrs_from_mut_ptrs(ptrs) }
+}
+
+#[inline]
+pub unsafe fn add_nonnull<'a, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+    count: usize,
+) -> NonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_add(ptrs, count) }
+}
+
+#[inline]
+pub unsafe fn offset_from_nonnull<T>(
+    context: &T::Context,
+    ptrs: NonNullPtrs<'_, T>,
+    origin: NonNullPtrs<'_, T>,
+) -> isize
+where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_offset_from(ptrs, origin) }
 }
 
 #[inline]
@@ -176,6 +211,38 @@ where
     T: SoaRaw + ?Sized,
 {
     context.nonnull_ptrs_as_mut_ptrs(ptrs)
+}
+
+#[inline]
+pub unsafe fn swap_nonoverlapping_nonnull<T>(
+    context: &T::Context,
+    x: NonNullPtrs<'_, T>,
+    y: NonNullPtrs<'_, T>,
+    count: usize,
+) where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_swap_nonoverlapping(x, y, count) }
+}
+
+#[inline]
+pub unsafe fn copy_nonoverlapping_nonnull<T>(
+    context: &T::Context,
+    src: NonNullPtrs<'_, T>,
+    dst: NonNullPtrs<'_, T>,
+    count: usize,
+) where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_copy_nonoverlapping(src, dst, count) }
+}
+
+#[inline]
+pub unsafe fn drop_in_place_nonnull<T>(context: &T::Context, to_drop: NonNullPtrs<'_, T>)
+where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_drop_in_place(to_drop) }
 }
 
 #[inline]
@@ -349,6 +416,17 @@ where
 }
 
 #[inline]
+pub unsafe fn clone_to_uninit_nonnull<T>(
+    context: &T::Context,
+    src: NonNullPtrs<'_, T>,
+    dst: NonNullPtrs<'_, T>,
+) where
+    T: SoaCloneToUninit + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_clone_to_uninit(src, dst) }
+}
+
+#[inline]
 pub unsafe fn read<'a, T, R>(context: &'a T::Context, src: Ptrs<'a, T>) -> R
 where
     T: SoaRead<'a, R> + ?Sized,
@@ -357,11 +435,35 @@ where
 }
 
 #[inline]
+pub unsafe fn read_mut<'a, T, R>(context: &'a T::Context, src: MutPtrs<'a, T>) -> R
+where
+    T: SoaRead<'a, R> + ?Sized,
+{
+    unsafe { context.mut_ptrs_read(src) }
+}
+
+#[inline]
+pub unsafe fn read_nonnull<'a, T, R>(context: &'a T::Context, src: NonNullPtrs<'a, T>) -> R
+where
+    T: SoaRead<'a, R> + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_read(src) }
+}
+
+#[inline]
 pub unsafe fn write<T, W>(context: &T::Context, dst: MutPtrs<'_, T>, value: W)
 where
     T: SoaWrite<W> + ?Sized,
 {
     unsafe { context.ptrs_write(dst, value) }
+}
+
+#[inline]
+pub unsafe fn write_nonnull<T, W>(context: &T::Context, dst: NonNullPtrs<'_, T>, value: W)
+where
+    T: SoaWrite<W> + ?Sized,
+{
+    unsafe { context.nonnull_ptrs_write(dst, value) }
 }
 
 /// Version of [`core::ptr::replace()`] but for [SoA](SoaRaw) types.

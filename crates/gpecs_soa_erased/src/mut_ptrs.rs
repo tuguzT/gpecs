@@ -12,8 +12,8 @@ use crate::{
     dangling::{Dangling, dangling},
     data::{ErasedMutPtr, ErasedPtr},
     error::{
-        DowncastError, InsufficientAlignError, PtrsError, check_offset, check_ptr_align,
-        check_sufficient_align, check_sufficient_len,
+        DowncastError, FromFieldsLayoutsError, InsufficientAlignError, PtrsError, check_offset,
+        check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
@@ -25,7 +25,7 @@ use crate::{
         },
         traits::{MutPtrs, SoaAlloc, SoaAllocContext, SoaRawContext},
     },
-    storage::AlignedStorage,
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 pub struct ErasedSoaMutPtrs<D, P>
@@ -421,6 +421,24 @@ where
 
         drop(src);
         let _ = value.into_parts();
+    }
+}
+
+impl<D, P> ErasedSoaMutPtrs<D, P>
+where
+    D: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone,
+    P: MutSliceItemPtr<Item: Clone>,
+{
+    #[inline]
+    pub unsafe fn read<T>(
+        &self,
+    ) -> Result<ErasedSoa<T, D, P::Ptrs>, FromFieldsLayoutsError<T::Error>>
+    where
+        T: AlignedStorageFromLayout<Item = P::Item>,
+    {
+        let fields = self.iter().map(|ptr| unsafe { ptr.as_ref_unchecked() });
+        let layouts = self.layouts().clone();
+        ErasedSoa::try_from_fields_layouts(fields, layouts)
     }
 }
 

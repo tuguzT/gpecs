@@ -124,12 +124,42 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            unsafe fn nonnull_ptrs_from_ptrs<'a>(
+                &'a self,
+                ptrs: Self::Ptrs<'a>,
+            ) -> Self::NonNullPtrs<'a> {
+                let ptrs = unsafe { ($(NonNull::new_unchecked(ptrs.$indices.cast_mut()),)*) };
+                ptrs
+            }
+
+            #[inline]
             unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
                 &'a self,
                 ptrs: Self::MutPtrs<'a>,
             ) -> Self::NonNullPtrs<'a> {
                 let ptrs = unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) };
                 ptrs
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_add<'a>(
+                &'a self,
+                ptrs: Self::NonNullPtrs<'a>,
+                count: usize,
+            ) -> Self::NonNullPtrs<'a> {
+                let ptrs = unsafe { ($(ptrs.$indices.add(count),)*) };
+                ptrs
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_offset_from(
+                &self,
+                ptrs: Self::NonNullPtrs<'_>,
+                origin: Self::NonNullPtrs<'_>,
+            ) -> isize {
+                let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
+                assert!(offsets.iter().all(|offset| offsets[0].eq(offset)));
+                offsets[0]
             }
 
             #[inline]
@@ -142,6 +172,32 @@ macro_rules! tuple_impl {
             fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
                 let ptrs = ($(ptrs.$indices.as_ptr(),)*);
                 ptrs
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_swap_nonoverlapping(
+                &self,
+                x: Self::NonNullPtrs<'_>,
+                y: Self::NonNullPtrs<'_>,
+                count: usize,
+            ) {
+                unsafe { $(ptr::swap_nonoverlapping(x.$indices.as_ptr(), y.$indices.as_ptr(), count);)* }
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_copy_nonoverlapping(
+                &self,
+                src: Self::NonNullPtrs<'_>,
+                dst: Self::NonNullPtrs<'_>,
+                count: usize,
+            ) {
+                // because source and destination are non-overlapping, we can copy them in any order
+                unsafe { $(dst.$indices.copy_from_nonoverlapping(src.$indices, count);)* }
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_drop_in_place(&self, to_drop: Self::NonNullPtrs<'_>) {
+                unsafe { $(to_drop.$indices.drop_in_place();)* }
             }
 
             type SlicePtrs<'a> = ($(*const [$types],)*);
@@ -250,21 +306,46 @@ macro_rules! tuple_impl {
             #[inline]
             unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
                 let src = unsafe { ($(src.$indices.as_ref_unchecked(),)*) };
-                unsafe { $(ptr::write(dst.$indices, src.$indices.clone());)* }
+                unsafe { $(dst.$indices.write(src.$indices.clone());)* }
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_clone_to_uninit(
+                &self,
+                src: Self::NonNullPtrs<'_>,
+                dst: Self::NonNullPtrs<'_>,
+            ) {
+                let src = unsafe { ($(src.$indices.as_ref(),)*) };
+                unsafe { $(dst.$indices.write(src.$indices.clone());)* }
             }
         }
 
         unsafe impl<'a, $($types,)*> SoaReadContext<'a, ($($types,)*)> for () {
             #[inline]
-            unsafe fn ptrs_read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
-                unsafe { ($(ptr::read(ptrs.$indices),)*) }
+            unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> ($($types,)*) {
+                unsafe { ($(src.$indices.read(),)*) }
+            }
+
+            #[inline]
+            unsafe fn mut_ptrs_read(&'a self, src: Self::MutPtrs<'a>) -> ($($types,)*) {
+                unsafe { ($(src.$indices.read(),)*) }
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_read(&'a self, src: Self::NonNullPtrs<'a>) -> ($($types,)*) {
+                unsafe { ($(src.$indices.read(),)*) }
             }
         }
 
         unsafe impl<$($types,)*> SoaWriteContext<($($types,)*)> for () {
             #[inline]
             unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: ($($types,)*)) {
-                unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
+                unsafe { $(dst.$indices.write(value.$indices);)* }
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_write(&self, dst: Self::NonNullPtrs<'_>, value: ($($types,)*)) {
+                unsafe { $(dst.$indices.write(value.$indices);)* }
             }
         }
 

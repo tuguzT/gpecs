@@ -77,8 +77,8 @@ where
         let (origin_key, origin_value) = origin.into_parts();
 
         let key_offset = unsafe { key.offset_from(origin_key) };
-        let values_offset = unsafe { context.ptrs_offset_from(value, origin_value) };
-        assert_eq!(key_offset, values_offset);
+        let value_offset = unsafe { context.ptrs_offset_from(value, origin_value) };
+        assert_eq!(key_offset, value_offset);
 
         key_offset
     }

@@ -16,9 +16,10 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaMutPtrs, ErasedSoaMutPtrsIter,
+    error::FromFieldsLayoutsError,
     ptr::slice::{CastConst, MutSliceItemPtr},
     soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
-    storage::AlignedStorage,
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 use itertools::equal;
 
@@ -405,6 +406,30 @@ where
 
             unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
+    }
+}
+
+type ReadResult<D, K, S, P> = Result<
+    ErasedBundleKind<D, K, S, <P as MutSliceItemPtr>::Ptrs>,
+    FromFieldsLayoutsError<<S as AlignedStorageFromLayout>::Error>,
+>;
+
+impl<D, P> ErasedBundleMutPtrs<D, P>
+where
+    D: ErasedArchetypeKind + Clone,
+    P: MutSliceItemPtr<Item: Clone>,
+{
+    #[inline]
+    pub unsafe fn read<K, S>(&self) -> ReadResult<D, K, S, P>
+    where
+        K: ErasedBundleDrop<D::Meta>,
+        S: AlignedStorageFromLayout<Item = P::Item>,
+    {
+        let Self { inner } = self;
+
+        let inner = unsafe { inner.read()? };
+        let bundle = unsafe { ErasedBundleKind::from_inner(inner) };
+        Ok(bundle)
     }
 }
 

@@ -38,8 +38,7 @@ where
     pub(super) fn new(vec: SoaVec<T>) -> Self {
         let (buffer, len) = vec.into_parts();
 
-        let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs = unsafe { context.nonnull_ptrs_from_mut_ptrs(ptrs) };
+        let ptrs = buffer.as_ptrs();
         let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'static, T>>(ptrs) };
 
         Self {
@@ -85,8 +84,8 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.nonnull_ptrs_add(ptrs, start) };
         let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
-        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 
@@ -107,8 +106,8 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.nonnull_ptrs_add(ptrs, start) };
         let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
-        let ptrs = unsafe { context.mut_ptrs_add(ptrs, start) };
         (context, ptrs)
     }
 
@@ -195,24 +194,24 @@ where
     #[inline]
     unsafe fn post_inc_start<'a>(
         start: &mut usize,
-        ptrs: Ptrs<'a, T>,
+        ptrs: NonNullPtrs<'a, T>,
         context: &'a T::Context,
         offset: usize,
-    ) -> Ptrs<'a, T> {
+    ) -> NonNullPtrs<'a, T> {
         let old_start = *start;
         *start = unsafe { start.unchecked_add(offset) };
-        unsafe { context.ptrs_add(ptrs, old_start) }
+        unsafe { context.nonnull_ptrs_add(ptrs, old_start) }
     }
 
     #[inline]
     unsafe fn pre_dec_end<'a>(
         end: &mut usize,
-        ptrs: Ptrs<'a, T>,
+        ptrs: NonNullPtrs<'a, T>,
         context: &'a T::Context,
         offset: usize,
-    ) -> Ptrs<'a, T> {
+    ) -> NonNullPtrs<'a, T> {
         *end = unsafe { end.unchecked_sub(offset) };
-        unsafe { context.ptrs_add(ptrs, *end) }
+        unsafe { context.nonnull_ptrs_add(ptrs, *end) }
     }
 }
 
@@ -353,10 +352,9 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
-        let item = unsafe { context.ptrs_read(ptrs) };
+        let item = unsafe { context.nonnull_ptrs_read(ptrs) };
         Some(item)
     }
 
@@ -390,7 +388,6 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         unsafe { Self::post_inc_start(start, ptrs, context, n) };
         self.next()
     }
@@ -433,9 +430,8 @@ where
             // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
-            let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
-            let ptrs = unsafe { context.ptrs_add(ptrs, i) };
-            let item = unsafe { context.ptrs_read(ptrs) };
+            let ptrs = unsafe { context.nonnull_ptrs_add(ptrs, i) };
+            let item = unsafe { context.nonnull_ptrs_read(ptrs) };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
@@ -571,10 +567,9 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
-        let item = unsafe { context.ptrs_read(ptrs) };
+        let item = unsafe { context.nonnull_ptrs_read(ptrs) };
         Some(item)
     }
 
@@ -594,7 +589,6 @@ where
 
         let context = buffer.context();
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         unsafe { Self::pre_dec_end(end, ptrs, context, n) };
         self.next_back()
     }

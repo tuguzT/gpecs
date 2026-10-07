@@ -16,12 +16,12 @@ use crate::{
     },
     buffer::{
         BufferDropCheck, BufferPrefix, buffer_align, buffer_layout, buffer_layout_capacity,
-        capacity_from, layout_is_dangling, ptr_to_buffer_context_mut, ptr_to_buffer_prefix_mut,
-        ptrs_from_buffer_mut,
+        capacity_from, layout_is_dangling, ptr_to_buffer_context_nonnull,
+        ptr_to_buffer_prefix_nonnull, ptrs_from_buffer_nonnull,
     },
-    ptrs::slice_from_raw_parts_mut,
+    ptrs::slice_from_raw_parts_nonnull,
     slices::SoaSlice,
-    traits::{MutPtrs, SoaAlloc, SoaAllocContext, SoaAllocTrusted},
+    traits::{NonNullPtrs, SoaAlloc, SoaAllocContext, SoaAllocTrusted},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -89,25 +89,25 @@ where
         };
 
         let mut me = unsafe { Self::from_nonnull(ptr, capacity) };
-        unsafe { ptr::write(me.ptr_to_context(), context) }
+        unsafe { me.ptr_to_context().write(context) }
         me.set_capacity_in_buffer();
 
         Ok(me)
     }
 
     #[inline]
-    pub fn ptr_to_context(&self) -> *mut T::Context {
+    pub fn ptr_to_context(&self) -> NonNull<T::Context> {
         let buffer = self.as_ptr();
-        unsafe { ptr_to_buffer_context_mut::<T>(buffer) }
+        unsafe { ptr_to_buffer_context_nonnull::<T>(buffer) }
     }
 
     #[inline]
-    pub fn ptr_to_prefix(&self) -> Option<*mut BufferPrefix<T>> {
+    pub fn ptr_to_prefix(&self) -> Option<NonNull<BufferPrefix<T>>> {
         let Self { ptr, capacity, .. } = *self;
         let context = self.context();
-        let buffer = ptr.as_ptr();
+        let buffer = ptr;
 
-        unsafe { ptr_to_buffer_prefix_mut::<T>(context, capacity, buffer).unwrap_unchecked() }
+        unsafe { ptr_to_buffer_prefix_nonnull::<T>(context, capacity, buffer).unwrap_unchecked() }
     }
 
     #[inline]
@@ -117,7 +117,7 @@ where
         };
 
         let capacity = self.capacity();
-        let ptr_to_capacity = unsafe { &raw mut (*prefix).capacity };
+        let ptr_to_capacity = unsafe { &raw mut (*prefix.as_ptr()).capacity };
         unsafe { ptr::write(ptr_to_capacity, capacity) }
     }
 
@@ -160,7 +160,7 @@ where
     unsafe fn deallocate(&mut self) -> T::Context {
         let context = self.ptr_to_context();
         // move context onto the stack to safely return it after buffer deallocation
-        let context = unsafe { ptr::read(context) };
+        let context = unsafe { context.read() };
 
         if let Some((ptr, layout)) = self.current_memory(&context) {
             unsafe { dealloc(ptr.as_ptr(), layout) }
@@ -192,24 +192,29 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *mut u8 {
+    pub fn as_ptr(&self) -> NonNull<u8> {
         let Self { ptr, .. } = *self;
-        ptr.as_ptr()
+        ptr
     }
 
     #[inline]
     pub fn context(&self) -> &T::Context {
         let context = self.ptr_to_context();
-        unsafe { context.as_ref_unchecked() }
+        unsafe { context.as_ref() }
     }
 
     #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&T::Context, MutPtrs<'_, T>) {
+    pub fn as_ptrs(&self) -> NonNullPtrs<'_, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, NonNullPtrs<'_, T>) {
         let Self { ptr, capacity, .. } = *self;
         let context = self.context();
-        let ptr = ptr.as_ptr();
 
-        let ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, capacity) };
+        let ptrs = unsafe { ptrs_from_buffer_nonnull::<T>(context, ptr, capacity) };
         (context, ptrs)
     }
 
@@ -391,8 +396,8 @@ where
         );
 
         let me = ManuallyDrop::new(self);
-        let slice = unsafe { slice_from_raw_parts_mut(me.as_ptr(), len, me.capacity()) };
-        unsafe { Box::from_raw(slice) }
+        let slice = unsafe { slice_from_raw_parts_nonnull(me.as_ptr(), len, me.capacity()) };
+        unsafe { Box::from_raw(slice.as_ptr()) }
     }
 }
 

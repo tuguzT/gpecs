@@ -106,12 +106,12 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
 
     unsafe fn from_slice(slice: NonNull<[Self::Item]>, index: usize) -> Self;
 
+    fn slice(self) -> NonNull<[Self::Item]>;
+
     fn dangling() -> Self {
         let slice = NonNull::from_ref(&[]);
         unsafe { Self::from_slice(slice, 0) }
     }
-
-    fn slice(self) -> NonNull<[Self::Item]>;
 
     fn as_raw_ptr(self) -> NonNull<Self::Item> {
         let count = self.index();
@@ -128,5 +128,39 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
         let slice = self.slice().as_ptr();
         let index = self.index();
         unsafe { MutSliceItemPtr::from_slice(slice, index) }
+    }
+
+    unsafe fn as_ref<'a>(self) -> &'a Self::Item {
+        unsafe { self.as_raw_ptr().as_ref() }
+    }
+
+    unsafe fn as_mut<'a>(self) -> &'a mut Self::Item {
+        unsafe { self.as_raw_ptr().as_mut() }
+    }
+
+    unsafe fn drop_in_place(self) {
+        unsafe { self.as_mut_ptr().drop_in_place() }
+    }
+
+    unsafe fn write(self, value: Self::Item) {
+        unsafe { self.as_mut_ptr().write(value) }
+    }
+
+    unsafe fn swap(self, with: Self) {
+        unsafe { self.as_mut_ptr().swap(with.as_mut_ptr()) }
+    }
+
+    unsafe fn swap_nonoverlapping(self, with: Self, count: usize) {
+        let with = with.as_mut_ptr();
+        unsafe { self.as_mut_ptr().swap_nonoverlapping(with, count) }
+    }
+
+    unsafe fn copy_from(self, src: Self, count: usize) {
+        unsafe { self.as_mut_ptr().copy_from(src.as_ptr(), count) }
+    }
+
+    unsafe fn copy_from_nonoverlapping(self, src: Self, count: usize) {
+        let src = src.as_ptr();
+        unsafe { self.as_mut_ptr().copy_from_nonoverlapping(src, count) }
     }
 }

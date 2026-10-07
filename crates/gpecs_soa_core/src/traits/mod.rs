@@ -112,8 +112,8 @@ where
         count: usize,
     );
 
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::Ptrs) to [dst](SoaRawContext::MutPtrs)
-    /// for each stored field.
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::Ptrs)
+    /// to [dst](SoaRawContext::MutPtrs) for each stored field.
     ///
     /// The source and destination, as well as all the field pointers, must not overlap.
     ///
@@ -127,7 +127,7 @@ where
         count: usize,
     );
 
-    /// Executes the destructors (if any) for the each stored field located at input [pointers](SoaRawContext::Ptrs).
+    /// Executes the destructors (if any) for the each stored field located at input [pointers](SoaRawContext::MutPtrs).
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each pointer
@@ -146,7 +146,19 @@ where
     /// Returns dangling [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field.
     fn nonnull_ptrs_dangling(&self) -> Self::NonNullPtrs<'_>;
 
-    /// Creates [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field.
+    /// Creates [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field
+    /// from their [pointers](SoaRawContext::Ptrs).
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
+        let ptrs = self.ptrs_cast_mut(ptrs);
+        unsafe { self.nonnull_ptrs_from_mut_ptrs(ptrs) }
+    }
+
+    /// Creates [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field
+    /// from their [mutable pointers](SoaRawContext::MutPtrs).
     ///
     /// All the safety requirements resulting from applying
     /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
@@ -155,6 +167,43 @@ where
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a>;
+
+    /// Adds an unsigned offset to each [non-null pointer](SoaRawContext::NonNullPtrs) of each stored field.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::add()`](core::ptr::NonNull::add) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_add<'a>(
+        &'a self,
+        ptrs: Self::NonNullPtrs<'a>,
+        count: usize,
+    ) -> Self::NonNullPtrs<'a> {
+        let ptrs = self.nonnull_ptrs_as_mut_ptrs(ptrs);
+        let ptrs = unsafe { self.mut_ptrs_add(ptrs, count) };
+        unsafe { self.nonnull_ptrs_from_mut_ptrs(ptrs) }
+    }
+
+    /// Calculates the distance between two [non-null pointers](SoaRawContext::NonNullPtrs)
+    /// to each stored field within the same allocation.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::offset_from()`](core::ptr::NonNull::offset_from) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    ///
+    /// Note that resulting offsets should be the same for all the fields,
+    /// or else this method could panic.
+    unsafe fn nonnull_ptrs_offset_from(
+        &self,
+        ptrs: Self::NonNullPtrs<'_>,
+        origin: Self::NonNullPtrs<'_>,
+    ) -> isize {
+        let ptrs = Self::nonnull_ptrs_upcast(ptrs);
+        let origin = Self::nonnull_ptrs_upcast(origin);
+
+        let ptrs = self.nonnull_ptrs_as_mut_ptrs(ptrs);
+        let origin = self.nonnull_ptrs_as_ptrs(origin);
+        unsafe { self.mut_ptrs_offset_from(ptrs, origin) }
+    }
 
     /// Acquires the underlying [pointers](SoaRawContext::Ptrs) from [non-null pointers](SoaRawContext::NonNullPtrs)
     /// to each stored field.
@@ -166,6 +215,61 @@ where
     /// Acquires the underlying [mutable pointers](SoaRawContext::MutPtrs) from [non-null pointers](SoaRawContext::NonNullPtrs)
     /// to each stored field.
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
+
+    /// Swaps `count * size_of::<fields[0]>() + ...` bytes between the two [non-null regions](SoaRawContext::NonNullPtrs)
+    /// of memory beginning at `x` and `y` for each stored field.
+    ///
+    /// The regions, as well as all the field pointers, must not overlap.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::swap_nonoverlapping()`](core::ptr::swap_nonoverlapping) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::NonNullPtrs<'_>,
+        y: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        let x = Self::nonnull_ptrs_upcast(x);
+        let y = Self::nonnull_ptrs_upcast(y);
+
+        let x = self.nonnull_ptrs_as_mut_ptrs(x);
+        let y = self.nonnull_ptrs_as_mut_ptrs(y);
+        unsafe { self.ptrs_swap_nonoverlapping(x, y, count) }
+    }
+
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::NonNullPtrs)
+    /// to [dst](SoaRawContext::NonNullPtrs) for each stored field.
+    ///
+    /// The source and destination, as well as all the field pointers, must not overlap.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`ptr::copy_nonoverlapping()`](core::ptr::copy_nonoverlapping) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_copy_nonoverlapping(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        let src = Self::nonnull_ptrs_upcast(src);
+        let dst = Self::nonnull_ptrs_upcast(dst);
+
+        let src = self.nonnull_ptrs_as_ptrs(src);
+        let dst = self.nonnull_ptrs_as_mut_ptrs(dst);
+        unsafe { self.ptrs_copy_nonoverlapping(src, dst, count) }
+    }
+
+    /// Executes the destructors (if any) for the each stored field located at input [pointers](SoaRawContext::NonNullPtrs).
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_drop_in_place(&self, to_drop: Self::NonNullPtrs<'_>) {
+        let to_drop = Self::nonnull_ptrs_upcast(to_drop);
+        let to_drop = self.nonnull_ptrs_as_mut_ptrs(to_drop);
+        unsafe { self.ptrs_drop_in_place(to_drop) }
+    }
 
     /// Collection of slice pointers to each stored field.
     type SlicePtrs<'a>: Clone;
@@ -324,6 +428,21 @@ where
     /// Performs copy-assignment of each stored field from [src](SoaRawContext::Ptrs) to [dst](SoaRawContext::MutPtrs).
     /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
     unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>);
+
+    /// Performs copy-assignment of each stored field from [src](SoaRawContext::NonNullPtrs) to [dst](SoaRawContext::NonNullPtrs).
+    /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
+    unsafe fn nonnull_ptrs_clone_to_uninit(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+    ) {
+        let src = Self::nonnull_ptrs_upcast(src);
+        let dst = Self::nonnull_ptrs_upcast(dst);
+
+        let src = self.nonnull_ptrs_as_ptrs(src);
+        let dst = self.nonnull_ptrs_as_mut_ptrs(dst);
+        unsafe { self.ptrs_clone_to_uninit(src, dst) }
+    }
 }
 
 /// A generalization of [`Clone`] specifically for [SoA](SoaRaw) type.
@@ -351,6 +470,28 @@ where
     /// [`ptr::read()`](core::ptr::read) method to each pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> R;
+
+    /// Constructs the value from reading each field to which [src](SoaRawContext::MutPtrs) points without moving them.
+    /// This leaves the memory in src unchanged.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`ptr::read()`](core::ptr::read) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn mut_ptrs_read(&'a self, src: Self::MutPtrs<'a>) -> R {
+        let src = self.ptrs_cast_const(src);
+        unsafe { self.ptrs_read(src) }
+    }
+
+    /// Constructs the value from reading each field to which [src](SoaRawContext::NonNullPtrs) points without moving them.
+    /// This leaves the memory in src unchanged.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::read()`](core::ptr::NonNull::read) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_read(&'a self, src: Self::NonNullPtrs<'a>) -> R {
+        let src = self.nonnull_ptrs_as_mut_ptrs(src);
+        unsafe { self.mut_ptrs_read(src) }
+    }
 }
 
 /// An extension of [SoA](SoaRaw) type which allows to read a value borrowed from the context
@@ -386,6 +527,18 @@ where
     /// [`ptr::write()`](core::ptr::write) method to each pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: W);
+
+    /// Overwrites a memory [location](SoaRawContext::NonNullPtrs) of each stored field
+    /// with the given value without reading or dropping the old value.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::write()`](core::ptr::NonNull::write) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_ptrs_write(&self, dst: Self::NonNullPtrs<'_>, value: W) {
+        let dst = Self::nonnull_ptrs_upcast(dst);
+        let dst = self.nonnull_ptrs_as_mut_ptrs(dst);
+        unsafe { self.ptrs_write(dst, value) }
+    }
 }
 
 /// An extension of [SoA](SoaRaw) type which allows to write given value

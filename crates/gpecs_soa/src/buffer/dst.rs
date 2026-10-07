@@ -1,10 +1,10 @@
-use core::ptr;
+use core::ptr::{self, NonNull};
 
 use crate::{
     buffer::{
         BufferData, BufferPrefix, buffer_layout, capacity_from_dangling, layout_is_dangling,
-        ptr_to_buffer_context, ptr_to_buffer_prefix_unchecked, ptrs_from_buffer,
-        ptrs_from_buffer_mut,
+        ptr_to_buffer_context, ptr_to_buffer_context_nonnull, ptr_to_buffer_prefix_unchecked,
+        ptrs_from_buffer, ptrs_from_buffer_mut,
     },
     traits::{MutPtrs, Ptrs, SoaAllocContext, SoaAllocTrusted},
 };
@@ -41,6 +41,20 @@ where
         unsafe { Self::ptr_from_inner_mut(inner) }
     }
 
+    #[inline]
+    pub unsafe fn ptr_from_raw_parts_nonnull(
+        data: NonNull<u8>,
+        len: usize,
+        capacity: usize,
+    ) -> NonNull<Self> {
+        let context = unsafe { ptr_to_buffer_context_nonnull::<T>(data).as_ref() };
+        Self::assert_trait_safety_requirements(context);
+
+        let len = Self::len_of_inner(context, len, capacity);
+        let inner = NonNull::slice_from_raw_parts(data.cast(), len);
+        unsafe { Self::ptr_from_inner_nonnull(inner) }
+    }
+
     unsafe fn ptr_from_inner(inner: *const [BufferData<T>]) -> *const Self {
         // Self is transparent over a slice of `BufferData<T>`
         inner as *const Self
@@ -49,6 +63,12 @@ where
     unsafe fn ptr_from_inner_mut(inner: *mut [BufferData<T>]) -> *mut Self {
         // Self is transparent over a slice of `BufferData<T>`
         inner as *mut Self
+    }
+
+    unsafe fn ptr_from_inner_nonnull(inner: NonNull<[BufferData<T>]>) -> NonNull<Self> {
+        // Self is transparent over a slice of `BufferData<T>`
+        let ptr = unsafe { Self::ptr_from_inner_mut(inner.as_ptr()) };
+        unsafe { NonNull::new_unchecked(ptr) }
     }
 
     fn assert_trait_safety_requirements(context: &T::Context) {

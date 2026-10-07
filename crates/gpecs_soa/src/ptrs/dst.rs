@@ -1,3 +1,5 @@
+use core::ptr::NonNull;
+
 use crate::{slices::SoaSlice, traits::SoaAllocTrusted};
 
 #[inline]
@@ -24,6 +26,19 @@ where
     T: SoaAllocTrusted + ?Sized,
 {
     unsafe { SoaSlice::ptr_from_raw_parts_mut(data, len, capacity) }
+}
+
+#[inline]
+#[track_caller]
+pub unsafe fn slice_from_raw_parts_nonnull<T>(
+    data: NonNull<u8>,
+    len: usize,
+    capacity: usize,
+) -> NonNull<SoaSlice<T>>
+where
+    T: SoaAllocTrusted + ?Sized,
+{
+    unsafe { SoaSlice::ptr_from_raw_parts_nonnull(data, len, capacity) }
 }
 
 pub trait SoaSlicePtr<T>: Copy + private::Sealed

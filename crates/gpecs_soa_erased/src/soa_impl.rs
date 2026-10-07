@@ -1,4 +1,4 @@
-use core::fmt::Debug;
+use core::{fmt::Debug, ptr::NonNull};
 
 use crate::{
     CovariantFieldLayouts, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
@@ -126,11 +126,34 @@ where
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
+        unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs.cast_mut()) }
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
         unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_add<'a>(
+        &'a self,
+        ptrs: Self::NonNullPtrs<'a>,
+        count: usize,
+    ) -> Self::NonNullPtrs<'a> {
+        unsafe { ptrs.add(count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_offset_from(
+        &self,
+        ptrs: Self::NonNullPtrs<'_>,
+        origin: Self::NonNullPtrs<'_>,
+    ) -> isize {
+        unsafe { ptrs.offset_from(&origin) }
     }
 
     #[inline]
@@ -141,6 +164,31 @@ where
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.into_mut_ptrs()
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_swap_nonoverlapping(
+        &self,
+        mut x: Self::NonNullPtrs<'_>,
+        mut y: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { x.swap_nonoverlapping(&mut y, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_nonoverlapping(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        mut dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_nonoverlapping(&src, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_drop_in_place(&self, _: Self::NonNullPtrs<'_>) {
+        // do nothing; it's safe to not drop anything
     }
 
     type SlicePtrs<'a> = ErasedSoaSlicePtrs<FieldLayoutsOutput<'a, D>, P::Const>;
@@ -249,6 +297,24 @@ where
         let value = unsafe { src.read() };
         value.expect("erased SoA should be created successfully")
     }
+
+    #[inline]
+    unsafe fn mut_ptrs_read(
+        &'a self,
+        src: Self::MutPtrs<'a>,
+    ) -> ErasedSoa<T, FieldLayoutsOutput<'a, D>, P> {
+        let value = unsafe { src.read() };
+        value.expect("erased SoA should be created successfully")
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_read(
+        &'a self,
+        src: Self::NonNullPtrs<'a>,
+    ) -> ErasedSoa<T, FieldLayoutsOutput<'a, D>, P> {
+        let value = unsafe { src.read() };
+        value.expect("erased SoA should be created successfully")
+    }
 }
 
 unsafe impl<T, D, N, P> SoaWriteContext<ErasedSoa<T, D, P>, ErasedSoa<T, N, P>>
@@ -261,6 +327,11 @@ where
 {
     #[inline]
     unsafe fn ptrs_write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
+        unsafe { dst.write(value) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_write(&self, mut dst: Self::NonNullPtrs<'_>, value: ErasedSoa<T, N, P>) {
         unsafe { dst.write(value) }
     }
 }
@@ -305,7 +376,16 @@ where
 
     #[inline]
     unsafe fn mut_ptrs_from_buffer(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-        unsafe { Self::ptrs_from_buffer_mut(self, buffer, capacity) }
+        unsafe { Self::mut_ptrs_from_buffer(self, buffer, capacity) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_from_buffer(
+        &self,
+        buffer: NonNull<u8>,
+        capacity: usize,
+    ) -> Self::NonNullPtrs<'_> {
+        unsafe { Self::nonnull_ptrs_from_buffer(self, buffer, capacity) }
     }
 
     #[inline]
@@ -319,10 +399,30 @@ where
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_copy_forward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        mut dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_forward(&src, count) }
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_backward(
         &self,
         src: Self::Ptrs<'_>,
         mut dst: Self::MutPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_backward(&src, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_backward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        mut dst: Self::NonNullPtrs<'_>,
         count: usize,
     ) {
         unsafe { dst.copy_from_backward(&src, count) }

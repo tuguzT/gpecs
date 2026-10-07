@@ -3,6 +3,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::{Index, IndexMut},
+    ptr::NonNull,
 };
 
 use crate::{
@@ -45,6 +46,15 @@ where
         Self::ptr_from_inner_mut(buffer)
     }
 
+    pub(crate) unsafe fn ptr_from_raw_parts_nonnull(
+        data: NonNull<u8>,
+        len: usize,
+        capacity: usize,
+    ) -> NonNull<Self> {
+        let buffer = unsafe { DstBuffer::ptr_from_raw_parts_nonnull(data, len, capacity) };
+        Self::ptr_from_inner_nonnull(buffer)
+    }
+
     fn ptr_from_inner(buffer: *const DstBuffer<T>) -> *const Self {
         // Self is transparent over `DstBuffer<T>`
         buffer as _
@@ -53,6 +63,12 @@ where
     fn ptr_from_inner_mut(buffer: *mut DstBuffer<T>) -> *mut Self {
         // Self is transparent over `DstBuffer<T>`
         buffer as _
+    }
+
+    fn ptr_from_inner_nonnull(buffer: NonNull<DstBuffer<T>>) -> NonNull<Self> {
+        // Self is transparent over `DstBuffer<T>`
+        let ptr = Self::ptr_from_inner_mut(buffer.as_ptr());
+        unsafe { NonNull::new_unchecked(ptr) }
     }
 
     pub(crate) fn ptr_as_ptr(this: *const Self) -> *const u8 {

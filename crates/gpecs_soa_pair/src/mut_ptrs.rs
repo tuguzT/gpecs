@@ -7,7 +7,8 @@ use core::{
 use gpecs_ptr::slice::{CastConst, MutSliceItemPtr, SliceItemPtr};
 use gpecs_soa::{
     traits::{
-        MutPtrs, Soa, SoaAllocContext, SoaContext, SoaRaw, SoaRawContext, SoaWrite, SoaWriteContext,
+        MutPtrs, Soa, SoaAllocContext, SoaContext, SoaRaw, SoaRawContext, SoaRead, SoaReadContext,
+        SoaWrite, SoaWriteContext,
     },
     wrapper,
 };
@@ -76,8 +77,8 @@ where
         let (origin_key, origin_value) = origin.into_parts();
 
         let key_offset = unsafe { key.cast_const().offset_from(origin_key) };
-        let values_offset = unsafe { context.mut_ptrs_offset_from(value, origin_value) };
-        assert_eq!(key_offset, values_offset);
+        let value_offset = unsafe { context.mut_ptrs_offset_from(value, origin_value) };
+        assert_eq!(key_offset, value_offset);
 
         key_offset
     }
@@ -122,6 +123,18 @@ where
             key.drop_in_place();
             context.ptrs_drop_in_place(value);
         }
+    }
+
+    #[inline]
+    pub unsafe fn read<R>(self, context: &'ctx V::Context) -> KeyValuePair<K, R, P::Ptrs>
+    where
+        V: SoaRead<'ctx, R>,
+    {
+        let (key, value) = self.into_parts();
+
+        let key = unsafe { key.read() };
+        let value = unsafe { context.mut_ptrs_read(value) };
+        KeyValuePair::new(key, value)
     }
 
     #[inline]

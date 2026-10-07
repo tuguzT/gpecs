@@ -14,20 +14,25 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
+    error::FromFieldsLayoutsError,
     ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaRawContext,
     },
+    storage::AlignedStorageFromLayout,
 };
 
 use crate::{
     bundle::{
         Bundle, BundleNonNullPtrs,
         erased::{
-            ErasedBundleMutPtrs, ErasedBundlePtrs,
+            ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundlePtrs,
             error::DowncastError,
-            traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
+            traits::{
+                ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
+                IntoErasedArchetypeIterator,
+            },
         },
     },
     erased::ErasedArchetypeView,
@@ -176,15 +181,18 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<'n, N>(&'a mut self, with: &'n mut ErasedBundleNonNullPtrs<N, P>)
-    where
+    pub unsafe fn swap_nonoverlapping<'n, N>(
+        &'a mut self,
+        with: &'n mut ErasedBundleNonNullPtrs<N, P>,
+        count: usize,
+    ) where
         N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
             + ?Sized,
     {
         let Self { inner } = self;
 
         let with = unsafe { with.as_mut_inner() };
-        unsafe { inner.swap(with) }
+        unsafe { inner.swap_nonoverlapping(with, count) }
     }
 
     #[inline]
@@ -277,6 +285,30 @@ where
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullPtr<P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
+    }
+}
+
+type ReadResult<D, K, S, P> = Result<
+    ErasedBundleKind<D, K, S, <P as NonNullSliceItemPtr>::Ptrs>,
+    FromFieldsLayoutsError<<S as AlignedStorageFromLayout>::Error>,
+>;
+
+impl<D, P> ErasedBundleNonNullPtrs<D, P>
+where
+    D: ErasedArchetypeKind + Clone,
+    P: NonNullSliceItemPtr<Item: Clone>,
+{
+    #[inline]
+    pub unsafe fn read<K, S>(&self) -> ReadResult<D, K, S, P>
+    where
+        K: ErasedBundleDrop<D::Meta>,
+        S: AlignedStorageFromLayout<Item = P::Item>,
+    {
+        let Self { inner } = self;
+
+        let inner = unsafe { inner.read()? };
+        let bundle = unsafe { ErasedBundleKind::from_inner(inner) };
+        Ok(bundle)
     }
 }
 

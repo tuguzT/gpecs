@@ -4,9 +4,10 @@ use core::{
     fmt::{self, Display},
     marker::PhantomData,
     mem::{ManuallyDrop, offset_of},
+    ptr::NonNull,
 };
 
-use crate::traits::{MutPtrs, Ptrs, SoaAlloc, SoaAllocContext, SoaRawContext};
+use crate::traits::{MutPtrs, NonNullPtrs, Ptrs, SoaAlloc, SoaAllocContext, SoaRawContext};
 
 pub mod dst;
 
@@ -221,13 +222,21 @@ where
 }
 
 #[inline]
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub const unsafe fn ptr_to_buffer_context_mut<T>(buffer: *mut u8) -> *mut T::Context
 where
     T: SoaAlloc + ?Sized,
 {
-    const { assert_buffer_context::<T>() }
-    buffer.cast()
+    let ptr = unsafe { ptr_to_buffer_context::<T>(buffer) };
+    ptr.cast_mut()
+}
+
+#[inline]
+pub const unsafe fn ptr_to_buffer_context_nonnull<T>(buffer: NonNull<u8>) -> NonNull<T::Context>
+where
+    T: SoaAlloc + ?Sized,
+{
+    let ptr = unsafe { ptr_to_buffer_context_mut::<T>(buffer.as_ptr()) };
+    unsafe { NonNull::new_unchecked(ptr) }
 }
 
 const fn assert_buffer_context<T>()
@@ -241,7 +250,6 @@ where
 }
 
 #[inline]
-#[expect(unused)]
 pub unsafe fn ptr_to_buffer_prefix<T>(
     context: &T::Context,
     capacity: usize,
@@ -260,7 +268,6 @@ where
 }
 
 #[inline]
-#[cfg_attr(not(feature = "alloc"), expect(unused))]
 pub unsafe fn ptr_to_buffer_prefix_mut<T>(
     context: &T::Context,
     capacity: usize,
@@ -269,13 +276,24 @@ pub unsafe fn ptr_to_buffer_prefix_mut<T>(
 where
     T: SoaAlloc + ?Sized,
 {
-    let buffer_layout = buffer_layout::<T>(context, capacity)?;
-    if layout_is_dangling(buffer_layout) {
-        return Ok(None);
-    }
+    let ptr = unsafe { ptr_to_buffer_prefix::<T>(context, capacity, buffer) }?;
+    let ptr = ptr.map(<*const _>::cast_mut);
+    Ok(ptr)
+}
 
-    let prefix = unsafe { ptr_to_buffer_prefix_unchecked_mut::<T>(buffer) };
-    Ok(Some(prefix))
+#[inline]
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
+pub unsafe fn ptr_to_buffer_prefix_nonnull<T>(
+    context: &T::Context,
+    capacity: usize,
+    buffer: NonNull<u8>,
+) -> Result<Option<NonNull<BufferPrefix<T>>>, LayoutError>
+where
+    T: SoaAlloc + ?Sized,
+{
+    let ptr = unsafe { ptr_to_buffer_prefix_mut::<T>(context, capacity, buffer.as_ptr()) }?;
+    let ptr = ptr.map(|ptr| unsafe { NonNull::new_unchecked(ptr) });
+    Ok(ptr)
 }
 
 #[inline]
@@ -291,7 +309,20 @@ pub const unsafe fn ptr_to_buffer_prefix_unchecked_mut<T>(buffer: *mut u8) -> *m
 where
     T: SoaAlloc + ?Sized,
 {
-    buffer.cast()
+    let ptr = unsafe { ptr_to_buffer_prefix_unchecked::<T>(buffer) };
+    ptr.cast_mut()
+}
+
+#[inline]
+#[expect(unused)]
+pub const unsafe fn ptr_to_buffer_prefix_unchecked_nonnull<T>(
+    buffer: NonNull<u8>,
+) -> NonNull<BufferPrefix<T>>
+where
+    T: SoaAlloc + ?Sized,
+{
+    let ptr = unsafe { ptr_to_buffer_prefix_unchecked_mut::<T>(buffer.as_ptr()) };
+    unsafe { NonNull::new_unchecked(ptr) }
 }
 
 #[inline]
@@ -329,6 +360,24 @@ where
 }
 
 #[inline]
+#[cfg_attr(not(feature = "alloc"), expect(unused))]
+pub unsafe fn ptrs_from_buffer_nonnull<T>(
+    context: &T::Context,
+    ptr: NonNull<u8>,
+    capacity: usize,
+) -> NonNullPtrs<'_, T>
+where
+    T: SoaAlloc + ?Sized,
+{
+    let buffer = unsafe { ptr_to_buffer_data_nonnull::<T>(context, ptr, capacity) };
+    let Ok(buffer) = buffer else {
+        return context.nonnull_ptrs_dangling();
+    };
+
+    unsafe { context.nonnull_ptrs_from_buffer(buffer, capacity) }
+}
+
+#[inline]
 pub unsafe fn ptr_to_buffer_data<T>(
     context: &T::Context,
     ptr: *const u8,
@@ -348,6 +397,20 @@ pub unsafe fn ptr_to_buffer_data_mut<T>(
     ptr: *mut u8,
     capacity: usize,
 ) -> Result<*mut u8, PtrToDataError>
+where
+    T: SoaAlloc + ?Sized,
+{
+    let offset = offset_to_buffer_data::<T>(context, capacity)?;
+    let data = unsafe { ptr.add(offset) };
+    Ok(data)
+}
+
+#[inline]
+pub unsafe fn ptr_to_buffer_data_nonnull<T>(
+    context: &T::Context,
+    ptr: NonNull<u8>,
+    capacity: usize,
+) -> Result<NonNull<u8>, PtrToDataError>
 where
     T: SoaAlloc + ?Sized,
 {

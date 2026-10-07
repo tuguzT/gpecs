@@ -1,10 +1,10 @@
 use core::{
     alloc::{Layout, LayoutError},
     iter::{Chain, Once},
-    ptr,
+    ptr::{self, NonNull},
 };
 
-use gpecs_ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs};
+use gpecs_ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtrs};
 use gpecs_soa::{
     field::{FieldLayouts, IntoFieldLayouts},
     identity::Identity,
@@ -130,13 +130,36 @@ where
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
+        let context = self.as_inner();
+        unsafe { KeyValueNonNullPtrs::from_ptrs(context, ptrs) }
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
         let context = self.as_inner();
-        let (key, value) = ptrs.into_parts();
-        unsafe { KeyValueNonNullPtrs::new_unchecked(context, key, value) }
+        unsafe { KeyValueNonNullPtrs::from_mut_ptrs(context, ptrs) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_add<'a>(
+        &'a self,
+        ptrs: Self::NonNullPtrs<'a>,
+        count: usize,
+    ) -> Self::NonNullPtrs<'a> {
+        unsafe { ptrs.add(self, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_offset_from(
+        &self,
+        ptrs: Self::NonNullPtrs<'_>,
+        origin: Self::NonNullPtrs<'_>,
+    ) -> isize {
+        unsafe { ptrs.offset_from(self, origin) }
     }
 
     #[inline]
@@ -147,6 +170,31 @@ where
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.into_mut_ptrs(self)
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::NonNullPtrs<'_>,
+        y: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { x.swap_nonoverlapping(self, y, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_nonoverlapping(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_nonoverlapping(self, src, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_drop_in_place(&self, to_drop: Self::NonNullPtrs<'_>) {
+        unsafe { to_drop.drop_in_place(self) }
     }
 
     type SlicePtrs<'a> = KeyValueSlicePtrs<'a, K, V, P::Const>;
@@ -252,6 +300,15 @@ where
     unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
         unsafe { src.clone_to_uninit(self, dst) }
     }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_clone_to_uninit(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+    ) {
+        unsafe { src.clone_to_uninit(self, dst) }
+    }
 }
 
 unsafe impl<'a, K, V, P, R> SoaReadContext<'a, KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>
@@ -264,6 +321,16 @@ where
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> KeyValuePair<K, R, P> {
         unsafe { src.read(self) }
     }
+
+    #[inline]
+    unsafe fn mut_ptrs_read(&'a self, src: Self::MutPtrs<'a>) -> KeyValuePair<K, R, P> {
+        unsafe { src.read(self) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_read(&'a self, src: Self::NonNullPtrs<'a>) -> KeyValuePair<K, R, P> {
+        unsafe { src.read(self) }
+    }
 }
 
 unsafe impl<K, V, P, W> SoaWriteContext<KeyValuePair<K, V, P>, KeyValuePair<K, W, P>>
@@ -274,6 +341,11 @@ where
 {
     #[inline]
     unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: KeyValuePair<K, W, P>) {
+        unsafe { dst.write(self, value) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_write(&self, dst: Self::NonNullPtrs<'_>, value: KeyValuePair<K, W, P>) {
         unsafe { dst.write(self, value) }
     }
 }
@@ -343,12 +415,53 @@ where
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_buffer(
+        &self,
+        buffer: NonNull<u8>,
+        capacity: usize,
+    ) -> Self::NonNullPtrs<'_> {
+        let context = self.as_inner();
+
+        let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
+        let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
+        let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
+
+        let key = unsafe {
+            let slice = NonNull::slice_from_raw_parts(buffer.cast(), capacity);
+            P::NonNull::from_slice(slice, 0)
+        };
+        let buffer = unsafe { buffer.add(offset) };
+        let value = unsafe { context.nonnull_ptrs_from_buffer(buffer, capacity) };
+        KeyValueNonNullPtrs::new(key, value)
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
         unsafe { dst.copy_from_forward(self, src, count) }
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_copy_forward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_forward(self, src, count) }
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
+        unsafe { dst.copy_from_backward(self, src, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_backward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
         unsafe { dst.copy_from_backward(self, src, count) }
     }
 }

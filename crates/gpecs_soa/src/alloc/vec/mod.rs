@@ -12,7 +12,7 @@ use core_alloc::boxed::Box;
 pub use super::error::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    buffer::{buffer_layout_capacity, ptrs_from_buffer, ptrs_from_buffer_mut},
+    buffer::{buffer_layout_capacity, ptrs_from_buffer_nonnull},
     ptrs::{IterMutPtrs, IterPtrs, SoaViewMutPtrs, SoaViewPtrs, get_unchecked, range},
     slices::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaView, SoaViewMut, ToSoaVec},
     traits::{
@@ -159,13 +159,13 @@ where
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         let Self { buffer, .. } = self;
-        buffer.as_ptr().cast_const()
+        buffer.as_ptr().as_ptr().cast_const()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { buffer, .. } = self;
-        buffer.as_ptr()
+        buffer.as_ptr().as_ptr()
     }
 
     #[inline]
@@ -179,7 +179,7 @@ where
         let Self { buffer, .. } = self;
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         (context, ptrs)
     }
 
@@ -192,7 +192,10 @@ where
     #[inline]
     pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
         let Self { buffer, .. } = self;
-        buffer.as_ptrs_with_context()
+
+        let (context, ptrs) = buffer.as_ptrs_with_context();
+        let ptrs = context.nonnull_ptrs_as_mut_ptrs(ptrs);
+        (context, ptrs)
     }
 
     #[inline]
@@ -275,38 +278,40 @@ where
             return;
         };
 
-        let ptr_to_len = unsafe { &raw mut (*prefix).len };
+        let ptr_to_len = unsafe { &raw mut (*prefix.as_ptr()).len };
         unsafe { ptr::write(ptr_to_len, len) }
     }
 
     #[inline]
     unsafe fn move_right(&mut self, old_capacity: usize) {
-        let new_capacity = self.capacity();
+        let Self { ref buffer, len } = *self;
+
+        let new_capacity = buffer.capacity();
         if new_capacity <= old_capacity {
             return;
         }
 
-        let len = self.len();
-        let ptr = self.as_mut_ptr();
-        let (context, new_ptrs) = self.as_mut_ptrs_with_context();
-        let old_ptrs = unsafe { ptrs_from_buffer::<T>(context, ptr, old_capacity) };
+        let ptr = buffer.as_ptr();
+        let (context, new_ptrs) = buffer.as_ptrs_with_context();
+        let old_ptrs = unsafe { ptrs_from_buffer_nonnull::<T>(context, ptr, old_capacity) };
 
-        unsafe { context.ptrs_copy_backward(old_ptrs, new_ptrs, len) }
+        unsafe { context.nonnull_ptrs_copy_backward(old_ptrs, new_ptrs, len) }
     }
 
     #[inline]
     unsafe fn move_left(&mut self, new_capacity: usize) {
-        let old_capacity = self.capacity();
+        let Self { ref buffer, len } = *self;
+
+        let old_capacity = buffer.capacity();
         if new_capacity >= old_capacity {
             return;
         }
 
-        let len = self.len();
-        let ptr = self.as_mut_ptr();
-        let (context, old_ptrs) = self.as_ptrs_with_context();
-        let new_ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, new_capacity) };
+        let ptr = buffer.as_ptr();
+        let (context, old_ptrs) = buffer.as_ptrs_with_context();
+        let new_ptrs = unsafe { ptrs_from_buffer_nonnull::<T>(context, ptr, new_capacity) };
 
-        unsafe { context.ptrs_copy_forward(old_ptrs, new_ptrs, len) }
+        unsafe { context.nonnull_ptrs_copy_forward(old_ptrs, new_ptrs, len) }
     }
 
     #[inline]
@@ -320,9 +325,11 @@ where
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let len = self.len();
-        let old_capacity = self.capacity();
-        let Self { buffer, .. } = self;
+        let Self {
+            ref mut buffer,
+            len,
+        } = *self;
+        let old_capacity = buffer.capacity();
 
         if !buffer.needs_to_grow(len, additional) {
             return;
@@ -336,9 +343,11 @@ where
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
-        let len = self.len();
-        let old_capacity = self.capacity();
-        let Self { buffer, .. } = self;
+        let Self {
+            ref mut buffer,
+            len,
+        } = *self;
+        let old_capacity = buffer.capacity();
 
         if !buffer.needs_to_grow(len, additional) {
             return;
@@ -352,9 +361,11 @@ where
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let len = self.len();
-        let old_capacity = self.capacity();
-        let Self { buffer, .. } = self;
+        let Self {
+            ref mut buffer,
+            len,
+        } = *self;
+        let old_capacity = buffer.capacity();
 
         if !buffer.needs_to_grow(len, additional) {
             return Ok(());
@@ -369,9 +380,11 @@ where
     }
 
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let len = self.len();
-        let old_capacity = self.capacity();
-        let Self { buffer, .. } = self;
+        let Self {
+            ref mut buffer,
+            len,
+        } = *self;
+        let old_capacity = buffer.capacity();
 
         if !buffer.needs_to_grow(len, additional) {
             return Ok(());
@@ -517,15 +530,14 @@ where
 
         let Self { buffer, .. } = self;
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let dst = unsafe { context.mut_ptrs_add(ptrs.clone(), index) };
+        let dst = unsafe { context.nonnull_ptrs_add(ptrs.clone(), index) };
 
-        let ptrs_into = dst.clone();
+        let ptrs_into = context.nonnull_ptrs_as_mut_ptrs(dst.clone());
         let result = f(context, ptrs_into);
 
         unsafe {
-            let src = context.ptrs_cast_const(ptrs);
-            let src = context.ptrs_add(src, len - 1);
-            context.ptrs_copy_forward(src, dst, 1);
+            let src = context.nonnull_ptrs_add(ptrs, len - 1);
+            context.nonnull_ptrs_copy_forward(src, dst, 1);
         }
 
         let new_len = len - 1;
@@ -542,10 +554,7 @@ where
     where
         T: SoaRead<'a, R>,
     {
-        self.swap_remove_into(index, |context, src| {
-            let src = context.ptrs_cast_const(src);
-            unsafe { context.ptrs_read(src) }
-        })
+        self.swap_remove_into(index, |context, src| unsafe { context.mut_ptrs_read(src) })
     }
 
     pub fn remove_into<'a, F, R>(&'a mut self, index: usize, f: F) -> R
@@ -566,15 +575,14 @@ where
 
         let Self { buffer, .. } = self;
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let dst = unsafe { context.mut_ptrs_add(ptrs, index) };
+        let dst = unsafe { context.nonnull_ptrs_add(ptrs, index) };
 
-        let ptrs_into = dst.clone();
+        let ptrs_into = context.nonnull_ptrs_as_mut_ptrs(dst.clone());
         let result = f(context, ptrs_into);
 
         unsafe {
-            let src = context.ptrs_cast_const(dst.clone());
-            let src = context.ptrs_add(src, 1);
-            context.ptrs_copy_forward(src, dst, len - index - 1);
+            let src = context.nonnull_ptrs_add(dst.clone(), 1);
+            context.nonnull_ptrs_copy_forward(src, dst, len - index - 1);
         }
 
         let new_len = len - 1;
@@ -591,10 +599,7 @@ where
     where
         T: SoaRead<'a, R>,
     {
-        self.remove_into(index, |context, src| {
-            let src = context.ptrs_cast_const(src);
-            unsafe { context.ptrs_read(src) }
-        })
+        self.remove_into(index, |context, src| unsafe { context.mut_ptrs_read(src) })
     }
 
     pub fn pop_into<'a, F, R>(&'a mut self, f: F) -> R
@@ -607,9 +612,10 @@ where
         }
 
         let Self { buffer, .. } = self;
-
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs_into = unsafe { context.mut_ptrs_add(ptrs, len - 1) };
+
+        let ptrs_into = unsafe { context.nonnull_ptrs_add(ptrs, len - 1) };
+        let ptrs_into = context.nonnull_ptrs_as_mut_ptrs(ptrs_into);
         let result = f(context, Some(ptrs_into));
 
         let new_len = len - 1;
@@ -627,8 +633,7 @@ where
         T: SoaRead<'a, R>,
     {
         self.pop_into(|context, src| {
-            let src = context.ptrs_cast_const(src?);
-            let value = unsafe { context.ptrs_read(src) };
+            let value = unsafe { context.mut_ptrs_read(src?) };
             Some(value)
         })
     }
@@ -660,12 +665,12 @@ where
         }
 
         if index < len {
-            let (context, ptrs) = self.as_mut_ptrs_with_context();
-            let ptrs = unsafe { context.mut_ptrs_add(ptrs, index) };
+            let (context, ptrs) = self.buffer.as_ptrs_with_context();
+            let ptrs = unsafe { context.nonnull_ptrs_add(ptrs, index) };
 
-            let src = context.ptrs_cast_const(ptrs.clone());
-            let dst = unsafe { context.mut_ptrs_add(ptrs, 1) };
-            unsafe { context.ptrs_copy_forward(src, dst, len - index) }
+            let src = ptrs.clone();
+            let dst = unsafe { context.nonnull_ptrs_add(ptrs, 1) };
+            unsafe { context.nonnull_ptrs_copy_forward(src, dst, len - index) }
         }
 
         #[expect(clippy::items_after_statements)]
@@ -685,13 +690,12 @@ where
         {
             fn drop(&mut self) {
                 let Self { buffer, index, len } = *self;
+                let (context, ptrs) = buffer.as_ptrs_with_context();
 
                 if index < len {
-                    let (context, ptrs) = buffer.as_ptrs_with_context();
-                    let dst = unsafe { context.mut_ptrs_add(ptrs, index) };
-                    let src = context.ptrs_cast_const(dst.clone());
-                    let src = unsafe { context.ptrs_add(src, 1) };
-                    unsafe { context.ptrs_copy_backward(src, dst, len - index) }
+                    let dst = unsafe { context.nonnull_ptrs_add(ptrs, index) };
+                    let src = unsafe { context.nonnull_ptrs_add(dst.clone(), 1) };
+                    unsafe { context.nonnull_ptrs_copy_backward(src, dst, len - index) }
                 }
             }
         }
@@ -700,7 +704,8 @@ where
         let guard = CopyBackGuard { buffer, index, len };
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs_from = unsafe { context.mut_ptrs_add(ptrs, index) };
+        let ptrs_from = unsafe { context.nonnull_ptrs_add(ptrs, index) };
+        let ptrs_from = context.nonnull_ptrs_as_mut_ptrs(ptrs_from);
         let result = f(context, ptrs_from);
 
         let new_len = len + 1;
@@ -741,7 +746,8 @@ where
         let Self { buffer, .. } = self;
 
         let (context, ptrs) = buffer.as_ptrs_with_context();
-        let ptrs_from = unsafe { context.mut_ptrs_add(ptrs, len) };
+        let ptrs_from = unsafe { context.nonnull_ptrs_add(ptrs, len) };
+        let ptrs_from = context.nonnull_ptrs_as_mut_ptrs(ptrs_from);
         let result = f(context, ptrs_from);
 
         let new_len = len + 1;

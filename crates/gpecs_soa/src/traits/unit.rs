@@ -1,6 +1,7 @@
 use core::{
     alloc::{Layout, LayoutError},
-    array, ptr,
+    array,
+    ptr::{self, NonNull},
 };
 
 use crate::traits::{FieldLayouts, SoaAllocContext, SoaAllocTrusted};
@@ -48,13 +49,42 @@ unsafe impl SoaAllocContext<()> for () {
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_buffer(
+        &self,
+        buffer: NonNull<u8>,
+        _capacity: usize,
+    ) -> Self::NonNullPtrs<'_> {
+        buffer.cast()
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
         unsafe { ptr::copy(src, dst, count) }
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_copy_forward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from(src, count) }
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
         unsafe { ptr::copy(src, dst, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_backward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from(src, count) }
     }
 }
 

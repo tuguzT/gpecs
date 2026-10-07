@@ -113,11 +113,35 @@ unsafe impl SoaRawContext<()> for () {
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
+        unsafe { NonNull::new_unchecked(ptrs.cast_mut()) }
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
         unsafe { NonNull::new_unchecked(ptrs) }
+    }
+
+    #[inline]
+    #[expect(clippy::zst_offset, reason = "as a reference for other manual impls")]
+    unsafe fn nonnull_ptrs_add<'a>(
+        &'a self,
+        ptrs: Self::NonNullPtrs<'a>,
+        count: usize,
+    ) -> Self::NonNullPtrs<'a> {
+        unsafe { ptrs.add(count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_offset_from(
+        &self,
+        ptrs: Self::NonNullPtrs<'_>,
+        origin: Self::NonNullPtrs<'_>,
+    ) -> isize {
+        unsafe { ptrs.offset_from(origin) }
     }
 
     #[inline]
@@ -128,6 +152,33 @@ unsafe impl SoaRawContext<()> for () {
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.as_ptr()
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::NonNullPtrs<'_>,
+        y: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        let x = x.as_ptr();
+        let y = y.as_ptr();
+        unsafe { ptr::swap_nonoverlapping(x, y, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_nonoverlapping(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_nonoverlapping(src, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_drop_in_place(&self, to_drop: Self::NonNullPtrs<'_>) {
+        unsafe { to_drop.drop_in_place() }
     }
 
     type SlicePtrs<'a> = *const [()];
@@ -218,19 +269,42 @@ unsafe impl SoaRaw for () {
 unsafe impl SoaCloneToUninitContext<()> for () {
     #[inline]
     unsafe fn ptrs_clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
+
+    #[inline]
+    unsafe fn nonnull_ptrs_clone_to_uninit(
+        &self,
+        _src: Self::NonNullPtrs<'_>,
+        _dst: Self::NonNullPtrs<'_>,
+    ) {
+    }
 }
 
 unsafe impl<'a> SoaReadContext<'a, ()> for () {
     #[inline]
-    unsafe fn ptrs_read(&'a self, ptrs: Self::Ptrs<'a>) {
-        unsafe { ptr::read(ptrs) }
+    unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) {
+        unsafe { src.read() }
+    }
+
+    #[inline]
+    unsafe fn mut_ptrs_read(&'a self, src: Self::MutPtrs<'a>) {
+        unsafe { src.read() }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_read(&'a self, src: Self::NonNullPtrs<'a>) {
+        unsafe { src.read() }
     }
 }
 
 unsafe impl SoaWriteContext<(), ()> for () {
     #[inline]
-    unsafe fn ptrs_write(&self, ptrs: Self::MutPtrs<'_>, value: ()) {
-        unsafe { ptr::write(ptrs, value) }
+    unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: ()) {
+        unsafe { dst.write(value) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_write(&self, dst: Self::NonNullPtrs<'_>, value: ()) {
+        unsafe { dst.write(value) }
     }
 }
 

@@ -113,11 +113,34 @@ unsafe impl<T> SoaRawContext<Identity<T>> for () {
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
+        unsafe { NonNull::new_unchecked(ptrs.cast_mut()) }
+    }
+
+    #[inline]
     unsafe fn nonnull_ptrs_from_mut_ptrs<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
         unsafe { NonNull::new_unchecked(ptrs) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_add<'a>(
+        &'a self,
+        ptrs: Self::NonNullPtrs<'a>,
+        count: usize,
+    ) -> Self::NonNullPtrs<'a> {
+        unsafe { ptrs.add(count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_offset_from(
+        &self,
+        ptrs: Self::NonNullPtrs<'_>,
+        origin: Self::NonNullPtrs<'_>,
+    ) -> isize {
+        unsafe { ptrs.offset_from(origin) }
     }
 
     #[inline]
@@ -128,6 +151,33 @@ unsafe impl<T> SoaRawContext<Identity<T>> for () {
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.as_ptr()
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_swap_nonoverlapping(
+        &self,
+        x: Self::NonNullPtrs<'_>,
+        y: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        let x = x.as_ptr();
+        let y = y.as_ptr();
+        unsafe { ptr::swap_nonoverlapping(x, y, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_nonoverlapping(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.copy_from_nonoverlapping(src, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_drop_in_place(&self, to_drop: Self::NonNullPtrs<'_>) {
+        unsafe { to_drop.drop_in_place() }
     }
 
     type SlicePtrs<'a> = *const [Identity<T>];
@@ -222,21 +272,46 @@ where
     #[inline]
     unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
         let src = unsafe { src.as_ref_unchecked() }.clone();
-        unsafe { ptr::write(dst, src) }
+        unsafe { dst.write(src) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_clone_to_uninit(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+    ) {
+        let src = unsafe { src.as_ref() }.clone();
+        unsafe { dst.write(src) }
     }
 }
 
 unsafe impl<'a, T> SoaReadContext<'a, Identity<T>> for () {
     #[inline]
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
-        unsafe { ptr::read(src) }
+        unsafe { src.read() }
+    }
+
+    #[inline]
+    unsafe fn mut_ptrs_read(&'a self, src: Self::MutPtrs<'a>) -> Identity<T> {
+        unsafe { src.read() }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_read(&'a self, src: Self::NonNullPtrs<'a>) -> Identity<T> {
+        unsafe { src.read() }
     }
 }
 
 unsafe impl<T> SoaWriteContext<Identity<T>, Identity<T>> for () {
     #[inline]
     unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: Identity<T>) {
-        unsafe { ptr::write(dst, value) }
+        unsafe { dst.write(value) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_write(&self, dst: Self::NonNullPtrs<'_>, value: Identity<T>) {
+        unsafe { dst.write(value) }
     }
 }
 

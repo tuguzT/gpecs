@@ -5,11 +5,11 @@ use core::{
     hash::{self, Hash},
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    ptr,
+    ptr::{self, NonNull},
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs, ErasedSoaPtrs,
     error::{InsufficientAlignError, check_sufficient_align},
     ptr::slice::SliceItemPtrs,
     soa::{
@@ -142,7 +142,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn ptrs_from_buffer_mut(
+    pub unsafe fn mut_ptrs_from_buffer(
         &'a self,
         buffer: *mut u8,
         capacity: usize,
@@ -151,6 +151,18 @@ where
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
         let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), layout.size());
         unsafe { ErasedSoaMutPtrs::new_unchecked(field_layouts, buffer, capacity, 0) }
+    }
+
+    #[inline]
+    pub unsafe fn nonnull_ptrs_from_buffer(
+        &'a self,
+        buffer: NonNull<u8>,
+        capacity: usize,
+    ) -> ErasedSoaNonNullPtrs<D::Output, P::NonNull> {
+        let field_layouts = self.field_layouts();
+        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
+        let buffer = NonNull::slice_from_raw_parts(buffer.cast(), layout.size());
+        unsafe { ErasedSoaNonNullPtrs::from_parts(field_layouts, buffer, capacity, 0) }
     }
 }
 

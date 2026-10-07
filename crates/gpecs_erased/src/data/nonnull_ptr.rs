@@ -2,7 +2,7 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use crate::{
     data::{
-        ErasedMutPtr, ErasedPtr,
+        ErasedMutPtr, ErasedMutRef, ErasedPtr, ErasedRef,
         error::{DowncastError, UpcastPtrError, check_downcast},
     },
     error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
@@ -99,6 +99,16 @@ where
     }
 
     #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedRef<'a, NonNullAsPtr<T>> {
+        unsafe { self.into_ptr().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedMutRef<'a, NonNullAsMutPtr<T>> {
+        unsafe { self.into_mut_ptr().as_mut_unchecked() }
+    }
+
+    #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { layout, ptr } = self;
@@ -128,6 +138,17 @@ where
             let this = unsafe { ptr.add(i) }.as_mut_ptr();
             let with = unsafe { with.ptr.add(i) }.as_mut_ptr();
             unsafe { this.swap(with) }
+        }
+    }
+
+    #[inline]
+    pub unsafe fn swap_nonoverlapping(self, with: Self, count: usize) {
+        let Self { layout, ptr } = self;
+
+        for i in 0..bytes_to_items::<T::Item>(layout.size()) {
+            let this = unsafe { ptr.add(i) };
+            let with = unsafe { with.ptr.add(i) };
+            unsafe { this.swap_nonoverlapping(with, count) }
         }
     }
 

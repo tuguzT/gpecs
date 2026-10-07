@@ -2,7 +2,7 @@ use core::{
     alloc::{Layout, LayoutError},
     array,
     marker::PhantomData,
-    ptr,
+    ptr::{self, NonNull},
 };
 
 use crate::traits::{FieldLayouts, SoaAllocContext, SoaAllocTrusted};
@@ -81,13 +81,42 @@ unsafe impl<A> SoaAllocContext<(A,)> for () {
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_from_buffer(
+        &self,
+        buffer: NonNull<u8>,
+        _capacity: usize,
+    ) -> Self::NonNullPtrs<'_> {
+        (buffer.cast(),)
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
         unsafe { ptr::copy(src.0, dst.0, count) }
     }
 
     #[inline]
+    unsafe fn nonnull_ptrs_copy_forward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.0.copy_from(src.0, count) }
+    }
+
+    #[inline]
     unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
         unsafe { ptr::copy(src.0, dst.0, count) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_ptrs_copy_backward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        unsafe { dst.0.copy_from(src.0, count) }
     }
 }
 
@@ -206,6 +235,21 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
+            unsafe fn nonnull_ptrs_from_buffer(&self, buffer: NonNull<u8>, capacity: usize) -> Self::NonNullPtrs<'_> {
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+
+                let mut layout = Layout::new::<()>();
+                let mut offsets = [0; count_idents!($($types,)*)];
+
+                let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
+                $((layout, offsets[permutation[$indices]]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
+                let _ = layout;
+
+                let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
+                ptrs
+            }
+
+            #[inline]
             unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
@@ -218,10 +262,44 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
+            unsafe fn nonnull_ptrs_copy_forward(
+                &self,
+                src: Self::NonNullPtrs<'_>,
+                dst: Self::NonNullPtrs<'_>,
+                count: usize,
+            ) {
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { dst.$indices.copy_from(src.$indices, count) },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in 0..count_idents!($($types,)*) {
+                    closures[permutation[index]]();
+                }
+            }
+
+            #[inline]
             unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize) {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, count) },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in (0..count_idents!($($types,)*)).rev() {
+                    closures[permutation[index]]();
+                }
+            }
+
+            #[inline]
+            unsafe fn nonnull_ptrs_copy_backward(
+                &self,
+                src: Self::NonNullPtrs<'_>,
+                dst: Self::NonNullPtrs<'_>,
+                count: usize,
+            ) {
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { dst.$indices.copy_from(src.$indices, count) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in (0..count_idents!($($types,)*)).rev() {

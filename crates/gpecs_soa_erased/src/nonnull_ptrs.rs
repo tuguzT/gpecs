@@ -5,10 +5,10 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutPtrs, ErasedSoaPtrs,
     assert::{assert_layouts, check_downcast},
     data::ErasedNonNullPtr,
-    error::{DowncastError, InsufficientAlignError},
+    error::{DowncastError, FromFieldsLayoutsError, InsufficientAlignError},
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
     ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
@@ -18,6 +18,7 @@ use crate::{
         },
         traits::{NonNullPtrs, SoaAlloc, SoaAllocContext, SoaRawContext},
     },
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 pub struct ErasedSoaNonNullPtrs<D, P>
@@ -271,8 +272,11 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<'e, E>(&'a mut self, with: &'e mut ErasedSoaNonNullPtrs<E, P>)
-    where
+    pub unsafe fn swap_nonoverlapping<'e, E>(
+        &'a mut self,
+        with: &'e mut ErasedSoaNonNullPtrs<E, P>,
+        count: usize,
+    ) where
         E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), with.field_layouts());
@@ -282,7 +286,7 @@ where
         for i in 0..n {
             let this = unsafe { self.nth_field_ptr(this_offsets, i) };
             let with = unsafe { with.nth_field_ptr(with_offsets, i) };
-            unsafe { this.swap(with) }
+            unsafe { this.swap_nonoverlapping(with, count) }
         }
     }
 
@@ -367,6 +371,39 @@ where
             let src = unsafe { src.nth_field_ptr(src_offsets, i) };
             unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn write<T, E>(&'a mut self, mut value: ErasedSoa<T, E, P::Ptrs>)
+    where
+        T: AlignedStorage<Item = P::Item>,
+        E: FieldLayoutsOwned<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf>>,
+    {
+        let src = value.as_mut_ptrs();
+        let src = unsafe { ErasedSoaNonNullPtrs::new_unchecked(src) };
+        unsafe { self.copy_from_nonoverlapping(&src, 1) };
+
+        drop(src);
+        let _ = value.into_parts();
+    }
+}
+
+impl<D, P> ErasedSoaNonNullPtrs<D, P>
+where
+    D: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf> + Clone,
+    P: NonNullSliceItemPtr<Item: Clone>,
+{
+    #[inline]
+    pub unsafe fn read<T>(
+        &self,
+    ) -> Result<ErasedSoa<T, D, P::Ptrs>, FromFieldsLayoutsError<T::Error>>
+    where
+        T: AlignedStorageFromLayout<Item = P::Item>,
+    {
+        let fields = self.iter().map(|ptr| unsafe { ptr.as_ref() });
+        let layouts = self.layouts().clone();
+        ErasedSoa::try_from_fields_layouts(fields, layouts)
     }
 }
 

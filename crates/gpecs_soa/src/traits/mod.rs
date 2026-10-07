@@ -1,4 +1,7 @@
-use core::alloc::{Layout, LayoutError};
+use core::{
+    alloc::{Layout, LayoutError},
+    ptr::NonNull,
+};
 
 pub use gpecs_soa_core::traits::*;
 
@@ -101,7 +104,29 @@ where
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](SoaAllocContext::buffer_layout) method.
-    unsafe fn mut_ptrs_from_buffer(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
+    unsafe fn mut_ptrs_from_buffer(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+        let ptrs = unsafe { self.ptrs_from_buffer(buffer, capacity) };
+        self.ptrs_cast_mut(ptrs)
+    }
+
+    /// Creates [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field
+    /// from a given buffer with given capacity.
+    ///
+    /// Implementations of this method should not account for `Self`,
+    /// as it is handled by the crate itself.
+    ///
+    /// # Safety
+    ///
+    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
+    /// must be the same as the one returned by [`buffer_layout()`](SoaAllocContext::buffer_layout) method.
+    unsafe fn nonnull_ptrs_from_buffer(
+        &self,
+        buffer: NonNull<u8>,
+        capacity: usize,
+    ) -> Self::NonNullPtrs<'_> {
+        let ptrs = unsafe { self.mut_ptrs_from_buffer(buffer.as_ptr(), capacity) };
+        unsafe { self.nonnull_ptrs_from_mut_ptrs(ptrs) }
+    }
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::Ptrs) to [dst](SoaRawContext::MutPtrs)
     /// for each stored field sequentially in the *same* order as they are stored in a buffer.
@@ -117,6 +142,32 @@ where
     /// [`ptrs_copy_nonoverlapping()`](SoaRawContext::ptrs_copy_nonoverlapping) can be used instead.
     unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
 
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::NonNullPtrs) to [dst](SoaRawContext::NonNullPtrs)
+    /// for each stored field sequentially in the *same* order as they are stored in a buffer.
+    ///
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    ///
+    /// If the source and destination will *never* overlap,
+    /// [`nonnull_ptrs_copy_nonoverlapping()`](SoaRawContext::nonnull_ptrs_copy_nonoverlapping) can be used instead.
+    unsafe fn nonnull_ptrs_copy_forward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        let src = Self::nonnull_ptrs_upcast(src);
+        let dst = Self::nonnull_ptrs_upcast(dst);
+
+        let src = self.nonnull_ptrs_as_ptrs(src);
+        let dst = self.nonnull_ptrs_as_mut_ptrs(dst);
+        unsafe { self.ptrs_copy_forward(src, dst, count) }
+    }
+
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::Ptrs) to [dst](SoaRawContext::MutPtrs)
     /// for each stored field sequentially in the *reverse* order as they are stored in a buffer.
     ///
@@ -130,6 +181,32 @@ where
     /// If the source and destination will *never* overlap,
     /// [`ptrs_copy_nonoverlapping()`](SoaRawContext::ptrs_copy_nonoverlapping) can be used instead.
     unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, count: usize);
+
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaRawContext::NonNullPtrs) to [dst](SoaRawContext::NonNullPtrs)
+    /// for each stored field sequentially in the *reverse* order as they are stored in a buffer.
+    ///
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    ///
+    /// If the source and destination will *never* overlap,
+    /// [`nonnull_ptrs_copy_nonoverlapping()`](SoaRawContext::nonnull_ptrs_copy_nonoverlapping) can be used instead.
+    unsafe fn nonnull_ptrs_copy_backward(
+        &self,
+        src: Self::NonNullPtrs<'_>,
+        dst: Self::NonNullPtrs<'_>,
+        count: usize,
+    ) {
+        let src = Self::nonnull_ptrs_upcast(src);
+        let dst = Self::nonnull_ptrs_upcast(dst);
+
+        let src = self.nonnull_ptrs_as_ptrs(src);
+        let dst = self.nonnull_ptrs_as_mut_ptrs(dst);
+        unsafe { self.ptrs_copy_backward(src, dst, count) }
+    }
 }
 
 /// An extension of [SoA](SoaRaw) type which allows to

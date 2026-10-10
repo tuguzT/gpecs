@@ -89,7 +89,7 @@ where
         } = self;
 
         let buffer = buffer.as_ptr().cast_const();
-        unsafe { ErasedSoaPtrs::new_unchecked(layouts, buffer, capacity, offset) }
+        unsafe { ErasedSoaPtrs::from_parts(layouts, buffer, capacity, offset) }
     }
 
     #[inline]
@@ -102,7 +102,7 @@ where
         } = self;
 
         let buffer = buffer.as_ptr();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(layouts, buffer, capacity, offset) }
+        unsafe { ErasedSoaMutPtrs::from_parts(layouts, buffer, capacity, offset) }
     }
 
     #[inline]

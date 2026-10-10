@@ -213,7 +213,7 @@ where
         let ptrs = {
             let layouts = layouts.field_layouts();
             let buffer = storage.as_slice();
-            unsafe { ErasedSoaPtrs::new_unchecked(layouts, buffer, 1, 0) }
+            unsafe { ErasedSoaPtrs::from_parts(layouts, buffer, 1, 0) }
         };
         (ptrs, layouts)
     }
@@ -235,7 +235,7 @@ where
         let ptrs = {
             let layouts = layouts.field_layouts();
             let buffer = storage.as_mut_slice();
-            unsafe { ErasedSoaMutPtrs::new_unchecked(layouts, buffer, 1, 0) }
+            unsafe { ErasedSoaMutPtrs::from_parts(layouts, buffer, 1, 0) }
         };
         (ptrs, layouts)
     }

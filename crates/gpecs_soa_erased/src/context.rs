@@ -138,7 +138,7 @@ where
         let field_layouts = self.field_layouts();
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
         let buffer = ptr::slice_from_raw_parts(buffer.cast(), layout.size());
-        unsafe { ErasedSoaPtrs::new_unchecked(field_layouts, buffer, capacity, 0) }
+        unsafe { ErasedSoaPtrs::from_parts(field_layouts, buffer, capacity, 0) }
     }
 
     #[inline]
@@ -150,7 +150,7 @@ where
         let field_layouts = self.field_layouts();
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
         let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), layout.size());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(field_layouts, buffer, capacity, 0) }
+        unsafe { ErasedSoaMutPtrs::from_parts(field_layouts, buffer, capacity, 0) }
     }
 
     #[inline]

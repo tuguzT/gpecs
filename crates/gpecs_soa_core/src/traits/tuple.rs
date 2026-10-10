@@ -292,6 +292,82 @@ macro_rules! tuple_impl {
             unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
                 unsafe { $(ptr::drop_in_place(slices_to_drop.$indices);)* }
             }
+
+            type SliceNonNullPtrs<'a> = ($(NonNull<[$types]>,)*);
+
+            #[inline]
+            fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+                from: Self::SliceNonNullPtrs<'long>,
+            ) -> Self::SliceNonNullPtrs<'short> {
+                from
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_from_raw_parts<'a>(
+                &'a self,
+                data: Self::NonNullPtrs<'a>,
+                len: usize,
+            ) -> Self::SliceNonNullPtrs<'a> {
+                let slices = ($(NonNull::slice_from_raw_parts(data.$indices, len),)*);
+                slices
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+                let lens = [$(slices.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_as_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceNonNullPtrs<'a>,
+            ) -> Self::Ptrs<'a> {
+                let slices = ($(slices.$indices.as_ptr().cast_const().cast(),)*); // should be `slices.$indices.as_mut_ptr().cast_const()` but it's unstable
+                slices
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_as_mut_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceNonNullPtrs<'a>,
+            ) -> Self::MutPtrs<'a> {
+                let slices = ($(slices.$indices.as_ptr().cast(),)*); // should be `slices.$indices.as_mut_ptr()` but it's unstable
+                slices
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_as_nonnull_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceNonNullPtrs<'a>,
+            ) -> Self::NonNullPtrs<'a> {
+                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_non_null_ptr()` but it's unstable
+                slices
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_as_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceNonNullPtrs<'a>,
+            ) -> Self::SlicePtrs<'a> {
+                let slices = ($(slices.$indices.as_ptr().cast_const(),)*);
+                slices
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_as_mut_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceNonNullPtrs<'a>,
+            ) -> Self::SliceMutPtrs<'a> {
+                let slices = ($(slices.$indices.as_ptr(),)*);
+                slices
+            }
+
+            #[inline]
+            unsafe fn nonnull_slices_drop_in_place(&self, slices_to_drop: Self::SliceNonNullPtrs<'_>) {
+                unsafe { $(slices_to_drop.$indices.drop_in_place();)* }
+            }
         }
 
         unsafe impl<$($types,)*> SoaRaw for ($($types,)*) {

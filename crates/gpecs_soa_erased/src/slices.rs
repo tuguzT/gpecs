@@ -31,7 +31,7 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn new_unchecked(
+    pub unsafe fn from_parts(
         layouts: D,
         buffer: &'a [P::Item],
         capacity: usize,
@@ -39,7 +39,7 @@ where
         len: usize,
     ) -> Self {
         let ptrs =
-            unsafe { ErasedSoaSlicePtrs::new_unchecked(layouts, buffer, capacity, offset, len) };
+            unsafe { ErasedSoaSlicePtrs::from_parts(layouts, buffer, capacity, offset, len) };
         unsafe { Self::from_slice_ptrs(ptrs) }
     }
 

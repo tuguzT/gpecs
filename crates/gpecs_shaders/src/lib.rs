@@ -66,14 +66,14 @@ pub fn swap_erased(
     let lhs_dense = unsafe {
         let len = u32_to_usize(lhs_len);
         let capacity = u32_to_usize(lhs_capacity);
-        ErasedSoaMutSlices::new_unchecked(layouts, lhs_dense, capacity, 0, len)
+        ErasedSoaMutSlices::from_parts(layouts, lhs_dense, capacity, 0, len)
     };
     let mut lhs_dense = SoaViewMut::<GpuErasedSoa<_>>::new(&context, lhs_dense);
 
     let rhs_dense = unsafe {
         let len = u32_to_usize(rhs_len);
         let capacity = u32_to_usize(rhs_capacity);
-        ErasedSoaMutSlices::new_unchecked(layouts, rhs_dense, capacity, 0, len)
+        ErasedSoaMutSlices::from_parts(layouts, rhs_dense, capacity, 0, len)
     };
     let mut rhs_dense = SoaViewMut::<GpuErasedSoa<_>>::new(&context, rhs_dense);
 
@@ -127,7 +127,7 @@ pub fn sparse_get(
     let lhs_values = unsafe {
         let len = u32_to_usize(lhs_len);
         let capacity = u32_to_usize(lhs_capacity);
-        ErasedSoaMutSlices::new_unchecked(layouts, lhs_dense, capacity, 0, len)
+        ErasedSoaMutSlices::from_parts(layouts, lhs_dense, capacity, 0, len)
     };
     let lhs_dense = unsafe {
         KeyValueMutSlices::<_, GpuErasedSoa<_>, _>::new_unchecked(lhs_entities, lhs_values)
@@ -138,7 +138,7 @@ pub fn sparse_get(
     let rhs_values = unsafe {
         let len = u32_to_usize(rhs_len);
         let capacity = u32_to_usize(rhs_capacity);
-        ErasedSoaMutSlices::new_unchecked(layouts, rhs_dense, capacity, 0, len)
+        ErasedSoaMutSlices::from_parts(layouts, rhs_dense, capacity, 0, len)
     };
     let rhs_dense = unsafe {
         KeyValueMutSlices::<_, GpuErasedSoa<_>, _>::new_unchecked(rhs_entities, rhs_values)

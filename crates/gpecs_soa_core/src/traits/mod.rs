@@ -341,16 +341,16 @@ where
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::MutPtrs<'a>;
 
-    /// Converts [slice pointers](SoaRawContext::SlicePtrs) of each field of stored fields
-    /// to the [mutable ones](SoaRawContext::SliceMutPtrs).
+    /// Converts [mutable slice pointers](SoaRawContext::SliceMutPtrs) of each field of stored fields
+    /// to the [const ones](SoaRawContext::SlicePtrs).
     fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
         let len = self.mut_slice_ptrs_len(&slices);
         let data = self.mut_slice_ptrs_as_ptrs(slices);
         self.slice_ptrs_from_raw_parts(data, len)
     }
 
-    /// Converts [mutable slice pointers](SoaRawContext::SliceMutPtrs) of each field of stored fields
-    /// to the [const ones](SoaRawContext::SlicePtrs).
+    /// Converts [slice pointers](SoaRawContext::SlicePtrs) of each field of stored fields
+    /// to the [mutable ones](SoaRawContext::SliceMutPtrs).
     fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
         let len = self.slice_ptrs_len(&slices);
         let ptrs = self.slice_ptrs_as_ptrs(slices);
@@ -373,6 +373,94 @@ where
             let to_drop = unsafe { self.mut_ptrs_add(ptrs.clone(), index) };
             unsafe { self.ptrs_drop_in_place(to_drop) }
         }
+    }
+
+    /// Collection of non-null slice pointers to each stored field.
+    type SliceNonNullPtrs<'a>: Clone;
+
+    /// Restricts [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) to each stored field
+    /// to be covariant over generic lifetime.
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short>;
+
+    /// Forms [non-null slice pointers](SoaRawContext::SliceMutPtrs) to each stored field
+    /// from [non-null pointers](SoaRawContext::MutPtrs) to each field and a length.
+    ///
+    /// The len argument is the number of elements, not the number of bytes.
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a>;
+
+    /// Returns the number of elements in slices to each [non-null slice pointer](SoaRawContext::SliceMutPtrs) of stored fields,
+    /// also referred to as their 'length'.
+    ///
+    /// Note that resulting lengths should be the same for all the non-null slice pointers,
+    /// or else this method could panic.
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize;
+
+    /// Returns [pointers](SoaRawContext::Ptrs) to the slice's buffer
+    /// of each [non-null slice pointer](SoaRawContext::SliceNonNullPtrs) of stored fields.
+    fn nonnull_slice_ptrs_as_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Ptrs<'a> {
+        let ptrs = self.nonnull_slice_ptrs_as_nonnull_ptrs(slices);
+        self.nonnull_ptrs_as_ptrs(ptrs)
+    }
+
+    /// Returns [mutable pointers](SoaRawContext::MutPtrs) to the slice's buffer
+    /// of each [non-null slice pointer](SoaRawContext::SliceNonNullPtrs) of stored fields.
+    fn nonnull_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
+        let ptrs = self.nonnull_slice_ptrs_as_nonnull_ptrs(slices);
+        self.nonnull_ptrs_as_mut_ptrs(ptrs)
+    }
+
+    /// Returns [non-null pointers](SoaRawContext::NonNullPtrs) to the slice's buffer
+    /// of each [non-null slice pointer](SoaRawContext::SliceNonNullPtrs) of stored fields.
+    fn nonnull_slice_ptrs_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a>;
+
+    /// Converts [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) of each field of stored fields
+    /// to the [const ones](SoaRawContext::SlicePtrs).
+    fn nonnull_slice_ptrs_as_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SlicePtrs<'a> {
+        let len = self.nonnull_slice_ptrs_len(&slices);
+        let data = self.nonnull_slice_ptrs_as_ptrs(slices);
+        self.slice_ptrs_from_raw_parts(data, len)
+    }
+
+    /// Converts [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) of each field of stored fields
+    /// to the [mutable ones](SoaRawContext::SliceMutPtrs).
+    fn nonnull_slice_ptrs_as_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SliceMutPtrs<'a> {
+        let len = self.nonnull_slice_ptrs_len(&slices);
+        let data = self.nonnull_slice_ptrs_as_mut_ptrs(slices);
+        self.mut_slice_ptrs_from_raw_parts(data, len)
+    }
+
+    /// Executes the destructors (if any) for the each [slice](SoaRawContext::SliceNonNullPtrs) of stored fields.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::drop_in_place()`](core::ptr::NonNull::drop_in_place) method to each slice pointer
+    /// should be satisfied to be safe to call this method.
+    ///
+    /// By default, this method just iterates by all the fields of slices and drops such fields one by one.
+    unsafe fn nonnull_slices_drop_in_place(&self, slices_to_drop: Self::SliceNonNullPtrs<'_>) {
+        let slices_to_drop = Self::nonnull_slice_ptrs_upcast(slices_to_drop);
+        let slices_to_drop = self.nonnull_slice_ptrs_as_mut_slice_ptrs(slices_to_drop);
+        unsafe { self.slices_drop_in_place(slices_to_drop) }
     }
 }
 
@@ -398,6 +486,10 @@ pub type SlicePtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SlicePtrs<'a>;
 /// Alias for the [`SliceMutPtrs`](SoaRawContext::SliceMutPtrs) associated type
 /// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
 pub type SliceMutPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SliceMutPtrs<'a>;
+
+/// Alias for the [`SliceNonNullPtrs`](SoaRawContext::SliceNonNullPtrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type SliceNonNullPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SliceNonNullPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern, or SoA.

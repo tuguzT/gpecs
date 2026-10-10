@@ -16,8 +16,8 @@ use gpecs_soa::{
 
 use crate::{
     KeyValueFieldLayouts, KeyValueMutPtrs, KeyValueMutRefs, KeyValueMutSlicePtrs,
-    KeyValueMutSlices, KeyValueNonNullPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs,
-    KeyValueSlicePtrs, KeyValueSlices,
+    KeyValueMutSlices, KeyValueNonNullPtrs, KeyValueNonNullSlicePtrs, KeyValuePair, KeyValuePtrs,
+    KeyValueRefs, KeyValueSlicePtrs, KeyValueSlices,
 };
 
 unsafe impl<K, V, P> SoaRawContext<KeyValuePair<K, V, P>> for Identity<V::Context>
@@ -277,6 +277,75 @@ where
 
     #[inline]
     unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
+        unsafe { slices_to_drop.drop_in_place(self) }
+    }
+
+    type SliceNonNullPtrs<'a> = KeyValueNonNullSlicePtrs<'a, K, V, P::NonNull>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        let context = self.as_inner();
+        KeyValueNonNullSlicePtrs::from_ptrs(context, data, len)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Ptrs<'a> {
+        slices.into_ptrs(self)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
+        slices.into_mut_ptrs(self)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a> {
+        slices.into_nonnull_ptrs(self)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SlicePtrs<'a> {
+        slices.into_slice_ptrs(self)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SliceMutPtrs<'a> {
+        slices.into_mut_slice_ptrs(self)
+    }
+
+    #[inline]
+    unsafe fn nonnull_slices_drop_in_place(&self, slices_to_drop: Self::SliceNonNullPtrs<'_>) {
         unsafe { slices_to_drop.drop_in_place(self) }
     }
 }

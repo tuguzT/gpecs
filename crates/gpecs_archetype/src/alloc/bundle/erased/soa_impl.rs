@@ -19,8 +19,8 @@ use crate::{
     bundle::erased::{
         ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, ErasedBundleMutPtrs,
         ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
-        ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
-        ErasedBundleSlices,
+        ErasedBundleNonNullPtrs, ErasedBundleNonNullSlicePtrs, ErasedBundlePtrs, ErasedBundleRefs,
+        ErasedBundleSlicePtrs, ErasedBundleSlices,
         traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::{ErasedArchetype, Iter},
@@ -269,7 +269,7 @@ where
 
     #[inline]
     fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::Ptrs<'a> {
-        slices.into_ptrs().cast_const()
+        slices.into_ptrs()
     }
 
     #[inline]
@@ -277,7 +277,7 @@ where
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::MutPtrs<'a> {
-        slices.into_ptrs()
+        slices.into_mut_ptrs()
     }
 
     #[inline]
@@ -295,6 +295,78 @@ where
         let archetype = self.as_inner();
         for ((_, meta), to_drop) in zip_eq(archetype, slices_to_drop) {
             unsafe { D::drop_in_place_slice_with(to_drop, meta) }
+        }
+    }
+
+    type SliceNonNullPtrs<'a> =
+        ErasedBundleNonNullSlicePtrs<&'a ErasedArchetype<T::Meta>, P::NonNull>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        unsafe { ErasedBundleNonNullSlicePtrs::from_ptrs(data, len) }
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Ptrs<'a> {
+        slices.into_ptrs()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
+        slices.into_mut_ptrs()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a> {
+        slices.into_nonnull_ptrs()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SlicePtrs<'a> {
+        slices.into_slice_ptrs()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SliceMutPtrs<'a> {
+        slices.into_mut_slice_ptrs()
+    }
+
+    #[inline]
+    unsafe fn nonnull_slices_drop_in_place(&self, slices_to_drop: Self::SliceNonNullPtrs<'_>) {
+        let archetype = self.as_inner();
+        for ((_, meta), to_drop) in zip_eq(archetype, slices_to_drop) {
+            unsafe { D::drop_in_place_slice_with(to_drop.into_mut_slice_ptr(), meta) }
         }
     }
 }

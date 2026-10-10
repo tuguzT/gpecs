@@ -8,8 +8,8 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
     soa::traits::{
-        MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut,
-        SoaAlloc, SoaOwned, SoaReadOwned, SoaWrite,
+        MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SliceNonNullPtrs, SlicePtrs,
+        Slices, SlicesMut, SoaAlloc, SoaOwned, SoaReadOwned, SoaWrite,
     },
 };
 
@@ -24,6 +24,7 @@ pub type BundleNonNullPtrs<B> = NonNullPtrs<'static, B>;
 
 pub type BundleSlicePtrs<B> = SlicePtrs<'static, B>;
 pub type BundleSliceMutPtrs<B> = SliceMutPtrs<'static, B>;
+pub type BundleSliceNonNullPtrs<B> = SliceNonNullPtrs<'static, B>;
 
 pub type BundleRefs<'a, B> = Refs<'static, 'a, B>;
 pub type BundleRefsMut<'a, B> = RefsMut<'static, 'a, B>;

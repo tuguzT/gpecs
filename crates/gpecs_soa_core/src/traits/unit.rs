@@ -259,6 +259,74 @@ unsafe impl SoaRawContext<()> for () {
     unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
         unsafe { ptr::drop_in_place(slices_to_drop) }
     }
+
+    type SliceNonNullPtrs<'a> = NonNull<[()]>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        NonNull::slice_from_raw_parts(data, len)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Ptrs<'a> {
+        slices.as_ptr().cast_const().cast() // should be `slices.as_mut_ptr().cast_const()` but it's unstable
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_mut_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::MutPtrs<'a> {
+        slices.as_ptr().cast() // should be `slices.as_mut_ptr()` but it's unstable
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::NonNullPtrs<'a> {
+        slices.cast() // should be `slices.as_non_null_ptr()` but it's unstable
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SlicePtrs<'a> {
+        slices.as_ptr().cast_const()
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_as_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SliceMutPtrs<'a> {
+        slices.as_ptr()
+    }
+
+    #[inline]
+    unsafe fn nonnull_slices_drop_in_place(&self, slices_to_drop: Self::SliceNonNullPtrs<'_>) {
+        unsafe { slices_to_drop.drop_in_place() }
+    }
 }
 
 unsafe impl SoaRaw for () {

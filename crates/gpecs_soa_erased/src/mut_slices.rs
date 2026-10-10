@@ -32,7 +32,7 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn new_unchecked(
+    pub unsafe fn from_parts(
         layouts: D,
         buffer: &'a mut [P::Item],
         capacity: usize,
@@ -40,7 +40,7 @@ where
         len: usize,
     ) -> Self {
         let ptrs =
-            unsafe { ErasedSoaMutSlicePtrs::new_unchecked(layouts, buffer, capacity, offset, len) };
+            unsafe { ErasedSoaMutSlicePtrs::from_parts(layouts, buffer, capacity, offset, len) };
         unsafe { Self::from_slice_ptrs(ptrs) }
     }
 

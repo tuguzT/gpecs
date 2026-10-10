@@ -24,7 +24,7 @@ use crate::{
     bundle::{
         Bundle, BundleSliceMutPtrs,
         erased::{
-            ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundleSlicePtrs,
+            ErasedBundleMutPtrs, ErasedBundleMutSlices, ErasedBundlePtrs, ErasedBundleSlicePtrs,
             ErasedBundleSlicePtrsIter, ErasedBundleSlices,
             error::DowncastError,
             traits::{
@@ -67,7 +67,15 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundleMutPtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, CastConst<P>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_ptrs();
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, P> {
         let Self { inner } = self;
 
         let inner = inner.into_mut_ptrs();
@@ -221,7 +229,7 @@ where
         let len = self.len();
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
         let ptrs = self
-            .into_ptrs()
+            .into_mut_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 

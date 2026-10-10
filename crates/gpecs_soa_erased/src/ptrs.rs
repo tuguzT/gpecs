@@ -43,7 +43,7 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn new_unchecked(
+    pub unsafe fn from_parts(
         layouts: D,
         buffer: *const [P::Item],
         capacity: usize,
@@ -81,7 +81,7 @@ where
         } = self;
 
         let layouts = f(layouts);
-        unsafe { ErasedSoaPtrs::new_unchecked(layouts, buffer, capacity, offset) }
+        unsafe { ErasedSoaPtrs::from_parts(layouts, buffer, capacity, offset) }
     }
 
     #[inline]
@@ -94,7 +94,7 @@ where
         } = self;
 
         let buffer = buffer.cast_mut();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(layouts, buffer, capacity, offset) }
+        unsafe { ErasedSoaMutPtrs::from_parts(layouts, buffer, capacity, offset) }
     }
 
     #[inline]
@@ -139,7 +139,7 @@ where
         let buffer_layout = Layout::array::<P::Item>(buffer.len())?;
         check_sufficient_len(buffer_layout.size(), layout.size())?;
 
-        let me = unsafe { Self::new_unchecked(layouts, buffer, capacity, offset) };
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, offset) };
         Ok(me)
     }
 
@@ -150,7 +150,7 @@ where
         let data = ptr::without_provenance(addr);
         let buffer = ptr::slice_from_raw_parts(data, 0);
 
-        let me = unsafe { Self::new_unchecked(layouts, buffer, capacity, 0) };
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, 0) };
         Ok(me)
     }
 
@@ -332,7 +332,7 @@ where
         } = *self;
 
         let layouts = layouts.clone();
-        unsafe { Self::new_unchecked(layouts, buffer, capacity, offset) }
+        unsafe { Self::from_parts(layouts, buffer, capacity, offset) }
     }
 }
 

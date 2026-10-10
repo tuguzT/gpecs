@@ -5,6 +5,7 @@ pub use self::{
     mut_slice::ErasedComponentMutSlice,
     mut_slice_ptr::ErasedComponentMutSlicePtr,
     nonnull_ptr::ErasedComponentNonNullPtr,
+    nonnull_slice_ptr::ErasedComponentNonNullSlicePtr,
     ptr::ErasedComponentPtr,
     r#ref::ErasedComponentRef,
     slice::ErasedComponentSlice,
@@ -20,6 +21,7 @@ mod mut_ref;
 mod mut_slice;
 mod mut_slice_ptr;
 mod nonnull_ptr;
+mod nonnull_slice_ptr;
 mod ptr;
 mod r#ref;
 mod slice;

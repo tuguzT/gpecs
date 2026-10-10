@@ -292,6 +292,32 @@ macro_rules! tuple_impl {
             unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
                 unsafe { $(ptr::drop_in_place(slices_to_drop.$indices);)* }
             }
+
+            type SliceNonNullPtrs<'a> = ($(NonNull<[$types]>,)*);
+
+            #[inline]
+            fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+                from: Self::SliceNonNullPtrs<'long>,
+            ) -> Self::SliceNonNullPtrs<'short> {
+                from
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_from_raw_parts<'a>(
+                &'a self,
+                data: Self::NonNullPtrs<'a>,
+                len: usize,
+            ) -> Self::SliceNonNullPtrs<'a> {
+                let slices = ($(NonNull::slice_from_raw_parts(data.$indices, len),)*);
+                slices
+            }
+
+            #[inline]
+            fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+                let lens = [$(slices.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
         }
 
         unsafe impl<$($types,)*> SoaRaw for ($($types,)*) {

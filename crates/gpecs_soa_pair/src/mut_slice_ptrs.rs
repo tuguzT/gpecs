@@ -99,8 +99,7 @@ where
         let Self { key, values, .. } = self;
 
         let key = key.cast_const();
-        let values = context.slice_ptrs_cast_const(values.into_inner());
-        let value = context.slice_ptrs_as_ptrs(values);
+        let value = context.mut_slice_ptrs_as_ptrs(values.into_inner());
         KeyValuePtrs::new(key, value)
     }
 

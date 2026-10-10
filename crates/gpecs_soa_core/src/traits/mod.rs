@@ -374,6 +374,32 @@ where
             unsafe { self.ptrs_drop_in_place(to_drop) }
         }
     }
+
+    /// Collection of non-null slice pointers to each stored field.
+    type SliceNonNullPtrs<'a>: Clone;
+
+    /// Restricts [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) to each stored field
+    /// to be covariant over generic lifetime.
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short>;
+
+    /// Forms [non-null slice pointers](SoaRawContext::SliceMutPtrs) to each stored field
+    /// from [non-null pointers](SoaRawContext::MutPtrs) to each field and a length.
+    ///
+    /// The len argument is the number of elements, not the number of bytes.
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a>;
+
+    /// Returns the number of elements in slices to each [non-null slice pointer](SoaRawContext::SliceMutPtrs) of stored fields,
+    /// also referred to as their 'length'.
+    ///
+    /// Note that resulting lengths should be the same for all the non-null slice pointers,
+    /// or else this method could panic.
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize;
 }
 
 /// Alias for the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
@@ -398,6 +424,10 @@ pub type SlicePtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SlicePtrs<'a>;
 /// Alias for the [`SliceMutPtrs`](SoaRawContext::SliceMutPtrs) associated type
 /// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
 pub type SliceMutPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SliceMutPtrs<'a>;
+
+/// Alias for the [`SliceNonNullPtrs`](SoaRawContext::SliceNonNullPtrs) associated type
+/// of the [`Context`](SoaRaw::Context) associated type of a given [SoA](SoaRaw) type.
+pub type SliceNonNullPtrs<'a, T> = <Context<T> as SoaRawContext<T>>::SliceNonNullPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern, or SoA.

@@ -3,7 +3,7 @@ use core::{fmt::Debug, ptr::NonNull};
 use crate::{
     CovariantFieldLayouts, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
     ErasedSoaMutRefs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlices, ErasedSoaNonNullPtrs,
-    ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaSlicePtrs, ErasedSoaSlices,
+    ErasedSoaNonNullSlicePtrs, ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaSlicePtrs, ErasedSoaSlices,
     offsets::BufferOffsetsFromSelf,
     ptr::slice::SliceItemPtrs,
     soa::{
@@ -268,6 +268,29 @@ where
     #[inline]
     unsafe fn slices_drop_in_place(&self, _: Self::SliceMutPtrs<'_>) {
         // do nothing; it's safe to not drop anything
+    }
+
+    type SliceNonNullPtrs<'a> = ErasedSoaNonNullSlicePtrs<FieldLayoutsOutput<'a, D>, P::NonNull>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        unsafe { from.map_layouts(D::upcast_field_layouts) }
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        unsafe { ErasedSoaNonNullSlicePtrs::from_ptrs(data, len) }
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
     }
 }
 

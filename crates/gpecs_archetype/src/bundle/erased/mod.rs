@@ -4,6 +4,7 @@ pub use self::{
     mut_slice_ptrs::{ErasedBundleMutSlicePtrs, ErasedBundleMutSlicePtrsIter},
     mut_slices::{ErasedBundleMutSlices, ErasedBundleMutSlicesIter},
     nonnull_ptrs::{ErasedBundleNonNullPtrs, ErasedBundleNonNullPtrsIter},
+    nonnull_slice_ptrs::ErasedBundleNonNullSlicePtrs,
     ptrs::{ErasedBundlePtrs, ErasedBundlePtrsIter},
     refs::{ErasedBundleRefs, ErasedBundleRefsIter},
     slice_ptrs::{ErasedBundleSlicePtrs, ErasedBundleSlicePtrsIter},
@@ -31,6 +32,7 @@ mod mut_refs;
 mod mut_slice_ptrs;
 mod mut_slices;
 mod nonnull_ptrs;
+mod nonnull_slice_ptrs;
 mod ptrs;
 mod refs;
 mod slice_ptrs;

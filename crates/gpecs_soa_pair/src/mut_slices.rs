@@ -96,8 +96,7 @@ where
         let Self { key, len, values } = self;
 
         let key = key.cast_const();
-        let values = context.mut_slices_as_slices(values.into_inner());
-        let values = context.slices_as_slice_ptrs(values);
+        let values = context.mut_slices_as_slice_ptrs(values.into_inner());
         unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
     }
 

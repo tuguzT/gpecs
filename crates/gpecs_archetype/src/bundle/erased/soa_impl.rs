@@ -18,8 +18,9 @@ use itertools::zip_eq;
 use crate::{
     bundle::erased::{
         ErasedBorrowedViewBundle, ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundleMutRefs,
-        ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs, ErasedBundlePtrs,
-        ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices,
+        ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs,
+        ErasedBundleNonNullSlicePtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
+        ErasedBundleSlices,
         traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::{ErasedArchetypeView, Iter},
@@ -295,6 +296,30 @@ where
         for ((_, meta), to_drop) in zip_eq(archetype, slices_to_drop) {
             unsafe { D::drop_in_place_slice_with(to_drop, meta) }
         }
+    }
+
+    type SliceNonNullPtrs<'a> =
+        ErasedBundleNonNullSlicePtrs<ErasedArchetypeView<'view, T::Meta>, P::NonNull>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        unsafe { ErasedBundleNonNullSlicePtrs::from_ptrs(data, len) }
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
     }
 }
 

@@ -258,6 +258,29 @@ unsafe impl<T> SoaRawContext<Identity<T>> for () {
     unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
         unsafe { ptr::drop_in_place(slices_to_drop) }
     }
+
+    type SliceNonNullPtrs<'a> = NonNull<[Identity<T>]>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        NonNull::slice_from_raw_parts(data, len)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
+    }
 }
 
 unsafe impl<T> SoaRaw for Identity<T> {

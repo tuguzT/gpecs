@@ -4,9 +4,9 @@ use crate::{
     ptrs::SlicePtrsIndex,
     refs, slices,
     traits::{
-        MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
-        SoaCloneToUninit, SoaCloneToUninitContext, SoaRaw, SoaRawContext, SoaRead, SoaReadContext,
-        SoaWrite, SoaWriteContext,
+        MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SliceNonNullPtrs, SlicePtrs,
+        Slices, SlicesMut, Soa, SoaCloneToUninit, SoaCloneToUninitContext, SoaRaw, SoaRawContext,
+        SoaRead, SoaReadContext, SoaWrite, SoaWriteContext,
     },
 };
 
@@ -361,6 +361,36 @@ where
     T: SoaRaw + ?Sized,
 {
     unsafe { context.slices_drop_in_place(slices_to_drop) }
+}
+
+#[inline]
+pub fn upcast_slices_nonnull<'short, 'long: 'short, T>(
+    from: SliceNonNullPtrs<'long, T>,
+) -> SliceNonNullPtrs<'short, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    T::Context::nonnull_slice_ptrs_upcast(from)
+}
+
+#[inline]
+pub fn slices_from_raw_parts_nonnull<'a, T>(
+    context: &'a T::Context,
+    data: NonNullPtrs<'a, T>,
+    len: usize,
+) -> SliceNonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    context.nonnull_slice_ptrs_from_raw_parts(data, len)
+}
+
+#[inline]
+pub fn slices_len_nonnull<T>(context: &T::Context, slices: &SliceNonNullPtrs<'_, T>) -> usize
+where
+    T: SoaRaw + ?Sized,
+{
+    context.nonnull_slice_ptrs_len(slices)
 }
 
 #[inline]

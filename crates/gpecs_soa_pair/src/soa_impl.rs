@@ -16,8 +16,8 @@ use gpecs_soa::{
 
 use crate::{
     KeyValueFieldLayouts, KeyValueMutPtrs, KeyValueMutRefs, KeyValueMutSlicePtrs,
-    KeyValueMutSlices, KeyValueNonNullPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs,
-    KeyValueSlicePtrs, KeyValueSlices,
+    KeyValueMutSlices, KeyValueNonNullPtrs, KeyValueNonNullSlicePtrs, KeyValuePair, KeyValuePtrs,
+    KeyValueRefs, KeyValueSlicePtrs, KeyValueSlices,
 };
 
 unsafe impl<K, V, P> SoaRawContext<KeyValuePair<K, V, P>> for Identity<V::Context>
@@ -278,6 +278,30 @@ where
     #[inline]
     unsafe fn slices_drop_in_place(&self, slices_to_drop: Self::SliceMutPtrs<'_>) {
         unsafe { slices_to_drop.drop_in_place(self) }
+    }
+
+    type SliceNonNullPtrs<'a> = KeyValueNonNullSlicePtrs<'a, K, V, P::NonNull>;
+
+    #[inline]
+    fn nonnull_slice_ptrs_upcast<'short, 'long: 'short>(
+        from: Self::SliceNonNullPtrs<'long>,
+    ) -> Self::SliceNonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        let context = self.as_inner();
+        KeyValueNonNullSlicePtrs::from_ptrs(context, data, len)
+    }
+
+    #[inline]
+    fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
+        slices.len()
     }
 }
 

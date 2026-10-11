@@ -649,3 +649,42 @@ where
 {
     index.index_mut_ptrs(context, slices)
 }
+
+#[inline]
+pub unsafe fn get_unchecked_nonnull<'a, T, I>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+    index: I,
+) -> I::NonNullPtrs<'a>
+where
+    T: SoaRaw + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    unsafe { index.get_unchecked_nonnull(context, slices) }
+}
+
+#[inline]
+pub fn get_nonnull<'a, T, I>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+    index: I,
+) -> Option<I::NonNullPtrs<'a>>
+where
+    T: SoaRaw + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    index.get_nonnull_ptrs(context, slices)
+}
+
+#[inline]
+pub fn index_nonnull<'a, T, I>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+    index: I,
+) -> I::NonNullPtrs<'a>
+where
+    T: SoaRaw + ?Sized,
+    I: SlicePtrsIndex<T>,
+{
+    index.index_nonnull_ptrs(context, slices)
+}

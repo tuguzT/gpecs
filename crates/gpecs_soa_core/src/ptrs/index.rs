@@ -1,8 +1,14 @@
 use core::ops;
 
 use crate::{
-    ptrs::{get, get_mut, get_unchecked, get_unchecked_mut, index, index_mut},
-    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, SoaRaw, SoaRawContext},
+    ptrs::{
+        get, get_mut, get_nonnull, get_unchecked, get_unchecked_mut, get_unchecked_nonnull, index,
+        index_mut, index_nonnull,
+    },
+    traits::{
+        MutPtrs, NonNullPtrs, Ptrs, SliceMutPtrs, SliceNonNullPtrs, SlicePtrs, SoaRaw,
+        SoaRawContext,
+    },
 };
 
 pub unsafe trait SlicePtrsIndex<T>: private::Sealed
@@ -44,6 +50,26 @@ where
         context: &'a T::Context,
         slices: SliceMutPtrs<'a, T>,
     ) -> Self::MutPtrs<'a>;
+
+    type NonNullPtrs<'a>;
+
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a>;
+
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>>;
+
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a>;
 }
 
 unsafe impl<T> SlicePtrsIndex<T> for usize
@@ -124,6 +150,46 @@ where
         }
 
         unsafe { get_unchecked_mut::<T, _>(context, slices, self) }
+    }
+
+    type NonNullPtrs<'a> = NonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        unsafe { get_offset_unchecked_nonnull::<T>(context, slices, self) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        if self >= len {
+            return None;
+        }
+
+        let ptrs = unsafe { get_unchecked_nonnull::<T, _>(context, slices, self) };
+        Some(ptrs)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        if self >= len {
+            slice_index_usize_fail(len, self)
+        }
+
+        unsafe { get_unchecked_nonnull::<T, _>(context, slices, self) }
     }
 }
 
@@ -226,6 +292,57 @@ where
 
         unsafe { get_offset_len_unchecked_mut::<T>(context, slices, start, new_len) }
     }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { start, end } = self;
+        let new_len = unsafe { end.unchecked_sub(start) };
+        unsafe { get_offset_len_unchecked_nonnull::<T>(context, slices, start, new_len) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let Self { start, end } = self;
+        let slices_len = context.nonnull_slice_ptrs_len(&slices);
+
+        let new_len = end.checked_sub(start)?;
+        if end > slices_len {
+            return None;
+        }
+
+        let slices =
+            unsafe { get_offset_len_unchecked_nonnull::<T>(context, slices, start, new_len) };
+        Some(slices)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { start, end } = self;
+        let slices_len = context.nonnull_slice_ptrs_len(&slices);
+
+        let Some(new_len) = end.checked_sub(start) else {
+            slice_index_fail(start, end, slices_len)
+        };
+        if end > slices_len {
+            slice_index_fail(start, end, slices_len)
+        }
+
+        unsafe { get_offset_len_unchecked_nonnull::<T>(context, slices, start, new_len) }
+    }
 }
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeTo<usize>
@@ -290,6 +407,38 @@ where
     ) -> Self::MutPtrs<'a> {
         let Self { end } = self;
         index_mut::<T, _>(context, slices, 0..end)
+    }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { end } = self;
+        unsafe { get_unchecked_nonnull::<T, _>(context, slices, 0..end) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let Self { end } = self;
+        get_nonnull::<T, _>(context, slices, 0..end)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { end } = self;
+        index_nonnull::<T, _>(context, slices, 0..end)
     }
 }
 
@@ -372,6 +521,46 @@ where
         let new_len = unsafe { len.unchecked_sub(start) };
         unsafe { get_offset_len_unchecked_mut::<T>(context, slices, start, new_len) }
     }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { start } = self;
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        unsafe { get_unchecked_nonnull::<T, _>(context, slices, start..len) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let Self { start } = self;
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        get_nonnull::<T, _>(context, slices, start..len)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { start } = self;
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        if start > len {
+            slice_index_fail(start, len, len)
+        }
+
+        let new_len = unsafe { len.unchecked_sub(start) };
+        unsafe { get_offset_len_unchecked_nonnull::<T>(context, slices, start, new_len) }
+    }
 }
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeFull
@@ -429,6 +618,35 @@ where
         _context: &'a T::Context,
         slices: SliceMutPtrs<'a, T>,
     ) -> Self::MutPtrs<'a> {
+        slices
+    }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        _context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        slices
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        _context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        Some(slices)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        _context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
         slices
     }
 }
@@ -539,6 +757,51 @@ where
         let range = range_into_slice_range(self);
         index_mut::<T, _>(context, slices, range)
     }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let range = range_into_slice_range(self);
+        unsafe { get_unchecked_nonnull::<T, _>(context, slices, range) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let end = *self.end();
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        if end >= len {
+            return None;
+        }
+
+        let range = range_into_slice_range(self);
+        get_nonnull::<T, _>(context, slices, range)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let start = *self.start();
+        let end = *self.end();
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        if end >= len {
+            slice_index_fail(start, end, len)
+        }
+
+        let range = range_into_slice_range(self);
+        index_nonnull::<T, _>(context, slices, range)
+    }
 }
 
 unsafe impl<T> SlicePtrsIndex<T> for ops::RangeToInclusive<usize>
@@ -603,6 +866,38 @@ where
     ) -> Self::MutPtrs<'a> {
         let Self { end } = self;
         index_mut::<T, _>(context, slices, 0..=end)
+    }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { end } = self;
+        unsafe { get_unchecked_nonnull::<T, _>(context, slices, 0..=end) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let Self { end } = self;
+        get_nonnull::<T, _>(context, slices, 0..=end)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let Self { end } = self;
+        index_nonnull::<T, _>(context, slices, 0..=end)
     }
 }
 
@@ -755,6 +1050,41 @@ where
         let range = into_slice_range(len, self);
         index_mut::<T, _>(context, slices, range)
     }
+
+    type NonNullPtrs<'a> = SliceNonNullPtrs<'a, T>;
+
+    #[inline]
+    unsafe fn get_unchecked_nonnull<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        let range = into_range_unchecked(len, self);
+        unsafe { get_unchecked_nonnull::<T, _>(context, slices, range) }
+    }
+
+    #[inline]
+    fn get_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Option<Self::NonNullPtrs<'a>> {
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        let range = try_into_slice_range(len, self)?;
+        get_nonnull::<T, _>(context, slices, range)
+    }
+
+    #[inline]
+    fn index_nonnull_ptrs<'a>(
+        self,
+        context: &'a T::Context,
+        slices: SliceNonNullPtrs<'a, T>,
+    ) -> Self::NonNullPtrs<'a> {
+        let len = context.nonnull_slice_ptrs_len(&slices);
+        let range = into_slice_range(len, self);
+        index_nonnull::<T, _>(context, slices, range)
+    }
 }
 
 mod private {
@@ -805,6 +1135,19 @@ where
     unsafe { context.mut_ptrs_add(ptrs, offset) }
 }
 
+#[inline]
+unsafe fn get_offset_unchecked_nonnull<'a, T>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+    offset: usize,
+) -> NonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    let ptrs = context.nonnull_slice_ptrs_as_nonnull_ptrs(slices);
+    unsafe { context.nonnull_ptrs_add(ptrs, offset) }
+}
+
 /// Copy of private `core::slice::index::get_offset_len_noubcheck()`.
 #[inline]
 unsafe fn get_offset_len_unchecked<'a, T>(
@@ -833,6 +1176,22 @@ where
 {
     let data = unsafe { get_offset_unchecked_mut::<T>(context, slices, offset) };
     context.mut_slice_ptrs_from_raw_parts(data, len)
+}
+
+/// Analogue of private `core::slice::index::get_offset_len_mut_noubcheck()`,
+/// but for non-null pointers.
+#[inline]
+unsafe fn get_offset_len_unchecked_nonnull<'a, T>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+    offset: usize,
+    len: usize,
+) -> SliceNonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    let data = unsafe { get_offset_unchecked_nonnull::<T>(context, slices, offset) };
+    context.nonnull_slice_ptrs_from_raw_parts(data, len)
 }
 
 /// Copy of [`core::slice::try_range()`].

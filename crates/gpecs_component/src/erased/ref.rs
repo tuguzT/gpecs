@@ -5,7 +5,10 @@ use core::{
     hash::{self, Hash},
 };
 
-use gpecs_erased::{data::ErasedRef, ptr::slice::ConstSliceItemPtr};
+use gpecs_erased::{
+    data::ErasedRef,
+    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
+};
 
 use crate::{
     Component,
@@ -22,10 +25,62 @@ use crate::{
 #[derive(Clone, Copy)]
 pub struct ErasedComponentRef<'a, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     component_id: ComponentId,
-    field: ErasedRef<'a, T>,
+    erased: ErasedRef<'a, T>,
+}
+
+impl<'a, T> ErasedComponentRef<'a, T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_parts(component_id: ComponentId, erased: ErasedRef<'a, T>) -> Self {
+        Self {
+            component_id,
+            erased,
+        }
+    }
+
+    #[inline]
+    pub unsafe fn from_ptr(ptr: ErasedComponentPtr<T>) -> Self {
+        let (component_id, erased) = ptr.into_parts();
+        let erased = unsafe { ErasedRef::from_ptr(erased) };
+        unsafe { Self::from_parts(component_id, erased) }
+    }
+
+    #[inline]
+    pub fn component_id(&self) -> ComponentId {
+        let Self { component_id, .. } = *self;
+        component_id
+    }
+
+    #[inline]
+    pub fn erased(&self) -> &ErasedRef<'a, T> {
+        let Self { erased, .. } = self;
+        erased
+    }
+
+    #[inline]
+    pub fn as_component_ptr(&self) -> ErasedComponentPtr<T> {
+        let Self {
+            ref erased,
+            component_id,
+        } = *self;
+
+        let erased = erased.ptr();
+        unsafe { ErasedComponentPtr::from_parts(component_id, erased) }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (ComponentId, ErasedRef<'a, T>) {
+        let Self {
+            component_id,
+            erased,
+        } = self;
+        (component_id, erased)
+    }
 }
 
 impl<'a, T> ErasedComponentRef<'a, T>
@@ -44,25 +99,10 @@ where
         let component_id = components
             .component_id::<C>()
             .ok_or_else(NotRegisteredError::of::<C>)?;
-        let field = ErasedRef::upcast(component)?;
+        let erased = ErasedRef::upcast(component)?;
 
-        let me = unsafe { Self::from_parts(component_id, field) };
+        let me = unsafe { Self::from_parts(component_id, erased) };
         Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_parts(component_id: ComponentId, field: ErasedRef<'a, T>) -> Self {
-        Self {
-            component_id,
-            field,
-        }
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedComponentPtr<T>) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let field = unsafe { ErasedRef::from_ptr(field) };
-        unsafe { Self::from_parts(component_id, field) }
     }
 
     #[inline]
@@ -75,11 +115,11 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+        let Self { erased, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let into_self = |field| unsafe { Self::from_parts(component_id, field) };
-        let component = unsafe { field.downcast() }.map_err(|err| err.map_value(into_self))?;
-        Ok(component)
+        let into_self = |erased| unsafe { Self::from_parts(component_id, erased) };
+        let r#ref = unsafe { erased.downcast() }.map_err(|err| err.map_value(into_self))?;
+        Ok(r#ref)
     }
 
     #[inline]
@@ -92,54 +132,22 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = *self;
-        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+        let Self { erased, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let component = unsafe { field.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
-        Ok(component)
-    }
-
-    #[inline]
-    pub fn component_id(&self) -> ComponentId {
-        let Self { component_id, .. } = *self;
-        component_id
-    }
-
-    #[inline]
-    pub fn field(&self) -> &ErasedRef<'a, T> {
-        let Self { field, .. } = self;
-        field
-    }
-
-    #[inline]
-    pub fn as_component_ptr(&self) -> ErasedComponentPtr<T> {
-        let Self {
-            ref field,
-            component_id,
-        } = *self;
-
-        let field = field.as_field_ptr();
-        unsafe { ErasedComponentPtr::from_parts(component_id, field) }
+        let r#ref = unsafe { erased.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
+        Ok(r#ref)
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const T::Item {
-        let Self { field, .. } = self;
-        field.as_ptr()
+        let Self { erased, .. } = self;
+        erased.as_ptr()
     }
 
     #[inline]
     pub fn as_buffer(&self) -> &[T::Item] {
-        let Self { field, .. } = self;
-        field.as_buffer()
-    }
-
-    #[inline]
-    pub fn into_parts(self) -> (ComponentId, ErasedRef<'a, T>) {
-        let Self {
-            component_id,
-            field,
-        } = self;
-        (component_id, field)
+        let Self { erased, .. } = self;
+        erased.as_buffer()
     }
 }
 
@@ -150,20 +158,20 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             component_id,
-            field,
+            erased,
         } = self;
 
         f.debug_struct("ErasedComponentRef")
             .field("component_id", component_id)
-            .field("field", field)
+            .field("erased", erased)
             .finish()
     }
 }
 
 impl<T, U> PartialEq<ErasedComponentRef<'_, U>> for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr,
-    U: ConstSliceItemPtr,
+    T: SliceItemPtr,
+    U: SliceItemPtr,
 {
     #[inline]
     fn eq(&self, other: &ErasedComponentRef<'_, U>) -> bool {
@@ -172,12 +180,12 @@ where
     }
 }
 
-impl<T> Eq for ErasedComponentRef<'_, T> where T: ConstSliceItemPtr {}
+impl<T> Eq for ErasedComponentRef<'_, T> where T: SliceItemPtr {}
 
 impl<T, U> PartialOrd<ErasedComponentRef<'_, U>> for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr,
-    U: ConstSliceItemPtr,
+    T: SliceItemPtr,
+    U: SliceItemPtr,
 {
     #[inline]
     fn partial_cmp(&self, other: &ErasedComponentRef<'_, U>) -> Option<cmp::Ordering> {
@@ -188,7 +196,7 @@ where
 
 impl<T> Ord for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -199,7 +207,7 @@ where
 
 impl<T> Hash for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -210,7 +218,7 @@ where
 
 impl<T> Borrow<ComponentId> for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn borrow(&self) -> &ComponentId {

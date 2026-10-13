@@ -2,12 +2,12 @@ use core::{alloc::Layout, ptr};
 
 use crate::{
     data::{
-        ErasedMutPtr, ErasedMutSlice, ErasedSlice, ErasedSlicePtr,
+        ErasedMutPtr, ErasedMutSlice, ErasedNonNullSlicePtr, ErasedSlice, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError, check_downcast},
     },
-    error::{check_len, check_ptr_align, check_sufficient_align},
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -40,7 +40,7 @@ impl<T> ErasedMutSlicePtr<T> {
     }
 
     #[inline]
-    pub fn field_ptr(self) -> ErasedMutPtr<T> {
+    pub fn ptr(self) -> ErasedMutPtr<T> {
         let Self { ptr, .. } = self;
         ptr
     }
@@ -49,6 +49,16 @@ impl<T> ErasedMutSlicePtr<T> {
     pub fn into_parts(self) -> (ErasedMutPtr<T>, usize) {
         let Self { ptr, len } = self;
         (ptr, len)
+    }
+}
+
+impl<T> ErasedMutSlicePtr<T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutSlice<'a, T> {
+        unsafe { ErasedMutSlice::from_ptr(self) }
     }
 }
 
@@ -73,6 +83,13 @@ where
         let ptr = unsafe { ErasedMutPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
+        let ptr = ErasedMutPtr::dangling(layout)?;
+        let me = unsafe { Self::from_parts(ptr, 0) };
         Ok(me)
     }
 
@@ -110,13 +127,18 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, ConstPtr<T::Ptrs>> {
-        unsafe { self.cast_const().as_ref_unchecked() }
+    pub fn cast_nonnull(self) -> Option<ErasedNonNullSlicePtr<NonNullPtr<T::Ptrs>>> {
+        ErasedNonNullSlicePtr::from_mut_slice_ptr(self)
     }
 
     #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutSlice<'a, T> {
-        unsafe { ErasedMutSlice::from_ptr(self) }
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedNonNullSlicePtr<NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedNonNullSlicePtr::from_mut_slice_ptr_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, ConstPtr<T::Ptrs>> {
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]

@@ -5,7 +5,7 @@ use crate::{
         ErasedMutSlicePtr, ErasedNonNullPtr, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError, check_downcast},
     },
-    error::{check_len, check_ptr_align, check_sufficient_align},
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
     ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
 };
@@ -40,7 +40,7 @@ impl<T> ErasedNonNullSlicePtr<T> {
     }
 
     #[inline]
-    pub fn field_ptr(self) -> ErasedNonNullPtr<T> {
+    pub fn ptr(self) -> ErasedNonNullPtr<T> {
         let Self { ptr, .. } = self;
         ptr
     }
@@ -73,6 +73,43 @@ where
     }
 
     #[inline]
+    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
+        let ptr = ErasedNonNullPtr::dangling(layout)?;
+        let me = unsafe { Self::from_parts(ptr, 0) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn from_slice_ptr(ptr: ErasedSlicePtr<ConstPtr<T::Ptrs>>) -> Option<Self> {
+        let (ptr, len) = ptr.into_parts();
+        let ptr = ErasedNonNullPtr::from_ptr(ptr)?;
+        let me = unsafe { Self::from_parts(ptr, len) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_slice_ptr_unchecked(ptr: ErasedSlicePtr<ConstPtr<T::Ptrs>>) -> Self {
+        let (ptr, len) = ptr.into_parts();
+        let ptr = unsafe { ErasedNonNullPtr::from_ptr_unchecked(ptr) };
+        unsafe { Self::from_parts(ptr, len) }
+    }
+
+    #[inline]
+    pub fn from_mut_slice_ptr(ptr: ErasedMutSlicePtr<MutPtr<T::Ptrs>>) -> Option<Self> {
+        let (ptr, len) = ptr.into_parts();
+        let ptr = ErasedNonNullPtr::from_mut_ptr(ptr)?;
+        let me = unsafe { Self::from_parts(ptr, len) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_mut_slice_ptr_unchecked(ptr: ErasedMutSlicePtr<MutPtr<T::Ptrs>>) -> Self {
+        let (ptr, len) = ptr.into_parts();
+        let ptr = unsafe { ErasedNonNullPtr::from_mut_ptr_unchecked(ptr) };
+        unsafe { Self::from_parts(ptr, len) }
+    }
+
+    #[inline]
     pub fn upcast<V>(ptr: NonNull<[V]>) -> Result<Self, UpcastSliceError> {
         let layout = Layout::new::<V>();
         check_ptr_align(ptr.as_ptr().cast(), layout)?;
@@ -99,16 +136,18 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptr(self) -> ErasedSlicePtr<ConstPtr<T::Ptrs>> {
+    pub fn cast_const(self) -> ErasedSlicePtr<ConstPtr<T::Ptrs>> {
         let Self { ptr, len } = self;
-        let ptr = ptr.into_ptr();
+
+        let ptr = ptr.cast_const();
         unsafe { ErasedSlicePtr::from_parts(ptr, len) }
     }
 
     #[inline]
-    pub fn into_mut_slice_ptr(self) -> ErasedMutSlicePtr<MutPtr<T::Ptrs>> {
+    pub fn cast_mut(self) -> ErasedMutSlicePtr<MutPtr<T::Ptrs>> {
         let Self { ptr, len } = self;
-        let ptr = ptr.into_mut_ptr();
+
+        let ptr = ptr.cast_mut();
         unsafe { ErasedMutSlicePtr::from_parts(ptr, len) }
     }
 

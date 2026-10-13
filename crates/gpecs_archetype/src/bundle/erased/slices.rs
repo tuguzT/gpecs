@@ -13,7 +13,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaSlices, ErasedSoaSlicesIter,
-    ptr::slice::ConstSliceItemPtr,
+    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaContext,
@@ -35,14 +35,14 @@ use crate::{
 pub struct ErasedBundleSlices<'a, D, P>
 where
     D: ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     inner: ErasedSoaSlices<'a, D, P>,
 }
 
 impl<'a, D, P> ErasedBundleSlices<'a, D, P>
 where
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub unsafe fn from_inner(inner: ErasedSoaSlices<'a, D, P>) -> Self {
@@ -89,7 +89,7 @@ where
 impl<D, P> ErasedBundleSlices<'_, D, P>
 where
     D: ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub fn as_buffer(&self) -> &[P::Item] {
@@ -124,6 +124,17 @@ where
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<D, P> ErasedBundleSlices<'_, D, P>
+where
+    D: ErasedArchetypeKind + ?Sized,
+    P: SliceItemPtr,
+{
+    #[inline]
+    pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
+        self.field_layouts()
     }
 }
 
@@ -177,11 +188,6 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
-        self.field_layouts()
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlice<'_, P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
@@ -191,7 +197,7 @@ where
 impl<D, P> Debug for ErasedBundleSlices<'_, D, P>
 where
     D: Debug + ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
@@ -204,7 +210,7 @@ where
 impl<D, P> Clone for ErasedBundleSlices<'_, D, P>
 where
     D: Clone,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -218,7 +224,7 @@ where
 impl<D, P> Copy for ErasedBundleSlices<'_, D, P>
 where
     D: Copy,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
 }
 
@@ -257,7 +263,7 @@ where
 impl<'a, D, P> FieldLayouts<'a> for ErasedBundleSlices<'_, D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -273,7 +279,7 @@ where
 impl<D, P> CovariantFieldLayouts for ErasedBundleSlices<'_, D, P>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -286,14 +292,14 @@ where
 pub struct ErasedBundleSlicesIter<'a, D, P, F>
 where
     D: ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     inner: ErasedSoaSlicesIter<'a, D, P, F>,
 }
 
 impl<'a, D, P, F> ErasedBundleSlicesIter<'a, D, P, F>
 where
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub(super) unsafe fn from_inner(inner: ErasedSoaSlicesIter<'a, D, P, F>) -> Self {
@@ -304,7 +310,7 @@ where
 impl<D, P, F> ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub fn as_buffer(&self) -> &[P::Item] {
@@ -382,7 +388,7 @@ where
 impl<D, P, F> Clone for ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: Clone,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
     F: Clone,
 {
     #[inline]
@@ -443,7 +449,7 @@ where
 impl<'a, D, P, F> FieldLayouts<'a> for ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -459,7 +465,7 @@ where
 impl<D, P, F> CovariantFieldLayouts for ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: ConstSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

@@ -9,15 +9,67 @@ use crate::{
         ErasedPtr, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError},
     },
-    ptr::slice::ConstSliceItemPtr,
+    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
 };
 
 pub struct ErasedSlice<'a, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     ptr: ErasedSlicePtr<T>,
     phantom: PhantomData<&'a [T::Item]>,
+}
+
+impl<T> ErasedSlice<'_, T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_parts(ptr: ErasedPtr<T>, len: usize) -> Self {
+        let ptr = unsafe { ErasedSlicePtr::from_parts(ptr, len) };
+        unsafe { Self::from_ptr(ptr) }
+    }
+
+    #[inline]
+    pub unsafe fn from_ptr(ptr: ErasedSlicePtr<T>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { ptr, .. } = self;
+        ptr.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn layout(&self) -> Layout {
+        let Self { ptr, .. } = self;
+        ptr.layout()
+    }
+
+    #[inline]
+    pub fn slice_ptr(&self) -> ErasedSlicePtr<T> {
+        let Self { ptr, .. } = *self;
+        ptr
+    }
+
+    #[inline]
+    pub fn ptr(&self) -> ErasedPtr<T> {
+        let Self { ptr, .. } = self;
+        ptr.ptr()
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (ErasedPtr<T>, usize) {
+        let Self { ptr, .. } = self;
+        ptr.into_parts()
+    }
 }
 
 impl<'a, T> ErasedSlice<'a, T>
@@ -36,18 +88,6 @@ where
         let ptr = ErasedSlicePtr::upcast(slice)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_parts(ptr: ErasedPtr<T>, len: usize) -> Self {
-        let ptr = unsafe { ErasedSlicePtr::from_parts(ptr, len) };
-        unsafe { Self::from_ptr(ptr) }
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedSlicePtr<T>) -> Self {
-        let phantom = PhantomData;
-        Self { ptr, phantom }
     }
 
     #[inline]
@@ -75,35 +115,6 @@ where
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { ptr, .. } = self;
-        ptr.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { ptr, .. } = self;
-        ptr.layout()
-    }
-
-    #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedSlicePtr<T> {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
-    pub fn as_field_ptr(&self) -> ErasedPtr<T> {
-        let Self { ptr, .. } = self;
-        ptr.field_ptr()
-    }
-
-    #[inline]
     pub fn as_buffer(&self) -> &[T::Item] {
         let Self { ptr, .. } = self;
 
@@ -123,12 +134,6 @@ where
 
         let buffer = ptr.as_buffer();
         unsafe { buffer.as_ref_unchecked() }
-    }
-
-    #[inline]
-    pub fn into_parts(self) -> (ErasedPtr<T>, usize) {
-        let Self { ptr, .. } = self;
-        ptr.into_parts()
     }
 }
 
@@ -150,7 +155,7 @@ where
 
 impl<T> Clone for ErasedSlice<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -158,7 +163,7 @@ where
     }
 }
 
-impl<T> Copy for ErasedSlice<'_, T> where T: ConstSliceItemPtr {}
+impl<T> Copy for ErasedSlice<'_, T> where T: SliceItemPtr {}
 
 impl<T> AsRef<[T::Item]> for ErasedSlice<'_, T>
 where

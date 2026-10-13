@@ -14,7 +14,7 @@ use crate::{
         DowncastError, SlicePtrsError, check_offset, check_offset_len, check_ptr_align,
         check_sufficient_align, check_sufficient_len,
     },
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
     soa::{
         field::{
             FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
@@ -27,7 +27,7 @@ use crate::{
 pub struct ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     len: usize,
     ptrs: ErasedSoaNonNullPtrs<D, P>,
@@ -35,7 +35,7 @@ where
 
 impl<D, P> ErasedSoaNonNullSlicePtrs<D, P>
 where
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub unsafe fn from_parts(
@@ -62,18 +62,6 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
-        let Self { ptrs, .. } = self;
-        ptrs.into_ptrs()
-    }
-
-    #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
-        let Self { ptrs, .. } = self;
-        ptrs.into_mut_ptrs()
-    }
-
-    #[inline]
     pub fn into_nonnull_ptrs(self) -> ErasedSoaNonNullPtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
@@ -88,6 +76,64 @@ where
 
         let ptrs = unsafe { ptrs.map_layouts(f) };
         unsafe { ErasedSoaNonNullSlicePtrs::from_ptrs(ptrs, len) }
+    }
+}
+
+impl<D, P> ErasedSoaNonNullSlicePtrs<D, P>
+where
+    D: ?Sized,
+    P: SliceItemPtr,
+{
+    #[inline]
+    pub fn as_buffer(&self) -> NonNull<[P::Item]> {
+        let Self { ptrs, .. } = self;
+        ptrs.as_buffer()
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { ptrs, .. } = self;
+        ptrs.capacity()
+    }
+
+    #[inline]
+    pub fn offset(&self) -> usize {
+        let Self { ptrs, .. } = self;
+        ptrs.offset()
+    }
+
+    #[inline]
+    pub fn layouts(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.layouts()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { len, .. } = *self;
+        len
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<D, P> ErasedSoaNonNullSlicePtrs<D, P>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_ptrs()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_mut_ptrs()
     }
 
     #[inline]
@@ -156,47 +202,6 @@ where
     }
 }
 
-impl<D, P> ErasedSoaNonNullSlicePtrs<D, P>
-where
-    D: ?Sized,
-    P: NonNullSliceItemPtr,
-{
-    #[inline]
-    pub fn as_buffer(&self) -> NonNull<[P::Item]> {
-        let Self { ptrs, .. } = self;
-        ptrs.as_buffer()
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        let Self { ptrs, .. } = self;
-        ptrs.capacity()
-    }
-
-    #[inline]
-    pub fn offset(&self) -> usize {
-        let Self { ptrs, .. } = self;
-        ptrs.offset()
-    }
-
-    #[inline]
-    pub fn layouts(&self) -> &D {
-        let Self { ptrs, .. } = self;
-        ptrs.layouts()
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
-        len
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
 impl<'a, D, P> ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
@@ -216,7 +221,7 @@ where
 impl<D, P> Debug for ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: Debug + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { len, ptrs } = self;
@@ -230,7 +235,7 @@ where
 impl<D, P> Clone for ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: Clone,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -244,7 +249,7 @@ where
 impl<D, P> Copy for ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: Copy,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
 }
 
@@ -282,7 +287,7 @@ where
 impl<'a, D, P> FieldLayouts<'a> for ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -298,7 +303,7 @@ where
 impl<D, P> CovariantFieldLayouts for ErasedSoaNonNullSlicePtrs<D, P>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -311,7 +316,7 @@ where
 pub struct ErasedSoaNonNullSlicePtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     len: usize,
     ptrs: ErasedSoaNonNullPtrsIter<D, P, F>,
@@ -319,7 +324,7 @@ where
 
 impl<D, P, F> ErasedSoaNonNullSlicePtrsIter<D, P, F>
 where
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub(super) unsafe fn new_unchecked(
@@ -333,7 +338,7 @@ where
 impl<D, P, F> ErasedSoaNonNullSlicePtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub fn as_buffer(&self) -> NonNull<[P::Item]> {
@@ -410,7 +415,7 @@ where
 impl<D, P, F> Clone for ErasedSoaNonNullSlicePtrsIter<D, P, F>
 where
     D: Clone,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
     F: Clone,
 {
     #[inline]
@@ -470,7 +475,7 @@ where
 impl<'a, D, P, F> FieldLayouts<'a> for ErasedSoaNonNullSlicePtrsIter<D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -486,7 +491,7 @@ where
 impl<D, P, F> CovariantFieldLayouts for ErasedSoaNonNullSlicePtrsIter<D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

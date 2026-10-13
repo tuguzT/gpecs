@@ -2,12 +2,12 @@ use core::{alloc::Layout, ptr};
 
 use crate::{
     data::{
-        ErasedMutRef, ErasedPtr, ErasedRef,
+        ErasedMutRef, ErasedNonNullPtr, ErasedPtr, ErasedRef,
         error::{DataError, DowncastError, UpcastPtrError, check_downcast},
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -43,6 +43,38 @@ impl<T> ErasedMutPtr<T> {
 
 impl<T> ErasedMutPtr<T>
 where
+    T: SliceItemPtr,
+{
+    #[inline]
+    #[must_use]
+    pub unsafe fn add(self, count: usize) -> Self {
+        let Self { layout, ptr } = self;
+
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
+        let ptr = unsafe { ptr.add(count) };
+        unsafe { Self::from_parts(layout, ptr) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from(self, origin: Self) -> isize {
+        let Self { layout, ptr } = self;
+
+        let offset = unsafe { ptr.offset_from(origin.ptr()) };
+        let len = bytes_to_items::<T::Item>(layout.size()).cast_signed();
+        offset
+            .checked_div(len)
+            .expect("erased pointer should not be a ZST")
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutRef<'a, T> {
+        unsafe { ErasedMutRef::from_ptr(self) }
+    }
+}
+
+impl<T> ErasedMutPtr<T>
+where
     T: MutSliceItemPtr,
 {
     #[inline]
@@ -64,13 +96,11 @@ where
     }
 
     #[inline]
-    pub fn upcast<V>(ptr: *mut V) -> Result<Self, UpcastPtrError> {
-        let layout = Layout::new::<V>();
-        check_ptr_align(ptr.cast(), layout)?;
+    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let len = bytes_to_items::<T::Item>(layout.size());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
+        let data = ptr::without_provenance_mut(layout.align());
+        let buffer = ptr::slice_from_raw_parts_mut(data, 0);
         let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
@@ -78,11 +108,13 @@ where
     }
 
     #[inline]
-    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
+    pub fn upcast<V>(ptr: *mut V) -> Result<Self, UpcastPtrError> {
+        let layout = Layout::new::<V>();
+        check_ptr_align(ptr.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let data = ptr::without_provenance_mut(layout.align());
-        let buffer = ptr::slice_from_raw_parts_mut(data, 0);
+        let len = bytes_to_items::<T::Item>(layout.size());
+        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
         let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
@@ -107,35 +139,18 @@ where
     }
 
     #[inline]
+    pub fn cast_nonnull(self) -> Option<ErasedNonNullPtr<NonNullPtr<T::Ptrs>>> {
+        ErasedNonNullPtr::from_mut_ptr(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedNonNullPtr<NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedNonNullPtr::from_mut_ptr_unchecked(self) }
+    }
+
+    #[inline]
     pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutRef<'a, T> {
-        unsafe { ErasedMutRef::from_ptr(self) }
-    }
-
-    #[inline]
-    #[must_use]
-    pub unsafe fn add(self, count: usize) -> Self {
-        let Self { layout, ptr } = self;
-
-        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
-        let ptr = unsafe { ptr.add(count) };
-        unsafe { Self::from_parts(layout, ptr) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from(self, origin: ErasedPtr<ConstPtr<T::Ptrs>>) -> isize {
-        let Self { layout, ptr } = self;
-
-        let offset = unsafe { ptr.offset_from(origin.cast_mut().ptr()) };
-        let len = bytes_to_items::<T::Item>(layout.size()).cast_signed();
-        offset
-            .checked_div(len)
-            .expect("erased pointer should not be a ZST")
     }
 
     #[inline]

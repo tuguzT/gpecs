@@ -17,7 +17,7 @@ use crate::{
     },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstPtr, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -31,7 +31,7 @@ use crate::{
 pub struct ErasedSoaMutPtrs<D, P>
 where
     D: ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     buffer: *mut [P::Item],
     capacity: usize,
@@ -41,7 +41,7 @@ where
 
 impl<D, P> ErasedSoaMutPtrs<D, P>
 where
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub unsafe fn from_parts(
@@ -86,6 +86,93 @@ where
     }
 
     #[inline]
+    #[must_use]
+    pub unsafe fn add(self, count: usize) -> Self {
+        let Self { offset, .. } = self;
+
+        let offset = unsafe { offset.unchecked_add(count) };
+        Self { offset, ..self }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
+        unsafe { ErasedSoaMutRefs::from_ptrs(self) }
+    }
+}
+
+impl<D, P> ErasedSoaMutPtrs<D, P>
+where
+    D: ?Sized,
+    P: SliceItemPtr,
+{
+    #[inline]
+    pub fn as_buffer(&self) -> *const [P::Item] {
+        let Self { buffer, .. } = *self;
+        buffer
+    }
+
+    #[inline]
+    pub fn as_mut_buffer(&mut self) -> *mut [P::Item] {
+        let Self { buffer, .. } = *self;
+        buffer
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
+    }
+
+    #[inline]
+    pub fn offset(&self) -> usize {
+        let Self { offset, .. } = *self;
+        offset
+    }
+
+    #[inline]
+    pub fn layouts(&self) -> &D {
+        let Self { layouts, .. } = self;
+        layouts
+    }
+}
+
+impl<'a, D, P> ErasedSoaMutPtrs<D, P>
+where
+    D: FieldLayouts<'a> + ?Sized,
+    P: SliceItemPtr,
+{
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from<'origin, ND, NP>(
+        &'a self,
+        origin: &'origin ErasedSoaPtrs<ND, NP>,
+    ) -> isize
+    where
+        ND: FieldLayouts<'origin> + ?Sized,
+        NP: SliceItemPtr<Item = P::Item>,
+    {
+        let Self {
+            ref layouts,
+            buffer,
+            capacity,
+            offset,
+        } = *self;
+
+        assert_eq!(buffer.cast_const(), origin.as_buffer());
+        assert_eq!(capacity, origin.capacity());
+        assert_layouts(layouts.field_layouts(), origin.field_layouts());
+
+        let offset = offset.cast_signed();
+        let origin_offset = origin.offset().cast_signed();
+        offset.wrapping_sub(origin_offset)
+    }
+}
+
+impl<D, P> ErasedSoaMutPtrs<D, P>
+where
+    P: MutSliceItemPtr,
+{
+    #[inline]
     pub fn cast_const(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
         let Self {
             layouts,
@@ -101,20 +188,6 @@ where
     #[inline]
     pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, ConstPtr<P::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
-        unsafe { ErasedSoaMutRefs::from_ptrs(self) }
-    }
-
-    #[inline]
-    #[must_use]
-    pub unsafe fn add(self, count: usize) -> Self {
-        let Self { offset, .. } = self;
-
-        let offset = unsafe { offset.unchecked_add(count) };
-        Self { offset, ..self }
     }
 }
 
@@ -187,73 +260,6 @@ where
     }
 }
 
-impl<D, P> ErasedSoaMutPtrs<D, P>
-where
-    D: ?Sized,
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    pub fn as_buffer(&self) -> *const [P::Item] {
-        let Self { buffer, .. } = *self;
-        buffer
-    }
-
-    #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [P::Item] {
-        let Self { buffer, .. } = *self;
-        buffer
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        let Self { capacity, .. } = *self;
-        capacity
-    }
-
-    #[inline]
-    pub fn offset(&self) -> usize {
-        let Self { offset, .. } = *self;
-        offset
-    }
-
-    #[inline]
-    pub fn layouts(&self) -> &D {
-        let Self { layouts, .. } = self;
-        layouts
-    }
-}
-
-impl<'a, D, P> ErasedSoaMutPtrs<D, P>
-where
-    D: FieldLayouts<'a> + ?Sized,
-    P: MutSliceItemPtr,
-{
-    #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from<'e, E>(
-        &'a self,
-        origin: &'e ErasedSoaPtrs<E, ConstPtr<P::Ptrs>>,
-    ) -> isize
-    where
-        E: FieldLayouts<'e> + ?Sized,
-    {
-        let Self {
-            ref layouts,
-            buffer,
-            capacity,
-            offset,
-        } = *self;
-
-        assert_eq!(buffer.cast_const(), origin.as_buffer());
-        assert_eq!(capacity, origin.capacity());
-        assert_layouts(layouts.field_layouts(), origin.field_layouts());
-
-        let offset = offset.cast_signed();
-        let origin_offset = origin.offset().cast_signed();
-        offset.wrapping_sub(origin_offset)
-    }
-}
-
 impl<'a, D, P> ErasedSoaMutPtrs<D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
@@ -311,12 +317,12 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap_nonoverlapping<'e, E>(
+    pub unsafe fn swap_nonoverlapping<'with, N>(
         &'a mut self,
-        with: &'e mut ErasedSoaMutPtrs<E, P>,
+        with: &'with mut ErasedSoaMutPtrs<N, P>,
         count: usize,
     ) where
-        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+        N: FieldLayouts<'with, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), with.field_layouts());
 
@@ -331,12 +337,12 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_forward<'e, E>(
+    pub unsafe fn copy_from_forward<'src, N>(
         &'a mut self,
-        src: &'e ErasedSoaPtrs<E, ConstPtr<P::Ptrs>>,
+        src: &'src ErasedSoaPtrs<N, ConstPtr<P::Ptrs>>,
         count: usize,
     ) where
-        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+        N: FieldLayouts<'src, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
@@ -351,25 +357,25 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_backward<'e, E>(
+    pub unsafe fn copy_from_backward<'src, N>(
         &'a mut self,
-        src: &'e ErasedSoaPtrs<E, ConstPtr<P::Ptrs>>,
+        src: &'src ErasedSoaPtrs<N, ConstPtr<P::Ptrs>>,
         count: usize,
     ) where
-        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+        N: FieldLayouts<'src, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         #[inline]
-        fn rec<'dst, 'src, D, E, P>(
+        fn rec<'dst, 'src, D, N, P>(
             dst_ptrs: &'dst ErasedSoaMutPtrs<D, P>,
             dst_offsets: &mut BufferOffsetsOf<D::OutputItem>,
-            src_ptrs: &'src ErasedSoaPtrs<E, ConstPtr<P::Ptrs>>,
-            src_offsets: &mut BufferOffsetsOf<E::OutputItem>,
+            src_ptrs: &'src ErasedSoaPtrs<N, ConstPtr<P::Ptrs>>,
+            src_offsets: &mut BufferOffsetsOf<N::OutputItem>,
             i: usize,
             n: usize,
             count: usize,
         ) where
             D: FieldLayouts<'dst, OutputItem: BufferOffsetsFromSelf> + ?Sized,
-            E: FieldLayouts<'src, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+            N: FieldLayouts<'src, OutputItem: BufferOffsetsFromSelf> + ?Sized,
             P: MutSliceItemPtr,
         {
             if i >= n {
@@ -394,12 +400,12 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_nonoverlapping<'e, E>(
+    pub unsafe fn copy_from_nonoverlapping<'src, N>(
         &'a mut self,
-        src: &'e ErasedSoaPtrs<E, ConstPtr<P::Ptrs>>,
+        src: &'src ErasedSoaPtrs<N, ConstPtr<P::Ptrs>>,
         count: usize,
     ) where
-        E: FieldLayouts<'e, OutputItem: BufferOffsetsFromSelf> + ?Sized,
+        N: FieldLayouts<'src, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     {
         let n = assert_layouts(self.field_layouts(), src.field_layouts());
 
@@ -414,10 +420,10 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn write<T, E>(&'a mut self, value: ErasedSoa<T, E, P::Ptrs>)
+    pub unsafe fn write<T, N>(&'a mut self, value: ErasedSoa<T, N, P::Ptrs>)
     where
         T: AlignedStorage<Item = P::Item>,
-        E: FieldLayoutsOwned<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf>>,
+        N: FieldLayoutsOwned<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf>>,
     {
         let src = value.as_ptrs();
         unsafe { self.copy_from_nonoverlapping(&src, 1) };
@@ -448,7 +454,7 @@ where
 impl<D, P> Debug for ErasedSoaMutPtrs<D, P>
 where
     D: Debug + ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -470,7 +476,7 @@ where
 impl<D, P> Clone for ErasedSoaMutPtrs<D, P>
 where
     D: Clone,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -489,7 +495,7 @@ where
 impl<D, P> Copy for ErasedSoaMutPtrs<D, P>
 where
     D: Copy,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
 }
 
@@ -548,7 +554,7 @@ where
 impl<'a, D, P> FieldLayouts<'a> for ErasedSoaMutPtrs<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -564,7 +570,7 @@ where
 impl<D, P> CovariantFieldLayouts for ErasedSoaMutPtrs<D, P>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -577,7 +583,7 @@ where
 pub struct ErasedSoaMutPtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     buffer: *mut [P::Item],
     capacity: usize,
@@ -588,7 +594,7 @@ where
 
 impl<D, P, F> ErasedSoaMutPtrsIter<D, P, F>
 where
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub(super) unsafe fn new_unchecked(
@@ -611,7 +617,7 @@ where
 impl<D, P, F> ErasedSoaMutPtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub fn as_buffer(&self) -> *const [P::Item] {
@@ -717,7 +723,7 @@ where
 impl<D, P, F> Clone for ErasedSoaMutPtrsIter<D, P, F>
 where
     D: Clone,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
     F: Clone,
 {
     #[inline]
@@ -791,7 +797,7 @@ where
 impl<'a, D, P, F> FieldLayouts<'a> for ErasedSoaMutPtrsIter<D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -807,7 +813,7 @@ where
 impl<D, P, F> CovariantFieldLayouts for ErasedSoaMutPtrsIter<D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: MutSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

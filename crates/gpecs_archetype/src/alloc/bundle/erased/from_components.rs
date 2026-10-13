@@ -56,7 +56,7 @@ where
 
         let fields = components
             .into_iter()
-            .map(|(_, component)| component.into_field());
+            .map(|(_, component)| component.into_erased());
 
         let inner = ErasedSoa::try_from_fields_layouts(fields, archetype)
             .map_err(into_from_components_error)?;

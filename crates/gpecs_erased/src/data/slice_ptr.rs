@@ -2,12 +2,12 @@ use core::{alloc::Layout, ptr};
 
 use crate::{
     data::{
-        ErasedMutSlicePtr, ErasedPtr, ErasedSlice,
+        ErasedMutSlicePtr, ErasedNonNullSlicePtr, ErasedPtr, ErasedSlice,
         error::{DataError, DowncastError, UpcastSliceError, check_downcast},
     },
-    error::{check_len, check_ptr_align, check_sufficient_align},
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstSliceItemPtr, MutPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -40,7 +40,7 @@ impl<T> ErasedSlicePtr<T> {
     }
 
     #[inline]
-    pub fn field_ptr(self) -> ErasedPtr<T> {
+    pub fn ptr(self) -> ErasedPtr<T> {
         let Self { ptr, .. } = self;
         ptr
     }
@@ -49,6 +49,16 @@ impl<T> ErasedSlicePtr<T> {
     pub fn into_parts(self) -> (ErasedPtr<T>, usize) {
         let Self { ptr, len } = self;
         (ptr, len)
+    }
+}
+
+impl<T> ErasedSlicePtr<T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, T> {
+        unsafe { ErasedSlice::from_ptr(self) }
     }
 }
 
@@ -73,6 +83,13 @@ where
         let ptr = unsafe { ErasedPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
+        let ptr = ErasedPtr::dangling(layout)?;
+        let me = unsafe { Self::from_parts(ptr, 0) };
         Ok(me)
     }
 
@@ -110,8 +127,13 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, T> {
-        unsafe { ErasedSlice::from_ptr(self) }
+    pub fn cast_nonnull(self) -> Option<ErasedNonNullSlicePtr<NonNullPtr<T::Ptrs>>> {
+        ErasedNonNullSlicePtr::from_slice_ptr(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedNonNullSlicePtr<NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedNonNullSlicePtr::from_slice_ptr_unchecked(self) }
     }
 
     #[inline]

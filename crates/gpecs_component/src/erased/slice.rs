@@ -5,7 +5,10 @@ use core::{
     hash::{self, Hash},
 };
 
-use gpecs_erased::{data::ErasedSlice, ptr::slice::ConstSliceItemPtr};
+use gpecs_erased::{
+    data::ErasedSlice,
+    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
+};
 
 use crate::{
     Component,
@@ -22,7 +25,7 @@ use crate::{
 #[derive(Clone, Copy)]
 pub struct ErasedComponentSlice<'a, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     component_id: ComponentId,
     fields: ErasedSlice<'a, T>,
@@ -30,26 +33,8 @@ where
 
 impl<'a, T> ErasedComponentSlice<'a, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
-    #[inline]
-    pub fn upcast<C, U>(
-        components: &ComponentRegistryView<impl Sized, U>,
-        component: &'a [C],
-    ) -> Result<Self, UpcastSliceError>
-    where
-        C: Component,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let component_id = components
-            .component_id::<C>()
-            .ok_or_else(NotRegisteredError::of::<C>)?;
-        let fields = ErasedSlice::upcast(component)?;
-
-        let me = unsafe { Self::from_parts(component_id, fields) };
-        Ok(me)
-    }
-
     #[inline]
     pub unsafe fn from_parts(component_id: ComponentId, fields: ErasedSlice<'a, T>) -> Self {
         Self {
@@ -63,39 +48,6 @@ where
         let (component_id, fields) = ptr.into_parts();
         let fields = unsafe { fields.as_ref_unchecked() };
         unsafe { Self::from_parts(component_id, fields) }
-    }
-
-    #[inline]
-    pub fn downcast<C, U>(
-        self,
-        components: &ComponentRegistryView<impl Sized, U>,
-    ) -> Result<&'a [C], DowncastError<Self>>
-    where
-        C: Component,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let Self { component_id, .. } = self;
-        let Self { fields, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
-
-        let into_self = |fields| unsafe { Self::from_parts(component_id, fields) };
-        let component = unsafe { fields.downcast() }.map_err(|err| err.map_value(into_self))?;
-        Ok(component)
-    }
-
-    #[inline]
-    pub fn downcast_ref<C, U>(
-        &self,
-        components: &ComponentRegistryView<impl Sized, U>,
-    ) -> Result<&[C], DowncastError<&Self>>
-    where
-        C: Component,
-        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let Self { component_id, .. } = *self;
-        let Self { fields, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
-
-        let component = unsafe { fields.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
-        Ok(component)
     }
 
     #[inline]
@@ -128,7 +80,7 @@ where
             component_id,
         } = *self;
 
-        let fields = fields.as_field_slice_ptr();
+        let fields = fields.slice_ptr();
         unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
@@ -139,8 +91,73 @@ where
             component_id,
         } = *self;
 
-        let field = fields.as_field_ptr();
+        let field = fields.ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (ComponentId, ErasedSlice<'a, T>) {
+        let Self {
+            component_id,
+            fields,
+        } = self;
+        (component_id, fields)
+    }
+}
+
+impl<'a, T> ErasedComponentSlice<'a, T>
+where
+    T: ConstSliceItemPtr,
+{
+    #[inline]
+    pub fn upcast<C, U>(
+        components: &ComponentRegistryView<impl Sized, U>,
+        component: &'a [C],
+    ) -> Result<Self, UpcastSliceError>
+    where
+        C: Component,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let component_id = components
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
+        let fields = ErasedSlice::upcast(component)?;
+
+        let me = unsafe { Self::from_parts(component_id, fields) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<C, U>(
+        self,
+        components: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<&'a [C], DowncastError<Self>>
+    where
+        C: Component,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let Self { component_id, .. } = self;
+        let Self { fields, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+
+        let into_self = |fields| unsafe { Self::from_parts(component_id, fields) };
+        let slice = unsafe { fields.downcast() }.map_err(|err| err.map_value(into_self))?;
+        Ok(slice)
+    }
+
+    #[inline]
+    pub fn downcast_ref<C, U>(
+        &self,
+        components: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<&[C], DowncastError<&Self>>
+    where
+        C: Component,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let Self { component_id, .. } = *self;
+        let Self { fields, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+
+        let slice = unsafe { fields.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
+        Ok(slice)
     }
 
     #[inline]
@@ -153,15 +170,6 @@ where
     pub fn as_buffer(&self) -> &[T::Item] {
         let Self { fields, .. } = self;
         fields.as_buffer()
-    }
-
-    #[inline]
-    pub fn into_parts(self) -> (ComponentId, ErasedSlice<'a, T>) {
-        let Self {
-            component_id,
-            fields,
-        } = self;
-        (component_id, fields)
     }
 }
 
@@ -184,8 +192,8 @@ where
 
 impl<T, U> PartialEq<ErasedComponentSlice<'_, U>> for ErasedComponentSlice<'_, T>
 where
-    T: ConstSliceItemPtr,
-    U: ConstSliceItemPtr,
+    T: SliceItemPtr,
+    U: SliceItemPtr,
 {
     #[inline]
     fn eq(&self, other: &ErasedComponentSlice<'_, U>) -> bool {
@@ -194,12 +202,12 @@ where
     }
 }
 
-impl<T> Eq for ErasedComponentSlice<'_, T> where T: ConstSliceItemPtr {}
+impl<T> Eq for ErasedComponentSlice<'_, T> where T: SliceItemPtr {}
 
 impl<T, U> PartialOrd<ErasedComponentSlice<'_, U>> for ErasedComponentSlice<'_, T>
 where
-    T: ConstSliceItemPtr,
-    U: ConstSliceItemPtr,
+    T: SliceItemPtr,
+    U: SliceItemPtr,
 {
     #[inline]
     fn partial_cmp(&self, other: &ErasedComponentSlice<'_, U>) -> Option<cmp::Ordering> {
@@ -210,7 +218,7 @@ where
 
 impl<T> Ord for ErasedComponentSlice<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -221,7 +229,7 @@ where
 
 impl<T> Hash for ErasedComponentSlice<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -232,7 +240,7 @@ where
 
 impl<T> Borrow<ComponentId> for ErasedComponentSlice<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn borrow(&self) -> &ComponentId {

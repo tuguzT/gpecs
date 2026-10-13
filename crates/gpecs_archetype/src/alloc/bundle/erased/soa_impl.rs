@@ -212,7 +212,7 @@ where
     unsafe fn nonnull_ptrs_drop_in_place(&self, to_drop: Self::NonNullPtrs<'_>) {
         let archetype = self.as_inner();
         for ((_, meta), to_drop) in zip_eq(archetype, to_drop) {
-            unsafe { D::drop_in_place_with(to_drop.into_mut_ptr(), meta) }
+            unsafe { D::drop_in_place_with(to_drop.cast_mut(), meta) }
         }
     }
 
@@ -366,7 +366,7 @@ where
     unsafe fn nonnull_slices_drop_in_place(&self, slices_to_drop: Self::SliceNonNullPtrs<'_>) {
         let archetype = self.as_inner();
         for ((_, meta), to_drop) in zip_eq(archetype, slices_to_drop) {
-            unsafe { D::drop_in_place_slice_with(to_drop.into_mut_slice_ptr(), meta) }
+            unsafe { D::drop_in_place_slice_with(to_drop.cast_mut(), meta) }
         }
     }
 }

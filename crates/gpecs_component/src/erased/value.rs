@@ -35,7 +35,7 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     component_id: ComponentId,
-    field: Erased<T, P>,
+    erased: Erased<T, P>,
     erased_drop: Option<ErasedDrop>,
 }
 
@@ -60,10 +60,10 @@ where
             return Err(FromStorageError::new(source, (storage, component)));
         };
 
-        let field = Erased::try_from_storage_value(storage, component)?;
+        let erased = Erased::try_from_storage_value(storage, component)?;
         let erased_drop = desc.erased_drop();
 
-        let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
+        let me = unsafe { Self::from_parts(component_id, erased, erased_drop) };
         Ok(me)
     }
 }
@@ -88,10 +88,10 @@ where
             return Err(FromComponentError::new(component, source));
         };
 
-        let field = Erased::try_from(component)?;
+        let erased = Erased::try_from(component)?;
         let erased_drop = desc.erased_drop();
 
-        let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
+        let me = unsafe { Self::from_parts(component_id, erased, erased_drop) };
         Ok(me)
     }
 }
@@ -104,12 +104,12 @@ where
     #[inline]
     pub unsafe fn from_parts(
         component_id: ComponentId,
-        field: Erased<T, P>,
+        erased: Erased<T, P>,
         erased_drop: Option<ErasedDrop>,
     ) -> Self {
         Self {
             component_id,
-            field,
+            erased,
             erased_drop,
         }
     }
@@ -124,11 +124,11 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let (_, field, erased_drop) =
+        let (_, erased, erased_drop) =
             check_downcast::<C, U, _>(components, component_id, self)?.into_parts();
 
-        let into_self = |field| unsafe { Self::from_parts(component_id, field, erased_drop) };
-        let component = unsafe { field.downcast() }.map_err(|err| err.map_value(into_self))?;
+        let into_self = |erased| unsafe { Self::from_parts(component_id, erased, erased_drop) };
+        let component = unsafe { erased.downcast() }.map_err(|err| err.map_value(into_self))?;
         Ok(component)
     }
 
@@ -142,9 +142,9 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = *self;
-        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+        let Self { erased, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let component = unsafe { field.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
+        let component = unsafe { erased.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
         Ok(component)
     }
 
@@ -161,7 +161,7 @@ where
         let mut this = check_downcast::<C, U, _>(components, component_id, self)?;
 
         let source = polonius!(|this| -> Result<&'polonius mut C, _> {
-            match unsafe { this.field.downcast_mut() } {
+            match unsafe { this.erased.downcast_mut() } {
                 Ok(component) => polonius_return!(Ok(component)),
                 Err(error) => error.into_source().into(),
             }
@@ -176,15 +176,15 @@ where
     }
 
     #[inline]
-    pub fn as_field(&self) -> &Erased<T, P> {
-        let Self { field, .. } = self;
-        field
+    pub fn as_erased(&self) -> &Erased<T, P> {
+        let Self { erased, .. } = self;
+        erased
     }
 
     #[inline]
-    pub unsafe fn as_mut_field(&mut self) -> &mut Erased<T, P> {
-        let Self { field, .. } = self;
-        field
+    pub unsafe fn as_mut_erased(&mut self) -> &mut Erased<T, P> {
+        let Self { erased, .. } = self;
+        erased
     }
 
     #[inline]
@@ -196,25 +196,25 @@ where
     #[inline]
     pub fn as_erased_component_ptr(&self) -> ErasedComponentPtr<P::Const> {
         let Self {
-            ref field,
+            ref erased,
             component_id,
             ..
         } = *self;
 
-        let field = field.as_erased_ptr();
-        unsafe { ErasedComponentPtr::from_parts(component_id, field) }
+        let erased = erased.as_erased_ptr();
+        unsafe { ErasedComponentPtr::from_parts(component_id, erased) }
     }
 
     #[inline]
     pub fn as_mut_erased_component_ptr(&mut self) -> ErasedComponentMutPtr<P::Mut> {
         let Self {
-            ref mut field,
+            ref mut erased,
             component_id,
             ..
         } = *self;
 
-        let field = field.as_mut_erased_ptr();
-        unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
+        let erased = erased.as_mut_erased_ptr();
+        unsafe { ErasedComponentMutPtr::from_parts(component_id, erased) }
     }
 
     #[inline]
@@ -229,32 +229,32 @@ where
 
     #[inline]
     pub fn as_ptr(&self) -> *const T::Item {
-        let Self { field, .. } = self;
-        field.as_ptr()
+        let Self { erased, .. } = self;
+        erased.as_ptr()
     }
 
     #[inline]
     pub unsafe fn as_mut_ptr(&mut self) -> *mut T::Item {
-        let Self { field, .. } = self;
-        field.as_mut_ptr()
+        let Self { erased, .. } = self;
+        erased.as_mut_ptr()
     }
 
     #[inline]
     pub fn as_slice(&self) -> &[T::Item] {
-        let Self { field, .. } = self;
-        field.as_slice()
+        let Self { erased, .. } = self;
+        erased.as_slice()
     }
 
     #[inline]
     pub unsafe fn as_mut_slice(&mut self) -> &mut [T::Item] {
-        let Self { field, .. } = self;
-        field.as_mut_slice()
+        let Self { erased, .. } = self;
+        erased.as_mut_slice()
     }
 
     #[inline]
-    pub fn into_field(self) -> Erased<T, P> {
+    pub fn into_erased(self) -> Erased<T, P> {
         let me = ManuallyDrop::new(self);
-        unsafe { ptr::read(&raw const me.field) }
+        unsafe { ptr::read(&raw const me.erased) }
     }
 
     #[inline]
@@ -265,8 +265,8 @@ where
             ..
         } = self;
 
-        let field = self.into_field();
-        (component_id, field, erased_drop)
+        let erased = self.into_erased();
+        (component_id, erased, erased_drop)
     }
 }
 
@@ -278,13 +278,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             component_id,
-            field,
+            erased,
             erased_drop,
         } = self;
 
         f.debug_struct("ErasedComponent")
             .field("component_id", component_id)
-            .field("field", field)
+            .field("erased", erased)
             .field("erased_drop", erased_drop)
             .finish()
     }

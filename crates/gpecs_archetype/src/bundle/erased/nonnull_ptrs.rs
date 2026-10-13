@@ -15,7 +15,7 @@ use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
     error::FromFieldsLayoutsError,
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaRawContext,
@@ -41,31 +41,15 @@ use crate::{
 pub struct ErasedBundleNonNullPtrs<D, P>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     inner: ErasedSoaNonNullPtrs<D, P>,
 }
 
 impl<D, P> ErasedBundleNonNullPtrs<D, P>
 where
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
-    #[inline]
-    pub fn new(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
-        let ptrs = ptrs.into_inner();
-        let inner = ErasedSoaNonNullPtrs::new(ptrs)?;
-
-        let me = unsafe { Self::from_inner(inner) };
-        Some(me)
-    }
-
-    #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
-        let ptrs = ptrs.into_inner();
-        let inner = unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) };
-        unsafe { Self::from_inner(inner) }
-    }
-
     #[inline]
     pub unsafe fn from_inner(inner: ErasedSoaNonNullPtrs<D, P>) -> Self {
         Self { inner }
@@ -75,22 +59,6 @@ where
     pub fn into_inner(self) -> ErasedSoaNonNullPtrs<D, P> {
         let Self { inner } = self;
         inner
-    }
-
-    #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
-        let Self { inner } = self;
-
-        let inner = inner.into_ptrs();
-        unsafe { ErasedBundlePtrs::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
-        let Self { inner } = self;
-
-        let inner = inner.into_mut_ptrs();
-        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -106,7 +74,7 @@ where
 impl<D, P> ErasedBundleNonNullPtrs<D, P>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub unsafe fn as_inner(&self) -> &ErasedSoaNonNullPtrs<D, P> {
@@ -148,18 +116,70 @@ where
 impl<'a, D, P> ErasedBundleNonNullPtrs<D, P>
 where
     D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from<'n, N>(&'a self, origin: &'n ErasedBundleNonNullPtrs<N, P>) -> isize
+    pub unsafe fn offset_from<'origin, ND, NP>(
+        &'a self,
+        origin: &'origin ErasedBundleNonNullPtrs<ND, NP>,
+    ) -> isize
     where
-        N: FieldLayouts<'n, OutputIter: ErasedArchetypeIterator> + ?Sized,
+        ND: FieldLayouts<'origin, OutputIter: ErasedArchetypeIterator> + ?Sized,
+        NP: SliceItemPtr<Item = P::Item>,
     {
         let Self { inner } = self;
 
         let origin = unsafe { origin.as_inner() };
         unsafe { inner.offset_from(origin) }
+    }
+}
+
+impl<D, P> ErasedBundleNonNullPtrs<D, P>
+where
+    D: ErasedArchetypeKind + ?Sized,
+    P: SliceItemPtr,
+{
+    #[inline]
+    pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
+        self.field_layouts()
+    }
+}
+
+impl<D, P> ErasedBundleNonNullPtrs<D, P>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    pub fn new(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = ErasedSoaNonNullPtrs::new(ptrs)?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_ptrs();
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_mut_ptrs();
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
 
@@ -181,13 +201,16 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap_nonoverlapping<'n, N>(
+    pub unsafe fn swap_nonoverlapping<'with, N>(
         &'a mut self,
-        with: &'n mut ErasedBundleNonNullPtrs<N, P>,
+        with: &'with mut ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
-            + ?Sized,
+        N: FieldLayouts<
+                'with,
+                OutputItem: BufferOffsetsFromSelf,
+                OutputIter: ErasedArchetypeIterator,
+            > + ?Sized,
     {
         let Self { inner } = self;
 
@@ -197,13 +220,16 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_forward<'n, N>(
+    pub unsafe fn copy_from_forward<'src, N>(
         &'a mut self,
-        src: &'n ErasedBundleNonNullPtrs<N, P>,
+        src: &'src ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
-            + ?Sized,
+        N: FieldLayouts<
+                'src,
+                OutputItem: BufferOffsetsFromSelf,
+                OutputIter: ErasedArchetypeIterator,
+            > + ?Sized,
     {
         let Self { inner } = self;
 
@@ -213,13 +239,16 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_backward<'n, N>(
+    pub unsafe fn copy_from_backward<'src, N>(
         &'a mut self,
-        src: &'n ErasedBundleNonNullPtrs<N, P>,
+        src: &'src ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
-            + ?Sized,
+        N: FieldLayouts<
+                'src,
+                OutputItem: BufferOffsetsFromSelf,
+                OutputIter: ErasedArchetypeIterator,
+            > + ?Sized,
     {
         let Self { inner } = self;
 
@@ -229,13 +258,16 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_nonoverlapping<'n, N>(
+    pub unsafe fn copy_from_nonoverlapping<'src, N>(
         &'a mut self,
-        src: &'n ErasedBundleNonNullPtrs<N, P>,
+        src: &'src ErasedBundleNonNullPtrs<N, P>,
         count: usize,
     ) where
-        N: FieldLayouts<'n, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
-            + ?Sized,
+        N: FieldLayouts<
+                'src,
+                OutputItem: BufferOffsetsFromSelf,
+                OutputIter: ErasedArchetypeIterator,
+            > + ?Sized,
     {
         let Self { inner } = self;
 
@@ -277,11 +309,6 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
-        self.field_layouts()
-    }
-
-    #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullPtr<P>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
@@ -315,7 +342,7 @@ where
 impl<D, P> Debug for ErasedBundleNonNullPtrs<D, P>
 where
     D: Debug + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
@@ -328,7 +355,7 @@ where
 impl<D, P> Clone for ErasedBundleNonNullPtrs<D, P>
 where
     D: Clone,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -342,7 +369,7 @@ where
 impl<D, P> Copy for ErasedBundleNonNullPtrs<D, P>
 where
     D: Copy,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
 }
 
@@ -381,7 +408,7 @@ where
 impl<'a, D, P> FieldLayouts<'a> for ErasedBundleNonNullPtrs<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -397,7 +424,7 @@ where
 impl<D, P> CovariantFieldLayouts for ErasedBundleNonNullPtrs<D, P>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -410,14 +437,14 @@ where
 pub struct ErasedBundleNonNullPtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     inner: ErasedSoaNonNullPtrsIter<D, P, F>,
 }
 
 impl<D, P, F> ErasedBundleNonNullPtrsIter<D, P, F>
 where
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub(super) unsafe fn from_inner(inner: ErasedSoaNonNullPtrsIter<D, P, F>) -> Self {
@@ -428,7 +455,7 @@ where
 impl<D, P, F> ErasedBundleNonNullPtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     pub fn as_buffer(&self) -> NonNull<[P::Item]> {
@@ -500,7 +527,7 @@ where
 impl<D, P, F> Clone for ErasedBundleNonNullPtrsIter<D, P, F>
 where
     D: Clone,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
     F: Clone,
 {
     #[inline]
@@ -561,7 +588,7 @@ where
 impl<'a, D, P, F> FieldLayouts<'a> for ErasedBundleNonNullPtrsIter<D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -577,7 +604,7 @@ where
 impl<D, P, F> CovariantFieldLayouts for ErasedBundleNonNullPtrsIter<D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: NonNullSliceItemPtr,
+    P: SliceItemPtr,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

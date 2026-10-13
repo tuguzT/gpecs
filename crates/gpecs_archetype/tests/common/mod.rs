@@ -114,7 +114,7 @@ where
     #[inline]
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {
         Self {
-            layout: component.as_field().layout(),
+            layout: component.as_erased().layout(),
             erased_drop: component.erased_drop(),
         }
     }

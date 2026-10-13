@@ -7,7 +7,7 @@ use core::{
 use gpecs_erased::{
     data::ErasedMutPtr,
     layout::WithLayout,
-    ptr::slice::{ConstPtr, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
 };
 
 use crate::{
@@ -25,15 +25,15 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedComponentMutPtr<T> {
     component_id: ComponentId,
-    field: ErasedMutPtr<T>,
+    erased: ErasedMutPtr<T>,
 }
 
 impl<T> ErasedComponentMutPtr<T> {
     #[inline]
-    pub unsafe fn from_parts(component_id: ComponentId, field: ErasedMutPtr<T>) -> Self {
+    pub unsafe fn from_parts(component_id: ComponentId, erased: ErasedMutPtr<T>) -> Self {
         Self {
             component_id,
-            field,
+            erased,
         }
     }
 
@@ -44,18 +44,49 @@ impl<T> ErasedComponentMutPtr<T> {
     }
 
     #[inline]
-    pub fn field(self) -> ErasedMutPtr<T> {
-        let Self { field, .. } = self;
-        field
+    pub fn erased(self) -> ErasedMutPtr<T> {
+        let Self { erased, .. } = self;
+        erased
     }
 
     #[inline]
     pub fn into_parts(self) -> (ComponentId, ErasedMutPtr<T>) {
         let Self {
             component_id,
-            field,
+            erased,
         } = self;
-        (component_id, field)
+        (component_id, erased)
+    }
+}
+
+impl<T> ErasedComponentMutPtr<T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    #[must_use]
+    pub unsafe fn add(self, count: usize) -> Self {
+        let Self {
+            component_id,
+            erased,
+        } = self;
+
+        let erased = unsafe { erased.add(count) };
+        unsafe { Self::from_parts(component_id, erased) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from(self, origin: Self) -> isize {
+        let Self { erased, .. } = self;
+
+        let origin = origin.erased();
+        unsafe { erased.offset_from(origin) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedComponentMutRef<'a, T> {
+        unsafe { ErasedComponentMutRef::from_ptr(self) }
     }
 }
 
@@ -73,9 +104,9 @@ where
             .ok_or_else(NotRegisteredError::new)?;
 
         let layout = component_desc.layout();
-        let field = ErasedMutPtr::dangling(layout)?;
+        let erased = ErasedMutPtr::dangling(layout)?;
 
-        let me = unsafe { Self::from_parts(component_id, field) };
+        let me = unsafe { Self::from_parts(component_id, erased) };
         Ok(me)
     }
 
@@ -91,9 +122,9 @@ where
         let component_id = components
             .component_id::<C>()
             .ok_or_else(NotRegisteredError::of::<C>)?;
-        let field = ErasedMutPtr::upcast(component)?;
+        let erased = ErasedMutPtr::upcast(component)?;
 
-        let me = unsafe { Self::from_parts(component_id, field) };
+        let me = unsafe { Self::from_parts(component_id, erased) };
         Ok(me)
     }
 
@@ -124,20 +155,20 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+        let Self { erased, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let component = field.downcast().map_err(|err| err.map_value(|_| self))?;
-        Ok(component)
+        let ptr = erased.downcast().map_err(|err| err.map_value(|_| self))?;
+        Ok(ptr)
     }
 
     #[inline]
     pub fn cast_const(self) -> ErasedComponentPtr<ConstPtr<T::Ptrs>> {
         let Self {
             component_id,
-            field,
+            erased,
         } = self;
 
-        let ptr = field.cast_const();
+        let ptr = erased.cast_const();
         unsafe { ErasedComponentPtr::from_parts(component_id, ptr) }
     }
 
@@ -147,45 +178,19 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedComponentMutRef<'a, T> {
-        unsafe { ErasedComponentMutRef::from_ptr(self) }
-    }
-
-    #[inline]
-    #[must_use]
-    pub unsafe fn add(self, count: usize) -> Self {
-        let Self {
-            component_id,
-            field,
-        } = self;
-
-        let field = unsafe { field.add(count) };
-        unsafe { Self::from_parts(component_id, field) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from(self, origin: ErasedComponentPtr<ConstPtr<T::Ptrs>>) -> isize {
-        let Self { field, .. } = self;
-
-        let origin = origin.field();
-        unsafe { field.offset_from(origin) }
-    }
-
-    #[inline]
     pub unsafe fn swap(self, with: Self) {
-        let Self { field, .. } = self;
+        let Self { erased, .. } = self;
 
-        let with = with.field();
-        unsafe { field.swap(with) }
+        let with = with.erased();
+        unsafe { erased.swap(with) }
     }
 
     #[inline]
     pub unsafe fn copy_from(self, src: ErasedComponentPtr<ConstPtr<T::Ptrs>>, count: usize) {
-        let Self { field, .. } = self;
+        let Self { erased, .. } = self;
 
-        let src = src.field();
-        unsafe { field.copy_from(src, count) }
+        let src = src.erased();
+        unsafe { erased.copy_from(src, count) }
     }
 
     #[inline]
@@ -194,10 +199,10 @@ where
         src: ErasedComponentPtr<ConstPtr<T::Ptrs>>,
         count: usize,
     ) {
-        let Self { field, .. } = self;
+        let Self { erased, .. } = self;
 
-        let src = src.field();
-        unsafe { field.copy_from_nonoverlapping(src, count) }
+        let src = src.erased();
+        unsafe { erased.copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
@@ -218,26 +223,26 @@ where
 
     #[inline]
     pub fn as_ptr(self) -> *const T::Item {
-        let Self { field, .. } = self;
-        field.as_ptr()
+        let Self { erased, .. } = self;
+        erased.as_ptr()
     }
 
     #[inline]
     pub unsafe fn as_mut_ptr(self) -> *mut T::Item {
-        let Self { field, .. } = self;
-        field.as_mut_ptr()
+        let Self { erased, .. } = self;
+        erased.as_mut_ptr()
     }
 
     #[inline]
     pub fn as_buffer(self) -> *const [T::Item] {
-        let Self { field, .. } = self;
-        field.as_buffer()
+        let Self { erased, .. } = self;
+        erased.as_buffer()
     }
 
     #[inline]
     pub unsafe fn as_mut_buffer(self) -> *mut [T::Item] {
-        let Self { field, .. } = self;
-        field.as_mut_buffer()
+        let Self { erased, .. } = self;
+        erased.as_mut_buffer()
     }
 }
 

@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
 };
 
-use gpecs_ptr::slice::{CastMut, ConstSliceItemPtr, MutSliceItemPtr};
+use gpecs_ptr::slice::{ConstSliceItemPtr, MutPtr, MutSliceItemPtr};
 use gpecs_soa::{
     traits::{
         Ptrs, Soa, SoaCloneToUninit, SoaCloneToUninitContext, SoaContext, SoaRaw, SoaRawContext,
@@ -49,7 +49,10 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self, context: &'ctx V::Context) -> KeyValueMutPtrs<'ctx, K, V, CastMut<P>> {
+    pub fn cast_mut(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let (key, value) = self.into_parts();
 
         let key = key.cast_mut();
@@ -106,7 +109,7 @@ where
     pub unsafe fn clone_to_uninit(
         self,
         context: &V::Context,
-        dst: KeyValueMutPtrs<'_, K, V, CastMut<P>>,
+        dst: KeyValueMutPtrs<'_, K, V, MutPtr<P::Ptrs>>,
     ) {
         let (key, value) = self.into_parts();
         let (dst_key, dst_value) = dst.into_parts();

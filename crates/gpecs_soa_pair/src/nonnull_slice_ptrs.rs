@@ -6,7 +6,7 @@ use core::{
     ptr::NonNull,
 };
 
-use gpecs_ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr};
 use gpecs_soa::{
     traits::{SliceNonNullPtrs, SoaRaw, SoaRawContext},
     wrapper,
@@ -47,7 +47,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: NonNull<[K]>, values: SliceNonNullPtrs<'ctx, V>) -> Self {
-        let key = unsafe { P::from_slice(keys, 0) };
+        let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
         unsafe { Self::from_parts(key, len, values) }
     }
@@ -89,7 +89,10 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, NonNullAsPtr<P>> {
+    pub fn into_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, values, .. } = self;
 
         let key = key.as_ptr();
@@ -101,7 +104,7 @@ where
     pub fn into_mut_ptrs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutPtrs<'ctx, K, V, NonNullAsMutPtr<P>> {
+    ) -> KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let Self { key, values, .. } = self;
 
         let key = key.as_mut_ptr();
@@ -124,7 +127,7 @@ where
     pub fn into_slice_ptrs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueSlicePtrs<'ctx, K, V, NonNullAsPtr<P>> {
+    ) -> KeyValueSlicePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
         let key = key.as_ptr();
@@ -136,7 +139,7 @@ where
     pub fn into_mut_slice_ptrs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutSlicePtrs<'ctx, K, V, NonNullAsMutPtr<P>> {
+    ) -> KeyValueMutSlicePtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
         let key = key.as_mut_ptr();

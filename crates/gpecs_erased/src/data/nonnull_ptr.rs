@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{MutSliceItemPtr, NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -46,24 +46,24 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptr: ErasedMutPtr<NonNullAsMutPtr<T>>) -> Option<Self> {
+    pub fn new(ptr: ErasedMutPtr<MutPtr<T::Ptrs>>) -> Option<Self> {
         let (layout, ptr) = ptr.into_parts();
 
         let buffer = ptr.slice();
         let buffer = NonNull::new(buffer)?;
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Some(me)
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptr: ErasedMutPtr<NonNullAsMutPtr<T>>) -> Self {
+    pub unsafe fn new_unchecked(ptr: ErasedMutPtr<MutPtr<T::Ptrs>>) -> Self {
         let (layout, ptr) = ptr.into_parts();
 
         let buffer = ptr.slice();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         unsafe { Self::from_parts(layout, ptr) }
     }
@@ -76,7 +76,7 @@ where
 
         let len = bytes_to_items::<T::Item>(layout.size());
         let buffer = NonNull::slice_from_raw_parts(ptr.cast(), len);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -99,12 +99,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref<'a>(self) -> ErasedRef<'a, NonNullAsPtr<T>> {
+    pub unsafe fn as_ref<'a>(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
         unsafe { self.into_ptr().as_ref_unchecked() }
     }
 
     #[inline]
-    pub unsafe fn as_mut<'a>(self) -> ErasedMutRef<'a, NonNullAsMutPtr<T>> {
+    pub unsafe fn as_mut<'a>(self) -> ErasedMutRef<'a, MutPtr<T::Ptrs>> {
         unsafe { self.into_mut_ptr().as_mut_unchecked() }
     }
 
@@ -186,7 +186,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptr(self) -> ErasedPtr<NonNullAsPtr<T>> {
+    pub fn into_ptr(self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.as_ptr();
@@ -194,7 +194,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptr(self) -> ErasedMutPtr<NonNullAsMutPtr<T>> {
+    pub fn into_mut_ptr(self) -> ErasedMutPtr<MutPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.as_mut_ptr();

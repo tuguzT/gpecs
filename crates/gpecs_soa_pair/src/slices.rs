@@ -41,7 +41,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
-        let key = unsafe { P::from_slice(keys, 0) };
+        let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
         unsafe { Self::from_parts(key, len, values) }
     }

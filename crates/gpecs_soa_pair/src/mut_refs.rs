@@ -5,7 +5,7 @@ use core::{
     slice,
 };
 
-use gpecs_ptr::slice::{CastConst, MutSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutSliceItemPtr};
 use gpecs_soa::{
     traits::{RefsMut, Soa, SoaContext, SoaOwned},
     wrapper,
@@ -30,7 +30,7 @@ where
 {
     #[inline]
     pub fn new(key: &'a mut K, value: RefsMut<'ctx, 'a, V>) -> Self {
-        let key = unsafe { P::from_slice(slice::from_mut(key), 0) };
+        let key = unsafe { P::from_parts(slice::from_mut(key), 0) };
         unsafe { Self::from_parts(key, value) }
     }
 
@@ -49,7 +49,10 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+    pub fn into_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, value } = self;
 
         let key = key.cast_const();
@@ -69,7 +72,7 @@ where
     pub fn into_refs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueRefs<'ctx, 'a, K, V, CastConst<P>> {
+    ) -> KeyValueRefs<'ctx, 'a, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, value } = self;
 
         let key = key.cast_const();

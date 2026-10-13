@@ -14,7 +14,7 @@ use crate::{
     },
     layout::WithLayout,
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
     soa::{
         field::{
             FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
@@ -61,7 +61,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConst<P>> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         ptrs.cast_const()
     }
@@ -84,14 +84,14 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
+    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.cast_const();
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, CastConst<P>> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, ConstPtr<P::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
     }
 
@@ -208,7 +208,8 @@ where
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedSoaSlicePtrsIter<D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>> {
+    ) -> ErasedSoaSlicePtrsIter<D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>
+    {
         let Self { ref ptrs, len } = *self;
 
         let ptrs = ptrs.iter();
@@ -266,9 +267,9 @@ where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedSlicePtr<CastConst<P>>;
+    type Item = ErasedSlicePtr<ConstPtr<P::Ptrs>>;
     type IntoIter =
-        ErasedSoaSlicePtrsIter<D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>>;
+        ErasedSoaSlicePtrsIter<D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

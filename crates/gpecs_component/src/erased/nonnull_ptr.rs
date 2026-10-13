@@ -8,7 +8,7 @@ use core::{
 use gpecs_erased::{
     data::ErasedNonNullPtr,
     layout::WithLayout,
-    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
 };
 
 use crate::{
@@ -67,7 +67,7 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptr: ErasedComponentMutPtr<NonNullAsMutPtr<T>>) -> Option<Self> {
+    pub fn new(ptr: ErasedComponentMutPtr<MutPtr<T::Ptrs>>) -> Option<Self> {
         let (component_id, field) = ptr.into_parts();
         let field = Field::new(field)?;
 
@@ -76,7 +76,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptr: ErasedComponentMutPtr<NonNullAsMutPtr<T>>) -> Self {
+    pub unsafe fn new_unchecked(ptr: ErasedComponentMutPtr<MutPtr<T::Ptrs>>) -> Self {
         let (component_id, field) = ptr.into_parts();
         let field = unsafe { Field::new_unchecked(field) };
 
@@ -202,7 +202,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptr(self) -> ErasedComponentPtr<NonNullAsPtr<T>> {
+    pub fn into_ptr(self) -> ErasedComponentPtr<ConstPtr<T::Ptrs>> {
         let Self {
             component_id,
             field,
@@ -213,7 +213,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptr(self) -> ErasedComponentMutPtr<NonNullAsMutPtr<T>> {
+    pub fn into_mut_ptr(self) -> ErasedComponentMutPtr<MutPtr<T::Ptrs>> {
         let Self {
             component_id,
             field,

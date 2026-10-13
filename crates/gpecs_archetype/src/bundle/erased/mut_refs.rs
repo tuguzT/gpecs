@@ -13,7 +13,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaMutRefs, ErasedSoaMutRefsIter,
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaContext,
@@ -63,7 +63,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, CastConst<P>> {
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
@@ -79,7 +79,7 @@ where
     }
 
     #[inline]
-    pub fn into_refs(self) -> ErasedBundleRefs<'a, D, CastConst<P>> {
+    pub fn into_refs(self) -> ErasedBundleRefs<'a, D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_refs();
@@ -132,7 +132,8 @@ where
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedBundleRefsIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>> {
+    ) -> ErasedBundleRefsIter<'a, D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>
+    {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -188,7 +189,10 @@ where
     }
 
     #[inline]
-    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentRef<'_, CastConst<P>>> {
+    pub fn get(
+        &self,
+        component_id: ComponentId,
+    ) -> Option<ErasedComponentRef<'_, ConstPtr<P::Ptrs>>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
     }
@@ -219,9 +223,9 @@ where
         + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedComponentRef<'a, CastConst<P>>;
+    type Item = ErasedComponentRef<'a, ConstPtr<P::Ptrs>>;
     type IntoIter =
-        ErasedBundleRefsIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>>;
+        ErasedBundleRefsIter<'a, D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

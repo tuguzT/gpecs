@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedNonNullSlicePtr,
-    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
 };
 
 use crate::{
@@ -127,7 +127,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptr(self) -> ErasedComponentSlicePtr<NonNullAsPtr<T>> {
+    pub fn into_slice_ptr(self) -> ErasedComponentSlicePtr<ConstPtr<T::Ptrs>> {
         let Self {
             component_id,
             fields,
@@ -138,7 +138,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_slice_ptr(self) -> ErasedComponentMutSlicePtr<NonNullAsMutPtr<T>> {
+    pub fn into_mut_slice_ptr(self) -> ErasedComponentMutSlicePtr<MutPtr<T::Ptrs>> {
         let Self {
             component_id,
             fields,

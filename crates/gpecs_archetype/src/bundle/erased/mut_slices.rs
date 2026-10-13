@@ -13,7 +13,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaMutSlices, ErasedSoaMutSlicesIter,
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaContext,
@@ -71,7 +71,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, CastConst<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_slice_ptrs();
@@ -87,7 +87,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, CastConst<P>> {
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
@@ -103,7 +103,7 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> ErasedBundleSlices<'a, D, CastConst<P>> {
+    pub fn into_slices(self) -> ErasedBundleSlices<'a, D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_slices();
@@ -167,7 +167,7 @@ where
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedBundleSlicesIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>>
+    ) -> ErasedBundleSlicesIter<'a, D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>
     {
         let Self { inner } = self;
 
@@ -224,7 +224,10 @@ where
     }
 
     #[inline]
-    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlice<'_, CastConst<P>>> {
+    pub fn get(
+        &self,
+        component_id: ComponentId,
+    ) -> Option<ErasedComponentSlice<'_, ConstPtr<P::Ptrs>>> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
     }
@@ -255,9 +258,13 @@ where
         + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedComponentSlice<'a, CastConst<P>>;
-    type IntoIter =
-        ErasedBundleSlicesIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>>;
+    type Item = ErasedComponentSlice<'a, ConstPtr<P::Ptrs>>;
+    type IntoIter = ErasedBundleSlicesIter<
+        'a,
+        D::OutputIter,
+        ConstPtr<P::Ptrs>,
+        BufferOffsetsOf<D::OutputItem>,
+    >;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

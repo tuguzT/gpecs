@@ -30,7 +30,7 @@ where
 {
     #[inline]
     pub fn new(key: &'a K, value: Refs<'ctx, 'a, V>) -> Self {
-        let key = unsafe { P::from_slice(slice::from_ref(key), 0) };
+        let key = unsafe { P::from_parts(slice::from_ref(key), 0) };
         unsafe { Self::from_parts(key, value) }
     }
 

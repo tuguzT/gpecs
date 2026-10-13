@@ -14,7 +14,7 @@ use crate::{
         DowncastError, SlicePtrsError, check_offset, check_offset_len, check_ptr_align,
         check_sufficient_align, check_sufficient_len,
     },
-    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
     soa::{
         field::{
             FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
@@ -62,13 +62,13 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, NonNullAsPtr<P>> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         ptrs.into_ptrs()
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>> {
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         ptrs.into_mut_ptrs()
     }
@@ -91,14 +91,14 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, NonNullAsPtr<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.into_ptrs();
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs(self) -> ErasedSoaMutSlicePtrs<D, NonNullAsMutPtr<P>> {
+    pub fn into_mut_slice_ptrs(self) -> ErasedSoaMutSlicePtrs<D, MutPtr<P::Ptrs>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.into_mut_ptrs();
         unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }

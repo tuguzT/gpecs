@@ -11,7 +11,7 @@ use crate::{
     error::{DowncastError, SlicePtrsError},
     layout::WithLayout,
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::{SlicesMut, Soa, SoaAlloc, SoaContext},
@@ -66,7 +66,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, CastConst<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         ptrs.cast_const()
     }
@@ -78,7 +78,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConst<P>> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         ptrs.into_ptrs()
     }
@@ -90,7 +90,7 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> ErasedSoaSlices<'a, D, CastConst<P>> {
+    pub fn into_slices(self) -> ErasedSoaSlices<'a, D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.as_ref_unchecked() }
     }
@@ -204,7 +204,8 @@ where
     #[inline]
     pub fn iter(
         &'a self,
-    ) -> ErasedSoaSlicesIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>> {
+    ) -> ErasedSoaSlicesIter<'a, D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>
+    {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -240,9 +241,9 @@ where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
     P: MutSliceItemPtr,
 {
-    type Item = ErasedSlice<'a, CastConst<P>>;
+    type Item = ErasedSlice<'a, ConstPtr<P::Ptrs>>;
     type IntoIter =
-        ErasedSoaSlicesIter<'a, D::OutputIter, CastConst<P>, BufferOffsetsOf<D::OutputItem>>;
+        ErasedSoaSlicesIter<'a, D::OutputIter, ConstPtr<P::Ptrs>, BufferOffsetsOf<D::OutputItem>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

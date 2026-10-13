@@ -5,7 +5,7 @@ use core::{
     slice,
 };
 
-use gpecs_ptr::slice::{CastConst, MutSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutSliceItemPtr};
 use gpecs_soa::{
     traits::{SlicesMut, Soa, SoaContext, SoaOwned},
     wrapper,
@@ -47,7 +47,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: &'a mut [K], values: SlicesMut<'ctx, 'a, V>) -> Self {
-        let key = unsafe { P::from_slice(keys, 0) };
+        let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
         unsafe { Self::from_parts(key, len, values) }
     }
@@ -92,7 +92,7 @@ where
     pub fn into_slice_ptrs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueSlicePtrs<'ctx, K, V, CastConst<P>> {
+    ) -> KeyValueSlicePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
         let key = key.cast_const();
@@ -112,7 +112,10 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+    pub fn into_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, values, .. } = self;
 
         let key = key.cast_const();
@@ -132,7 +135,7 @@ where
     pub fn into_slices(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueSlices<'ctx, 'a, K, V, CastConst<P>> {
+    ) -> KeyValueSlices<'ctx, 'a, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
         let key = key.cast_const();

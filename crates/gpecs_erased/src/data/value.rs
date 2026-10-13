@@ -258,7 +258,7 @@ where
 
         let layout = storage.layout();
         let buffer = storage.as_slice();
-        let ptr = unsafe { ConstSliceItemPtr::from_slice(buffer, 0) };
+        let ptr = unsafe { ConstSliceItemPtr::from_parts(buffer, 0) };
         unsafe { ErasedPtr::from_parts(layout, ptr) }
     }
 
@@ -273,7 +273,7 @@ where
 
         let layout = storage.layout();
         let buffer = storage.as_mut_slice();
-        let ptr = unsafe { MutSliceItemPtr::from_slice(buffer, 0) };
+        let ptr = unsafe { MutSliceItemPtr::from_parts(buffer, 0) };
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }

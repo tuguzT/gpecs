@@ -6,8 +6,7 @@ use core::{
 };
 
 use gpecs_ptr::slice::{
-    ConstSliceItemPtr, MutSliceItemPtr, NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr,
-    SliceItemPtr,
+    ConstPtr, ConstSliceItemPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr,
 };
 use gpecs_soa::{
     traits::{
@@ -49,12 +48,12 @@ where
     #[inline]
     pub unsafe fn from_ptrs(
         context: &'ctx V::Context,
-        ptrs: KeyValuePtrs<'ctx, K, V, NonNullAsPtr<P>>,
+        ptrs: KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>>,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
         let key = unsafe {
             let slice = NonNull::new_unchecked(key.slice().cast_mut());
-            P::from_slice(slice, key.index())
+            P::from_parts(slice, key.index())
         };
         let value = unsafe { context.nonnull_ptrs_from_ptrs(value) };
         Self::new(key, value)
@@ -63,12 +62,12 @@ where
     #[inline]
     pub unsafe fn from_mut_ptrs(
         context: &'ctx V::Context,
-        ptrs: KeyValueMutPtrs<'ctx, K, V, NonNullAsMutPtr<P>>,
+        ptrs: KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>>,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
         let key = unsafe {
             let slice = NonNull::new_unchecked(key.slice());
-            P::from_slice(slice, key.index())
+            P::from_parts(slice, key.index())
         };
         let value = unsafe { context.nonnull_ptrs_from_mut_ptrs(value) };
         Self::new(key, value)
@@ -81,7 +80,10 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, NonNullAsPtr<P>> {
+    pub fn into_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let (key, value) = self.into_parts();
 
         let key = key.as_ptr();
@@ -93,7 +95,7 @@ where
     pub fn into_mut_ptrs(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutPtrs<'ctx, K, V, NonNullAsMutPtr<P>> {
+    ) -> KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let (key, value) = self.into_parts();
 
         let key = key.as_mut_ptr();

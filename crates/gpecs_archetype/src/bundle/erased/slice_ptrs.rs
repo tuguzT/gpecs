@@ -13,7 +13,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
-    ptr::slice::{CastMut, ConstSliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaRawContext,
@@ -71,7 +71,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedBundleMutSlicePtrs<D, CastMut<P>> {
+    pub fn cast_mut(self) -> ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.cast_mut();

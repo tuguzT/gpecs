@@ -14,7 +14,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaNonNullSlicePtrs, ErasedSoaNonNullSlicePtrsIter,
-    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
     soa::{field::FieldLayouts, traits::SoaRawContext},
 };
 use gpecs_sparse::soa::field::{FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned};
@@ -64,7 +64,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, NonNullAsPtr<P>> {
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
@@ -72,7 +72,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>> {
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_mut_ptrs();
@@ -88,7 +88,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, NonNullAsPtr<P>> {
+    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_slice_ptrs();
@@ -96,7 +96,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs(self) -> ErasedBundleMutSlicePtrs<D, NonNullAsMutPtr<P>> {
+    pub fn into_mut_slice_ptrs(self) -> ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_mut_slice_ptrs();

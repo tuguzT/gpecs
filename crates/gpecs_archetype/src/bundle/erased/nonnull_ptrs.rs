@@ -15,7 +15,7 @@ use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
     error::FromFieldsLayoutsError,
-    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaRawContext,
@@ -51,7 +51,7 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptrs: ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>>) -> Option<Self> {
+    pub fn new(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
         let ptrs = ptrs.into_inner();
         let inner = ErasedSoaNonNullPtrs::new(ptrs)?;
 
@@ -60,7 +60,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>>) -> Self {
+    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
         let ptrs = ptrs.into_inner();
         let inner = unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) };
         unsafe { Self::from_inner(inner) }
@@ -78,7 +78,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, NonNullAsPtr<P>> {
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
@@ -86,7 +86,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, NonNullAsMutPtr<P>> {
+    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.into_mut_ptrs();

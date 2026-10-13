@@ -90,7 +90,7 @@ where
     type Ptrs = GpuSliceItemPtrs<T>;
 
     #[inline]
-    unsafe fn from_slice(slice: *const [T], index: usize) -> Self {
+    unsafe fn from_parts(slice: *const [T], index: usize) -> Self {
         Self { index, slice }
     }
 
@@ -141,7 +141,7 @@ where
     type Ptrs = GpuSliceItemPtrs<T>;
 
     #[inline]
-    unsafe fn from_slice(slice: *mut [T], index: usize) -> Self {
+    unsafe fn from_parts(slice: *mut [T], index: usize) -> Self {
         Self { index, slice }
     }
 
@@ -247,7 +247,7 @@ where
     type Ptrs = GpuSliceItemPtrs<T>;
 
     #[inline]
-    unsafe fn from_slice(slice: NonNull<[T]>, index: usize) -> Self {
+    unsafe fn from_parts(slice: NonNull<[T]>, index: usize) -> Self {
         Self { index, slice }
     }
 

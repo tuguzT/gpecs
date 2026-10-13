@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{CastMut, ConstSliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -57,7 +57,7 @@ where
         let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
         check_len(buffer_layout.size(), layout.size())?;
 
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -71,7 +71,7 @@ where
 
         let len = bytes_to_items::<T::Item>(layout.size());
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), len);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -83,7 +83,7 @@ where
 
         let data = ptr::without_provenance(layout.align());
         let buffer = ptr::slice_from_raw_parts(data, 0);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -99,7 +99,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedMutPtr<CastMut<T>> {
+    pub fn cast_mut(self) -> ErasedMutPtr<MutPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.cast_mut();

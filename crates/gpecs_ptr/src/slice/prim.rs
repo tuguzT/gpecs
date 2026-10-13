@@ -46,7 +46,7 @@ unsafe impl<T> ConstSliceItemPtr for *const T {
     type Ptrs = CoreSliceItemPtrs<T>;
 
     #[inline]
-    unsafe fn from_slice(slice: *const [T], index: usize) -> Self {
+    unsafe fn from_parts(slice: *const [T], index: usize) -> Self {
         unsafe { slice.cast::<T>().add(index) }
     }
 
@@ -94,7 +94,7 @@ unsafe impl<T> MutSliceItemPtr for *mut T {
     type Ptrs = CoreSliceItemPtrs<T>;
 
     #[inline]
-    unsafe fn from_slice(slice: *mut [T], index: usize) -> Self {
+    unsafe fn from_parts(slice: *mut [T], index: usize) -> Self {
         unsafe { slice.cast::<T>().add(index) }
     }
 
@@ -167,7 +167,7 @@ unsafe impl<T> NonNullSliceItemPtr for NonNull<T> {
     type Ptrs = CoreSliceItemPtrs<T>;
 
     #[inline]
-    unsafe fn from_slice(slice: NonNull<[T]>, index: usize) -> Self {
+    unsafe fn from_parts(slice: NonNull<[T]>, index: usize) -> Self {
         unsafe { slice.cast::<T>().add(index) }
     }
 

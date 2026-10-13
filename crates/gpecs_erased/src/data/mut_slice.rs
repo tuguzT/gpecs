@@ -9,7 +9,7 @@ use crate::{
         ErasedMutPtr, ErasedMutSlicePtr, ErasedPtr, ErasedSlice, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError},
     },
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
 };
 
 pub struct ErasedMutSlice<'a, T>
@@ -104,13 +104,13 @@ where
     }
 
     #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedSlicePtr<CastConst<T>> {
+    pub fn as_field_slice_ptr(&self) -> ErasedSlicePtr<ConstPtr<T::Ptrs>> {
         let Self { ptr, .. } = self;
         ptr.cast_const()
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedPtr<CastConst<T>> {
+    pub fn as_field_ptr(&self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
         let Self { ptr, .. } = self;
         ptr.field_ptr().cast_const()
     }
@@ -164,7 +164,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice(self) -> ErasedSlice<'a, CastConst<T>> {
+    pub fn into_slice(self) -> ErasedSlice<'a, ConstPtr<T::Ptrs>> {
         let ptr = self.as_field_slice_ptr();
         unsafe { ErasedSlice::from_ptr(ptr) }
     }

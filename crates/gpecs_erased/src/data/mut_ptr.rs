@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -57,7 +57,7 @@ where
         let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
         check_len(buffer_layout.size(), layout.size())?;
 
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -71,7 +71,7 @@ where
 
         let len = bytes_to_items::<T::Item>(layout.size());
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -83,7 +83,7 @@ where
 
         let data = ptr::without_provenance_mut(layout.align());
         let buffer = ptr::slice_from_raw_parts_mut(data, 0);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -99,7 +99,7 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedPtr<CastConst<T>> {
+    pub fn cast_const(self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.cast_const();
@@ -107,7 +107,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, CastConst<T>> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
     }
 
@@ -128,7 +128,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from(self, origin: ErasedPtr<CastConst<T>>) -> isize {
+    pub unsafe fn offset_from(self, origin: ErasedPtr<ConstPtr<T::Ptrs>>) -> isize {
         let Self { layout, ptr } = self;
 
         let offset = unsafe { ptr.offset_from(origin.cast_mut().ptr()) };
@@ -161,7 +161,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from(self, src: ErasedPtr<CastConst<T>>, count: usize) {
+    pub unsafe fn copy_from(self, src: ErasedPtr<ConstPtr<T::Ptrs>>, count: usize) {
         let Self { layout, ptr } = self;
 
         let src = src.ptr();
@@ -170,7 +170,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from_nonoverlapping(self, src: ErasedPtr<CastConst<T>>, count: usize) {
+    pub unsafe fn copy_from_nonoverlapping(self, src: ErasedPtr<ConstPtr<T::Ptrs>>, count: usize) {
         let Self { layout, ptr } = self;
 
         let src = src.ptr();

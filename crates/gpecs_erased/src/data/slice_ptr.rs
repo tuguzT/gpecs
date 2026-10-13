@@ -7,7 +7,7 @@ use crate::{
     },
     error::{check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{CastMut, ConstSliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -69,7 +69,7 @@ where
         let expected_layout = layout.pad_to_align().repeat_packed(len)?;
         check_len(buffer_layout.size(), expected_layout.size())?;
 
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
         let ptr = unsafe { ErasedPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
@@ -86,7 +86,7 @@ where
         let buffer_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), buffer_len);
 
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
         let ptr = unsafe { ErasedPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
@@ -103,7 +103,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedMutSlicePtr<CastMut<T>> {
+    pub fn cast_mut(self) -> ErasedMutSlicePtr<MutPtr<T::Ptrs>> {
         let Self { ptr, len } = self;
         let ptr = ptr.cast_mut();
         unsafe { ErasedMutSlicePtr::from_parts(ptr, len) }

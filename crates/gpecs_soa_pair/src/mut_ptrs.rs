@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
 };
 
-use gpecs_ptr::slice::{CastConst, MutSliceItemPtr, SliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr};
 use gpecs_soa::{
     traits::{
         MutPtrs, Soa, SoaAllocContext, SoaContext, SoaRaw, SoaRawContext, SoaRead, SoaReadContext,
@@ -49,7 +49,10 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, CastConst<P>> {
+    pub fn cast_const(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let (key, value) = self.into_parts();
 
         let key = key.cast_const();
@@ -71,7 +74,7 @@ where
     pub unsafe fn offset_from(
         self,
         context: &V::Context,
-        origin: KeyValuePtrs<'_, K, V, CastConst<P>>,
+        origin: KeyValuePtrs<'_, K, V, ConstPtr<P::Ptrs>>,
     ) -> isize {
         let (key, value) = self.into_parts();
         let (origin_key, origin_value) = origin.into_parts();
@@ -103,7 +106,7 @@ where
     pub unsafe fn copy_from_nonoverlapping(
         self,
         context: &V::Context,
-        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
+        from: KeyValuePtrs<'_, K, V, ConstPtr<P::Ptrs>>,
         count: usize,
     ) {
         let (dst_key, dst_value) = self.into_parts();
@@ -161,7 +164,7 @@ where
     pub unsafe fn copy_from_forward(
         self,
         context: &V::Context,
-        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
+        from: KeyValuePtrs<'_, K, V, ConstPtr<P::Ptrs>>,
         count: usize,
     ) {
         let (dst_key, dst_value) = self.into_parts();
@@ -177,7 +180,7 @@ where
     pub unsafe fn copy_from_backward(
         self,
         context: &V::Context,
-        from: KeyValuePtrs<'_, K, V, CastConst<P>>,
+        from: KeyValuePtrs<'_, K, V, ConstPtr<P::Ptrs>>,
         count: usize,
     ) {
         let (dst_key, dst_value) = self.into_parts();
@@ -199,7 +202,7 @@ where
     pub unsafe fn as_ref_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueRefs<'ctx, 'a, K, V, CastConst<P>> {
+    ) -> KeyValueRefs<'ctx, 'a, K, V, ConstPtr<P::Ptrs>> {
         unsafe { self.cast_const(context).as_ref_unchecked(context) }
     }
 

@@ -11,7 +11,7 @@ use crate::{
     error::{DowncastError, FromFieldsLayoutsError, InsufficientAlignError},
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{NonNullAsMutPtr, NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -37,7 +37,7 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptrs: ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>>) -> Option<Self> {
+    pub fn new(ptrs: ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = NonNull::new(buffer)?;
 
@@ -46,7 +46,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>>) -> Self {
+    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
 
@@ -80,7 +80,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, NonNullAsPtr<P>> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
         let Self {
             layouts,
             buffer,
@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, NonNullAsMutPtr<P>> {
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self {
             layouts,
             buffer,
@@ -775,6 +775,6 @@ where
         (bytes_to_items::<P::Item>(offset), desc.layout())
     };
 
-    let ptr = unsafe { P::from_slice(buffer, index) };
+    let ptr = unsafe { P::from_parts(buffer, index) };
     unsafe { ErasedNonNullPtr::from_parts(layout, ptr).add(offset) }
 }

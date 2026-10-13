@@ -14,7 +14,7 @@ use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaPtrs, ErasedSoaPtrsIter,
     error::FromFieldsLayoutsError,
-    ptr::slice::{CastMut, ConstSliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr},
     soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
     storage::AlignedStorageFromLayout,
 };
@@ -58,7 +58,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedBundleMutPtrs<D, CastMut<P>> {
+    pub fn cast_mut(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
         let inner = inner.cast_mut();

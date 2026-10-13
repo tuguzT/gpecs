@@ -6,7 +6,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedMutSlicePtr,
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
 };
 
 use crate::{
@@ -127,7 +127,7 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedComponentSlicePtr<CastConst<T>> {
+    pub fn cast_const(self) -> ErasedComponentSlicePtr<ConstPtr<T::Ptrs>> {
         let Self {
             component_id,
             fields,
@@ -138,7 +138,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentSlice<'a, CastConst<T>> {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentSlice<'a, ConstPtr<T::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
     }
 

@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedMutRef,
-    ptr::slice::{CastConst, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr},
 };
 use polonius_the_crab::{polonius, polonius_return};
 
@@ -135,7 +135,7 @@ where
     }
 
     #[inline]
-    pub fn as_component_ptr(&self) -> ErasedComponentPtr<CastConst<T>> {
+    pub fn as_component_ptr(&self) -> ErasedComponentPtr<ConstPtr<T::Ptrs>> {
         let Self {
             ref field,
             component_id,
@@ -190,7 +190,7 @@ where
     }
 
     #[inline]
-    pub fn into_ref(self) -> ErasedComponentRef<'a, CastConst<T>> {
+    pub fn into_ref(self) -> ErasedComponentRef<'a, ConstPtr<T::Ptrs>> {
         let Self {
             component_id,
             field,

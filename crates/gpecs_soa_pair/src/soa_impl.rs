@@ -459,7 +459,7 @@ where
 
         let key = unsafe {
             let slice = ptr::slice_from_raw_parts(buffer.cast(), capacity);
-            P::Const::from_slice(slice, 0)
+            P::Const::from_parts(slice, 0)
         };
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.ptrs_from_buffer(buffer, capacity) };
@@ -476,7 +476,7 @@ where
 
         let key = unsafe {
             let slice = ptr::slice_from_raw_parts_mut(buffer.cast(), capacity);
-            P::Mut::from_slice(slice, 0)
+            P::Mut::from_parts(slice, 0)
         };
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.mut_ptrs_from_buffer(buffer, capacity) };
@@ -497,7 +497,7 @@ where
 
         let key = unsafe {
             let slice = NonNull::slice_from_raw_parts(buffer.cast(), capacity);
-            P::NonNull::from_slice(slice, 0)
+            P::NonNull::from_parts(slice, 0)
         };
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.nonnull_ptrs_from_buffer(buffer, capacity) };

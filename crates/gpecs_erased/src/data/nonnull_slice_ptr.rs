@@ -1,7 +1,5 @@
 use core::{alloc::Layout, ptr::NonNull};
 
-use gpecs_ptr::slice::{NonNullAsMutPtr, NonNullAsPtr};
-
 use crate::{
     data::{
         ErasedMutSlicePtr, ErasedNonNullPtr, ErasedSlicePtr,
@@ -9,7 +7,7 @@ use crate::{
     },
     error::{check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::NonNullSliceItemPtr,
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -67,7 +65,7 @@ where
         let expected_layout = layout.pad_to_align().repeat_packed(len)?;
         check_len(buffer_layout.size(), expected_layout.size())?;
 
-        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { T::from_parts(buffer, 0) };
         let ptr = unsafe { ErasedNonNullPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
@@ -84,7 +82,7 @@ where
         let buffer_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
         let buffer = NonNull::slice_from_raw_parts(ptr.cast(), buffer_len);
 
-        let ptr = unsafe { NonNullSliceItemPtr::from_slice(buffer, 0) };
+        let ptr = unsafe { NonNullSliceItemPtr::from_parts(buffer, 0) };
         let ptr = unsafe { ErasedNonNullPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
@@ -101,14 +99,14 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptr(self) -> ErasedSlicePtr<NonNullAsPtr<T>> {
+    pub fn into_slice_ptr(self) -> ErasedSlicePtr<ConstPtr<T::Ptrs>> {
         let Self { ptr, len } = self;
         let ptr = ptr.into_ptr();
         unsafe { ErasedSlicePtr::from_parts(ptr, len) }
     }
 
     #[inline]
-    pub fn into_mut_slice_ptr(self) -> ErasedMutSlicePtr<NonNullAsMutPtr<T>> {
+    pub fn into_mut_slice_ptr(self) -> ErasedMutSlicePtr<MutPtr<T::Ptrs>> {
         let Self { ptr, len } = self;
         let ptr = ptr.into_mut_ptr();
         unsafe { ErasedMutSlicePtr::from_parts(ptr, len) }

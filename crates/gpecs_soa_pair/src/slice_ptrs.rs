@@ -5,7 +5,7 @@ use core::{
     ptr,
 };
 
-use gpecs_ptr::slice::{CastMut, ConstSliceItemPtr};
+use gpecs_ptr::slice::{ConstSliceItemPtr, MutPtr};
 use gpecs_soa::{
     traits::{SlicePtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
@@ -41,7 +41,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: *const [K], values: SlicePtrs<'ctx, V>) -> Self {
-        let key = unsafe { P::from_slice(keys, 0) };
+        let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
         unsafe { Self::from_parts(key, len, values) }
     }
@@ -86,7 +86,7 @@ where
     pub fn cast_mut(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutSlicePtrs<'ctx, K, V, CastMut<P>> {
+    ) -> KeyValueMutSlicePtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
         let key = key.cast_mut();

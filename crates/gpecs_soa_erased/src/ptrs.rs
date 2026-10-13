@@ -16,7 +16,7 @@ use crate::{
     },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{CastMut, ConstSliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -85,7 +85,7 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedSoaMutPtrs<D, CastMut<P>> {
+    pub fn cast_mut(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self {
             layouts,
             buffer,
@@ -661,6 +661,6 @@ where
         (bytes_to_items::<P::Item>(offset), desc.layout())
     };
 
-    let ptr = unsafe { P::from_slice(buffer, index) };
+    let ptr = unsafe { P::from_parts(buffer, index) };
     unsafe { ErasedPtr::from_parts(layout, ptr).add(offset) }
 }

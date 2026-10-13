@@ -84,7 +84,7 @@ where
     pub fn into_parts(self) -> (&'a mut [K], SlicesMut<'ctx, 'a, V>) {
         let Self { key, len, values } = self;
 
-        let keys = unsafe { slice::from_raw_parts_mut(key.as_mut_raw_ptr(), len) };
+        let keys = unsafe { slice::from_raw_parts_mut(key.as_mut_ptr(), len) };
         (keys, values.into_inner())
     }
 
@@ -158,7 +158,7 @@ where
             ref values,
         } = *self;
 
-        let keys = unsafe { slice::from_raw_parts(key.as_mut_raw_ptr(), len) };
+        let keys = unsafe { slice::from_raw_parts(key.as_mut_ptr(), len) };
         f.debug_struct("KeyValueMutSlices")
             .field("keys", &keys)
             .field("values", values)
@@ -194,8 +194,8 @@ where
             ref values,
         } = *self;
 
-        let keys = unsafe { slice::from_raw_parts(key.as_mut_raw_ptr(), len) };
-        let other_keys = unsafe { slice::from_raw_parts(other.key.as_mut_raw_ptr(), other.len) };
+        let keys = unsafe { slice::from_raw_parts(key.as_mut_ptr(), len) };
+        let other_keys = unsafe { slice::from_raw_parts(other.key.as_mut_ptr(), other.len) };
 
         let other = (other_keys, &other.values);
         (keys, values) == other
@@ -225,8 +225,8 @@ where
             ref values,
         } = *self;
 
-        let keys = unsafe { slice::from_raw_parts(key.as_mut_raw_ptr(), len) };
-        let other_keys = unsafe { slice::from_raw_parts(other.key.as_mut_raw_ptr(), other.len) };
+        let keys = unsafe { slice::from_raw_parts(key.as_mut_ptr(), len) };
+        let other_keys = unsafe { slice::from_raw_parts(other.key.as_mut_ptr(), other.len) };
 
         let other = (other_keys, &other.values);
         (keys, values).partial_cmp(&other)
@@ -247,8 +247,8 @@ where
             ref values,
         } = *self;
 
-        let keys = unsafe { slice::from_raw_parts(key.as_mut_raw_ptr(), len) };
-        let other_keys = unsafe { slice::from_raw_parts(other.key.as_mut_raw_ptr(), other.len) };
+        let keys = unsafe { slice::from_raw_parts(key.as_mut_ptr(), len) };
+        let other_keys = unsafe { slice::from_raw_parts(other.key.as_mut_ptr(), other.len) };
 
         let other = (other_keys, &other.values);
         (keys, values).cmp(&other)
@@ -269,7 +269,7 @@ where
             ref values,
         } = *self;
 
-        let keys = unsafe { slice::from_raw_parts(key.as_mut_raw_ptr(), len) };
+        let keys = unsafe { slice::from_raw_parts(key.as_mut_ptr(), len) };
         (keys, values).hash(state);
     }
 }

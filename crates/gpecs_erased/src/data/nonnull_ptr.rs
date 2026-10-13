@@ -94,7 +94,7 @@ where
         let Self { layout, .. } = self;
         let Self { ptr, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let ptr = ptr.as_raw_ptr().cast();
+        let ptr = ptr.as_ptr().cast();
         Ok(ptr)
     }
 
@@ -135,8 +135,8 @@ where
         let Self { layout, ptr } = self;
 
         for i in 0..bytes_to_items::<T::Item>(layout.size()) {
-            let this = unsafe { ptr.add(i) }.as_mut_ptr();
-            let with = unsafe { with.ptr.add(i) }.as_mut_ptr();
+            let this = unsafe { ptr.add(i) };
+            let with = unsafe { with.ptr.add(i) };
             unsafe { this.swap(with) }
         }
     }
@@ -156,25 +156,25 @@ where
     pub unsafe fn copy_from(self, src: Self, count: usize) {
         let Self { layout, ptr } = self;
 
-        let src = src.ptr().as_mut_ptr().cast_const();
+        let src = src.ptr();
         let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
-        unsafe { ptr.as_mut_ptr().copy_from(src, count) }
+        unsafe { ptr.copy_from(src, count) }
     }
 
     #[inline]
     pub unsafe fn copy_from_nonoverlapping(self, src: Self, count: usize) {
         let Self { layout, ptr } = self;
 
-        let src = src.ptr().as_mut_ptr().cast_const();
+        let src = src.ptr();
         let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
-        unsafe { ptr.as_mut_ptr().copy_from_nonoverlapping(src, count) }
+        unsafe { ptr.copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
     pub fn as_buffer(self) -> NonNull<[T::Item]> {
         let Self { layout, ptr } = self;
 
-        let data = ptr.as_raw_ptr();
+        let data = ptr.as_ptr();
         let len = bytes_to_items::<T::Item>(layout.size());
         NonNull::slice_from_raw_parts(data, len)
     }
@@ -182,14 +182,14 @@ where
     #[inline]
     pub fn as_ptr(self) -> NonNull<T::Item> {
         let Self { ptr, .. } = self;
-        ptr.as_raw_ptr()
+        ptr.as_ptr()
     }
 
     #[inline]
     pub fn into_ptr(self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
-        let ptr = ptr.as_ptr();
+        let ptr = ptr.cast_const();
         unsafe { ErasedPtr::from_parts(layout, ptr) }
     }
 
@@ -197,7 +197,7 @@ where
     pub fn into_mut_ptr(self) -> ErasedMutPtr<MutPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
-        let ptr = ptr.as_mut_ptr();
+        let ptr = ptr.cast_mut();
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }

@@ -61,7 +61,7 @@ unsafe impl<T> ConstSliceItemPtr for *const T {
     }
 
     #[inline]
-    fn as_raw_ptr(self) -> *const Self::Item {
+    fn as_ptr(self) -> *const Self::Item {
         self
     }
 }
@@ -109,7 +109,7 @@ unsafe impl<T> MutSliceItemPtr for *mut T {
     }
 
     #[inline]
-    fn as_mut_raw_ptr(self) -> *mut Self::Item {
+    fn as_mut_ptr(self) -> *mut Self::Item {
         self
     }
 
@@ -182,7 +182,7 @@ unsafe impl<T> NonNullSliceItemPtr for NonNull<T> {
     }
 
     #[inline]
-    fn as_raw_ptr(self) -> NonNull<Self::Item> {
+    fn as_ptr(self) -> NonNull<Self::Item> {
         self
     }
 }

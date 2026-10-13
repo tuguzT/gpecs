@@ -1006,7 +1006,7 @@ where
             let result = f(context, Ok(Some(access)));
 
             *sparse_item = S::occupied(key.epoch(), dense_index);
-            unsafe { ptr::replace(dense_key.as_mut_raw_ptr(), key) };
+            unsafe { ptr::replace(dense_key.as_mut_ptr(), key) };
 
             return result;
         }

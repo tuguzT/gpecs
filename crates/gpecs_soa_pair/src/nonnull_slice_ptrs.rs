@@ -73,7 +73,7 @@ where
     pub fn into_parts(self) -> (NonNull<[K]>, SliceNonNullPtrs<'ctx, V>) {
         let Self { key, len, values } = self;
 
-        let keys = NonNull::slice_from_raw_parts(key.as_raw_ptr(), len);
+        let keys = NonNull::slice_from_raw_parts(key.as_ptr(), len);
         (keys, values.into_inner())
     }
 
@@ -95,7 +95,7 @@ where
     ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, values, .. } = self;
 
-        let key = key.as_ptr();
+        let key = key.cast_const();
         let value = context.nonnull_slice_ptrs_as_ptrs(values.into_inner());
         KeyValuePtrs::new(key, value)
     }
@@ -107,7 +107,7 @@ where
     ) -> KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let Self { key, values, .. } = self;
 
-        let key = key.as_mut_ptr();
+        let key = key.cast_mut();
         let value = context.nonnull_slice_ptrs_as_mut_ptrs(values.into_inner());
         KeyValueMutPtrs::new(key, value)
     }
@@ -130,7 +130,7 @@ where
     ) -> KeyValueSlicePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
-        let key = key.as_ptr();
+        let key = key.cast_const();
         let values = context.nonnull_slice_ptrs_as_slice_ptrs(values.into_inner());
         unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
     }
@@ -142,7 +142,7 @@ where
     ) -> KeyValueMutSlicePtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
-        let key = key.as_mut_ptr();
+        let key = key.cast_mut();
         let values = context.nonnull_slice_ptrs_as_mut_slice_ptrs(values.into_inner());
         unsafe { KeyValueMutSlicePtrs::from_parts(key, len, values) }
     }
@@ -173,7 +173,7 @@ where
             ref values,
         } = *self;
 
-        let keys = NonNull::slice_from_raw_parts(key.as_raw_ptr(), len);
+        let keys = NonNull::slice_from_raw_parts(key.as_ptr(), len);
         f.debug_struct("KeyValueNonNullSlicePtrs")
             .field("keys", &keys)
             .field("values", values)

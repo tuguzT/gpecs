@@ -86,7 +86,7 @@ where
     ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let (key, value) = self.into_parts();
 
-        let key = key.as_ptr();
+        let key = key.cast_const();
         let value = context.nonnull_ptrs_as_ptrs(value);
         KeyValuePtrs::new(key, value)
     }
@@ -98,7 +98,7 @@ where
     ) -> KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>> {
         let (key, value) = self.into_parts();
 
-        let key = key.as_mut_ptr();
+        let key = key.cast_mut();
         let value = context.nonnull_ptrs_as_mut_ptrs(value);
         KeyValueMutPtrs::new(key, value)
     }

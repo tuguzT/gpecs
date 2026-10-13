@@ -67,7 +67,7 @@ where
     pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'ctx, V>) {
         let Self { key, len, values } = self;
 
-        let keys = ptr::slice_from_raw_parts_mut(key.as_mut_raw_ptr(), len);
+        let keys = ptr::slice_from_raw_parts_mut(key.as_mut_ptr(), len);
         (keys, values.into_inner())
     }
 
@@ -165,7 +165,7 @@ where
             ref values,
         } = *self;
 
-        let keys = ptr::slice_from_raw_parts_mut(key.as_mut_raw_ptr(), len);
+        let keys = ptr::slice_from_raw_parts_mut(key.as_mut_ptr(), len);
         f.debug_struct("KeyValueMutSlicePtrs")
             .field("keys", &keys)
             .field("values", values)

@@ -67,7 +67,7 @@ where
     pub fn into_parts(self) -> (*const [K], SlicePtrs<'ctx, V>) {
         let Self { key, len, values } = self;
 
-        let keys = ptr::slice_from_raw_parts(key.as_raw_ptr(), len);
+        let keys = ptr::slice_from_raw_parts(key.as_ptr(), len);
         (keys, values.into_inner())
     }
 
@@ -133,7 +133,7 @@ where
             ref values,
         } = *self;
 
-        let keys = ptr::slice_from_raw_parts(key.as_raw_ptr(), len);
+        let keys = ptr::slice_from_raw_parts(key.as_ptr(), len);
         f.debug_struct("KeyValueSlicePtrs")
             .field("keys", &keys)
             .field("values", values)

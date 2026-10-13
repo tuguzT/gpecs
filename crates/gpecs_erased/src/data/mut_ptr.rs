@@ -94,7 +94,7 @@ where
         let Self { layout, .. } = self;
         let Self { ptr, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let ptr = ptr.as_mut_raw_ptr().cast();
+        let ptr = ptr.as_mut_ptr().cast();
         Ok(ptr)
     }
 
@@ -182,7 +182,7 @@ where
     pub fn as_buffer(self) -> *const [T::Item] {
         let Self { layout, ptr } = self;
 
-        let data = ptr.as_mut_raw_ptr().cast_const().cast();
+        let data = ptr.as_mut_ptr().cast_const();
         let len = bytes_to_items::<T::Item>(layout.size());
         ptr::slice_from_raw_parts(data, len)
     }
@@ -191,7 +191,7 @@ where
     pub fn as_mut_buffer(self) -> *mut [T::Item] {
         let Self { layout, ptr } = self;
 
-        let data = ptr.as_mut_raw_ptr().cast();
+        let data = ptr.as_mut_ptr();
         let len = bytes_to_items::<T::Item>(layout.size());
         ptr::slice_from_raw_parts_mut(data, len)
     }
@@ -199,12 +199,12 @@ where
     #[inline]
     pub fn as_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
-        ptr.as_mut_raw_ptr().cast_const().cast()
+        ptr.as_mut_ptr().cast_const()
     }
 
     #[inline]
     pub fn as_mut_ptr(self) -> *mut T::Item {
         let Self { ptr, .. } = self;
-        ptr.as_mut_raw_ptr().cast()
+        ptr.as_mut_ptr()
     }
 }

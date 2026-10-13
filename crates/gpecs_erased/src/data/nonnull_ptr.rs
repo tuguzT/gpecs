@@ -1,13 +1,13 @@
-use core::{alloc::Layout, ptr::NonNull};
+use core::{alloc::Layout, num::NonZeroUsize, ptr::NonNull};
 
 use crate::{
     data::{
         ErasedMutPtr, ErasedMutRef, ErasedPtr, ErasedRef,
-        error::{DowncastError, UpcastPtrError, check_downcast},
+        error::{DataError, DowncastError, UpcastPtrError, check_downcast},
     },
-    error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, ConstSliceItemPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -46,25 +46,59 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptr: ErasedMutPtr<MutPtr<T::Ptrs>>) -> Option<Self> {
-        let (layout, ptr) = ptr.into_parts();
+    pub fn new(layout: Layout, buffer: NonNull<[T::Item]>) -> Result<Self, DataError> {
+        check_ptr_align(buffer.as_ptr().cast(), layout)?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer = ptr.slice();
-        let buffer = NonNull::new(buffer)?;
+        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
+        check_len(buffer_layout.size(), layout.size())?;
+
         let ptr = unsafe { T::from_parts(buffer, 0) };
 
+        let me = unsafe { Self::from_parts(layout, ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
+
+        let addr = unsafe { NonZeroUsize::new_unchecked(layout.align()) };
+        let data = NonNull::without_provenance(addr);
+        let buffer = NonNull::slice_from_raw_parts(data, 0);
+        let ptr = unsafe { T::from_parts(buffer, 0) };
+
+        let me = unsafe { Self::from_parts(layout, ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn from_ptr(ptr: ErasedPtr<ConstPtr<T::Ptrs>>) -> Option<Self> {
+        let (layout, ptr) = ptr.into_parts();
+        let ptr = ptr.cast_nonnull()?;
         let me = unsafe { Self::from_parts(layout, ptr) };
         Some(me)
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptr: ErasedMutPtr<MutPtr<T::Ptrs>>) -> Self {
+    pub unsafe fn from_ptr_unchecked(ptr: ErasedPtr<ConstPtr<T::Ptrs>>) -> Self {
         let (layout, ptr) = ptr.into_parts();
+        let ptr = unsafe { ptr.cast_nonnull_unchecked() };
+        unsafe { Self::from_parts(layout, ptr) }
+    }
 
-        let buffer = ptr.slice();
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+    #[inline]
+    pub fn from_mut_ptr(ptr: ErasedMutPtr<MutPtr<T::Ptrs>>) -> Option<Self> {
+        let (layout, ptr) = ptr.into_parts();
+        let ptr = ptr.cast_nonnull()?;
+        let me = unsafe { Self::from_parts(layout, ptr) };
+        Some(me)
+    }
 
+    #[inline]
+    pub unsafe fn from_mut_ptr_unchecked(ptr: ErasedMutPtr<MutPtr<T::Ptrs>>) -> Self {
+        let (layout, ptr) = ptr.into_parts();
+        let ptr = unsafe { ptr.cast_nonnull_unchecked() };
         unsafe { Self::from_parts(layout, ptr) }
     }
 
@@ -83,13 +117,6 @@ where
     }
 
     #[inline]
-    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
-        let ptr = ErasedMutPtr::dangling(layout)?;
-        let me = unsafe { Self::new_unchecked(ptr) };
-        Ok(me)
-    }
-
-    #[inline]
     pub fn downcast<V>(self) -> Result<NonNull<V>, DowncastError<Self>> {
         let Self { layout, .. } = self;
         let Self { ptr, .. } = check_downcast::<V, _>(layout, self)?;
@@ -100,12 +127,12 @@ where
 
     #[inline]
     pub unsafe fn as_ref<'a>(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
-        unsafe { self.into_ptr().as_ref_unchecked() }
+        unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
     pub unsafe fn as_mut<'a>(self) -> ErasedMutRef<'a, MutPtr<T::Ptrs>> {
-        unsafe { self.into_mut_ptr().as_mut_unchecked() }
+        unsafe { self.cast_mut().as_mut_unchecked() }
     }
 
     #[inline]
@@ -186,7 +213,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptr(self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
+    pub fn cast_const(self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.cast_const();
@@ -194,7 +221,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptr(self) -> ErasedMutPtr<MutPtr<T::Ptrs>> {
+    pub fn cast_mut(self) -> ErasedMutPtr<MutPtr<T::Ptrs>> {
         let Self { layout, ptr } = self;
 
         let ptr = ptr.cast_mut();

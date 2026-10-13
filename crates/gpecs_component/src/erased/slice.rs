@@ -128,7 +128,7 @@ where
             component_id,
         } = *self;
 
-        let fields = fields.as_field_slice_ptr();
+        let fields = fields.slice_ptr();
         unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
@@ -139,7 +139,7 @@ where
             component_id,
         } = *self;
 
-        let field = fields.as_field_ptr();
+        let field = fields.ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 

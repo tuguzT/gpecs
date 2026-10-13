@@ -63,7 +63,7 @@ impl<T> ErasedComponentNonNullSlicePtr<T> {
             fields,
         } = self;
 
-        let field = fields.field_ptr();
+        let field = fields.ptr();
         unsafe { ErasedComponentNonNullPtr::from_parts(component_id, field) }
     }
 
@@ -133,7 +133,7 @@ where
             fields,
         } = self;
 
-        let fields = fields.into_slice_ptr();
+        let fields = fields.cast_const();
         unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
@@ -144,7 +144,7 @@ where
             fields,
         } = self;
 
-        let fields = fields.into_mut_slice_ptr();
+        let fields = fields.cast_mut();
         unsafe { ErasedComponentMutSlicePtr::from_parts(component_id, fields) }
     }
 

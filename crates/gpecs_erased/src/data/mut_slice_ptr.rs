@@ -2,12 +2,12 @@ use core::{alloc::Layout, ptr};
 
 use crate::{
     data::{
-        ErasedMutPtr, ErasedMutSlice, ErasedSlice, ErasedSlicePtr,
+        ErasedMutPtr, ErasedMutSlice, ErasedNonNullSlicePtr, ErasedSlice, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError, check_downcast},
     },
-    error::{check_len, check_ptr_align, check_sufficient_align},
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -40,7 +40,7 @@ impl<T> ErasedMutSlicePtr<T> {
     }
 
     #[inline]
-    pub fn field_ptr(self) -> ErasedMutPtr<T> {
+    pub fn ptr(self) -> ErasedMutPtr<T> {
         let Self { ptr, .. } = self;
         ptr
     }
@@ -77,6 +77,13 @@ where
     }
 
     #[inline]
+    pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
+        let ptr = ErasedMutPtr::dangling(layout)?;
+        let me = unsafe { Self::from_parts(ptr, 0) };
+        Ok(me)
+    }
+
+    #[inline]
     pub fn upcast<V>(ptr: *mut [V]) -> Result<Self, UpcastSliceError> {
         let layout = Layout::new::<V>();
         check_ptr_align(ptr.cast(), layout)?;
@@ -107,6 +114,16 @@ where
         let Self { ptr, len } = self;
         let ptr = ptr.cast_const();
         unsafe { ErasedSlicePtr::from_parts(ptr, len) }
+    }
+
+    #[inline]
+    pub fn cast_nonnull(self) -> Option<ErasedNonNullSlicePtr<NonNullPtr<T::Ptrs>>> {
+        ErasedNonNullSlicePtr::from_mut_slice_ptr(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedNonNullSlicePtr<NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedNonNullSlicePtr::from_mut_slice_ptr_unchecked(self) }
     }
 
     #[inline]

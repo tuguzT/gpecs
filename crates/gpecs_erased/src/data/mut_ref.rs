@@ -9,15 +9,38 @@ use crate::{
         ErasedMutPtr, ErasedPtr, ErasedRef,
         error::{DataError, DowncastError, UpcastPtrError},
     },
-    ptr::slice::{ConstPtr, MutSliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
 };
 
 pub struct ErasedMutRef<'a, T>
 where
-    T: MutSliceItemPtr,
+    T: SliceItemPtr,
 {
     ptr: ErasedMutPtr<T>,
     phantom: PhantomData<&'a mut [T::Item]>,
+}
+
+impl<T> ErasedMutRef<'_, T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_ptr(ptr: ErasedMutPtr<T>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn layout(&self) -> Layout {
+        let Self { ptr, .. } = self;
+        ptr.layout()
+    }
+
+    #[inline]
+    pub fn mut_ptr(&mut self) -> ErasedMutPtr<T> {
+        let Self { ptr, .. } = *self;
+        ptr
+    }
 }
 
 impl<'a, T> ErasedMutRef<'a, T>
@@ -36,12 +59,6 @@ where
         let ptr = ErasedMutPtr::upcast(r#ref)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedMutPtr<T>) -> Self {
-        let phantom = PhantomData;
-        Self { ptr, phantom }
     }
 
     #[inline]
@@ -81,13 +98,7 @@ where
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { ptr, .. } = self;
-        ptr.layout()
-    }
-
-    #[inline]
-    pub fn as_field_ptr(&self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
+    pub fn ptr(&self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
         let Self { ptr, .. } = *self;
         ptr.cast_const()
     }
@@ -121,12 +132,6 @@ where
     }
 
     #[inline]
-    pub fn as_mut_field_ptr(&mut self) -> ErasedMutPtr<T> {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
     pub fn into_buffer(self) -> &'a mut [T::Item] {
         let Self { ptr, .. } = self;
 
@@ -135,8 +140,14 @@ where
     }
 
     #[inline]
+    pub fn as_ref(&self) -> ErasedRef<'_, ConstPtr<T::Ptrs>> {
+        let Self { ptr, .. } = self;
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    #[inline]
     pub fn into_ref(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
-        let ptr = self.as_field_ptr();
+        let Self { ptr, .. } = self;
         unsafe { ptr.as_ref_unchecked() }
     }
 }

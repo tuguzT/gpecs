@@ -9,15 +9,38 @@ use crate::{
         ErasedPtr,
         error::{DataError, DowncastError, UpcastPtrError},
     },
-    ptr::slice::ConstSliceItemPtr,
+    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
 };
 
 pub struct ErasedRef<'a, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     ptr: ErasedPtr<T>,
     phantom: PhantomData<&'a [T::Item]>,
+}
+
+impl<T> ErasedRef<'_, T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_ptr(ptr: ErasedPtr<T>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn layout(&self) -> Layout {
+        let Self { ptr, .. } = self;
+        ptr.layout()
+    }
+
+    #[inline]
+    pub fn ptr(&self) -> ErasedPtr<T> {
+        let Self { ptr, .. } = *self;
+        ptr
+    }
 }
 
 impl<'a, T> ErasedRef<'a, T>
@@ -36,12 +59,6 @@ where
         let ptr = ErasedPtr::upcast(r#ref)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedPtr<T>) -> Self {
-        let phantom = PhantomData;
-        Self { ptr, phantom }
     }
 
     #[inline]
@@ -69,20 +86,9 @@ where
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { ptr, .. } = self;
-        ptr.layout()
-    }
-
-    #[inline]
-    pub fn as_field_ptr(&self) -> ErasedPtr<T> {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
     pub fn as_buffer(&self) -> &[T::Item] {
         let Self { ptr, .. } = self;
+
         let buffer = ptr.as_buffer();
         unsafe { buffer.as_ref_unchecked() }
     }
@@ -96,6 +102,7 @@ where
     #[inline]
     pub fn into_buffer(self) -> &'a [T::Item] {
         let Self { ptr, .. } = self;
+
         let buffer = ptr.as_buffer();
         unsafe { buffer.as_ref_unchecked() }
     }
@@ -117,7 +124,7 @@ where
 
 impl<T> Clone for ErasedRef<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: SliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -125,7 +132,7 @@ where
     }
 }
 
-impl<T> Copy for ErasedRef<'_, T> where T: ConstSliceItemPtr {}
+impl<T> Copy for ErasedRef<'_, T> where T: SliceItemPtr {}
 
 impl<T> AsRef<[T::Item]> for ErasedRef<'_, T>
 where

@@ -141,7 +141,7 @@ where
             component_id,
         } = *self;
 
-        let field = field.as_field_ptr();
+        let field = field.ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 
@@ -152,7 +152,7 @@ where
             component_id,
         } = *self;
 
-        let field = field.as_mut_field_ptr();
+        let field = field.mut_ptr();
         unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
     }
 

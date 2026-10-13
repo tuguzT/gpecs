@@ -117,7 +117,7 @@ where
             component_id,
         } = *self;
 
-        let field = field.as_field_ptr();
+        let field = field.ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 

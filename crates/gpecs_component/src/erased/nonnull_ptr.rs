@@ -69,7 +69,7 @@ where
     #[inline]
     pub fn new(ptr: ErasedComponentMutPtr<MutPtr<T::Ptrs>>) -> Option<Self> {
         let (component_id, field) = ptr.into_parts();
-        let field = Field::new(field)?;
+        let field = Field::from_mut_ptr(field)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
         Some(me)
@@ -78,7 +78,7 @@ where
     #[inline]
     pub unsafe fn new_unchecked(ptr: ErasedComponentMutPtr<MutPtr<T::Ptrs>>) -> Self {
         let (component_id, field) = ptr.into_parts();
-        let field = unsafe { Field::new_unchecked(field) };
+        let field = unsafe { Field::from_mut_ptr_unchecked(field) };
 
         unsafe { Self::from_parts(component_id, field) }
     }
@@ -208,7 +208,7 @@ where
             field,
         } = self;
 
-        let field = field.into_ptr();
+        let field = field.cast_const();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 
@@ -219,7 +219,7 @@ where
             field,
         } = self;
 
-        let field = field.into_mut_ptr();
+        let field = field.cast_mut();
         unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
     }
 }

@@ -63,7 +63,7 @@ impl<T> ErasedComponentMutSlicePtr<T> {
             fields,
         } = self;
 
-        let field = fields.field_ptr();
+        let field = fields.ptr();
         unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
     }
 

@@ -153,7 +153,7 @@ where
             component_id,
         } = *self;
 
-        let fields = fields.as_field_slice_ptr();
+        let fields = fields.slice_ptr();
         unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
@@ -164,7 +164,7 @@ where
             component_id,
         } = *self;
 
-        let fields = fields.as_mut_field_slice_ptr();
+        let fields = fields.mut_slice_ptr();
         unsafe { ErasedComponentMutSlicePtr::from_parts(component_id, fields) }
     }
 
@@ -175,7 +175,7 @@ where
             component_id,
         } = *self;
 
-        let field = fields.as_field_ptr();
+        let field = fields.ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 
@@ -186,7 +186,7 @@ where
             component_id,
         } = *self;
 
-        let field = fields.as_mut_field_ptr();
+        let field = fields.mut_ptr();
         unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
     }
 

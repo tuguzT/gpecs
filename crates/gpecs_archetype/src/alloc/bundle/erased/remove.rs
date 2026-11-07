@@ -129,7 +129,7 @@ where
         let (refs, archetype) = bundle.as_mut_refs_with_archetype();
         let fields = zip_eq(refs, archetype).filter_map(|(mut field, (component_id, meta))| {
             if to_destroy.contains(component_id) {
-                let to_drop = field.as_mut_component_ptr();
+                let to_drop = field.as_mut_ptr();
                 unsafe { D::drop_in_place_with(to_drop, meta) };
                 return None;
             }

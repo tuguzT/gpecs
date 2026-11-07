@@ -31,8 +31,8 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
-            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
-            ErasedBundleRefs, ErasedBundleRefsIter,
+            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter,
+            ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleRefsIter,
             error::{DowncastError, ShuffleError, ShuffleErrorKind},
             traits::{ErasedArchetypeKind, ErasedBundleDrop, IntoErasedArchetypeIterator},
         },
@@ -160,6 +160,29 @@ where
     }
 
     #[inline]
+    pub fn as_nonnull_ptrs(
+        &self,
+    ) -> ErasedBundleNonNullPtrs<ErasedArchetypeView<'_, T::Meta>, P::NonNull> {
+        let (ptrs, _) = self.as_nonnull_ptrs_with_archetype();
+        ptrs
+    }
+
+    #[inline]
+    #[expect(clippy::type_complexity)]
+    pub fn as_nonnull_ptrs_with_archetype(
+        &self,
+    ) -> (
+        ErasedBundleNonNullPtrs<ErasedArchetypeView<'_, T::Meta>, P::NonNull>,
+        ErasedArchetypeView<'_, T::Meta>,
+    ) {
+        let Self { inner, .. } = self;
+
+        let (inner, layouts) = inner.as_nonnull_ptrs_with_layouts();
+        let ptrs = unsafe { ErasedBundleNonNullPtrs::from_inner(inner) };
+        (ptrs, layouts.field_layouts())
+    }
+
+    #[inline]
     pub fn as_mut_ptrs(&mut self) -> ErasedBundleMutPtrs<ErasedArchetypeView<'_, T::Meta>, P::Mut> {
         let (ptrs, _) = self.as_mut_ptrs_with_archetype();
         ptrs
@@ -181,7 +204,7 @@ where
     }
 
     #[inline]
-    pub fn as_refs(&self) -> ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Const> {
+    pub fn as_refs(&self) -> ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::NonNull> {
         let (refs, _) = self.as_refs_with_archetype();
         refs
     }
@@ -191,18 +214,18 @@ where
     pub fn as_refs_with_archetype(
         &self,
     ) -> (
-        ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Const>,
+        ErasedBundleRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::NonNull>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
-        let (ptrs, layouts) = self.as_ptrs_with_archetype();
-        let refs = unsafe { ptrs.as_ref_unchecked() };
+        let (ptrs, layouts) = self.as_nonnull_ptrs_with_archetype();
+        let refs = unsafe { ptrs.as_ref() };
         (refs, layouts)
     }
 
     #[inline]
     pub fn as_mut_refs(
         &mut self,
-    ) -> ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Mut> {
+    ) -> ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::NonNull> {
         let (refs, _) = self.as_mut_refs_with_archetype();
         refs
     }
@@ -212,11 +235,11 @@ where
     pub fn as_mut_refs_with_archetype(
         &mut self,
     ) -> (
-        ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::Mut>,
+        ErasedBundleMutRefs<'_, ErasedArchetypeView<'_, T::Meta>, P::NonNull>,
         ErasedArchetypeView<'_, T::Meta>,
     ) {
-        let (ptrs, layouts) = self.as_mut_ptrs_with_archetype();
-        let refs = unsafe { ptrs.as_mut_unchecked() };
+        let (ptrs, layouts) = self.as_nonnull_ptrs_with_archetype();
+        let refs = unsafe { ptrs.as_mut() };
         (refs, layouts)
     }
 
@@ -267,7 +290,7 @@ where
     ) -> ErasedBundleRefsIter<
         '_,
         Iter<'_, T::Meta>,
-        P::Const,
+        P::NonNull,
         BufferOffsetsOf<FieldLayoutsItem<'_, T>>,
     > {
         self.as_refs().into_iter()
@@ -279,7 +302,7 @@ where
     ) -> ErasedBundleMutRefsIter<
         '_,
         Iter<'_, T::Meta>,
-        P::Mut,
+        P::NonNull,
         BufferOffsetsOf<FieldLayoutsItem<'_, T>>,
     > {
         self.as_mut_refs().into_iter()
@@ -439,11 +462,11 @@ where
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
 {
-    type Item = ErasedComponentRef<'a, P::Const>;
+    type Item = ErasedComponentRef<'a, P::NonNull>;
     type IntoIter = ErasedBundleRefsIter<
         'a,
         Iter<'a, T::Meta>,
-        P::Const,
+        P::NonNull,
         BufferOffsetsOf<FieldLayoutsItem<'a, T>>,
     >;
 
@@ -460,11 +483,11 @@ where
     S: AlignedStorage,
     P: SliceItemPtrs<Item = S::Item>,
 {
-    type Item = ErasedComponentMutRef<'a, P::Mut>;
+    type Item = ErasedComponentMutRef<'a, P::NonNull>;
     type IntoIter = ErasedBundleMutRefsIter<
         'a,
         Iter<'a, T::Meta>,
-        P::Mut,
+        P::NonNull,
         BufferOffsetsOf<FieldLayoutsItem<'a, T>>,
     >;
 

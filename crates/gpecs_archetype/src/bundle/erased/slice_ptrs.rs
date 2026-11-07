@@ -13,7 +13,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
-    ptr::slice::{ConstSliceItemPtr, MutPtr, SliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaRawContext,
@@ -68,11 +68,6 @@ where
 
         let inner = inner.into_ptrs();
         unsafe { ErasedBundlePtrs::from_inner(inner) }
-    }
-
-    #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleSlices<'a, D, P> {
-        unsafe { ErasedBundleSlices::from_slice_ptrs(self) }
     }
 }
 
@@ -138,6 +133,16 @@ where
 
         let inner = inner.cast_mut();
         unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedBundleSlices<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { ErasedBundleSlices::from_slice_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleSlices<'a, D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedBundleSlices::from_slice_ptrs_unchecked(self) }
     }
 }
 

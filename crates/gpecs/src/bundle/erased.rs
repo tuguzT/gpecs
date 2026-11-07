@@ -1,12 +1,12 @@
-use std::mem::MaybeUninit;
+use std::{mem::MaybeUninit, ptr::NonNull};
 
 use gpecs_archetype::bundle::erased::{self, traits::MustDrop};
 use gpecs_soa_erased::{ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage};
 
 pub use erased::*;
 
-pub type ErasedBundleRefs<'a, D> = erased::ErasedBundleRefs<'a, D, *const MaybeUninit<u8>>;
-pub type ErasedBundleMutRefs<'a, D> = erased::ErasedBundleMutRefs<'a, D, *mut MaybeUninit<u8>>;
+pub type ErasedBundleRefs<'a, D> = erased::ErasedBundleRefs<'a, D, NonNull<MaybeUninit<u8>>>;
+pub type ErasedBundleMutRefs<'a, D> = erased::ErasedBundleMutRefs<'a, D, NonNull<MaybeUninit<u8>>>;
 
 pub type ErasedBundleKind<T> = erased::ErasedBundleKind<T, MustDrop, Storage, SlicePtrs>;
 pub type ErasedBundle<Meta> = erased::ErasedBundle<Meta, MustDrop, Storage, SlicePtrs>;

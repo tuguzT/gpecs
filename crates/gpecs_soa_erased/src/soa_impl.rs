@@ -127,7 +127,7 @@ where
 
     #[inline]
     unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
-        unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs.cast_mut()) }
+        unsafe { ErasedSoaNonNullPtrs::from_ptrs_unchecked(ptrs) }
     }
 
     #[inline]
@@ -135,7 +135,7 @@ where
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
-        unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) }
+        unsafe { ErasedSoaNonNullPtrs::from_mut_ptrs_unchecked(ptrs) }
     }
 
     #[inline]
@@ -158,12 +158,12 @@ where
 
     #[inline]
     fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
-        ptrs.into_ptrs()
+        ptrs.cast_const()
     }
 
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
-        ptrs.into_mut_ptrs()
+        ptrs.cast_mut()
     }
 
     #[inline]
@@ -298,7 +298,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::Ptrs<'a> {
-        slices.into_ptrs()
+        slices.into_ptrs().cast_const()
     }
 
     #[inline]
@@ -306,7 +306,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::MutPtrs<'a> {
-        slices.into_mut_ptrs()
+        slices.into_ptrs().cast_mut()
     }
 
     #[inline]
@@ -314,7 +314,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
-        slices.into_nonnull_ptrs()
+        slices.into_ptrs()
     }
 
     #[inline]
@@ -322,7 +322,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::SlicePtrs<'a> {
-        slices.into_slice_ptrs()
+        slices.cast_const()
     }
 
     #[inline]
@@ -330,7 +330,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::SliceMutPtrs<'a> {
-        slices.into_mut_slice_ptrs()
+        slices.cast_mut()
     }
 
     #[inline]
@@ -503,7 +503,7 @@ where
         + ?Sized,
     P: SliceItemPtrs<Item: 'data>,
 {
-    type Refs<'a> = ErasedSoaRefs<'data, FieldLayoutsOutput<'a, D>, P::Const>;
+    type Refs<'a> = ErasedSoaRefs<'data, FieldLayoutsOutput<'a, D>, P::NonNull>;
 
     #[inline]
     fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -520,7 +520,7 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedSoaMutRefs<'data, FieldLayoutsOutput<'a, D>, P::Mut>;
+    type RefsMut<'a> = ErasedSoaMutRefs<'data, FieldLayoutsOutput<'a, D>, P::NonNull>;
 
     #[inline]
     fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -547,7 +547,7 @@ where
         refs.into_refs()
     }
 
-    type Slices<'a> = ErasedSoaSlices<'data, FieldLayoutsOutput<'a, D>, P::Const>;
+    type Slices<'a> = ErasedSoaSlices<'data, FieldLayoutsOutput<'a, D>, P::NonNull>;
 
     #[inline]
     fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -568,7 +568,7 @@ where
         data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::Slices<'a> {
-        unsafe { ErasedSoaSlices::from_ptrs(data, len) }
+        unsafe { ErasedSoaSlices::from_ptrs_unchecked(data, len) }
     }
 
     #[inline]
@@ -586,7 +586,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedSoaMutSlices<'data, FieldLayoutsOutput<'a, D>, P::Mut>;
+    type SlicesMut<'a> = ErasedSoaMutSlices<'data, FieldLayoutsOutput<'a, D>, P::NonNull>;
 
     #[inline]
     fn mut_slices_upcast<'short, 'long: 'short>(
@@ -609,7 +609,7 @@ where
         data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SlicesMut<'a> {
-        unsafe { ErasedSoaMutSlices::from_ptrs(data, len) }
+        unsafe { ErasedSoaMutSlices::from_mut_ptrs_unchecked(data, len) }
     }
 
     #[inline]

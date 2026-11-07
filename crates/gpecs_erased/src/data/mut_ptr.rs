@@ -66,11 +66,6 @@ where
             .checked_div(len)
             .expect("erased pointer should not be a ZST")
     }
-
-    #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutRef<'a, T> {
-        unsafe { ErasedMutRef::from_ptr(self) }
-    }
 }
 
 impl<T> ErasedMutPtr<T>
@@ -80,16 +75,16 @@ where
     #[inline]
     #[expect(
         clippy::not_unsafe_ptr_arg_deref,
-        reason = "`T::from_slice` should not dereference input buffer"
+        reason = "`T::from_slice` should not dereference input slice"
     )]
-    pub fn new(layout: Layout, buffer: *mut [T::Item]) -> Result<Self, DataError> {
-        check_ptr_align(buffer.cast(), layout)?;
+    pub fn new(layout: Layout, items: *mut [T::Item]) -> Result<Self, DataError> {
+        check_ptr_align(items.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
-        check_len(buffer_layout.size(), layout.size())?;
+        let layout_of_items = Layout::array::<T::Item>(items.len())?;
+        check_len(layout_of_items.size(), layout.size())?;
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(items, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -100,8 +95,8 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let data = ptr::without_provenance_mut(layout.align());
-        let buffer = ptr::slice_from_raw_parts_mut(data, 0);
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let slice = ptr::slice_from_raw_parts_mut(data, 0);
+        let ptr = unsafe { T::from_parts(slice, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -114,8 +109,8 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let len = bytes_to_items::<T::Item>(layout.size());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let slice = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
+        let ptr = unsafe { T::from_parts(slice, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -149,8 +144,23 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedRef<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { self.cast_const().as_ref() }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, NonNullPtr<T::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> Option<ErasedMutRef<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { ErasedMutRef::from_mut_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutRef<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedMutRef::from_mut_ptr_unchecked(self) }
     }
 
     #[inline]
@@ -194,7 +204,7 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
+    pub fn as_items(self) -> *const [T::Item] {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_mut_ptr().cast_const();
@@ -203,7 +213,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_buffer(self) -> *mut [T::Item] {
+    pub fn as_mut_items(self) -> *mut [T::Item] {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_mut_ptr();
@@ -212,13 +222,13 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
         ptr.as_mut_ptr().cast_const()
     }
 
     #[inline]
-    pub fn as_mut_ptr(self) -> *mut T::Item {
+    pub fn as_mut_item_ptr(self) -> *mut T::Item {
         let Self { ptr, .. } = self;
         ptr.as_mut_ptr()
     }

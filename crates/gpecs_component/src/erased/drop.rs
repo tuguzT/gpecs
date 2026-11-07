@@ -47,7 +47,7 @@ impl ErasedDrop {
     {
         let Self(inner) = self;
 
-        let to_drop = unsafe { to_drop.as_mut_ptr().cast() };
+        let to_drop = unsafe { to_drop.as_mut_item_ptr().cast() };
         unsafe { inner(to_drop) }
     }
 
@@ -58,7 +58,7 @@ impl ErasedDrop {
         T: MutSliceItemPtr,
     {
         for i in 0..to_drop.len() {
-            let to_drop = unsafe { to_drop.component_ptr().add(i) };
+            let to_drop = unsafe { to_drop.as_mut_ptr().add(i) };
             unsafe { self.drop_in_place(to_drop) }
         }
     }

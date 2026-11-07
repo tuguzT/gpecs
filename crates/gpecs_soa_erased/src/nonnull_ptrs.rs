@@ -1,20 +1,27 @@
 use core::{
+    alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
     ptr::NonNull,
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutPtrs, ErasedSoaPtrs,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutPtrs, ErasedSoaMutRefs, ErasedSoaPtrs,
+    ErasedSoaRefs,
     assert::{assert_layouts, check_downcast},
+    dangling::{Dangling, dangling},
     data::ErasedNonNullPtr,
-    error::{DowncastError, FromFieldsLayoutsError, InsufficientAlignError},
+    error::{
+        DowncastError, FromFieldsLayoutsError, InsufficientAlignError, PtrsError, check_offset,
+        check_ptr_align, check_sufficient_align, check_sufficient_len,
+    },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
     ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
+            buffer_offsets,
         },
         traits::{NonNullPtrs, SoaAlloc, SoaAllocContext, SoaRawContext},
     },
@@ -86,6 +93,16 @@ where
         let offset = unsafe { offset.unchecked_add(count) };
         Self { offset, ..self }
     }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedSoaRefs<'a, D, P> {
+        unsafe { ErasedSoaRefs::from_nonnull_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
+        unsafe { ErasedSoaMutRefs::from_nonnull_ptrs(self) }
+    }
 }
 
 impl<D, P> ErasedSoaNonNullPtrs<D, P>
@@ -155,7 +172,24 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptrs: ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
+    pub fn from_ptrs(ptrs: ErasedSoaPtrs<D, ConstPtr<P::Ptrs>>) -> Option<Self> {
+        let (layouts, buffer, capacity, offset) = ptrs.into_parts();
+        let buffer = NonNull::new(buffer.cast_mut())?;
+
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, offset) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs_unchecked(ptrs: ErasedSoaPtrs<D, ConstPtr<P::Ptrs>>) -> Self {
+        let (layouts, buffer, capacity, offset) = ptrs.into_parts();
+        let buffer = unsafe { NonNull::new_unchecked(buffer.cast_mut()) };
+
+        unsafe { Self::from_parts(layouts, buffer, capacity, offset) }
+    }
+
+    #[inline]
+    pub fn from_mut_ptrs(ptrs: ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = NonNull::new(buffer)?;
 
@@ -164,7 +198,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
+    pub unsafe fn from_mut_ptrs_unchecked(ptrs: ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
 
@@ -172,7 +206,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
+    pub fn cast_const(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
         let Self {
             layouts,
             buffer,
@@ -185,7 +219,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
+    pub fn cast_mut(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self {
             layouts,
             buffer,
@@ -204,9 +238,38 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
+    pub fn new(
+        layouts: D,
+        buffer: NonNull<[P::Item]>,
+        capacity: usize,
+        offset: usize,
+    ) -> Result<Self, PtrsError> {
+        check_offset(offset, capacity)?;
+
+        let mut offsets = buffer_offsets(layouts.field_layouts(), capacity);
+        offsets.by_ref().try_for_each(|offset| {
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<P::Item>())
+                .map_err(PtrsError::from)
+        })?;
+
+        let layout = offsets.into_buffer().layout();
+        check_ptr_align(buffer.as_ptr().cast(), layout)?;
+
+        let buffer_layout = Layout::array::<P::Item>(buffer.len())?;
+        check_sufficient_len(buffer_layout.size(), layout.size())?;
+
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, offset) };
+        Ok(me)
+    }
+
+    #[inline]
     pub fn dangling(layouts: D) -> Result<Self, InsufficientAlignError> {
-        let ptrs = ErasedSoaMutPtrs::dangling(layouts)?;
-        let me = unsafe { Self::new_unchecked(ptrs) };
+        let Dangling { addr, capacity } = dangling::<_, P::Item>(layouts.field_layouts())?;
+
+        let data = NonNull::without_provenance(addr);
+        let buffer = NonNull::slice_from_raw_parts(data, 0);
+
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, 0) };
         Ok(me)
     }
 
@@ -390,7 +453,7 @@ where
         E: FieldLayoutsOwned<Output: FieldLayoutsOwned<OutputItem: BufferOffsetsFromSelf>>,
     {
         let src = value.as_mut_ptrs();
-        let src = unsafe { ErasedSoaNonNullPtrs::new_unchecked(src) };
+        let src = unsafe { ErasedSoaNonNullPtrs::from_mut_ptrs_unchecked(src) };
         unsafe { self.copy_from_nonoverlapping(&src, 1) };
 
         drop(src);

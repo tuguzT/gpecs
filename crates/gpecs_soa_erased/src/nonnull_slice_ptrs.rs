@@ -7,8 +7,8 @@ use core::{
 
 use crate::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
-    ErasedSoaMutPtrs, ErasedSoaMutSlicePtrs, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
-    ErasedSoaPtrs, ErasedSoaSlicePtrs,
+    ErasedSoaMutSlicePtrs, ErasedSoaMutSlices, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter,
+    ErasedSoaSlicePtrs, ErasedSoaSlices,
     data::ErasedNonNullSlicePtr,
     error::{
         DowncastError, SlicePtrsError, check_offset, check_offset_len, check_ptr_align,
@@ -62,7 +62,7 @@ where
     }
 
     #[inline]
-    pub fn into_nonnull_ptrs(self) -> ErasedSoaNonNullPtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedSoaNonNullPtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
     }
@@ -76,6 +76,16 @@ where
 
         let ptrs = unsafe { ptrs.map_layouts(f) };
         unsafe { ErasedSoaNonNullSlicePtrs::from_ptrs(ptrs, len) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedSoaSlices<'a, D, P> {
+        unsafe { ErasedSoaSlices::from_nonnull_slice_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedSoaMutSlices<'a, D, P> {
+        unsafe { ErasedSoaMutSlices::from_nonnull_slice_ptrs(self) }
     }
 }
 
@@ -125,28 +135,52 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
-        let Self { ptrs, .. } = self;
-        ptrs.into_ptrs()
+    pub fn from_slice_ptrs(ptrs: ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>>) -> Option<Self> {
+        let (layouts, buffer, capacity, offset, len) = ptrs.into_parts();
+        let buffer = NonNull::new(buffer.cast_mut())?;
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, offset, len) };
+        Some(me)
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
-        let Self { ptrs, .. } = self;
-        ptrs.into_mut_ptrs()
+    pub unsafe fn from_slice_ptrs_unchecked(
+        ptrs: ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>>,
+    ) -> Self {
+        let (layouts, buffer, capacity, offset, len) = ptrs.into_parts();
+        let buffer = unsafe { NonNull::new_unchecked(buffer.cast_mut()) };
+        unsafe { Self::from_parts(layouts, buffer, capacity, offset, len) }
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>> {
+    pub fn from_mut_slice_ptrs(ptrs: ErasedSoaMutSlicePtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
+        let (layouts, buffer, capacity, offset, len) = ptrs.into_parts();
+        let buffer = NonNull::new(buffer)?;
+        let me = unsafe { Self::from_parts(layouts, buffer, capacity, offset, len) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_mut_slice_ptrs_unchecked(
+        ptrs: ErasedSoaMutSlicePtrs<D, MutPtr<P::Ptrs>>,
+    ) -> Self {
+        let (layouts, buffer, capacity, offset, len) = ptrs.into_parts();
+        let buffer = unsafe { NonNull::new_unchecked(buffer) };
+        unsafe { Self::from_parts(layouts, buffer, capacity, offset, len) }
+    }
+
+    #[inline]
+    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { ptrs, len } = self;
-        let ptrs = ptrs.into_ptrs();
+
+        let ptrs = ptrs.cast_const();
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs(self) -> ErasedSoaMutSlicePtrs<D, MutPtr<P::Ptrs>> {
+    pub fn cast_mut(self) -> ErasedSoaMutSlicePtrs<D, MutPtr<P::Ptrs>> {
         let Self { ptrs, len } = self;
-        let ptrs = ptrs.into_mut_ptrs();
+
+        let ptrs = ptrs.cast_mut();
         unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
     }
 }

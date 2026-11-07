@@ -66,11 +66,6 @@ where
             .checked_div(len)
             .expect("erased pointer should not be a ZST")
     }
-
-    #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, T> {
-        unsafe { ErasedRef::from_ptr(self) }
-    }
 }
 
 impl<T> ErasedPtr<T>
@@ -80,16 +75,16 @@ where
     #[inline]
     #[expect(
         clippy::not_unsafe_ptr_arg_deref,
-        reason = "`T::from_slice` should not dereference input buffer"
+        reason = "`T::from_slice` should not dereference input slice"
     )]
-    pub fn new(layout: Layout, buffer: *const [T::Item]) -> Result<Self, DataError> {
-        check_ptr_align(buffer.cast(), layout)?;
+    pub fn new(layout: Layout, items: *const [T::Item]) -> Result<Self, DataError> {
+        check_ptr_align(items.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
-        check_len(buffer_layout.size(), layout.size())?;
+        let layout_of_items = Layout::array::<T::Item>(items.len())?;
+        check_len(layout_of_items.size(), layout.size())?;
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(items, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -100,8 +95,8 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let data = ptr::without_provenance(layout.align());
-        let buffer = ptr::slice_from_raw_parts(data, 0);
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let slice = ptr::slice_from_raw_parts(data, 0);
+        let ptr = unsafe { T::from_parts(slice, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -114,8 +109,8 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let len = bytes_to_items::<T::Item>(layout.size());
-        let buffer = ptr::slice_from_raw_parts(ptr.cast(), len);
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let slice = ptr::slice_from_raw_parts(ptr.cast(), len);
+        let ptr = unsafe { T::from_parts(slice, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -149,7 +144,17 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedRef<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { ErasedRef::from_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedRef<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedRef::from_ptr_unchecked(self) }
+    }
+
+    #[inline]
+    pub fn as_items(self) -> *const [T::Item] {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_ptr();
@@ -158,7 +163,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }

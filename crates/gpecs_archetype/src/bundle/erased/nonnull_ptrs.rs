@@ -27,7 +27,8 @@ use crate::{
     bundle::{
         Bundle, BundleNonNullPtrs,
         erased::{
-            ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundlePtrs,
+            ErasedBundleKind, ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundlePtrs,
+            ErasedBundleRefs,
             error::DowncastError,
             traits::{
                 ErasedArchetypeIterator, ErasedArchetypeKind, ErasedBundleDrop,
@@ -68,6 +69,16 @@ where
 
         let inner = unsafe { inner.add(count) };
         unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedBundleRefs<'a, D, P> {
+        unsafe { ErasedBundleRefs::from_nonnull_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedBundleMutRefs<'a, D, P> {
+        unsafe { ErasedBundleMutRefs::from_nonnull_ptrs(self) }
     }
 }
 
@@ -151,34 +162,50 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
+    pub fn from_ptrs(ptrs: ErasedBundlePtrs<D, ConstPtr<P::Ptrs>>) -> Option<Self> {
         let ptrs = ptrs.into_inner();
-        let inner = ErasedSoaNonNullPtrs::new(ptrs)?;
+        let inner = ErasedSoaNonNullPtrs::from_ptrs(ptrs)?;
 
         let me = unsafe { Self::from_inner(inner) };
         Some(me)
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
+    pub unsafe fn from_ptrs_unchecked(ptrs: ErasedBundlePtrs<D, ConstPtr<P::Ptrs>>) -> Self {
         let ptrs = ptrs.into_inner();
-        let inner = unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) };
+        let inner = unsafe { ErasedSoaNonNullPtrs::from_ptrs_unchecked(ptrs) };
         unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
+    pub fn from_mut_ptrs(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = ErasedSoaNonNullPtrs::from_mut_ptrs(ptrs)?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_mut_ptrs_unchecked(ptrs: ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>>) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaNonNullPtrs::from_mut_ptrs_unchecked(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn cast_const(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
-        let inner = inner.into_ptrs();
+        let inner = inner.cast_const();
         unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
+    pub fn cast_mut(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
-        let inner = inner.into_mut_ptrs();
+        let inner = inner.cast_mut();
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
@@ -292,9 +319,9 @@ where
     where
         B: Bundle,
     {
-        let into_self = |ptrs| unsafe { Self::new_unchecked(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_mut_ptrs_unchecked(ptrs) };
         let ptrs = self
-            .into_mut_ptrs()
+            .cast_mut()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 

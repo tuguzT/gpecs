@@ -198,25 +198,25 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[T::Item] {
+    pub fn as_items(&self) -> &[T::Item] {
         let Self { storage, .. } = self;
         storage.as_slice()
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const T::Item {
+    pub fn as_item_ptr(&self) -> *const T::Item {
         let Self { storage, .. } = self;
         storage.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T::Item] {
+    pub unsafe fn as_mut_items(&mut self) -> &mut [T::Item] {
         let Self { storage, .. } = self;
         storage.as_mut_slice()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut T::Item {
+    pub unsafe fn as_mut_item_ptr(&mut self) -> *mut T::Item {
         let Self { storage, .. } = self;
         storage.as_mut_ptr()
     }
@@ -248,32 +248,32 @@ where
     P: SliceItemPtrs<Item = T::Item>,
 {
     #[inline]
-    pub fn as_erased(&self) -> ErasedRef<'_, P::Const> {
-        unsafe { self.as_erased_ptr().as_ref_unchecked() }
+    pub fn as_ref(&self) -> ErasedRef<'_, P::NonNull> {
+        unsafe { self.as_ptr().as_ref_unchecked() }
     }
 
     #[inline]
-    pub fn as_erased_ptr(&self) -> ErasedPtr<P::Const> {
+    pub fn as_ptr(&self) -> ErasedPtr<P::Const> {
         let Self { storage, .. } = self;
 
         let layout = storage.layout();
-        let buffer = storage.as_slice();
-        let ptr = unsafe { ConstSliceItemPtr::from_parts(buffer, 0) };
+        let slice = storage.as_slice();
+        let ptr = unsafe { ConstSliceItemPtr::from_parts(slice, 0) };
         unsafe { ErasedPtr::from_parts(layout, ptr) }
     }
 
     #[inline]
-    pub fn as_mut_erased(&mut self) -> ErasedMutRef<'_, P::Mut> {
-        unsafe { self.as_mut_erased_ptr().as_mut_unchecked() }
+    pub fn as_mut(&mut self) -> ErasedMutRef<'_, P::NonNull> {
+        unsafe { self.as_mut_ptr().as_mut_unchecked() }
     }
 
     #[inline]
-    pub fn as_mut_erased_ptr(&mut self) -> ErasedMutPtr<P::Mut> {
+    pub fn as_mut_ptr(&mut self) -> ErasedMutPtr<P::Mut> {
         let Self { storage, .. } = self;
 
         let layout = storage.layout();
-        let buffer = storage.as_mut_slice();
-        let ptr = unsafe { MutSliceItemPtr::from_parts(buffer, 0) };
+        let slice = storage.as_mut_slice();
+        let ptr = unsafe { MutSliceItemPtr::from_parts(slice, 0) };
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }
@@ -285,10 +285,10 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
-        let buffer = &self.as_slice();
+        let items = &self.as_items();
         f.debug_struct("Erased")
             .field("layout", layout)
-            .field("buffer", buffer)
+            .field("items", items)
             .finish()
     }
 }
@@ -300,18 +300,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {
-        self.as_slice()
-    }
-}
-
-impl<T, P> AsMut<[T::Item]> for Erased<T, P>
-where
-    T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs,
-{
-    #[inline]
-    fn as_mut(&mut self) -> &mut [T::Item] {
-        self.as_mut_slice()
+        self.as_items()
     }
 }
 

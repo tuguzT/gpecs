@@ -7,13 +7,13 @@ use core::{
 use gpecs_erased::{
     data::ErasedPtr,
     layout::WithLayout,
-    ptr::slice::{ConstSliceItemPtr, MutPtr, SliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
 };
 
 use crate::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentRef,
+        ErasedComponentMutPtr, ErasedComponentNonNullPtr, ErasedComponentRef,
         error::{DanglingError, DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
@@ -44,7 +44,7 @@ impl<T> ErasedComponentPtr<T> {
     }
 
     #[inline]
-    pub fn erased(self) -> ErasedPtr<T> {
+    pub fn as_erased(self) -> ErasedPtr<T> {
         let Self { erased, .. } = self;
         erased
     }
@@ -80,13 +80,8 @@ where
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { erased, .. } = self;
 
-        let origin = origin.erased();
+        let origin = origin.as_erased();
         unsafe { erased.offset_from(origin) }
-    }
-
-    #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentRef<'a, T> {
-        unsafe { ErasedComponentRef::from_ptr(self) }
     }
 }
 
@@ -173,15 +168,30 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
-        let Self { erased, .. } = self;
-        erased.as_ptr()
+    pub fn cast_nonnull(self) -> Option<ErasedComponentNonNullPtr<NonNullPtr<T::Ptrs>>> {
+        ErasedComponentNonNullPtr::from_ptr(self)
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedComponentNonNullPtr<NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedComponentNonNullPtr::from_ptr_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentRef<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { self.cast_nonnull_unchecked().as_ref() }
+    }
+
+    #[inline]
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { erased, .. } = self;
-        erased.as_buffer()
+        erased.as_item_ptr()
+    }
+
+    #[inline]
+    pub fn as_items(self) -> *const [T::Item] {
+        let Self { erased, .. } = self;
+        erased.as_items()
     }
 }
 

@@ -257,7 +257,7 @@ impl TransferCache {
                 continue;
             };
 
-            let components = unsafe { components.as_mut_buffer() };
+            let components = unsafe { components.as_mut_items() };
             components.write_copy_of_slice(&mapped_components);
         }
 
@@ -354,7 +354,7 @@ impl TransferCache {
             };
             let staging_components = &mut entry.staging;
 
-            let contents = unsafe { cpu_components.as_buffer().assume_init_ref() };
+            let contents = unsafe { cpu_components.as_items().assume_init_ref() };
             let Some(contents) = NonEmptyContents::new(contents) else {
                 continue;
             };

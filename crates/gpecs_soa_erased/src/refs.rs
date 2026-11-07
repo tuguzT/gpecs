@@ -2,18 +2,19 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaPtrs, ErasedSoaPtrsIter,
+    CovariantFieldLayouts, ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter, ErasedSoaPtrs,
     data::ErasedRef,
     error::{DowncastError, PtrsError},
     layout::WithLayout,
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, NonNullSliceItemPtr, SliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
-        traits::{Refs, Soa, SoaAlloc, SoaContext},
+        traits::{Refs, Soa, SoaAlloc, SoaContext, SoaRawContext},
     },
 };
 
@@ -23,7 +24,7 @@ where
     P: SliceItemPtr,
 {
     phantom: PhantomData<&'a [P::Item]>,
-    ptrs: ErasedSoaPtrs<D, P>,
+    ptrs: ErasedSoaNonNullPtrs<D, P>,
 }
 
 impl<'a, D, P> ErasedSoaRefs<'a, D, P>
@@ -37,12 +38,13 @@ where
         capacity: usize,
         offset: usize,
     ) -> Self {
-        let ptrs = unsafe { ErasedSoaPtrs::from_parts(layouts, buffer, capacity, offset) };
-        unsafe { Self::from_ptrs(ptrs) }
+        let buffer = NonNull::from_ref(buffer);
+        let ptrs = unsafe { ErasedSoaNonNullPtrs::from_parts(layouts, buffer, capacity, offset) };
+        unsafe { Self::from_nonnull_ptrs(ptrs) }
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedSoaPtrs<D, P>) -> Self {
+    pub unsafe fn from_nonnull_ptrs(ptrs: ErasedSoaNonNullPtrs<D, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
     }
@@ -52,12 +54,12 @@ where
         let Self { ptrs, .. } = self;
         let (layouts, buffer, capacity, offset) = ptrs.into_parts();
 
-        let buffer = unsafe { buffer.as_ref_unchecked() };
+        let buffer = unsafe { buffer.as_ref() };
         (layouts, buffer, capacity, offset)
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, P> {
+    pub fn into_nonnull_ptrs(self) -> ErasedSoaNonNullPtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
     }
@@ -70,7 +72,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = unsafe { ptrs.map_layouts(f) };
-        unsafe { ErasedSoaRefs::from_ptrs(ptrs) }
+        unsafe { ErasedSoaRefs::from_nonnull_ptrs(ptrs) }
     }
 }
 
@@ -84,7 +86,7 @@ where
         let Self { ptrs, .. } = self;
 
         let buffer = ptrs.as_buffer();
-        unsafe { buffer.as_ref_unchecked() }
+        unsafe { buffer.as_ref() }
     }
 
     #[inline]
@@ -106,10 +108,34 @@ where
     }
 }
 
+impl<D, P> ErasedSoaRefs<'_, D, P>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaPtrs<D, ConstPtr<P::Ptrs>>) -> Option<Self> {
+        let ptrs = ptrs.cast_nonnull()?;
+        let me = unsafe { Self::from_nonnull_ptrs(ptrs) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs_unchecked(ptrs: ErasedSoaPtrs<D, ConstPtr<P::Ptrs>>) -> Self {
+        let ptrs = unsafe { ptrs.cast_nonnull_unchecked() };
+        unsafe { Self::from_nonnull_ptrs(ptrs) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, ConstPtr<P::Ptrs>> {
+        let Self { ptrs, .. } = self;
+        ptrs.cast_const()
+    }
+}
+
 impl<'a, D, P> ErasedSoaRefs<'a, D, P>
 where
     D: FieldLayoutsOwned,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn new(
@@ -118,8 +144,10 @@ where
         capacity: usize,
         offset: usize,
     ) -> Result<Self, PtrsError> {
-        let ptrs = ErasedSoaPtrs::new(layouts, buffer, capacity, offset)?;
-        let me = unsafe { Self::from_ptrs(ptrs) };
+        let buffer = NonNull::from_ref(buffer);
+        let ptrs = ErasedSoaNonNullPtrs::new(layouts, buffer, capacity, offset)?;
+
+        let me = unsafe { Self::from_nonnull_ptrs(ptrs) };
         Ok(me)
     }
 
@@ -134,9 +162,11 @@ where
         let Self { ptrs, .. } = self;
 
         let result = unsafe { ptrs.downcast::<T>(context) };
-        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_nonnull_ptrs(ptrs) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
 
+        // TODO: add SoaContext method to deref nonnull pointers
+        let ptrs = context.nonnull_ptrs_as_ptrs(ptrs);
         let refs = unsafe { context.refs_from_ptrs(ptrs) };
         Ok(refs)
     }
@@ -145,7 +175,7 @@ where
 impl<'a, D, P> ErasedSoaRefs<'_, D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn iter(
@@ -154,7 +184,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
-        unsafe { ErasedSoaRefsIter::from_ptrs(ptrs) }
+        unsafe { ErasedSoaRefsIter::from_inner(ptrs) }
     }
 }
 
@@ -195,7 +225,7 @@ where
 impl<'a, D, P> IntoIterator for &'a ErasedSoaRefs<'_, D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     type Item = ErasedRef<'a, P>;
     type IntoIter = ErasedSoaRefsIter<'a, D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
@@ -209,7 +239,7 @@ where
 impl<'a, D, P> IntoIterator for ErasedSoaRefs<'a, D, P>
 where
     D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     type Item = ErasedRef<'a, P>;
     type IntoIter = ErasedSoaRefsIter<'a, D::IntoIter, P, BufferOffsetsOf<D::Item>>;
@@ -219,7 +249,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.into_iter();
-        unsafe { ErasedSoaRefsIter::from_ptrs(ptrs) }
+        unsafe { ErasedSoaRefsIter::from_inner(ptrs) }
     }
 }
 
@@ -258,7 +288,7 @@ where
     P: SliceItemPtr,
 {
     phantom: PhantomData<&'a [P::Item]>,
-    ptrs: ErasedSoaPtrsIter<D, P, F>,
+    ptrs: ErasedSoaNonNullPtrsIter<D, P, F>,
 }
 
 impl<D, P, F> ErasedSoaRefsIter<'_, D, P, F>
@@ -266,7 +296,7 @@ where
     P: SliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn from_ptrs(ptrs: ErasedSoaPtrsIter<D, P, F>) -> Self {
+    pub(super) unsafe fn from_inner(ptrs: ErasedSoaNonNullPtrsIter<D, P, F>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
     }
@@ -282,7 +312,7 @@ where
         let Self { ptrs, .. } = self;
 
         let buffer = ptrs.as_buffer();
-        unsafe { buffer.as_ref_unchecked() }
+        unsafe { buffer.as_ref() }
     }
 
     #[inline]
@@ -307,7 +337,7 @@ where
 impl<'a, D, P, F> ErasedSoaRefsIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
@@ -315,14 +345,14 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
-        unsafe { ErasedSoaRefsIter::from_ptrs(ptrs) }
+        unsafe { ErasedSoaRefsIter::from_inner(ptrs) }
     }
 }
 
 impl<'a, D, P, F> IntoIterator for &'a ErasedSoaRefsIter<'_, D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedRef<'a, P>;
@@ -337,7 +367,7 @@ where
 impl<D, P, F> Debug for ErasedSoaRefsIter<'_, D, P, F>
 where
     D: FieldLayoutsOwned + ?Sized,
-    P: ConstSliceItemPtr<Item: Debug>,
+    P: NonNullSliceItemPtr<Item: Debug>,
     F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -363,7 +393,7 @@ where
 impl<'a, D, P, F> Iterator for ErasedSoaRefsIter<'a, D, P, F>
 where
     D: Iterator<Item: WithLayout> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::Item>,
 {
     type Item = ErasedRef<'a, P>;
@@ -372,7 +402,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ptrs, .. } = self;
 
-        let item = unsafe { ptrs.next()?.as_ref_unchecked() };
+        let item = unsafe { ptrs.next()?.as_ref() };
         Some(item)
     }
 
@@ -386,7 +416,7 @@ where
 impl<D, P, F> ExactSizeIterator for ErasedSoaRefsIter<'_, D, P, F>
 where
     D: ExactSizeIterator<Item: WithLayout> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::Item>,
 {
     #[inline]
@@ -399,7 +429,7 @@ where
 impl<D, P, F> FusedIterator for ErasedSoaRefsIter<'_, D, P, F>
 where
     D: FusedIterator<Item: WithLayout> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::Item>,
 {
 }

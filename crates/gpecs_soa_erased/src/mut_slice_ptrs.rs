@@ -6,7 +6,8 @@ use core::{
 
 use crate::{
     CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaMutSlices,
-    ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter, ErasedSoaSlices,
+    ErasedSoaNonNullSlicePtrs, ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
+    ErasedSoaSlices,
     data::{ErasedMutSlicePtr, ErasedSlicePtr},
     error::{
         DowncastError, SlicePtrsError, check_offset, check_offset_len, check_ptr_align,
@@ -14,7 +15,7 @@ use crate::{
     },
     layout::WithLayout,
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
     soa::{
         field::{
             FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
@@ -75,11 +76,6 @@ where
 
         let ptrs = unsafe { ptrs.map_layouts(f) };
         unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutSlices<'a, D, P> {
-        unsafe { ErasedSoaMutSlices::from_slice_ptrs(self) }
     }
 }
 
@@ -148,8 +144,35 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, ConstPtr<P::Ptrs>> {
+    pub fn cast_nonnull(self) -> Option<ErasedSoaNonNullSlicePtrs<D, NonNullPtr<P::Ptrs>>> {
+        ErasedSoaNonNullSlicePtrs::from_mut_slice_ptrs(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(
+        self,
+    ) -> ErasedSoaNonNullSlicePtrs<D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaNonNullSlicePtrs::from_mut_slice_ptrs_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedSoaSlices<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { self.cast_const().as_ref() }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, NonNullPtr<P::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> Option<ErasedSoaMutSlices<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { ErasedSoaMutSlices::from_mut_slice_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutSlices<'a, D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaMutSlices::from_mut_slice_ptrs_unchecked(self) }
     }
 }
 

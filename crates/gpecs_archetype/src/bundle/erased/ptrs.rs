@@ -14,7 +14,7 @@ use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaPtrs, ErasedSoaPtrsIter,
     error::FromFieldsLayoutsError,
-    ptr::slice::{ConstSliceItemPtr, MutPtr, SliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
     soa::field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
     storage::AlignedStorageFromLayout,
 };
@@ -64,11 +64,6 @@ where
 
         let inner = unsafe { inner.add(count) };
         unsafe { Self::from_inner(inner) }
-    }
-
-    #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleRefs<'a, D, P> {
-        unsafe { ErasedBundleRefs::from_ptrs(self) }
     }
 }
 
@@ -151,6 +146,16 @@ where
 
         let inner = inner.cast_mut();
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedBundleRefs<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { ErasedBundleRefs::from_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedBundleRefs<'a, D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedBundleRefs::from_ptrs_unchecked(self) }
     }
 }
 

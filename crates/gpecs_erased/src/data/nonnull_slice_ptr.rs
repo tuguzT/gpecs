@@ -2,12 +2,12 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use crate::{
     data::{
-        ErasedMutSlicePtr, ErasedNonNullPtr, ErasedSlicePtr,
+        ErasedMutSlice, ErasedMutSlicePtr, ErasedNonNullPtr, ErasedSlice, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError, check_downcast},
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -40,15 +40,30 @@ impl<T> ErasedNonNullSlicePtr<T> {
     }
 
     #[inline]
-    pub fn ptr(self) -> ErasedNonNullPtr<T> {
-        let Self { ptr, .. } = self;
-        ptr
-    }
-
-    #[inline]
     pub fn into_parts(self) -> (ErasedNonNullPtr<T>, usize) {
         let Self { ptr, len } = self;
         (ptr, len)
+    }
+
+    #[inline]
+    pub fn as_ptr(self) -> ErasedNonNullPtr<T> {
+        let Self { ptr, .. } = self;
+        ptr
+    }
+}
+
+impl<T> ErasedNonNullSlicePtr<T>
+where
+    T: SliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedSlice<'a, T> {
+        unsafe { ErasedSlice::from_nonnull_slice_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedMutSlice<'a, T> {
+        unsafe { ErasedMutSlice::from_nonnull_slice_ptr(self) }
     }
 }
 
@@ -57,15 +72,15 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(layout: Layout, buffer: NonNull<[T::Item]>, len: usize) -> Result<Self, DataError> {
-        check_ptr_align(buffer.as_ptr().cast(), layout)?;
+    pub fn new(layout: Layout, items: NonNull<[T::Item]>, len: usize) -> Result<Self, DataError> {
+        check_ptr_align(items.as_ptr().cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
+        let layout_of_items = Layout::array::<T::Item>(items.len())?;
         let expected_layout = layout.pad_to_align().repeat_packed(len)?;
-        check_len(buffer_layout.size(), expected_layout.size())?;
+        check_len(layout_of_items.size(), expected_layout.size())?;
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(items, 0) };
         let ptr = unsafe { ErasedNonNullPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
@@ -116,10 +131,10 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let len = ptr.len();
-        let buffer_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
-        let buffer = NonNull::slice_from_raw_parts(ptr.cast(), buffer_len);
+        let slice_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
+        let slice = NonNull::slice_from_raw_parts(ptr.cast(), slice_len);
 
-        let ptr = unsafe { NonNullSliceItemPtr::from_parts(buffer, 0) };
+        let ptr = unsafe { NonNullSliceItemPtr::from_parts(slice, 0) };
         let ptr = unsafe { ErasedNonNullPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
@@ -130,7 +145,7 @@ where
         let layout = self.layout();
         let Self { ptr, len, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let data = ptr.as_ptr().cast();
+        let data = ptr.as_item_ptr().cast();
         let slice = NonNull::slice_from_raw_parts(data, len);
         Ok(slice)
     }
@@ -152,17 +167,17 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> NonNull<[T::Item]> {
+    pub fn as_items(self) -> NonNull<[T::Item]> {
         let Self { ptr, len } = self;
 
-        let buffer = ptr.as_buffer();
-        let len = buffer.len().wrapping_mul(len);
-        NonNull::slice_from_raw_parts(buffer.cast(), len)
+        let items = ptr.as_items();
+        let len = items.len().wrapping_mul(len);
+        NonNull::slice_from_raw_parts(items.cast(), len)
     }
 
     #[inline]
-    pub fn as_ptr(self) -> NonNull<T::Item> {
+    pub fn as_item_ptr(self) -> NonNull<T::Item> {
         let Self { ptr, .. } = self;
-        ptr.as_ptr()
+        ptr.as_item_ptr()
     }
 }

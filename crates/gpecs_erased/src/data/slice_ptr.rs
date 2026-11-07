@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -40,25 +40,15 @@ impl<T> ErasedSlicePtr<T> {
     }
 
     #[inline]
-    pub fn ptr(self) -> ErasedPtr<T> {
-        let Self { ptr, .. } = self;
-        ptr
-    }
-
-    #[inline]
     pub fn into_parts(self) -> (ErasedPtr<T>, usize) {
         let Self { ptr, len } = self;
         (ptr, len)
     }
-}
 
-impl<T> ErasedSlicePtr<T>
-where
-    T: SliceItemPtr,
-{
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, T> {
-        unsafe { ErasedSlice::from_ptr(self) }
+    pub fn as_ptr(self) -> ErasedPtr<T> {
+        let Self { ptr, .. } = self;
+        ptr
     }
 }
 
@@ -69,17 +59,17 @@ where
     #[inline]
     #[expect(
         clippy::not_unsafe_ptr_arg_deref,
-        reason = "`T::from_slice` should not dereference input buffer"
+        reason = "`T::from_slice` should not dereference input slice"
     )]
-    pub fn new(layout: Layout, buffer: *const [T::Item], len: usize) -> Result<Self, DataError> {
-        check_ptr_align(buffer.cast(), layout)?;
+    pub fn new(layout: Layout, items: *const [T::Item], len: usize) -> Result<Self, DataError> {
+        check_ptr_align(items.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
+        let layout_of_items = Layout::array::<T::Item>(items.len())?;
         let expected_layout = layout.pad_to_align().repeat_packed(len)?;
-        check_len(buffer_layout.size(), expected_layout.size())?;
+        check_len(layout_of_items.size(), expected_layout.size())?;
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(items, 0) };
         let ptr = unsafe { ErasedPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
@@ -100,10 +90,10 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let len = ptr.len();
-        let buffer_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
-        let buffer = ptr::slice_from_raw_parts(ptr.cast(), buffer_len);
+        let slice_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
+        let slice = ptr::slice_from_raw_parts(ptr.cast(), slice_len);
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(slice, 0) };
         let ptr = unsafe { ErasedPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
@@ -114,7 +104,7 @@ where
         let layout = self.layout();
         let Self { ptr, len, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let data = ptr.as_ptr().cast();
+        let data = ptr.as_item_ptr().cast();
         let slice = ptr::slice_from_raw_parts(data, len);
         Ok(slice)
     }
@@ -137,17 +127,27 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
-        let Self { ptr, len } = self;
-
-        let buffer = ptr.as_buffer();
-        let len = buffer.len().wrapping_mul(len);
-        ptr::slice_from_raw_parts(buffer.cast(), len)
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedSlice<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { ErasedSlice::from_slice_ptr(self) }
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedSlice::from_slice_ptr_unchecked(self) }
+    }
+
+    #[inline]
+    pub fn as_items(self) -> *const [T::Item] {
+        let Self { ptr, len } = self;
+
+        let items = ptr.as_items();
+        let len = items.len().wrapping_mul(len);
+        ptr::slice_from_raw_parts(items.cast(), len)
+    }
+
+    #[inline]
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
-        ptr.as_ptr()
+        ptr.as_item_ptr()
     }
 }

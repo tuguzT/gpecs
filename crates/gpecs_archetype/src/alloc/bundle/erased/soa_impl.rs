@@ -149,7 +149,7 @@ where
 
     #[inline]
     unsafe fn nonnull_ptrs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::NonNullPtrs<'a> {
-        unsafe { ErasedBundleNonNullPtrs::new_unchecked(ptrs.cast_mut()) }
+        unsafe { ErasedBundleNonNullPtrs::from_ptrs_unchecked(ptrs) }
     }
 
     #[inline]
@@ -157,7 +157,7 @@ where
         &'a self,
         ptrs: Self::MutPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
-        unsafe { ErasedBundleNonNullPtrs::new_unchecked(ptrs) }
+        unsafe { ErasedBundleNonNullPtrs::from_mut_ptrs_unchecked(ptrs) }
     }
 
     #[inline]
@@ -180,12 +180,12 @@ where
 
     #[inline]
     fn nonnull_ptrs_as_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Ptrs<'a> {
-        ptrs.into_ptrs()
+        ptrs.cast_const()
     }
 
     #[inline]
     fn nonnull_ptrs_as_mut_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
-        ptrs.into_mut_ptrs()
+        ptrs.cast_mut()
     }
 
     #[inline]
@@ -327,7 +327,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::Ptrs<'a> {
-        slices.into_ptrs()
+        slices.into_ptrs().cast_const()
     }
 
     #[inline]
@@ -335,7 +335,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::MutPtrs<'a> {
-        slices.into_mut_ptrs()
+        slices.into_ptrs().cast_mut()
     }
 
     #[inline]
@@ -343,7 +343,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::NonNullPtrs<'a> {
-        slices.into_nonnull_ptrs()
+        slices.into_ptrs()
     }
 
     #[inline]
@@ -351,7 +351,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::SlicePtrs<'a> {
-        slices.into_slice_ptrs()
+        slices.cast_const()
     }
 
     #[inline]
@@ -359,7 +359,7 @@ where
         &'a self,
         slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::SliceMutPtrs<'a> {
-        slices.into_mut_slice_ptrs()
+        slices.cast_mut()
     }
 
     #[inline]
@@ -469,7 +469,7 @@ where
         dst: Self::NonNullPtrs<'_>,
         bundle: ErasedBundleKind<W, N, U, P>,
     ) {
-        unsafe { dst.into_mut_ptrs().write(bundle) }
+        unsafe { dst.cast_mut().write(bundle) }
     }
 }
 
@@ -589,7 +589,7 @@ where
     S: AlignedStorage<Item: 'data>,
     P: SliceItemPtrs<Item = S::Item>,
 {
-    type Refs<'a> = ErasedBundleRefs<'data, &'a ErasedArchetype<Meta>, P::Const>;
+    type Refs<'a> = ErasedBundleRefs<'data, &'a ErasedArchetype<Meta>, P::NonNull>;
 
     #[inline]
     fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -606,7 +606,7 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedBundleMutRefs<'data, &'a ErasedArchetype<Meta>, P::Mut>;
+    type RefsMut<'a> = ErasedBundleMutRefs<'data, &'a ErasedArchetype<Meta>, P::NonNull>;
 
     #[inline]
     fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -633,7 +633,7 @@ where
         refs.into_refs()
     }
 
-    type Slices<'a> = ErasedBundleSlices<'data, &'a ErasedArchetype<Meta>, P::Const>;
+    type Slices<'a> = ErasedBundleSlices<'data, &'a ErasedArchetype<Meta>, P::NonNull>;
 
     #[inline]
     fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -654,7 +654,7 @@ where
         data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::Slices<'a> {
-        unsafe { ErasedBundleSlices::from_ptrs(data, len) }
+        unsafe { ErasedBundleSlices::from_ptrs_unchecked(data, len) }
     }
 
     #[inline]
@@ -672,7 +672,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedBundleMutSlices<'data, &'a ErasedArchetype<Meta>, P::Mut>;
+    type SlicesMut<'a> = ErasedBundleMutSlices<'data, &'a ErasedArchetype<Meta>, P::NonNull>;
 
     #[inline]
     fn mut_slices_upcast<'short, 'long: 'short>(
@@ -695,7 +695,7 @@ where
         data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SlicesMut<'a> {
-        unsafe { ErasedBundleMutSlices::from_ptrs(data, len) }
+        unsafe { ErasedBundleMutSlices::from_mut_ptrs_unchecked(data, len) }
     }
 
     #[inline]

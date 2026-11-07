@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutPtrs, ErasedSoaRefs,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs, ErasedSoaRefs,
     assert::{assert_layouts, check_downcast},
     dangling::{Dangling, dangling},
     data::ErasedPtr,
@@ -16,7 +16,7 @@ use crate::{
     },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstSliceItemPtr, MutPtr, SliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -91,11 +91,6 @@ where
 
         let offset = unsafe { offset.unchecked_add(count) };
         Self { offset, ..self }
-    }
-
-    #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, P> {
-        unsafe { ErasedSoaRefs::from_ptrs(self) }
     }
 }
 
@@ -177,6 +172,26 @@ where
         let buffer = buffer.cast_mut();
         unsafe { ErasedSoaMutPtrs::from_parts(layouts, buffer, capacity, offset) }
     }
+
+    #[inline]
+    pub fn cast_nonnull(self) -> Option<ErasedSoaNonNullPtrs<D, NonNullPtr<P::Ptrs>>> {
+        ErasedSoaNonNullPtrs::from_ptrs(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedSoaNonNullPtrs<D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaNonNullPtrs::from_ptrs_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedSoaRefs<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { ErasedSoaRefs::from_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaRefs::from_ptrs_unchecked(self) }
+    }
 }
 
 impl<D, P> ErasedSoaPtrs<D, P>
@@ -214,7 +229,7 @@ where
     pub fn dangling(layouts: D) -> Result<Self, InsufficientAlignError> {
         let Dangling { addr, capacity } = dangling::<_, P::Item>(layouts.field_layouts())?;
 
-        let data = ptr::without_provenance(addr);
+        let data = ptr::without_provenance(addr.get());
         let buffer = ptr::slice_from_raw_parts(data, 0);
 
         let me = unsafe { Self::from_parts(layouts, buffer, capacity, 0) };

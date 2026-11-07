@@ -14,7 +14,7 @@ use gpecs_erased::{
 use crate::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentPtr,
+        ErasedComponentMutPtr, ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef,
         error::{DanglingError, DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
@@ -45,7 +45,7 @@ impl<T> ErasedComponentNonNullPtr<T> {
     }
 
     #[inline]
-    pub fn erased(self) -> ErasedNonNullPtr<T> {
+    pub fn as_erased(self) -> ErasedNonNullPtr<T> {
         let Self { erased, .. } = self;
         erased
     }
@@ -81,8 +81,18 @@ where
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { erased, .. } = self;
 
-        let origin = origin.erased();
+        let origin = origin.as_erased();
         unsafe { erased.offset_from(origin) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedComponentRef<'a, T> {
+        unsafe { ErasedComponentRef::from_nonnull_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedComponentMutRef<'a, T> {
+        unsafe { ErasedComponentMutRef::from_nonnull_ptr(self) }
     }
 }
 
@@ -195,7 +205,7 @@ where
     pub unsafe fn swap(self, with: Self) {
         let Self { erased, .. } = self;
 
-        let with = with.erased();
+        let with = with.as_erased();
         unsafe { erased.swap(with) }
     }
 
@@ -203,7 +213,7 @@ where
     pub unsafe fn copy_from(self, src: Self, count: usize) {
         let Self { erased, .. } = self;
 
-        let src = src.erased();
+        let src = src.as_erased();
         unsafe { erased.copy_from(src, count) }
     }
 
@@ -211,14 +221,20 @@ where
     pub unsafe fn copy_from_nonoverlapping(self, src: Self, count: usize) {
         let Self { erased, .. } = self;
 
-        let src = src.erased();
+        let src = src.as_erased();
         unsafe { erased.copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
-    pub fn as_ptr(self) -> NonNull<T::Item> {
+    pub fn as_items(self) -> NonNull<[T::Item]> {
         let Self { erased, .. } = self;
-        erased.as_ptr()
+        erased.as_items()
+    }
+
+    #[inline]
+    pub fn as_item_ptr(self) -> NonNull<T::Item> {
+        let Self { erased, .. } = self;
+        erased.as_item_ptr()
     }
 
     #[inline]

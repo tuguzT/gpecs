@@ -13,10 +13,10 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaSlices, ErasedSoaSlicesIter,
-    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, NonNullSliceItemPtr, SliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
-        traits::SoaContext,
+        traits::{SoaContext, SoaRawContext},
     },
 };
 
@@ -24,7 +24,8 @@ use crate::{
     bundle::{
         Bundle, BundleSlices,
         erased::{
-            ErasedBundlePtrs, ErasedBundleSlicePtrs,
+            ErasedBundleNonNullPtrs, ErasedBundleNonNullSlicePtrs, ErasedBundlePtrs,
+            ErasedBundleSlicePtrs,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -50,16 +51,16 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_slice_ptrs(ptrs: ErasedBundleSlicePtrs<D, P>) -> Self {
+    pub unsafe fn from_nonnull_slice_ptrs(ptrs: ErasedBundleNonNullSlicePtrs<D, P>) -> Self {
         let ptrs = ptrs.into_inner();
-        let inner = unsafe { ErasedSoaSlices::from_slice_ptrs(ptrs) };
+        let inner = unsafe { ErasedSoaSlices::from_nonnull_slice_ptrs(ptrs) };
         unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedBundlePtrs<D, P>, len: usize) -> Self {
+    pub unsafe fn from_nonnull_ptrs(ptrs: ErasedBundleNonNullPtrs<D, P>, len: usize) -> Self {
         let ptrs = ptrs.into_inner();
-        let inner = unsafe { ErasedSoaSlices::from_ptrs(ptrs, len) };
+        let inner = unsafe { ErasedSoaSlices::from_nonnull_ptrs(ptrs, len) };
         unsafe { Self::from_inner(inner) }
     }
 
@@ -70,19 +71,19 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, P> {
+    pub fn into_nonnull_slice_ptrs(self) -> ErasedBundleNonNullSlicePtrs<D, P> {
         let Self { inner } = self;
 
-        let inner = inner.into_slice_ptrs();
-        unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
+        let inner = inner.into_nonnull_slice_ptrs();
+        unsafe { ErasedBundleNonNullSlicePtrs::from_inner(inner) }
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, P> {
+    pub fn into_nonnull_ptrs(self) -> ErasedBundleNonNullPtrs<D, P> {
         let Self { inner } = self;
 
-        let inner = inner.into_ptrs();
-        unsafe { ErasedBundlePtrs::from_inner(inner) }
+        let inner = inner.into_nonnull_ptrs();
+        unsafe { ErasedBundleNonNullPtrs::from_inner(inner) }
     }
 }
 
@@ -138,11 +139,74 @@ where
     }
 }
 
+impl<D, P> ErasedBundleSlices<'_, D, P>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_slice_ptrs(
+        ptrs: ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>>,
+    ) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaSlices::from_slice_ptrs(ptrs) }?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_slice_ptrs_unchecked(
+        ptrs: ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>>,
+    ) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaSlices::from_slice_ptrs_unchecked(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs(
+        ptrs: ErasedBundlePtrs<D, ConstPtr<P::Ptrs>>,
+        len: usize,
+    ) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaSlices::from_ptrs(ptrs, len) }?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_ptrs_unchecked(
+        ptrs: ErasedBundlePtrs<D, ConstPtr<P::Ptrs>>,
+        len: usize,
+    ) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaSlices::from_ptrs_unchecked(ptrs, len) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_slice_ptrs();
+        unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
+        let Self { inner } = self;
+
+        let inner = inner.into_ptrs();
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
+    }
+}
+
 impl<'a, D, P> ErasedBundleSlices<'_, D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
         + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn iter(
@@ -158,7 +222,7 @@ where
 impl<'a, D, P> ErasedBundleSlices<'a, D, P>
 where
     D: ErasedArchetypeKind,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn downcast<B>(
@@ -171,12 +235,14 @@ where
     where
         B: Bundle,
     {
-        let into_self = |ptrs| unsafe { Self::from_slice_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_nonnull_slice_ptrs(ptrs) };
         let slices = self
-            .into_slice_ptrs()
+            .into_nonnull_slice_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
+        // TODO: add SoaContext method to deref nonnull slice pointers
+        let slices = B::CONTEXT.nonnull_slice_ptrs_as_slice_ptrs(slices);
         let slices = unsafe { B::CONTEXT.slices_from_slice_ptrs(slices) };
         Ok(slices)
     }
@@ -185,7 +251,7 @@ where
 impl<D, P> ErasedBundleSlices<'_, D, P>
 where
     D: ErasedArchetypeKind + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlice<'_, P>> {
@@ -232,7 +298,7 @@ impl<'a, D, P> IntoIterator for &'a ErasedBundleSlices<'_, D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
         + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     type Item = ErasedComponentSlice<'a, P>;
     type IntoIter = ErasedBundleSlicesIter<'a, D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
@@ -246,7 +312,7 @@ where
 impl<'a, D, P> IntoIterator for ErasedBundleSlices<'a, D, P>
 where
     D: IntoErasedArchetypeIterator<Item: BufferOffsetsFromSelf>,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
 {
     type Item = ErasedComponentSlice<'a, P>;
     type IntoIter = ErasedBundleSlicesIter<'a, D::IntoIter, P, BufferOffsetsOf<D::Item>>;
@@ -346,7 +412,7 @@ where
 impl<'a, D, P, F> ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
@@ -361,7 +427,7 @@ where
 impl<'a, D, P, F> IntoIterator for &'a ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedComponentSlice<'a, P>;
@@ -376,7 +442,7 @@ where
 impl<D, P, F> Debug for ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: FieldLayoutsOwned<OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr<Item: Debug>,
+    P: NonNullSliceItemPtr<Item: Debug>,
     F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     #[inline]
@@ -403,7 +469,7 @@ where
 impl<'a, D, P, F> Iterator for ErasedBundleSlicesIter<'a, D, P, F>
 where
     D: ErasedArchetypeIterator + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::Item>,
 {
     type Item = ErasedComponentSlice<'a, P>;
@@ -428,7 +494,7 @@ where
 impl<D, P, F> ExactSizeIterator for ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: ErasedArchetypeIterator + ExactSizeIterator + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::Item>,
 {
     #[inline]
@@ -441,7 +507,7 @@ where
 impl<D, P, F> FusedIterator for ErasedBundleSlicesIter<'_, D, P, F>
 where
     D: ErasedArchetypeIterator + FusedIterator + ?Sized,
-    P: ConstSliceItemPtr,
+    P: NonNullSliceItemPtr,
     F: BufferOffsetsFrom<D::Item>,
 {
 }

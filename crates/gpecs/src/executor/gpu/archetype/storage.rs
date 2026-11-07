@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
+    ptr::NonNull,
 };
 
 use bytemuck::must_cast_slice;
@@ -262,7 +263,7 @@ impl StorageBuffer {
     #[inline]
     fn from_components<L>(
         device: &Device,
-        components: ErasedComponentSlice<'_, *const MaybeUninit<u8>>,
+        components: ErasedComponentSlice<'_, NonNull<MaybeUninit<u8>>>,
         capacity: usize,
         label: impl FnOnce() -> L,
     ) -> Self
@@ -270,8 +271,8 @@ impl StorageBuffer {
         L: AsRef<str>,
     {
         // SAFETY: GPU components implement `NoUninit`, and so all the bytes of its slice should be initialized, too
-        let contents = unsafe { components.as_buffer().assume_init_ref() };
-        let item_layout = components.fields().layout();
+        let contents = unsafe { components.as_items().assume_init_ref() };
+        let item_layout = components.as_erased().layout();
         let capacity_in_bytes = item_layout.size().strict_mul(capacity);
         unsafe { Self::from_contents(device, item_layout, contents, capacity_in_bytes, label) }
     }

@@ -1,4 +1,4 @@
-use std::{alloc::Layout, mem::MaybeUninit};
+use std::{alloc::Layout, mem::MaybeUninit, ptr::NonNull};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
@@ -56,10 +56,10 @@ fn value() {
         &(),
     );
 
-    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_items().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::upcast(&()).unwrap().into_buffer(),
+        ErasedRef::<NonNull<_>>::upcast(&()).unwrap().into_items(),
     );
 
     let field_ref = erased_refs.iter().nth(1).unwrap();
@@ -68,10 +68,10 @@ fn value() {
         &i3,
     );
 
-    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_items().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::upcast(&i3).unwrap().into_buffer(),
+        ErasedRef::<NonNull<_>>::upcast(&i3).unwrap().into_items(),
     );
 
     let field_ref = erased_refs.iter().nth(2).unwrap();
@@ -80,10 +80,10 @@ fn value() {
         &i1,
     );
 
-    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_items().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::upcast(&i1).unwrap().into_buffer(),
+        ErasedRef::<NonNull<_>>::upcast(&i1).unwrap().into_items(),
     );
 
     let field_ref = erased_refs.iter().nth(3).unwrap();
@@ -98,25 +98,25 @@ fn value() {
         &i2,
     );
 
-    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_items().align_to::<u8>() };
     assert_eq!(
         field_ref_bytes,
-        ErasedRef::<*const _>::upcast(&i2).unwrap().into_buffer(),
+        ErasedRef::<NonNull<_>>::upcast(&i2).unwrap().into_items(),
     );
 
     let field_refs = [
-        ErasedRef::<*const _>::new(layouts[0], bytemuck::bytes_of(&())).unwrap(),
-        ErasedRef::<*const _>::new(layouts[1], bytemuck::bytes_of(&i3)).unwrap(),
-        ErasedRef::<*const _>::new(layouts[2], bytemuck::bytes_of(&i1)).unwrap(),
-        ErasedRef::<*const _>::new(layouts[4], bytemuck::bytes_of(&i2)).unwrap(),
+        ErasedRef::<NonNull<_>>::new(layouts[0], bytemuck::bytes_of(&())).unwrap(),
+        ErasedRef::<NonNull<_>>::new(layouts[1], bytemuck::bytes_of(&i3)).unwrap(),
+        ErasedRef::<NonNull<_>>::new(layouts[2], bytemuck::bytes_of(&i1)).unwrap(),
+        ErasedRef::<NonNull<_>>::new(layouts[4], bytemuck::bytes_of(&i2)).unwrap(),
     ];
     itertools::assert_equal(
         erased_refs
             .iter()
             .enumerate()
             .filter_map(|(i, item)| (i != 3).then_some(item))
-            .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
-        field_refs.into_iter().map(ErasedRef::into_buffer),
+            .map(|item| unsafe { item.into_items().align_to::<u8>().1 }),
+        field_refs.into_iter().map(ErasedRef::into_items),
     );
 
     let mut fields = erased_value
@@ -139,8 +139,8 @@ fn value() {
     itertools::assert_equal(
         erased_value
             .iter()
-            .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
-        field_refs.into_iter().map(ErasedRef::into_buffer),
+            .map(|item| unsafe { item.into_items().align_to::<u8>().1 }),
+        field_refs.into_iter().map(ErasedRef::into_items),
     );
 
     let context = Default::default();
@@ -166,10 +166,10 @@ fn value_zst() {
     itertools::assert_equal(
         erased_value
             .iter()
-            .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
+            .map(|item| unsafe { item.into_items().align_to::<u8>().1 }),
         field_refs
             .into_iter()
-            .map(ErasedRef::<*const _>::into_buffer),
+            .map(ErasedRef::<NonNull<_>>::into_items),
     );
 
     let value = unsafe { erased_value.downcast::<(), _>(&context) }

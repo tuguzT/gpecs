@@ -7,13 +7,14 @@ use core::{
 use gpecs_erased::{
     data::ErasedMutPtr,
     layout::WithLayout,
-    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
 };
 
 use crate::{
     Component,
     erased::{
-        ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef, WithErasedDrop,
+        ErasedComponentMutRef, ErasedComponentNonNullPtr, ErasedComponentPtr, ErasedComponentRef,
+        WithErasedDrop,
         error::{DanglingError, DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
@@ -44,7 +45,7 @@ impl<T> ErasedComponentMutPtr<T> {
     }
 
     #[inline]
-    pub fn erased(self) -> ErasedMutPtr<T> {
+    pub fn as_erased(self) -> ErasedMutPtr<T> {
         let Self { erased, .. } = self;
         erased
     }
@@ -80,13 +81,8 @@ where
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { erased, .. } = self;
 
-        let origin = origin.erased();
+        let origin = origin.as_erased();
         unsafe { erased.offset_from(origin) }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedComponentMutRef<'a, T> {
-        unsafe { ErasedComponentMutRef::from_ptr(self) }
     }
 }
 
@@ -173,15 +169,30 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentRef<'a, ConstPtr<T::Ptrs>> {
-        unsafe { self.cast_const().as_ref_unchecked() }
+    pub fn cast_nonnull(self) -> Option<ErasedComponentNonNullPtr<NonNullPtr<T::Ptrs>>> {
+        ErasedComponentNonNullPtr::from_mut_ptr(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedComponentNonNullPtr<NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedComponentNonNullPtr::from_mut_ptr_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentRef<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { self.cast_nonnull_unchecked().as_ref() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedComponentMutRef<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { self.cast_nonnull_unchecked().as_mut() }
     }
 
     #[inline]
     pub unsafe fn swap(self, with: Self) {
         let Self { erased, .. } = self;
 
-        let with = with.erased();
+        let with = with.as_erased();
         unsafe { erased.swap(with) }
     }
 
@@ -189,7 +200,7 @@ where
     pub unsafe fn copy_from(self, src: ErasedComponentPtr<ConstPtr<T::Ptrs>>, count: usize) {
         let Self { erased, .. } = self;
 
-        let src = src.erased();
+        let src = src.as_erased();
         unsafe { erased.copy_from(src, count) }
     }
 
@@ -201,7 +212,7 @@ where
     ) {
         let Self { erased, .. } = self;
 
-        let src = src.erased();
+        let src = src.as_erased();
         unsafe { erased.copy_from_nonoverlapping(src, count) }
     }
 
@@ -222,27 +233,27 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { erased, .. } = self;
-        erased.as_ptr()
+        erased.as_item_ptr()
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(self) -> *mut T::Item {
+    pub unsafe fn as_mut_item_ptr(self) -> *mut T::Item {
         let Self { erased, .. } = self;
-        erased.as_mut_ptr()
+        erased.as_mut_item_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
+    pub fn as_items(self) -> *const [T::Item] {
         let Self { erased, .. } = self;
-        erased.as_buffer()
+        erased.as_items()
     }
 
     #[inline]
-    pub unsafe fn as_mut_buffer(self) -> *mut [T::Item] {
+    pub unsafe fn as_mut_items(self) -> *mut [T::Item] {
         let Self { erased, .. } = self;
-        erased.as_mut_buffer()
+        erased.as_mut_items()
     }
 }
 

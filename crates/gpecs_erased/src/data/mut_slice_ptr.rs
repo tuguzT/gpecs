@@ -2,12 +2,13 @@ use core::{alloc::Layout, ptr};
 
 use crate::{
     data::{
-        ErasedMutPtr, ErasedMutSlice, ErasedNonNullSlicePtr, ErasedSlice, ErasedSlicePtr,
+        ErasedMutPtr, ErasedMutSlice, ErasedNonNullSlicePtr, ErasedPtr, ErasedSlice,
+        ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError, check_downcast},
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -40,25 +41,15 @@ impl<T> ErasedMutSlicePtr<T> {
     }
 
     #[inline]
-    pub fn ptr(self) -> ErasedMutPtr<T> {
-        let Self { ptr, .. } = self;
-        ptr
-    }
-
-    #[inline]
     pub fn into_parts(self) -> (ErasedMutPtr<T>, usize) {
         let Self { ptr, len } = self;
         (ptr, len)
     }
-}
 
-impl<T> ErasedMutSlicePtr<T>
-where
-    T: SliceItemPtr,
-{
     #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutSlice<'a, T> {
-        unsafe { ErasedMutSlice::from_ptr(self) }
+    pub fn as_mut_ptr(self) -> ErasedMutPtr<T> {
+        let Self { ptr, .. } = self;
+        ptr
     }
 }
 
@@ -69,17 +60,17 @@ where
     #[inline]
     #[expect(
         clippy::not_unsafe_ptr_arg_deref,
-        reason = "`T::from_slice` should not dereference input buffer"
+        reason = "`T::from_slice` should not dereference input slice"
     )]
-    pub fn new(layout: Layout, buffer: *mut [T::Item], len: usize) -> Result<Self, DataError> {
-        check_ptr_align(buffer.cast(), layout)?;
+    pub fn new(layout: Layout, items: *mut [T::Item], len: usize) -> Result<Self, DataError> {
+        check_ptr_align(items.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
+        let layout_of_items = Layout::array::<T::Item>(items.len())?;
         let expected_layout = layout.pad_to_align().repeat_packed(len)?;
-        check_len(buffer_layout.size(), expected_layout.size())?;
+        check_len(layout_of_items.size(), expected_layout.size())?;
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(items, 0) };
         let ptr = unsafe { ErasedMutPtr::from_parts(layout, ptr) };
 
         let me = unsafe { Self::from_parts(ptr, len) };
@@ -100,10 +91,10 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let len = ptr.len();
-        let buffer_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), buffer_len);
+        let slice_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
+        let slice = ptr::slice_from_raw_parts_mut(ptr.cast(), slice_len);
 
-        let ptr = unsafe { MutSliceItemPtr::from_parts(buffer, 0) };
+        let ptr = unsafe { MutSliceItemPtr::from_parts(slice, 0) };
         let ptr = unsafe { ErasedMutPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
@@ -114,7 +105,7 @@ where
         let layout = self.layout();
         let Self { ptr, len, .. } = check_downcast::<V, _>(layout, self)?;
 
-        let data = ptr.as_mut_ptr().cast();
+        let data = ptr.as_mut_item_ptr().cast();
         let slice = ptr::slice_from_raw_parts_mut(data, len);
         Ok(slice)
     }
@@ -137,37 +128,58 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, ConstPtr<T::Ptrs>> {
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedSlice<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { self.cast_const().as_ref() }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSlice<'a, NonNullPtr<T::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
+    pub unsafe fn as_mut<'a>(self) -> Option<ErasedMutSlice<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { ErasedMutSlice::from_mut_slice_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedMutSlice<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedMutSlice::from_mut_slice_ptr_unchecked(self) }
+    }
+
+    #[inline]
+    pub fn as_ptr(self) -> ErasedPtr<ConstPtr<T::Ptrs>> {
+        let Self { ptr, .. } = self;
+        ptr.cast_const()
+    }
+
+    #[inline]
+    pub fn as_items(self) -> *const [T::Item] {
         let Self { ptr, len } = self;
 
-        let buffer = ptr.as_buffer();
-        let len = buffer.len().wrapping_mul(len);
-        ptr::slice_from_raw_parts(buffer.cast(), len)
+        let items = ptr.as_items();
+        let len = items.len().wrapping_mul(len);
+        ptr::slice_from_raw_parts(items.cast(), len)
     }
 
     #[inline]
-    pub fn as_mut_buffer(self) -> *mut [T::Item] {
+    pub fn as_mut_items(self) -> *mut [T::Item] {
         let Self { ptr, len } = self;
 
-        let buffer = ptr.as_mut_buffer();
-        let len = buffer.len().wrapping_mul(len);
-        ptr::slice_from_raw_parts_mut(buffer.cast(), len)
+        let items = ptr.as_mut_items();
+        let len = items.len().wrapping_mul(len);
+        ptr::slice_from_raw_parts_mut(items.cast(), len)
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
-        ptr.as_ptr()
+        ptr.as_item_ptr()
     }
 
     #[inline]
-    pub fn as_mut_ptr(self) -> *mut T::Item {
+    pub fn as_mut_item_ptr(self) -> *mut T::Item {
         let Self { ptr, .. } = self;
-        ptr.as_mut_ptr()
+        ptr.as_mut_item_ptr()
     }
 }

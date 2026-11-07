@@ -194,61 +194,61 @@ where
     }
 
     #[inline]
-    pub fn as_erased_component_ptr(&self) -> ErasedComponentPtr<P::Const> {
+    pub fn as_ptr(&self) -> ErasedComponentPtr<P::Const> {
         let Self {
             ref erased,
             component_id,
             ..
         } = *self;
 
-        let erased = erased.as_erased_ptr();
+        let erased = erased.as_ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, erased) }
     }
 
     #[inline]
-    pub fn as_mut_erased_component_ptr(&mut self) -> ErasedComponentMutPtr<P::Mut> {
+    pub fn as_mut_ptr(&mut self) -> ErasedComponentMutPtr<P::Mut> {
         let Self {
             ref mut erased,
             component_id,
             ..
         } = *self;
 
-        let erased = erased.as_mut_erased_ptr();
+        let erased = erased.as_mut_ptr();
         unsafe { ErasedComponentMutPtr::from_parts(component_id, erased) }
     }
 
     #[inline]
-    pub fn as_erased_component(&self) -> ErasedComponentRef<'_, P::Const> {
-        unsafe { self.as_erased_component_ptr().as_ref_unchecked() }
+    pub fn as_ref(&self) -> ErasedComponentRef<'_, P::NonNull> {
+        unsafe { self.as_ptr().as_ref_unchecked() }
     }
 
     #[inline]
-    pub fn as_mut_erased_component(&mut self) -> ErasedComponentMutRef<'_, P::Mut> {
-        unsafe { self.as_mut_erased_component_ptr().as_mut_unchecked() }
+    pub fn as_mut(&mut self) -> ErasedComponentMutRef<'_, P::NonNull> {
+        unsafe { self.as_mut_ptr().as_mut_unchecked() }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const T::Item {
+    pub fn as_item_ptr(&self) -> *const T::Item {
         let Self { erased, .. } = self;
-        erased.as_ptr()
+        erased.as_item_ptr()
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&mut self) -> *mut T::Item {
+    pub unsafe fn as_mut_item_ptr(&mut self) -> *mut T::Item {
         let Self { erased, .. } = self;
-        erased.as_mut_ptr()
+        unsafe { erased.as_mut_item_ptr() }
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[T::Item] {
+    pub fn as_items(&self) -> &[T::Item] {
         let Self { erased, .. } = self;
-        erased.as_slice()
+        erased.as_items()
     }
 
     #[inline]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [T::Item] {
+    pub unsafe fn as_mut_items(&mut self) -> &mut [T::Item] {
         let Self { erased, .. } = self;
-        erased.as_mut_slice()
+        unsafe { erased.as_mut_items() }
     }
 
     #[inline]
@@ -368,7 +368,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {
-        self.as_slice()
+        self.as_items()
     }
 }
 
@@ -383,7 +383,7 @@ where
             return;
         };
 
-        let to_drop = self.as_mut_erased_component_ptr();
+        let to_drop = self.as_mut_ptr();
         unsafe { drop.drop_in_place(to_drop) }
     }
 }

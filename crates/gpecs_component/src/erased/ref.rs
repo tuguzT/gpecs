@@ -7,13 +7,13 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedRef,
-    ptr::slice::{ConstSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, NonNullSliceItemPtr, SliceItemPtr},
 };
 
 use crate::{
     Component,
     erased::{
-        ErasedComponentPtr,
+        ErasedComponentNonNullPtr, ErasedComponentPtr,
         error::{DowncastError, NotRegisteredError, UpcastPtrError, check_downcast},
     },
     registry::{
@@ -44,9 +44,9 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedComponentPtr<T>) -> Self {
+    pub unsafe fn from_nonnull_ptr(ptr: ErasedComponentNonNullPtr<T>) -> Self {
         let (component_id, erased) = ptr.into_parts();
-        let erased = unsafe { ErasedRef::from_ptr(erased) };
+        let erased = unsafe { ErasedRef::from_nonnull_ptr(erased) };
         unsafe { Self::from_parts(component_id, erased) }
     }
 
@@ -57,20 +57,20 @@ where
     }
 
     #[inline]
-    pub fn erased(&self) -> &ErasedRef<'a, T> {
+    pub fn as_erased(&self) -> &ErasedRef<'a, T> {
         let Self { erased, .. } = self;
         erased
     }
 
     #[inline]
-    pub fn as_component_ptr(&self) -> ErasedComponentPtr<T> {
+    pub fn as_nonnull_component_ptr(&self) -> ErasedComponentNonNullPtr<T> {
         let Self {
             ref erased,
             component_id,
         } = *self;
 
-        let erased = erased.ptr();
-        unsafe { ErasedComponentPtr::from_parts(component_id, erased) }
+        let erased = erased.as_nonnull_ptr();
+        unsafe { ErasedComponentNonNullPtr::from_parts(component_id, erased) }
     }
 
     #[inline]
@@ -85,7 +85,7 @@ where
 
 impl<'a, T> ErasedComponentRef<'a, T>
 where
-    T: ConstSliceItemPtr,
+    T: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn upcast<C, U>(
@@ -139,21 +139,32 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const T::Item {
-        let Self { erased, .. } = self;
-        erased.as_ptr()
+    pub fn as_ptr(&self) -> ErasedComponentPtr<ConstPtr<T::Ptrs>> {
+        let Self {
+            ref erased,
+            component_id,
+        } = *self;
+
+        let erased = erased.as_ptr();
+        unsafe { ErasedComponentPtr::from_parts(component_id, erased) }
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[T::Item] {
+    pub fn as_item_ptr(&self) -> *const T::Item {
         let Self { erased, .. } = self;
-        erased.as_buffer()
+        erased.as_item_ptr()
+    }
+
+    #[inline]
+    pub fn as_items(&self) -> &[T::Item] {
+        let Self { erased, .. } = self;
+        erased.as_items()
     }
 }
 
 impl<T> Debug for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr<Item: Debug>,
+    T: NonNullSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -229,10 +240,10 @@ where
 
 impl<T> AsRef<[T::Item]> for ErasedComponentRef<'_, T>
 where
-    T: ConstSliceItemPtr,
+    T: NonNullSliceItemPtr,
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {
-        self.as_buffer()
+        self.as_items()
     }
 }

@@ -68,6 +68,16 @@ where
             .checked_div(len)
             .expect("erased field pointer should not be a ZST")
     }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedRef<'a, T> {
+        unsafe { ErasedRef::from_nonnull_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedMutRef<'a, T> {
+        unsafe { ErasedMutRef::from_nonnull_ptr(self) }
+    }
 }
 
 impl<T> ErasedNonNullPtr<T>
@@ -75,14 +85,14 @@ where
     T: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new(layout: Layout, buffer: NonNull<[T::Item]>) -> Result<Self, DataError> {
-        check_ptr_align(buffer.as_ptr().cast(), layout)?;
+    pub fn new(layout: Layout, items: NonNull<[T::Item]>) -> Result<Self, DataError> {
+        check_ptr_align(items.as_ptr().cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
-        check_len(buffer_layout.size(), layout.size())?;
+        let layout_of_items = Layout::array::<T::Item>(items.len())?;
+        check_len(layout_of_items.size(), layout.size())?;
 
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let ptr = unsafe { T::from_parts(items, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -94,8 +104,8 @@ where
 
         let addr = unsafe { NonZeroUsize::new_unchecked(layout.align()) };
         let data = NonNull::without_provenance(addr);
-        let buffer = NonNull::slice_from_raw_parts(data, 0);
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let slice = NonNull::slice_from_raw_parts(data, 0);
+        let ptr = unsafe { T::from_parts(slice, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -138,8 +148,8 @@ where
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let len = bytes_to_items::<T::Item>(layout.size());
-        let buffer = NonNull::slice_from_raw_parts(ptr.cast(), len);
-        let ptr = unsafe { T::from_parts(buffer, 0) };
+        let slice = NonNull::slice_from_raw_parts(ptr.cast(), len);
+        let ptr = unsafe { T::from_parts(slice, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
         Ok(me)
@@ -152,16 +162,6 @@ where
 
         let ptr = ptr.as_ptr().cast();
         Ok(ptr)
-    }
-
-    #[inline]
-    pub unsafe fn as_ref<'a>(self) -> ErasedRef<'a, ConstPtr<T::Ptrs>> {
-        unsafe { self.cast_const().as_ref_unchecked() }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut<'a>(self) -> ErasedMutRef<'a, MutPtr<T::Ptrs>> {
-        unsafe { self.cast_mut().as_mut_unchecked() }
     }
 
     #[inline]
@@ -205,7 +205,7 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> NonNull<[T::Item]> {
+    pub fn as_items(self) -> NonNull<[T::Item]> {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_ptr();
@@ -214,7 +214,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> NonNull<T::Item> {
+    pub fn as_item_ptr(self) -> NonNull<T::Item> {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }

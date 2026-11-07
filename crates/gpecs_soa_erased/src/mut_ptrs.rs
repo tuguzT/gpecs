@@ -6,8 +6,8 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutRefs, ErasedSoaPtrs, ErasedSoaPtrsIter,
-    ErasedSoaRefs,
+    CovariantFieldLayouts, ErasedSoa, ErasedSoaMutRefs, ErasedSoaNonNullPtrs, ErasedSoaPtrs,
+    ErasedSoaPtrsIter, ErasedSoaRefs,
     assert::{assert_layouts, check_downcast},
     dangling::{Dangling, dangling},
     data::{ErasedMutPtr, ErasedPtr},
@@ -17,7 +17,7 @@ use crate::{
     },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
     soa::{
         field::{
             BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -92,11 +92,6 @@ where
 
         let offset = unsafe { offset.unchecked_add(count) };
         Self { offset, ..self }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
-        unsafe { ErasedSoaMutRefs::from_ptrs(self) }
     }
 }
 
@@ -186,8 +181,33 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, ConstPtr<P::Ptrs>> {
+    pub fn cast_nonnull(self) -> Option<ErasedSoaNonNullPtrs<D, NonNullPtr<P::Ptrs>>> {
+        ErasedSoaNonNullPtrs::from_mut_ptrs(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(self) -> ErasedSoaNonNullPtrs<D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaNonNullPtrs::from_mut_ptrs_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedSoaRefs<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { self.cast_const().as_ref() }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaRefs<'a, D, NonNullPtr<P::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> Option<ErasedSoaMutRefs<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { ErasedSoaMutRefs::from_mut_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedSoaMutRefs<'a, D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaMutRefs::from_mut_ptrs_unchecked(self) }
     }
 }
 
@@ -226,7 +246,7 @@ where
     pub fn dangling(layouts: D) -> Result<Self, InsufficientAlignError> {
         let Dangling { addr, capacity } = dangling::<_, P::Item>(layouts.field_layouts())?;
 
-        let data = ptr::without_provenance_mut(addr);
+        let data = ptr::without_provenance_mut(addr.get());
         let buffer = ptr::slice_from_raw_parts_mut(data, 0);
 
         let me = unsafe { Self::from_parts(layouts, buffer, capacity, 0) };

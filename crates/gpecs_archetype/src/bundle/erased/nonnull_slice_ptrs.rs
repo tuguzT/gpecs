@@ -7,7 +7,7 @@ use core::{
 use gpecs_component::{
     erased::ErasedComponentNonNullSlicePtr,
     registry::{
-        ComponentRegistryView,
+        ComponentId, ComponentRegistryView,
         traits::{ComponentIdFrom, FromComponentType, WithComponentId},
     },
 };
@@ -25,8 +25,7 @@ use crate::{
     bundle::{
         Bundle,
         erased::{
-            ErasedBundleMutPtrs, ErasedBundleMutSlicePtrs, ErasedBundleNonNullPtrs,
-            ErasedBundlePtrs, ErasedBundleSlicePtrs,
+            ErasedBundleMutSlicePtrs, ErasedBundleNonNullPtrs, ErasedBundleSlicePtrs,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -66,10 +65,10 @@ where
     }
 
     #[inline]
-    pub fn into_nonnull_ptrs(self) -> ErasedBundleNonNullPtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedBundleNonNullPtrs<D, P> {
         let Self { inner } = self;
 
-        let inner = inner.into_nonnull_ptrs();
+        let inner = inner.into_ptrs();
         unsafe { ErasedBundleNonNullPtrs::from_inner(inner) }
     }
 }
@@ -131,34 +130,18 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn into_ptrs(self) -> ErasedBundlePtrs<D, ConstPtr<P::Ptrs>> {
+    pub fn cast_const(self) -> ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 
-        let inner = inner.into_ptrs();
-        unsafe { ErasedBundlePtrs::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedBundleMutPtrs<D, MutPtr<P::Ptrs>> {
-        let Self { inner } = self;
-
-        let inner = inner.into_mut_ptrs();
-        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn into_slice_ptrs(self) -> ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>> {
-        let Self { inner } = self;
-
-        let inner = inner.into_slice_ptrs();
+        let inner = inner.cast_const();
         unsafe { ErasedBundleSlicePtrs::from_inner(inner) }
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs(self) -> ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>> {
+    pub fn cast_mut(self) -> ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>> {
         let Self { inner } = self;
 
-        let inner = inner.into_mut_slice_ptrs();
+        let inner = inner.cast_mut();
         unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
     }
 }
@@ -199,7 +182,7 @@ where
         let len = self.len();
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
         let ptrs = self
-            .into_nonnull_ptrs()
+            .into_ptrs()
             .downcast::<B>(components)
             .map_err(|error| error.map_value(into_self))?;
 
@@ -213,17 +196,11 @@ where
     D: ErasedArchetypeKind + ?Sized,
     P: NonNullSliceItemPtr,
 {
-    // #[inline]
-    // pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlicePtr<CastConst<P>>> {
-    //     let index = self.archetype().get_index_of(component_id)?;
-    //     self.iter().nth(index)
-    // }
-
-    // #[inline]
-    // pub fn get_mut(&mut self, component_id: ComponentId) -> Option<ErasedComponentMutSlicePtr<P>> {
-    //     let index = self.archetype().get_index_of(component_id)?;
-    //     self.iter_mut().nth(index)
-    // }
+    #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullSlicePtr<P>> {
+        let index = self.archetype().get_index_of(component_id)?;
+        self.iter().nth(index)
+    }
 }
 
 impl<D, P> Debug for ErasedBundleNonNullSlicePtrs<D, P>

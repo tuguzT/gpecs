@@ -6,13 +6,13 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedMutSlicePtr,
-    ptr::slice::{ConstPtr, MutSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr},
 };
 
 use crate::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentMutSlice, ErasedComponentSlice,
+        ErasedComponentMutPtr, ErasedComponentMutSlice, ErasedComponentPtr, ErasedComponentSlice,
         ErasedComponentSlicePtr, WithErasedDrop,
         error::{DowncastError, NotRegisteredError, UpcastSliceError, check_downcast},
     },
@@ -57,17 +57,6 @@ impl<T> ErasedComponentMutSlicePtr<T> {
     }
 
     #[inline]
-    pub fn component_ptr(self) -> ErasedComponentMutPtr<T> {
-        let Self {
-            component_id,
-            erased,
-        } = self;
-
-        let field = erased.ptr();
-        unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
-    }
-
-    #[inline]
     pub fn len(self) -> usize {
         let Self { erased, .. } = self;
         erased.len()
@@ -86,15 +75,16 @@ impl<T> ErasedComponentMutSlicePtr<T> {
         } = self;
         (component_id, erased)
     }
-}
 
-impl<T> ErasedComponentMutSlicePtr<T>
-where
-    T: SliceItemPtr,
-{
     #[inline]
-    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedComponentMutSlice<'a, T> {
-        unsafe { ErasedComponentMutSlice::from_ptr(self) }
+    pub fn as_mut_ptr(self) -> ErasedComponentMutPtr<T> {
+        let Self {
+            component_id,
+            erased,
+        } = self;
+
+        let field = erased.as_mut_ptr();
+        unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
     }
 }
 
@@ -148,8 +138,23 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentSlice<'a, ConstPtr<T::Ptrs>> {
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedComponentSlice<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { self.cast_const().as_ref() }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedComponentSlice<'a, NonNullPtr<T::Ptrs>> {
         unsafe { self.cast_const().as_ref_unchecked() }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> Option<ErasedComponentMutSlice<'a, NonNullPtr<T::Ptrs>>> {
+        unsafe { ErasedComponentMutSlice::from_mut_slice_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_unchecked<'a>(self) -> ErasedComponentMutSlice<'a, NonNullPtr<T::Ptrs>> {
+        unsafe { ErasedComponentMutSlice::from_mut_slice_ptr_unchecked(self) }
     }
 
     #[inline]
@@ -169,27 +174,38 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const T::Item {
-        let Self { erased, .. } = self;
-        erased.as_ptr()
+    pub fn as_ptr(self) -> ErasedComponentPtr<ConstPtr<T::Ptrs>> {
+        let Self {
+            component_id,
+            erased,
+        } = self;
+
+        let field = erased.as_ptr();
+        unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(self) -> *mut T::Item {
+    pub fn as_item_ptr(self) -> *const T::Item {
         let Self { erased, .. } = self;
-        erased.as_mut_ptr()
+        erased.as_item_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [T::Item] {
+    pub unsafe fn as_mut_item_ptr(self) -> *mut T::Item {
         let Self { erased, .. } = self;
-        erased.as_buffer()
+        erased.as_mut_item_ptr()
     }
 
     #[inline]
-    pub unsafe fn as_mut_buffer(self) -> *mut [T::Item] {
+    pub fn as_items(self) -> *const [T::Item] {
         let Self { erased, .. } = self;
-        erased.as_mut_buffer()
+        erased.as_items()
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_items(self) -> *mut [T::Item] {
+        let Self { erased, .. } = self;
+        erased.as_mut_items()
     }
 }
 

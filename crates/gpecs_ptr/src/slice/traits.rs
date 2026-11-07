@@ -47,6 +47,10 @@ pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
         unsafe { slice.cast::<Self::Item>().add(index) }
     }
 
+    unsafe fn as_ref<'a>(self) -> Option<&'a Self::Item> {
+        unsafe { self.as_ptr().as_ref() }
+    }
+
     unsafe fn as_ref_unchecked<'a>(self) -> &'a Self::Item {
         unsafe { self.as_ptr().as_ref_unchecked() }
     }
@@ -91,8 +95,16 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
         unsafe { slice.cast::<Self::Item>().add(index) }
     }
 
+    unsafe fn as_ref<'a>(self) -> Option<&'a Self::Item> {
+        unsafe { self.as_ptr().as_ref() }
+    }
+
     unsafe fn as_ref_unchecked<'a>(self) -> &'a Self::Item {
         unsafe { self.as_ptr().as_ref_unchecked() }
+    }
+
+    unsafe fn as_mut<'a>(self) -> Option<&'a mut Self::Item> {
+        unsafe { self.as_mut_ptr().as_mut() }
     }
 
     unsafe fn as_mut_unchecked<'a>(self) -> &'a mut Self::Item {
@@ -188,11 +200,13 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
     }
 
     unsafe fn as_ref<'a>(self) -> &'a Self::Item {
-        unsafe { self.as_ptr().as_ref() }
+        let ptr = &self.as_ptr();
+        unsafe { NonNull::as_ref(ptr) }
     }
 
     unsafe fn as_mut<'a>(self) -> &'a mut Self::Item {
-        unsafe { self.as_ptr().as_mut() }
+        let ptr = &mut self.as_ptr();
+        unsafe { NonNull::as_mut(ptr) }
     }
 
     unsafe fn drop_in_place(self) {

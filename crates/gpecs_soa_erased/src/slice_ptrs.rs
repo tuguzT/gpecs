@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaPtrs, ErasedSoaPtrsIter,
-    ErasedSoaSlices,
+    CovariantFieldLayouts, ErasedSoaMutSlicePtrs, ErasedSoaNonNullSlicePtrs, ErasedSoaPtrs,
+    ErasedSoaPtrsIter, ErasedSoaSlices,
     data::ErasedSlicePtr,
     error::{
         DowncastError, SlicePtrsError, check_offset, check_offset_len, check_ptr_align,
@@ -14,7 +14,7 @@ use crate::{
     },
     layout::WithLayout,
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstSliceItemPtr, MutPtr, SliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
     soa::{
         field::{
             FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned, buffer_offsets,
@@ -76,11 +76,6 @@ where
         let ptrs = unsafe { ptrs.map_layouts(f) };
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs, len) }
     }
-
-    #[inline]
-    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, P> {
-        unsafe { ErasedSoaSlices::from_slice_ptrs(self) }
-    }
 }
 
 impl<D, P> ErasedSoaSlicePtrs<D, P>
@@ -133,6 +128,28 @@ where
         let Self { ptrs, len } = self;
         let ptrs = ptrs.cast_mut();
         unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
+    }
+
+    #[inline]
+    pub fn cast_nonnull(self) -> Option<ErasedSoaNonNullSlicePtrs<D, NonNullPtr<P::Ptrs>>> {
+        ErasedSoaNonNullSlicePtrs::from_slice_ptrs(self)
+    }
+
+    #[inline]
+    pub unsafe fn cast_nonnull_unchecked(
+        self,
+    ) -> ErasedSoaNonNullSlicePtrs<D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaNonNullSlicePtrs::from_slice_ptrs_unchecked(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> Option<ErasedSoaSlices<'a, D, NonNullPtr<P::Ptrs>>> {
+        unsafe { ErasedSoaSlices::from_slice_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref_unchecked<'a>(self) -> ErasedSoaSlices<'a, D, NonNullPtr<P::Ptrs>> {
+        unsafe { ErasedSoaSlices::from_slice_ptrs_unchecked(self) }
     }
 }
 

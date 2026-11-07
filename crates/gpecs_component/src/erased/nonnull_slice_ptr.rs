@@ -51,20 +51,9 @@ impl<T> ErasedComponentNonNullSlicePtr<T> {
     }
 
     #[inline]
-    pub fn erased(self) -> ErasedNonNullSlicePtr<T> {
+    pub fn as_erased(self) -> ErasedNonNullSlicePtr<T> {
         let Self { erased, .. } = self;
         erased
-    }
-
-    #[inline]
-    pub fn component_ptr(self) -> ErasedComponentNonNullPtr<T> {
-        let Self {
-            component_id,
-            erased,
-        } = self;
-
-        let field = erased.ptr();
-        unsafe { ErasedComponentNonNullPtr::from_parts(component_id, field) }
     }
 
     #[inline]
@@ -85,6 +74,17 @@ impl<T> ErasedComponentNonNullSlicePtr<T> {
             erased,
         } = self;
         (component_id, erased)
+    }
+
+    #[inline]
+    pub fn as_ptr(self) -> ErasedComponentNonNullPtr<T> {
+        let Self {
+            component_id,
+            erased,
+        } = self;
+
+        let field = erased.as_ptr();
+        unsafe { ErasedComponentNonNullPtr::from_parts(component_id, field) }
     }
 }
 
@@ -149,15 +149,15 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(self) -> NonNull<T::Item> {
+    pub fn as_item_ptr(self) -> NonNull<T::Item> {
         let Self { erased, .. } = self;
-        erased.as_ptr()
+        erased.as_item_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> NonNull<[T::Item]> {
+    pub fn as_items(self) -> NonNull<[T::Item]> {
         let Self { erased, .. } = self;
-        erased.as_buffer()
+        erased.as_items()
     }
 }
 

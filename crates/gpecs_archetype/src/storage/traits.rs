@@ -9,8 +9,9 @@ use gpecs_soa_erased::{
 use crate::{
     bundle::erased::{
         ErasedBorrowedViewBundle, ErasedBundleMutPtrs, ErasedBundleMutRefs,
-        ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs, ErasedBundlePtrs,
-        ErasedBundleRefs, ErasedBundleSlicePtrs, ErasedBundleSlices,
+        ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs,
+        ErasedBundleNonNullSlicePtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
+        ErasedBundleSlices,
         traits::{ErasedArchetypeKind, ErasedArchetypeMeta, ErasedBundleDrop},
     },
     erased::ErasedArchetypeView,
@@ -18,18 +19,19 @@ use crate::{
 
 pub trait ErasedArchetypeSoa:
     SoaOwned<
-        Context: for<'data, 'a> SoaContext<
+        Context: for<'a, 'data> SoaContext<
             'data,
             Self,
-            Ptrs<'a> = ErasedBundlePtrs<Self::Archetype<'a>, ConstPtr<Self::Ptrs>>,
-            MutPtrs<'a> = ErasedBundleMutPtrs<Self::Archetype<'a>, MutPtr<Self::Ptrs>>,
-            NonNullPtrs<'a> = ErasedBundleNonNullPtrs<Self::Archetype<'a>, NonNullPtr<Self::Ptrs>>,
-            SlicePtrs<'a> = ErasedBundleSlicePtrs<Self::Archetype<'a>, ConstPtr<Self::Ptrs>>,
-            SliceMutPtrs<'a> = ErasedBundleMutSlicePtrs<Self::Archetype<'a>, MutPtr<Self::Ptrs>>,
-            Refs<'a> = ErasedBundleRefs<'data, Self::Archetype<'a>, ConstPtr<Self::Ptrs>>,
-            RefsMut<'a> = ErasedBundleMutRefs<'data, Self::Archetype<'a>, MutPtr<Self::Ptrs>>,
-            Slices<'a> = ErasedBundleSlices<'data, Self::Archetype<'a>, ConstPtr<Self::Ptrs>>,
-            SlicesMut<'a> = ErasedBundleMutSlices<'data, Self::Archetype<'a>, MutPtr<Self::Ptrs>>,
+            Ptrs<'a> = ErasedArchetypeSoaPtrs<'a, Self>,
+            MutPtrs<'a> = ErasedArchetypeSoaMutPtrs<'a, Self>,
+            NonNullPtrs<'a> = ErasedArchetypeSoaNonNullPtrs<'a, Self>,
+            SlicePtrs<'a> = ErasedArchetypeSoaSlicePtrs<'a, Self>,
+            SliceMutPtrs<'a> = ErasedArchetypeSoaMutSlicePtrs<'a, Self>,
+            SliceNonNullPtrs<'a> = ErasedArchetypeSoaNonNullSlicePtrs<'a, Self>,
+            Refs<'a> = ErasedArchetypeSoaRefs<'a, 'data, Self>,
+            RefsMut<'a> = ErasedArchetypeSoaMutRefs<'a, 'data, Self>,
+            Slices<'a> = ErasedArchetypeSoaSlices<'a, 'data, Self>,
+            SlicesMut<'a> = ErasedArchetypeSoaSlicesMut<'a, 'data, Self>,
         > + Deref<Target: ErasedArchetypeKind<Meta = Self::Meta>>,
     > + SoaAlloc
 {
@@ -38,6 +40,51 @@ pub trait ErasedArchetypeSoa:
     type DropKind: ErasedBundleDrop<Self::Meta>;
     type Ptrs: SliceItemPtrs;
 }
+
+pub type ErasedArchetypeSoaPtrs<'a, T> = ErasedBundlePtrs<
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    ConstPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaMutPtrs<'a, T> = ErasedBundleMutPtrs<
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    MutPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaNonNullPtrs<'a, T> = ErasedBundleNonNullPtrs<
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    NonNullPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaSlicePtrs<'a, T> = ErasedBundleSlicePtrs<
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    ConstPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaMutSlicePtrs<'a, T> = ErasedBundleMutSlicePtrs<
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    MutPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaNonNullSlicePtrs<'a, T> = ErasedBundleNonNullSlicePtrs<
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    NonNullPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaRefs<'a, 'data, T> = ErasedBundleRefs<
+    'data,
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    NonNullPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaMutRefs<'a, 'data, T> = ErasedBundleMutRefs<
+    'data,
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    NonNullPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaSlices<'a, 'data, T> = ErasedBundleSlices<
+    'data,
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    NonNullPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
+pub type ErasedArchetypeSoaSlicesMut<'a, 'data, T> = ErasedBundleMutSlices<
+    'data,
+    <T as ErasedArchetypeSoa>::Archetype<'a>,
+    NonNullPtr<<T as ErasedArchetypeSoa>::Ptrs>,
+>;
 
 impl<'view, Meta, D, S, P> ErasedArchetypeSoa for ErasedBorrowedViewBundle<'view, Meta, D, S, P>
 where

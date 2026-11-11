@@ -70,6 +70,14 @@ where
         let inner = inner.into_nonnull_ptrs();
         unsafe { ErasedBundleNonNullPtrs::from_inner(inner) }
     }
+
+    #[inline]
+    pub fn into_refs(self) -> ErasedBundleRefs<'a, D, P> {
+        let Self { inner } = self;
+
+        let inner = inner.into_refs();
+        unsafe { ErasedBundleRefs::from_inner(inner) }
+    }
 }
 
 impl<D, P> ErasedBundleMutRefs<'_, D, P>
@@ -119,7 +127,7 @@ where
     }
 }
 
-impl<'a, D, P> ErasedBundleMutRefs<'a, D, P>
+impl<D, P> ErasedBundleMutRefs<'_, D, P>
 where
     P: NonNullSliceItemPtr,
 {
@@ -153,14 +161,6 @@ where
 
         let inner = inner.into_mut_ptrs();
         unsafe { ErasedBundleMutPtrs::from_inner(inner) }
-    }
-
-    #[inline]
-    pub fn into_refs(self) -> ErasedBundleRefs<'a, D, P> {
-        let Self { inner } = self;
-
-        let inner = inner.into_refs();
-        unsafe { ErasedBundleRefs::from_inner(inner) }
     }
 }
 

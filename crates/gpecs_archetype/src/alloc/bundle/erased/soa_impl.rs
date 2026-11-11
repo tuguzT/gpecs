@@ -602,8 +602,18 @@ where
     }
 
     #[inline]
+    unsafe fn refs_from_nonnull_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Refs<'a> {
+        unsafe { ptrs.as_ref() }
+    }
+
+    #[inline]
     fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a> {
         refs.into_ptrs()
+    }
+
+    #[inline]
+    fn refs_as_nonnull_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::NonNullPtrs<'a> {
+        refs.into_nonnull_ptrs()
     }
 
     type RefsMut<'a> = ErasedBundleMutRefs<'data, &'a ErasedArchetype<Meta>, P::NonNull>;
@@ -619,6 +629,14 @@ where
     }
 
     #[inline]
+    unsafe fn mut_refs_from_nonnull_ptrs<'a>(
+        &'a self,
+        ptrs: Self::NonNullPtrs<'a>,
+    ) -> Self::RefsMut<'a> {
+        unsafe { ptrs.as_mut() }
+    }
+
+    #[inline]
     fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
         refs.into_ptrs()
     }
@@ -626,6 +644,11 @@ where
     #[inline]
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
         refs.into_mut_ptrs()
+    }
+
+    #[inline]
+    fn mut_refs_as_nonnull_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::NonNullPtrs<'a> {
+        refs.into_nonnull_ptrs()
     }
 
     #[inline]

@@ -443,8 +443,20 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            unsafe fn refs_from_nonnull_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Refs<'a> {
+                let refs = unsafe { ($(ptrs.$indices.as_ref(),)*) };
+                refs
+            }
+
+            #[inline]
             fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a> {
                 let ptrs = ($(ptr::from_ref(refs.$indices),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn refs_as_nonnull_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::NonNullPtrs<'a> {
+                let ptrs = ($(NonNull::from_ref(refs.$indices),)*);
                 ptrs
             }
 
@@ -462,6 +474,12 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            unsafe fn mut_refs_from_nonnull_ptrs<'a>(&'a self, mut ptrs: Self::NonNullPtrs<'a>) -> Self::RefsMut<'a> {
+                let refs = unsafe { ($(ptrs.$indices.as_mut(),)*) };
+                refs
+            }
+
+            #[inline]
             fn mut_refs_as_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Ptrs<'a> {
                 let ptrs = ($(ptr::from_ref(refs.$indices),)*);
                 ptrs
@@ -470,6 +488,12 @@ macro_rules! tuple_impl {
             #[inline]
             fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
                 let ptrs = ($(ptr::from_mut(refs.$indices),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn mut_refs_as_nonnull_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::NonNullPtrs<'a> {
+                let ptrs = ($(NonNull::from_mut(refs.$indices),)*);
                 ptrs
             }
 

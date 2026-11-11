@@ -10,13 +10,13 @@ use gpecs_ptr::slice::{
 };
 use gpecs_soa::{
     traits::{
-        NonNullPtrs, SoaAllocContext, SoaCloneToUninit, SoaCloneToUninitContext, SoaRaw,
-        SoaRawContext, SoaRead, SoaReadContext, SoaWrite, SoaWriteContext,
+        NonNullPtrs, Soa, SoaAllocContext, SoaCloneToUninit, SoaCloneToUninitContext, SoaContext,
+        SoaRaw, SoaRawContext, SoaRead, SoaReadContext, SoaWrite, SoaWriteContext,
     },
     wrapper,
 };
 
-use crate::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs};
+use crate::{KeyValueMutPtrs, KeyValueMutRefs, KeyValuePair, KeyValuePtrs, KeyValueRefs};
 
 pub struct KeyValueNonNullPtrs<'ctx, K, V, P = NonNull<K>>
 where
@@ -254,6 +254,28 @@ where
             context.nonnull_ptrs_copy_backward(src_value, dst_value, count);
             dst_key.copy_from(src_key, count);
         }
+    }
+}
+
+impl<'ctx, 'a, K, V, P> KeyValueNonNullPtrs<'ctx, K, V, P>
+where
+    V: Soa<'a> + ?Sized,
+    P: NonNullSliceItemPtr<Item = K>,
+{
+    #[inline]
+    pub unsafe fn as_ref(self, context: &'ctx V::Context) -> KeyValueRefs<'ctx, 'a, K, V, P> {
+        let (key, value) = self.into_parts();
+
+        let value = unsafe { context.refs_from_nonnull_ptrs(value) };
+        unsafe { KeyValueRefs::from_parts(key, value) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut(self, context: &'ctx V::Context) -> KeyValueMutRefs<'ctx, 'a, K, V, P> {
+        let (key, value) = self.into_parts();
+
+        let value = unsafe { context.mut_refs_from_nonnull_ptrs(value) };
+        unsafe { KeyValueMutRefs::from_parts(key, value) }
     }
 }
 

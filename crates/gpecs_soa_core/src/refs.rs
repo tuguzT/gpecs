@@ -1,4 +1,4 @@
-use crate::traits::{MutPtrs, Ptrs, Refs, RefsMut, Soa, SoaContext};
+use crate::traits::{MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, Soa, SoaContext};
 
 #[inline]
 pub fn upcast<'short, 'long: 'short, 'data, T>(
@@ -22,11 +22,33 @@ where
 }
 
 #[inline]
+pub unsafe fn from_nonnull_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+) -> Refs<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.refs_from_nonnull_ptrs(ptrs) }
+}
+
+#[inline]
 pub fn as_ptrs<'a, 'data, T>(context: &'a T::Context, refs: Refs<'a, 'data, T>) -> Ptrs<'a, T>
 where
     T: Soa<'data> + ?Sized,
 {
     context.refs_as_ptrs(refs)
+}
+
+#[inline]
+pub fn as_nonnull_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    refs: Refs<'a, 'data, T>,
+) -> NonNullPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.refs_as_nonnull_ptrs(refs)
 }
 
 #[inline]
@@ -51,6 +73,17 @@ where
 }
 
 #[inline]
+pub unsafe fn mut_from_nonnull_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+) -> RefsMut<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.mut_refs_from_nonnull_ptrs(ptrs) }
+}
+
+#[inline]
 pub fn mut_as_ptrs<'a, 'data, T>(
     context: &'a T::Context,
     refs: RefsMut<'a, 'data, T>,
@@ -70,6 +103,17 @@ where
     T: Soa<'data> + ?Sized,
 {
     context.mut_refs_as_mut_ptrs(refs)
+}
+
+#[inline]
+pub fn mut_as_nonnull_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    refs: RefsMut<'a, 'data, T>,
+) -> NonNullPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_refs_as_nonnull_ptrs(refs)
 }
 
 #[inline]

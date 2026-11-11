@@ -470,6 +470,17 @@ where
 }
 
 #[inline]
+pub unsafe fn as_refs<'a, 'data, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+) -> Refs<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { refs::from_nonnull_ptrs::<T>(context, ptrs) }
+}
+
+#[inline]
 pub unsafe fn as_mut_refs_unchecked<'a, 'data, T>(
     context: &'a T::Context,
     ptrs: MutPtrs<'a, T>,
@@ -478,6 +489,17 @@ where
     T: Soa<'data> + ?Sized,
 {
     unsafe { refs::from_mut_ptrs::<T>(context, ptrs) }
+}
+
+#[inline]
+pub unsafe fn as_mut_refs<'a, 'data, T>(
+    context: &'a T::Context,
+    ptrs: NonNullPtrs<'a, T>,
+) -> RefsMut<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { refs::mut_from_nonnull_ptrs::<T>(context, ptrs) }
 }
 
 #[inline]

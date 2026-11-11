@@ -10,7 +10,7 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::{KeyValueMutPtrs, KeyValuePtrs, KeyValueRefs};
+use crate::{KeyValueMutPtrs, KeyValueNonNullPtrs, KeyValuePtrs, KeyValueRefs};
 
 pub struct KeyValueMutRefs<'ctx, 'a, K, V, P = *mut K>
 where
@@ -69,6 +69,17 @@ where
         let key = key.cast_mut();
         let value = context.mut_refs_as_mut_ptrs(value.into_inner());
         KeyValueMutPtrs::new(key, value)
+    }
+
+    #[inline]
+    pub fn into_nonnull_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValueNonNullPtrs<'ctx, K, V, P> {
+        let Self { key, value } = self;
+
+        let value = context.mut_refs_as_nonnull_ptrs(value.into_inner());
+        KeyValueNonNullPtrs::new(key, value)
     }
 
     #[inline]

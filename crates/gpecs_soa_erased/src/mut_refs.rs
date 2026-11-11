@@ -12,7 +12,7 @@ use crate::{
     error::{DowncastError, PtrsError},
     layout::WithLayout,
     offsets::{BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::{ConstPtr, MutPtr, NonNullPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::{RefsMut, Soa, SoaAlloc, SoaContext, SoaRawContext},
@@ -75,6 +75,12 @@ where
         let ptrs = unsafe { ptrs.map_layouts(f) };
         unsafe { ErasedSoaMutRefs::from_nonnull_ptrs(ptrs) }
     }
+
+    #[inline]
+    pub fn into_refs(self) -> ErasedSoaRefs<'a, D, P> {
+        let Self { ptrs, .. } = self;
+        unsafe { ptrs.as_ref() }
+    }
 }
 
 impl<D, P> ErasedSoaMutRefs<'_, D, P>
@@ -117,7 +123,7 @@ where
     }
 }
 
-impl<'a, D, P> ErasedSoaMutRefs<'a, D, P>
+impl<D, P> ErasedSoaMutRefs<'_, D, P>
 where
     P: NonNullSliceItemPtr,
 {
@@ -144,12 +150,6 @@ where
     pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, MutPtr<P::Ptrs>> {
         let Self { ptrs, .. } = self;
         ptrs.cast_mut()
-    }
-
-    #[inline]
-    pub fn into_refs(self) -> ErasedSoaRefs<'a, D, NonNullPtr<P::Ptrs>> {
-        let Self { ptrs, .. } = self;
-        unsafe { ptrs.as_ref() }
     }
 }
 

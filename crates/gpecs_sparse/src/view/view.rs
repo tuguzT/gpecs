@@ -701,7 +701,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
-    pub fn into_slices(self) -> (KeyValueSlices<'ctx, 'a, K, V, P::Const>, &'a [S]) {
+    pub fn into_slices(self) -> (KeyValueSlices<'ctx, 'a, K, V, P::NonNull>, &'a [S]) {
         let (_, dense, sparse) = self.into_slices_with_context();
         (dense, sparse)
     }
@@ -712,7 +712,7 @@ where
         self,
     ) -> (
         &'ctx V::Context,
-        KeyValueSlices<'ctx, 'a, K, V, P::Const>,
+        KeyValueSlices<'ctx, 'a, K, V, P::NonNull>,
         &'a [S],
     ) {
         let (context, dense, sparse) = self.into_slice_ptrs_with_context();
@@ -735,7 +735,7 @@ where
     }
 
     #[inline]
-    pub fn into_dense_slices(self) -> KeyValueSlices<'ctx, 'a, K, V, P::Const> {
+    pub fn into_dense_slices(self) -> KeyValueSlices<'ctx, 'a, K, V, P::NonNull> {
         let (_, dense) = self.into_dense_slices_with_context();
         dense
     }
@@ -743,7 +743,7 @@ where
     #[inline]
     pub fn into_dense_slices_with_context(
         self,
-    ) -> (&'ctx V::Context, KeyValueSlices<'ctx, 'a, K, V, P::Const>) {
+    ) -> (&'ctx V::Context, KeyValueSlices<'ctx, 'a, K, V, P::NonNull>) {
         let (context, dense, _) = self.into_slices_with_context();
         (context, dense)
     }
@@ -872,7 +872,7 @@ where
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V, P::Const>, &'a [S]) {
+    pub fn as_slices(&'a self) -> (KeyValueSlices<'a, 'a, K, V, P::NonNull>, &'a [S]) {
         let (_, dense, sparse) = self.as_slices_with_context();
         (dense, sparse)
     }
@@ -883,7 +883,7 @@ where
         &'a self,
     ) -> (
         &'a V::Context,
-        KeyValueSlices<'a, 'a, K, V, P::Const>,
+        KeyValueSlices<'a, 'a, K, V, P::NonNull>,
         &'a [S],
     ) {
         let (context, dense, sparse) = self.as_slice_ptrs_with_context();
@@ -906,7 +906,7 @@ where
     }
 
     #[inline]
-    pub fn as_dense_slices(&'a self) -> KeyValueSlices<'a, 'a, K, V, P::Const> {
+    pub fn as_dense_slices(&'a self) -> KeyValueSlices<'a, 'a, K, V, P::NonNull> {
         let (_, dense) = self.as_dense_slices_with_context();
         dense
     }
@@ -914,7 +914,7 @@ where
     #[inline]
     pub fn as_dense_slices_with_context(
         &'a self,
-    ) -> (&'a V::Context, KeyValueSlices<'a, 'a, K, V, P::Const>) {
+    ) -> (&'a V::Context, KeyValueSlices<'a, 'a, K, V, P::NonNull>) {
         let (context, dense, _) = self.as_slices_with_context();
         (context, dense)
     }

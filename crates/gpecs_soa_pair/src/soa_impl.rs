@@ -548,7 +548,7 @@ where
     V: SoaRaw<Context: SoaContext<'data, V>> + ?Sized,
     P: SliceItemPtrs<Item = K>,
 {
-    type Refs<'a> = KeyValueRefs<'a, 'data, K, V, P::Const>;
+    type Refs<'a> = KeyValueRefs<'a, 'data, K, V, P::NonNull>;
 
     #[inline]
     fn refs_upcast<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -567,7 +567,7 @@ where
         refs.into_ptrs(self)
     }
 
-    type RefsMut<'a> = KeyValueMutRefs<'a, 'data, K, V, P::Mut>;
+    type RefsMut<'a> = KeyValueMutRefs<'a, 'data, K, V, P::NonNull>;
 
     #[inline]
     fn mut_refs_upcast<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -596,7 +596,7 @@ where
         refs.into_refs(self)
     }
 
-    type Slices<'a> = KeyValueSlices<'a, 'data, K, V, P::Const>;
+    type Slices<'a> = KeyValueSlices<'a, 'data, K, V, P::NonNull>;
 
     #[inline]
     fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -638,7 +638,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = KeyValueMutSlices<'a, 'data, K, V, P::Mut>;
+    type SlicesMut<'a> = KeyValueMutSlices<'a, 'data, K, V, P::NonNull>;
 
     #[inline]
     fn mut_slices_upcast<'short, 'long: 'short>(

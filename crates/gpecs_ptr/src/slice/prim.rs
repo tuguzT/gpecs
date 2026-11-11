@@ -182,6 +182,16 @@ unsafe impl<T> NonNullSliceItemPtr for NonNull<T> {
     }
 
     #[inline]
+    fn from_ref(r: &Self::Item) -> Self {
+        NonNull::from_ref(r)
+    }
+
+    #[inline]
+    fn from_mut(r: &mut Self::Item) -> Self {
+        NonNull::from_mut(r)
+    }
+
+    #[inline]
     fn as_ptr(self) -> NonNull<Self::Item> {
         self
     }

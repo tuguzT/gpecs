@@ -5,7 +5,7 @@ use core::{
     mem, ptr,
 };
 
-use gpecs_ptr::slice::{ConstPtr, MutSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr};
 use gpecs_soa::{
     traits::{SliceMutPtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
@@ -136,7 +136,7 @@ where
     pub unsafe fn as_ref_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueSlices<'ctx, 'a, K, V, ConstPtr<P::Ptrs>> {
+    ) -> KeyValueSlices<'ctx, 'a, K, V, NonNullPtr<P::Ptrs>> {
         unsafe { self.cast_const(context).as_ref_unchecked(context) }
     }
 
@@ -144,9 +144,10 @@ where
     pub unsafe fn as_mut_unchecked(
         self,
         context: &'ctx V::Context,
-    ) -> KeyValueMutSlices<'ctx, 'a, K, V, P> {
+    ) -> KeyValueMutSlices<'ctx, 'a, K, V, NonNullPtr<P::Ptrs>> {
         let Self { key, len, values } = self;
 
+        let key = unsafe { key.cast_nonnull_unchecked() };
         let values = unsafe { context.mut_slices_from_mut_slice_ptrs(values.into_inner()) };
         unsafe { KeyValueMutSlices::from_parts(key, len, values) }
     }

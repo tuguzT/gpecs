@@ -2,10 +2,9 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    slice,
 };
 
-use gpecs_ptr::slice::ConstSliceItemPtr;
+use gpecs_ptr::slice::{ConstPtr, NonNullSliceItemPtr};
 use gpecs_soa::{
     traits::{Refs, Soa, SoaContext, SoaOwned},
     wrapper,
@@ -17,7 +16,7 @@ pub struct KeyValueRefs<'ctx, 'a, K, V, P = *const K>
 where
     K: 'a,
     V: Soa<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
 {
     key: P,
     value: wrapper::Refs<'ctx, 'a, V>,
@@ -26,11 +25,11 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueRefs<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
 {
     #[inline]
     pub fn new(key: &'a K, value: Refs<'ctx, 'a, V>) -> Self {
-        let key = unsafe { P::from_parts(slice::from_ref(key), 0) };
+        let key = P::from_ref(key);
         unsafe { Self::from_parts(key, value) }
     }
 
@@ -44,14 +43,18 @@ where
     pub fn into_parts(self) -> (&'a K, Refs<'ctx, 'a, V>) {
         let Self { key, value } = self;
 
-        let key = unsafe { key.as_ref_unchecked() };
+        let key = unsafe { key.as_ref() };
         (key, value.into_inner())
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx V::Context) -> KeyValuePtrs<'ctx, K, V, P> {
+    pub fn into_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>> {
         let Self { key, value } = self;
 
+        let key = key.cast_const();
         let value = context.refs_as_ptrs(value.into_inner());
         KeyValuePtrs::new(key, value)
     }
@@ -61,13 +64,13 @@ impl<K, V, P> Debug for KeyValueRefs<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
 
-        let key = unsafe { key.as_ref_unchecked() };
+        let key = unsafe { key.as_ref() };
         f.debug_struct("KeyValueRefs")
             .field("key", key)
             .field("value", value)
@@ -79,14 +82,14 @@ impl<K, V, P> PartialEq for KeyValueRefs<'_, '_, K, V, P>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
 
-        let key = unsafe { key.as_ref_unchecked() };
-        let other_key = unsafe { other.key.as_ref_unchecked() };
+        let key = unsafe { key.as_ref() };
+        let other_key = unsafe { other.key.as_ref() };
 
         let other = (other_key, &other.value);
         (key, value) == other
@@ -97,7 +100,7 @@ impl<K, V, P> Eq for KeyValueRefs<'_, '_, K, V, P>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Eq,
 {
 }
@@ -106,14 +109,14 @@ impl<K, V, P> PartialOrd for KeyValueRefs<'_, '_, K, V, P>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
 
-        let key = unsafe { key.as_ref_unchecked() };
-        let other_key = unsafe { other.key.as_ref_unchecked() };
+        let key = unsafe { key.as_ref() };
+        let other_key = unsafe { other.key.as_ref() };
 
         let other = (other_key, &other.value);
         (key, value).partial_cmp(&other)
@@ -124,14 +127,14 @@ impl<K, V, P> Ord for KeyValueRefs<'_, '_, K, V, P>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
 
-        let key = unsafe { key.as_ref_unchecked() };
-        let other_key = unsafe { other.key.as_ref_unchecked() };
+        let key = unsafe { key.as_ref() };
+        let other_key = unsafe { other.key.as_ref() };
 
         let other = (other_key, &other.value);
         (key, value).cmp(&other)
@@ -142,13 +145,13 @@ impl<K, V, P> Hash for KeyValueRefs<'_, '_, K, V, P>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
 
-        let key = unsafe { key.as_ref_unchecked() };
+        let key = unsafe { key.as_ref() };
         (key, value).hash(state);
     }
 }
@@ -156,7 +159,7 @@ where
 impl<K, V, P> Clone for KeyValueRefs<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Clone,
 {
     #[inline]
@@ -171,7 +174,7 @@ where
 impl<K, V, P> Copy for KeyValueRefs<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: NonNullSliceItemPtr<Item = K>,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Copy,
 {
 }

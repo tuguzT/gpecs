@@ -1,4 +1,7 @@
-use core::ptr::{self, NonNull};
+use core::{
+    ptr::{self, NonNull},
+    slice,
+};
 
 pub type ConstPtr<T> = <T as SliceItemPtrs>::Const;
 pub type MutPtr<T> = <T as SliceItemPtrs>::Mut;
@@ -152,7 +155,20 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
     }
 
     fn dangling() -> Self {
-        let slice = NonNull::slice_from_raw_parts(NonNull::dangling(), 0);
+        let data = NonNull::dangling();
+        let slice = NonNull::slice_from_raw_parts(data, 0);
+        unsafe { Self::from_parts(slice, 0) }
+    }
+
+    fn from_ref(r: &Self::Item) -> Self {
+        let slice = slice::from_ref(r);
+        let slice = NonNull::from_ref(slice);
+        unsafe { Self::from_parts(slice, 0) }
+    }
+
+    fn from_mut(r: &mut Self::Item) -> Self {
+        let slice = slice::from_mut(r);
+        let slice = NonNull::from_mut(slice);
         unsafe { Self::from_parts(slice, 0) }
     }
 

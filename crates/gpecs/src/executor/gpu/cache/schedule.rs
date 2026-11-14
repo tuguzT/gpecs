@@ -192,10 +192,7 @@ where
             let additional_entries = additional_entries
                 .as_ref()
                 .map(AdditionalEntries::additional_entries);
-            let additional_entries = additional_entries
-                .as_ref()
-                .map(AsRef::as_ref)
-                .unwrap_or_default();
+            let additional_entries = additional_entries.as_ref().map_or_default(AsRef::as_ref);
 
             let into_archetype_cache = |(archetype_id, _)| {
                 let archetype_id = archetypes.map_archetype_id(archetype_id)?;
@@ -239,10 +236,7 @@ where
         let additional_entries = additional_entries
             .as_ref()
             .map(AdditionalEntries::additional_entries);
-        let additional_entries = additional_entries
-            .as_ref()
-            .map(AsRef::as_ref)
-            .unwrap_or_default();
+        let additional_entries = additional_entries.as_ref().map_or_default(AsRef::as_ref);
 
         let mut update_count = 0_usize;
         archetypes.retain(|&archetype_id, archetype_cache| {

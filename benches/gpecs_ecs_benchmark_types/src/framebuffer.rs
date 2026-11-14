@@ -49,9 +49,9 @@ where
     B: AsMut<[u32]>,
 {
     pub fn draw(&mut self, x: i32, y: i32, char: u32) {
-        let (Ok(x), Ok(y)) = (u32::try_from(x), u32::try_from(y)) else {
-            return;
-        };
+        // TODO: return error handling here
+        let x = x.cast_unsigned();
+        let y = y.cast_unsigned();
 
         let Self {
             desc,

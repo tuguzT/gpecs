@@ -42,7 +42,7 @@ authors = ["tuguzT <timurka.tugushev@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2024"
 # stable counterpart of nightly-2026-04-11, which is required for Rust-GPU project
-rust-version = "1.95.0"
+rust-version = "1.99.0"
 
 [workspace.dependencies]
 # main crates
@@ -72,8 +72,8 @@ gpecs_ecs_benchmark_core = { path = "benches/gpecs_ecs_benchmark_core" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
 cargo_metadata = { version = "0.23" }
-cargo-gpu-install = { version = "0.10.0-alpha.1" }
-spirv-std = { version = "0.10.0-alpha.1" }
+cargo-gpu-install = { version = "0.11.0" }
+spirv-std = { version = "0.11.0" }
 indexmap = { version = "2.14", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
@@ -83,7 +83,7 @@ itertools = { version = "0.15", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 polonius-the-crab = { version = "0.6", default-features = false }
 bytemuck = { version = "1.25", default-features = false }
-glam = { version = "0.33", default-features = false, features = ["nostd-libm"] }
+glam = { version = "0.34", default-features = false, features = ["nostd-libm"] }
 wgpu = { version = "30", default-features = false }
 rayon = { version = "1.12" }
 pollster = { version = "1.0", default-features = false }
@@ -101,8 +101,8 @@ egui-wgpu = { version = "0.37", default-features = false }
 rand = { version = "0.10" }
 
 [patch.crates-io]
-cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a27c0363d391a54de1feb9ee6864ad9dff72d243" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "a27c0363d391a54de1feb9ee6864ad9dff72d243" }
+cargo-gpu-install = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "60d1e2541ea55c82e1024b8d6969573736f062a5" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "60d1e2541ea55c82e1024b8d6969573736f062a5" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

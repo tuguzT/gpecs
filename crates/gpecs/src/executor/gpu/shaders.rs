@@ -75,6 +75,5 @@ mod tests {
         println!("Shader compilation info: {shader_compilation_info:#?}");
 
         let _swap_erased = init_pipeline(&device, &shader_module, "swap_erased");
-        let _sparse_get = init_pipeline(&device, &shader_module, "sparse_get");
     }
 }

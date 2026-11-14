@@ -662,17 +662,17 @@ where
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a>;
+    unsafe fn refs_from_ptrs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
+        let ptrs = unsafe { self.nonnull_ptrs_from_ptrs(ptrs) };
+        unsafe { self.refs_from_nonnull_ptrs(ptrs) }
+    }
 
     /// Converts [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field
     /// to their [references](SoaContext::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn refs_from_nonnull_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Refs<'a> {
-        let ptrs = self.nonnull_ptrs_as_ptrs(ptrs);
-        unsafe { self.refs_from_ptrs(ptrs) }
-    }
+    unsafe fn refs_from_nonnull_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::Refs<'a>;
 
     /// Converts [references](SoaContext::Refs) to each stored field
     /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
@@ -697,7 +697,10 @@ where
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a>;
+    unsafe fn mut_refs_from_mut_ptrs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
+        let ptrs = unsafe { self.nonnull_ptrs_from_mut_ptrs(ptrs) };
+        unsafe { self.mut_refs_from_nonnull_ptrs(ptrs) }
+    }
 
     /// Converts [non-null pointers](SoaRawContext::NonNullPtrs) to each stored field
     /// to their [mutable references](SoaContext::RefsMut) by dereferencing each one of them.
@@ -707,10 +710,7 @@ where
     unsafe fn mut_refs_from_nonnull_ptrs<'a>(
         &'a self,
         ptrs: Self::NonNullPtrs<'a>,
-    ) -> Self::RefsMut<'a> {
-        let ptrs = self.nonnull_ptrs_as_mut_ptrs(ptrs);
-        unsafe { self.mut_refs_from_mut_ptrs(ptrs) }
-    }
+    ) -> Self::RefsMut<'a>;
 
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
     /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
@@ -733,8 +733,8 @@ where
     /// Converts [mutable references](SoaContext::RefsMut) to each stored field
     /// to their [references](SoaContext::Refs) by explicitly converting each one of them via `&*` operator combination.
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        let ptrs = self.mut_refs_as_ptrs(refs);
-        unsafe { self.refs_from_ptrs(ptrs) }
+        let ptrs = self.mut_refs_as_nonnull_ptrs(refs);
+        unsafe { self.refs_from_nonnull_ptrs(ptrs) }
     }
 
     /// Collection of slices of each stored field.

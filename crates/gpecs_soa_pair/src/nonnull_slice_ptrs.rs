@@ -42,14 +42,14 @@ where
         let values_len = context.nonnull_slice_ptrs_len(&values);
         assert_eq!(keys_len, values_len);
 
-        unsafe { Self::new_unchecked(keys, values) }
+        unsafe { Self::from_parts(keys, values) }
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: NonNull<[K]>, values: SliceNonNullPtrs<'ctx, V>) -> Self {
+    pub unsafe fn from_parts(keys: NonNull<[K]>, values: SliceNonNullPtrs<'ctx, V>) -> Self {
         let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
-        unsafe { Self::from_parts(key, len, values) }
+        unsafe { Self::from_raw_parts(key, len, values) }
     }
 
     #[inline]
@@ -60,21 +60,41 @@ where
     ) -> Self {
         let (key, value) = ptrs.into_parts();
         let values = context.nonnull_slice_ptrs_from_raw_parts(value, len);
-        unsafe { Self::from_parts(key, len, values) }
+        unsafe { Self::from_raw_parts(key, len, values) }
     }
 
     #[inline]
-    pub unsafe fn from_parts(key: P, len: usize, values: SliceNonNullPtrs<'ctx, V>) -> Self {
+    pub unsafe fn from_slice_ptrs(
+        context: &'ctx V::Context,
+        ptrs: KeyValueSlicePtrs<'ctx, K, V, ConstPtr<P::Ptrs>>,
+    ) -> Self {
+        let (key, len, value) = ptrs.into_raw_parts();
+        let key = unsafe { P::from_ptr_unchecked(key) };
+        let values = unsafe { context.nonnull_slice_ptrs_from_slice_ptrs(value) };
+        unsafe { Self::from_raw_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub unsafe fn from_mut_slice_ptrs(
+        context: &'ctx V::Context,
+        ptrs: KeyValueMutSlicePtrs<'ctx, K, V, MutPtr<P::Ptrs>>,
+    ) -> Self {
+        let (key, len, value) = ptrs.into_raw_parts();
+        let key = unsafe { P::from_mut_ptr_unchecked(key) };
+        let values = unsafe { context.nonnull_slice_ptrs_from_mut_slice_ptrs(value) };
+        unsafe { Self::from_raw_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub unsafe fn from_raw_parts(key: P, len: usize, values: SliceNonNullPtrs<'ctx, V>) -> Self {
         let values = wrapper::SliceNonNullPtrs::new(values);
         Self { key, len, values }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (NonNull<[K]>, SliceNonNullPtrs<'ctx, V>) {
+    pub fn into_parts(self) -> (P, usize, SliceNonNullPtrs<'ctx, V>) {
         let Self { key, len, values } = self;
-
-        let keys = NonNull::slice_from_raw_parts(key.as_ptr(), len);
-        (keys, values.into_inner())
+        (key, len, values.into_inner())
     }
 
     #[inline]
@@ -132,7 +152,7 @@ where
 
         let key = key.cast_const();
         let values = context.nonnull_slice_ptrs_as_slice_ptrs(values.into_inner());
-        unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
+        unsafe { KeyValueSlicePtrs::from_raw_parts(key, len, values) }
     }
 
     #[inline]
@@ -144,7 +164,7 @@ where
 
         let key = key.cast_mut();
         let values = context.nonnull_slice_ptrs_as_mut_slice_ptrs(values.into_inner());
-        unsafe { KeyValueMutSlicePtrs::from_parts(key, len, values) }
+        unsafe { KeyValueMutSlicePtrs::from_raw_parts(key, len, values) }
     }
 
     #[inline]

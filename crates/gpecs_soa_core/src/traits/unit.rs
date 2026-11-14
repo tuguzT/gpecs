@@ -279,6 +279,22 @@ unsafe impl SoaRawContext<()> for () {
     }
 
     #[inline]
+    unsafe fn nonnull_slice_ptrs_from_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicePtrs<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        unsafe { NonNull::new_unchecked(slices.cast_mut()) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_slice_ptrs_from_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        unsafe { NonNull::new_unchecked(slices) }
+    }
+
+    #[inline]
     fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
         slices.len()
     }

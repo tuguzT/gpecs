@@ -93,7 +93,7 @@ where
 
         let key = key.cast_const();
         let values = context.slices_as_slice_ptrs(values.into_inner());
-        unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
+        unsafe { KeyValueSlicePtrs::from_raw_parts(key, len, values) }
     }
 
     #[inline]

@@ -300,6 +300,24 @@ where
     }
 
     #[inline]
+    unsafe fn nonnull_slice_ptrs_from_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicePtrs<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        let context = self.as_inner();
+        unsafe { KeyValueNonNullSlicePtrs::from_slice_ptrs(context, slices) }
+    }
+
+    #[inline]
+    unsafe fn nonnull_slice_ptrs_from_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        let context = self.as_inner();
+        unsafe { KeyValueNonNullSlicePtrs::from_mut_slice_ptrs(context, slices) }
+    }
+
+    #[inline]
     fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
         slices.len()
     }

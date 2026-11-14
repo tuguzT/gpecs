@@ -313,6 +313,24 @@ macro_rules! tuple_impl {
             }
 
             #[inline]
+            unsafe fn nonnull_slice_ptrs_from_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SlicePtrs<'a>,
+            ) -> Self::SliceNonNullPtrs<'a> {
+                let slices = unsafe { ($(NonNull::new_unchecked(slices.$indices.cast_mut()),)*) };
+                slices
+            }
+
+            #[inline]
+            unsafe fn nonnull_slice_ptrs_from_mut_slice_ptrs<'a>(
+                &'a self,
+                slices: Self::SliceMutPtrs<'a>,
+            ) -> Self::SliceNonNullPtrs<'a> {
+                let slices = unsafe { ($(NonNull::new_unchecked(slices.$indices),)*) };
+                slices
+            }
+
+            #[inline]
             fn nonnull_slice_ptrs_len(&self, slices: &Self::SliceNonNullPtrs<'_>) -> usize {
                 let lens = [$(slices.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));

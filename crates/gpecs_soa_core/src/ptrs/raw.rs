@@ -386,6 +386,28 @@ where
 }
 
 #[inline]
+pub unsafe fn nonnull_slices_from_slices<'a, T>(
+    context: &'a T::Context,
+    slices: SlicePtrs<'a, T>,
+) -> SliceNonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_slice_ptrs_from_slice_ptrs(slices) }
+}
+
+#[inline]
+pub unsafe fn nonnull_slices_from_mut_slices<'a, T>(
+    context: &'a T::Context,
+    slices: SliceMutPtrs<'a, T>,
+) -> SliceNonNullPtrs<'a, T>
+where
+    T: SoaRaw + ?Sized,
+{
+    unsafe { context.nonnull_slice_ptrs_from_mut_slice_ptrs(slices) }
+}
+
+#[inline]
 pub fn slices_len_nonnull<T>(context: &T::Context, slices: &SliceNonNullPtrs<'_, T>) -> usize
 where
     T: SoaRaw + ?Sized,

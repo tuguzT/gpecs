@@ -36,14 +36,14 @@ where
         let values_len = context.mut_slice_ptrs_len(&values);
         assert_eq!(keys_len, values_len);
 
-        unsafe { Self::new_unchecked(keys, values) }
+        unsafe { Self::from_parts(keys, values) }
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'ctx, V>) -> Self {
+    pub unsafe fn from_parts(keys: *mut [K], values: SliceMutPtrs<'ctx, V>) -> Self {
         let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
-        unsafe { Self::from_parts(key, len, values) }
+        unsafe { Self::from_raw_parts(key, len, values) }
     }
 
     #[inline]
@@ -54,11 +54,11 @@ where
     ) -> Self {
         let (key, value) = ptrs.into_parts();
         let values = context.mut_slice_ptrs_from_raw_parts(value, len);
-        unsafe { Self::from_parts(key, len, values) }
+        unsafe { Self::from_raw_parts(key, len, values) }
     }
 
     #[inline]
-    pub unsafe fn from_parts(key: P, len: usize, values: SliceMutPtrs<'ctx, V>) -> Self {
+    pub unsafe fn from_raw_parts(key: P, len: usize, values: SliceMutPtrs<'ctx, V>) -> Self {
         let values = wrapper::SliceMutPtrs::new(values);
         Self { key, len, values }
     }
@@ -69,6 +69,12 @@ where
 
         let keys = ptr::slice_from_raw_parts_mut(key.as_mut_ptr(), len);
         (keys, values.into_inner())
+    }
+
+    #[inline]
+    pub fn into_raw_parts(self) -> (P, usize, SliceMutPtrs<'ctx, V>) {
+        let Self { key, len, values } = self;
+        (key, len, values.into_inner())
     }
 
     #[inline]
@@ -91,7 +97,7 @@ where
 
         let key = key.cast_const();
         let values = context.slice_ptrs_cast_const(values.into_inner());
-        unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
+        unsafe { KeyValueSlicePtrs::from_raw_parts(key, len, values) }
     }
 
     #[inline]

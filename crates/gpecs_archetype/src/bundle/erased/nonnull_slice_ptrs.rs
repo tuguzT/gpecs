@@ -130,6 +130,40 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
+    pub fn from_slice_ptrs(ptrs: ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>>) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = ErasedSoaNonNullSlicePtrs::from_slice_ptrs(ptrs)?;
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_slice_ptrs_unchecked(
+        ptrs: ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>>,
+    ) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaNonNullSlicePtrs::from_slice_ptrs_unchecked(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn from_mut_slice_ptrs(ptrs: ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>>) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = ErasedSoaNonNullSlicePtrs::from_mut_slice_ptrs(ptrs)?;
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_mut_slice_ptrs_unchecked(
+        ptrs: ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>>,
+    ) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { ErasedSoaNonNullSlicePtrs::from_mut_slice_ptrs_unchecked(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
     pub fn cast_const(self) -> ErasedBundleSlicePtrs<D, ConstPtr<P::Ptrs>> {
         let Self { inner } = self;
 

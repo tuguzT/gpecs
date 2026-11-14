@@ -394,6 +394,38 @@ where
         len: usize,
     ) -> Self::SliceNonNullPtrs<'a>;
 
+    /// Creates [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) to each stored field
+    /// from their [slice pointers](SoaRawContext::SlicePtrs).
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_slice_ptrs_from_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicePtrs<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        let len = self.slice_ptrs_len(&slices);
+        let ptrs = self.slice_ptrs_as_ptrs(slices);
+        let data = unsafe { self.nonnull_ptrs_from_ptrs(ptrs) };
+        self.nonnull_slice_ptrs_from_raw_parts(data, len)
+    }
+
+    /// Creates [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) to each stored field
+    /// from their [mutable slice pointers](SoaRawContext::SliceMutPtrs).
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn nonnull_slice_ptrs_from_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        let len = self.mut_slice_ptrs_len(&slices);
+        let ptrs = self.mut_slice_ptrs_as_mut_ptrs(slices);
+        let data = unsafe { self.nonnull_ptrs_from_mut_ptrs(ptrs) };
+        self.nonnull_slice_ptrs_from_raw_parts(data, len)
+    }
+
     /// Returns the number of elements in slices to each [non-null slice pointer](SoaRawContext::SliceMutPtrs) of stored fields,
     /// also referred to as their 'length'.
     ///

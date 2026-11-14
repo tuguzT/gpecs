@@ -5,9 +5,7 @@ use core::{
     ptr::NonNull,
 };
 
-use gpecs_ptr::slice::{
-    ConstPtr, ConstSliceItemPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr,
-};
+use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr};
 use gpecs_soa::{
     traits::{
         NonNullPtrs, Soa, SoaAllocContext, SoaCloneToUninit, SoaCloneToUninitContext, SoaContext,
@@ -51,10 +49,7 @@ where
         ptrs: KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>>,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
-        let key = unsafe {
-            let slice = NonNull::new_unchecked(key.slice().cast_mut());
-            P::from_parts(slice, key.index())
-        };
+        let key = unsafe { P::from_ptr_unchecked(key) };
         let value = unsafe { context.nonnull_ptrs_from_ptrs(value) };
         Self::new(key, value)
     }
@@ -65,10 +60,7 @@ where
         ptrs: KeyValueMutPtrs<'ctx, K, V, MutPtr<P::Ptrs>>,
     ) -> Self {
         let (key, value) = ptrs.into_parts();
-        let key = unsafe {
-            let slice = NonNull::new_unchecked(key.slice());
-            P::from_parts(slice, key.index())
-        };
+        let key = unsafe { P::from_mut_ptr_unchecked(key) };
         let value = unsafe { context.nonnull_ptrs_from_mut_ptrs(value) };
         Self::new(key, value)
     }

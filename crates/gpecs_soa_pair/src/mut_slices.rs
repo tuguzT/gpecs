@@ -99,7 +99,7 @@ where
 
         let key = key.cast_const();
         let values = context.mut_slices_as_slice_ptrs(values.into_inner());
-        unsafe { KeyValueSlicePtrs::from_parts(key, len, values) }
+        unsafe { KeyValueSlicePtrs::from_raw_parts(key, len, values) }
     }
 
     #[inline]
@@ -111,7 +111,7 @@ where
 
         let key = key.cast_mut();
         let values = context.mut_slices_as_mut_slice_ptrs(values.into_inner());
-        unsafe { KeyValueMutSlicePtrs::from_parts(key, len, values) }
+        unsafe { KeyValueMutSlicePtrs::from_raw_parts(key, len, values) }
     }
 
     #[inline]

@@ -781,8 +781,23 @@ where
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn slices_from_slice_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>)
-    -> Self::Slices<'a>;
+    unsafe fn slices_from_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicePtrs<'a>,
+    ) -> Self::Slices<'a> {
+        let slices = unsafe { self.nonnull_slice_ptrs_from_slice_ptrs(slices) };
+        unsafe { self.slices_from_nonnull_slice_ptrs(slices) }
+    }
+
+    /// Converts [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) to each stored field
+    /// to their [slices](SoaContext::Slices) by dereferencing each one of them.
+    ///
+    /// All the safety requirements resulting from dereferencing of each non-null slice pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn slices_from_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Slices<'a>;
 
     /// Forms [slices](SoaContext::Slices) to each stored field
     /// from [pointers](SoaRawContext::Ptrs) to each field and a length.
@@ -801,15 +816,49 @@ where
         unsafe { self.slices_from_slice_ptrs(slices) }
     }
 
+    /// Forms [slices](SoaContext::Slices) to each stored field
+    /// from [non-null pointers](SoaRawContext::NonNullPtrs) to each field and a length.
+    ///
+    /// The len argument is the number of elements, not the number of bytes.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`slice::from_raw_parts()`](core::slice::from_raw_parts) method to each non-null pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn slices_from_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::Slices<'a> {
+        let slices = self.nonnull_slice_ptrs_from_raw_parts(data, len);
+        unsafe { self.slices_from_nonnull_slice_ptrs(slices) }
+    }
+
     /// Converts [slices](SoaContext::Slices) to each stored field
     /// to their [slice pointers](SoaRawContext::SlicePtrs) by taking the pointer of each one of them.
-    fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a>;
+    fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
+        let slices = self.slices_as_nonnull_slice_ptrs(slices);
+        self.nonnull_slice_ptrs_as_slice_ptrs(slices)
+    }
+
+    /// Converts [slices](SoaContext::Slices) to each stored field
+    /// to their [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) by taking the pointer of each one of them.
+    fn slices_as_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::Slices<'a>,
+    ) -> Self::SliceNonNullPtrs<'a>;
 
     /// Converts [slices](SoaContext::Slices) to each stored field
     /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
     fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
         let slices = self.slices_as_slice_ptrs(slices);
         self.slice_ptrs_as_ptrs(slices)
+    }
+
+    /// Converts [slices](SoaContext::Slices) to each stored field
+    /// to their [non-null pointers](SoaRawContext::NonNullPtrs) by taking the pointer of each one of them.
+    fn slices_as_nonnull_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::NonNullPtrs<'a> {
+        let slices = self.slices_as_nonnull_slice_ptrs(slices);
+        self.nonnull_slice_ptrs_as_nonnull_ptrs(slices)
     }
 
     /// Returns the number of elements in [slices](SoaContext::Slices) to each stored field,
@@ -836,6 +885,19 @@ where
     unsafe fn mut_slices_from_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::SlicesMut<'a> {
+        let slices = unsafe { self.nonnull_slice_ptrs_from_mut_slice_ptrs(slices) };
+        unsafe { self.mut_slices_from_nonnull_slice_ptrs(slices) }
+    }
+
+    /// Converts [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) to each stored field
+    /// to their [mutable slices](SoaContext::SlicesMut) by dereferencing each one of them.
+    ///
+    /// All the safety requirements resulting from dereferencing of each non-null slice pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn mut_slices_from_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
     ) -> Self::SlicesMut<'a>;
 
     /// Forms [mutable slices](SoaContext::SlicesMut) to each stored field
@@ -844,7 +906,7 @@ where
     /// The len argument is the number of elements, not the number of bytes.
     ///
     /// All the safety requirements resulting from applying
-    /// [`slice::from_raw_parts_mut()`](core::slice::from_raw_parts_mut) method to each pointer
+    /// [`slice::from_raw_parts_mut()`](core::slice::from_raw_parts_mut) method to each mutable pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn mut_slices_from_raw_parts<'a>(
         &'a self,
@@ -855,11 +917,28 @@ where
         unsafe { self.mut_slices_from_mut_slice_ptrs(slices) }
     }
 
+    /// Forms [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// from [non-null pointers](SoaRawContext::NonNullPtrs) to each field and a length.
+    ///
+    /// The len argument is the number of elements, not the number of bytes.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`slice::from_raw_parts_mut()`](core::slice::from_raw_parts_mut) method to each non-null pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn mut_slices_from_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SlicesMut<'a> {
+        let slices = self.nonnull_slice_ptrs_from_raw_parts(data, len);
+        unsafe { self.mut_slices_from_nonnull_slice_ptrs(slices) }
+    }
+
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
     /// to their [slice pointers](SoaRawContext::SlicePtrs) by taking the pointer of each one of them.
     fn mut_slices_as_slice_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::SlicePtrs<'a> {
-        let slices = self.mut_slices_as_mut_slice_ptrs(slices);
-        self.slice_ptrs_cast_const(slices)
+        let slices = self.mut_slices_as_nonnull_slice_ptrs(slices);
+        self.nonnull_slice_ptrs_as_slice_ptrs(slices)
     }
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
@@ -867,7 +946,17 @@ where
     fn mut_slices_as_mut_slice_ptrs<'a>(
         &'a self,
         slices: Self::SlicesMut<'a>,
-    ) -> Self::SliceMutPtrs<'a>;
+    ) -> Self::SliceMutPtrs<'a> {
+        let slices = self.mut_slices_as_nonnull_slice_ptrs(slices);
+        self.nonnull_slice_ptrs_as_mut_slice_ptrs(slices)
+    }
+
+    /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// to their [non-null slice pointers](SoaRawContext::SliceNonNullPtrs) by taking the pointer of each one of them.
+    fn mut_slices_as_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::SliceNonNullPtrs<'a>;
 
     /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
     /// to their [pointers](SoaRawContext::Ptrs) by taking the pointer of each one of them.
@@ -881,6 +970,16 @@ where
     fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
         let slices = self.mut_slices_as_mut_slice_ptrs(slices);
         self.mut_slice_ptrs_as_mut_ptrs(slices)
+    }
+
+    /// Converts [mutable slices](SoaContext::SlicesMut) to each stored field
+    /// to their [non-null pointers](SoaRawContext::NonNullPtrs) by taking the pointer of each one of them.
+    fn mut_slices_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::NonNullPtrs<'a> {
+        let slices = self.mut_slices_as_nonnull_slice_ptrs(slices);
+        self.nonnull_slice_ptrs_as_nonnull_ptrs(slices)
     }
 
     /// Returns the number of elements in [mutable slices](SoaContext::SlicesMut) to each stored field,

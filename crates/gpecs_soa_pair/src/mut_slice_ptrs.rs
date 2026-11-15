@@ -155,7 +155,7 @@ where
 
         let key = unsafe { key.cast_nonnull_unchecked() };
         let values = unsafe { context.mut_slices_from_mut_slice_ptrs(values.into_inner()) };
-        unsafe { KeyValueMutSlices::from_parts(key, len, values) }
+        unsafe { KeyValueMutSlices::from_raw_parts(key, len, values) }
     }
 }
 

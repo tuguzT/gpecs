@@ -11,7 +11,7 @@ use gpecs_soa::{
     wrapper,
 };
 
-use crate::{KeyValuePtrs, KeyValueSlicePtrs};
+use crate::{KeyValueNonNullPtrs, KeyValueNonNullSlicePtrs, KeyValuePtrs, KeyValueSlicePtrs};
 
 pub struct KeyValueSlices<'ctx, 'a, K, V, P = *const K>
 where
@@ -36,25 +36,25 @@ where
         let values_len = context.slices_len(&values);
         assert_eq!(keys_len, values_len);
 
-        unsafe { Self::new_unchecked(keys, values) }
+        unsafe { Self::from_parts(keys, values) }
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
+    pub unsafe fn from_parts(keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
         let keys = NonNull::from_ref(keys);
         let key = unsafe { P::from_parts(keys, 0) };
         let len = keys.len();
-        unsafe { Self::from_parts(key, len, values) }
+        unsafe { Self::from_raw_parts(key, len, values) }
     }
 
     #[inline]
-    pub unsafe fn from_parts(key: P, len: usize, values: Slices<'ctx, 'a, V>) -> Self {
+    pub unsafe fn from_raw_parts(key: P, len: usize, values: Slices<'ctx, 'a, V>) -> Self {
         let values = wrapper::Slices::new(values);
         Self { key, len, values }
     }
 
     #[inline]
-    pub unsafe fn from_raw_parts(
+    pub unsafe fn from_ptrs(
         context: &'ctx V::Context,
         data: KeyValuePtrs<'ctx, K, V, ConstPtr<P::Ptrs>>,
         len: usize,
@@ -62,7 +62,18 @@ where
         let (key, values) = data.into_parts();
         let key = unsafe { key.cast_nonnull_unchecked() };
         let values = unsafe { context.slices_from_raw_parts(values, len) };
-        unsafe { Self::from_parts(key, len, values) }
+        unsafe { Self::from_raw_parts(key, len, values) }
+    }
+
+    #[inline]
+    pub unsafe fn from_nonnull_ptrs(
+        context: &'ctx V::Context,
+        data: KeyValueNonNullPtrs<'ctx, K, V, P>,
+        len: usize,
+    ) -> Self {
+        let (key, values) = data.into_parts();
+        let values = unsafe { context.slices_from_parts(values, len) };
+        unsafe { Self::from_raw_parts(key, len, values) }
     }
 
     #[inline]
@@ -74,6 +85,12 @@ where
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    #[inline]
+    pub fn into_raw_parts(self) -> (P, usize, Slices<'ctx, 'a, V>) {
+        let Self { key, len, values } = self;
+        (key, len, values.into_inner())
     }
 
     #[inline]
@@ -97,6 +114,17 @@ where
     }
 
     #[inline]
+    pub fn into_nonnull_slice_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValueNonNullSlicePtrs<'ctx, K, V, P> {
+        let Self { key, len, values } = self;
+
+        let values = context.slices_as_nonnull_slice_ptrs(values.into_inner());
+        unsafe { KeyValueNonNullSlicePtrs::from_raw_parts(key, len, values) }
+    }
+
+    #[inline]
     pub fn into_ptrs(
         self,
         context: &'ctx V::Context,
@@ -106,6 +134,17 @@ where
         let key = key.cast_const();
         let values = context.slices_as_ptrs(values.into_inner());
         KeyValuePtrs::new(key, values)
+    }
+
+    #[inline]
+    pub fn into_nonnull_ptrs(
+        self,
+        context: &'ctx V::Context,
+    ) -> KeyValueNonNullPtrs<'ctx, K, V, P> {
+        let Self { key, values, .. } = self;
+
+        let values = context.slices_as_nonnull_ptrs(values.into_inner());
+        KeyValueNonNullPtrs::new(key, values)
     }
 
     unsafe fn keys<'b>(key: P, len: usize) -> &'b [K] {
@@ -146,7 +185,7 @@ where
     fn default() -> Self {
         let keys = Default::default();
         let values = Slices::<V>::default();
-        unsafe { Self::new_unchecked(keys, values) }
+        unsafe { Self::from_parts(keys, values) }
     }
 }
 

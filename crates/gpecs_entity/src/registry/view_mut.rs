@@ -64,7 +64,7 @@ where
         let dense = unsafe {
             SoaViewMut::new(
                 Identity::from_inner_ref(context),
-                KeyValueMutSlices::new_unchecked(entities, metas.as_identity_slice_mut()),
+                KeyValueMutSlices::from_parts(entities, metas.as_identity_slice_mut()),
             )
         };
 

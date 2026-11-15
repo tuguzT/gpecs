@@ -1,6 +1,9 @@
 use crate::{
     slices::SlicesIndex,
-    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext},
+    traits::{
+        MutPtrs, NonNullPtrs, Ptrs, SliceMutPtrs, SliceNonNullPtrs, SlicePtrs, Slices, SlicesMut,
+        Soa, SoaContext,
+    },
 };
 
 #[inline]
@@ -25,6 +28,17 @@ where
 }
 
 #[inline]
+pub unsafe fn from_nonnull_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+) -> Slices<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
+}
+
+#[inline]
 pub unsafe fn from_raw_parts<'a, 'data, T>(
     context: &'a T::Context,
     data: Ptrs<'a, T>,
@@ -34,6 +48,18 @@ where
     T: Soa<'data> + ?Sized,
 {
     unsafe { context.slices_from_raw_parts(data, len) }
+}
+
+#[inline]
+pub unsafe fn from_parts<'a, 'data, T>(
+    context: &'a T::Context,
+    data: NonNullPtrs<'a, T>,
+    len: usize,
+) -> Slices<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.slices_from_parts(data, len) }
 }
 
 #[inline]
@@ -48,11 +74,33 @@ where
 }
 
 #[inline]
+pub fn as_nonnull_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: Slices<'a, 'data, T>,
+) -> SliceNonNullPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.slices_as_nonnull_slice_ptrs(slices)
+}
+
+#[inline]
 pub fn as_ptrs<'a, 'data, T>(context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Ptrs<'a, T>
 where
     T: Soa<'data> + ?Sized,
 {
     context.slices_as_ptrs(slices)
+}
+
+#[inline]
+pub fn as_nonnull_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: Slices<'a, 'data, T>,
+) -> NonNullPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.slices_as_nonnull_ptrs(slices)
 }
 
 #[inline]
@@ -85,6 +133,17 @@ where
 }
 
 #[inline]
+pub unsafe fn from_nonnull_slice_ptrs_mut<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SliceNonNullPtrs<'a, T>,
+) -> SlicesMut<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
+}
+
+#[inline]
 pub unsafe fn from_raw_parts_mut<'a, 'data, T>(
     context: &'a T::Context,
     data: MutPtrs<'a, T>,
@@ -94,6 +153,18 @@ where
     T: Soa<'data> + ?Sized,
 {
     unsafe { context.mut_slices_from_raw_parts(data, len) }
+}
+
+#[inline]
+pub unsafe fn from_parts_mut<'a, 'data, T>(
+    context: &'a T::Context,
+    data: NonNullPtrs<'a, T>,
+    len: usize,
+) -> SlicesMut<'a, 'data, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    unsafe { context.mut_slices_from_parts(data, len) }
 }
 
 #[inline]
@@ -119,6 +190,17 @@ where
 }
 
 #[inline]
+pub fn mut_as_nonnull_slice_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> SliceNonNullPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_nonnull_slice_ptrs(slices)
+}
+
+#[inline]
 pub fn mut_as_ptrs<'a, 'data, T>(
     context: &'a T::Context,
     slices: SlicesMut<'a, 'data, T>,
@@ -138,6 +220,17 @@ where
     T: Soa<'data> + ?Sized,
 {
     context.mut_slices_as_mut_ptrs(slices)
+}
+
+#[inline]
+pub fn mut_as_nonnull_ptrs<'a, 'data, T>(
+    context: &'a T::Context,
+    slices: SlicesMut<'a, 'data, T>,
+) -> NonNullPtrs<'a, T>
+where
+    T: Soa<'data> + ?Sized,
+{
+    context.mut_slices_as_nonnull_ptrs(slices)
 }
 
 #[inline]

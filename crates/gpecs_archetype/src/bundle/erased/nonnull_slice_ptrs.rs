@@ -25,7 +25,8 @@ use crate::{
     bundle::{
         Bundle,
         erased::{
-            ErasedBundleMutSlicePtrs, ErasedBundleNonNullPtrs, ErasedBundleSlicePtrs,
+            ErasedBundleMutSlicePtrs, ErasedBundleMutSlices, ErasedBundleNonNullPtrs,
+            ErasedBundleSlicePtrs, ErasedBundleSlices,
             error::DowncastError,
             traits::{ErasedArchetypeIterator, ErasedArchetypeKind, IntoErasedArchetypeIterator},
         },
@@ -70,6 +71,16 @@ where
 
         let inner = inner.into_ptrs();
         unsafe { ErasedBundleNonNullPtrs::from_inner(inner) }
+    }
+
+    #[inline]
+    pub unsafe fn as_ref<'a>(self) -> ErasedBundleSlices<'a, D, P> {
+        unsafe { ErasedBundleSlices::from_nonnull_slice_ptrs(self) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut<'a>(self) -> ErasedBundleMutSlices<'a, D, P> {
+        unsafe { ErasedBundleMutSlices::from_nonnull_slice_ptrs(self) }
     }
 }
 

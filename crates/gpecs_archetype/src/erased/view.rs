@@ -82,7 +82,7 @@ where
         let dense = unsafe {
             SoaView::new(
                 Identity::from_inner_ref(context),
-                KeyValueSlices::new_unchecked(keys, values),
+                KeyValueSlices::from_parts(keys, values),
             )
         };
 

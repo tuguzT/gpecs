@@ -123,7 +123,7 @@ where
 
         let key = unsafe { key.cast_nonnull_unchecked() };
         let values = unsafe { context.slices_from_slice_ptrs(values.into_inner()) };
-        unsafe { KeyValueSlices::from_parts(key, len, values) }
+        unsafe { KeyValueSlices::from_raw_parts(key, len, values) }
     }
 }
 

@@ -8,12 +8,13 @@ use core::{
 
 use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr};
 use gpecs_soa::{
-    traits::{SliceNonNullPtrs, SoaRaw, SoaRawContext},
+    traits::{SliceNonNullPtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
 };
 
 use crate::{
-    KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueNonNullPtrs, KeyValuePtrs, KeyValueSlicePtrs,
+    KeyValueMutPtrs, KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValueNonNullPtrs, KeyValuePtrs,
+    KeyValueSlicePtrs, KeyValueSlices,
 };
 
 pub struct KeyValueNonNullSlicePtrs<'ctx, K, V, P = NonNull<K>>
@@ -92,7 +93,15 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (P, usize, SliceNonNullPtrs<'ctx, V>) {
+    pub fn into_parts(self) -> (NonNull<[K]>, SliceNonNullPtrs<'ctx, V>) {
+        let Self { key, len, values } = self;
+
+        let keys = NonNull::slice_from_raw_parts(key.as_ptr(), len);
+        (keys, values.into_inner())
+    }
+
+    #[inline]
+    pub fn into_raw_parts(self) -> (P, usize, SliceNonNullPtrs<'ctx, V>) {
         let Self { key, len, values } = self;
         (key, len, values.into_inner())
     }
@@ -177,6 +186,28 @@ where
             }
         }
         unsafe { context.nonnull_slices_drop_in_place(values.into_inner()) }
+    }
+}
+
+impl<'ctx, 'a, K, V, P> KeyValueNonNullSlicePtrs<'ctx, K, V, P>
+where
+    V: Soa<'a> + ?Sized,
+    P: NonNullSliceItemPtr<Item = K>,
+{
+    #[inline]
+    pub unsafe fn as_ref(self, context: &'ctx V::Context) -> KeyValueSlices<'ctx, 'a, K, V, P> {
+        let (key, len, value) = self.into_raw_parts();
+
+        let value = unsafe { context.slices_from_nonnull_slice_ptrs(value) };
+        unsafe { KeyValueSlices::from_raw_parts(key, len, value) }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut(self, context: &'ctx V::Context) -> KeyValueMutSlices<'ctx, 'a, K, V, P> {
+        let (key, len, value) = self.into_raw_parts();
+
+        let value = unsafe { context.mut_slices_from_nonnull_slice_ptrs(value) };
+        unsafe { KeyValueMutSlices::from_raw_parts(key, len, value) }
     }
 }
 

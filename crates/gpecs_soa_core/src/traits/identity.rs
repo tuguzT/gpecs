@@ -486,6 +486,14 @@ where
     }
 
     #[inline]
+    unsafe fn slices_from_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Slices<'a> {
+        unsafe { slices.as_ref() }
+    }
+
+    #[inline]
     unsafe fn slices_from_raw_parts<'a>(
         &'a self,
         data: Self::Ptrs<'a>,
@@ -495,13 +503,35 @@ where
     }
 
     #[inline]
+    unsafe fn slices_from_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::Slices<'a> {
+        unsafe { NonNull::slice_from_raw_parts(data, len).as_ref() }
+    }
+
+    #[inline]
     fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
         ptr::from_ref(slices)
     }
 
     #[inline]
+    fn slices_as_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::Slices<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        NonNull::from_ref(slices)
+    }
+
+    #[inline]
     fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
         slices.as_ptr()
+    }
+
+    #[inline]
+    fn slices_as_nonnull_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::NonNullPtrs<'a> {
+        NonNull::from_ref(slices).cast() // should be `slices.as_non_null_ptr()` but it's unstable
     }
 
     #[inline]
@@ -527,12 +557,29 @@ where
     }
 
     #[inline]
+    unsafe fn mut_slices_from_nonnull_slice_ptrs<'a>(
+        &'a self,
+        mut slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SlicesMut<'a> {
+        unsafe { slices.as_mut() }
+    }
+
+    #[inline]
     unsafe fn mut_slices_from_raw_parts<'a>(
         &'a self,
         data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SlicesMut<'a> {
         unsafe { slice::from_raw_parts_mut(data, len) }
+    }
+
+    #[inline]
+    unsafe fn mut_slices_from_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SlicesMut<'a> {
+        unsafe { NonNull::slice_from_raw_parts(data, len).as_mut() }
     }
 
     #[inline]
@@ -549,6 +596,14 @@ where
     }
 
     #[inline]
+    fn mut_slices_as_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        NonNull::from_mut(slices)
+    }
+
+    #[inline]
     fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
         slices.as_ptr()
     }
@@ -556,6 +611,14 @@ where
     #[inline]
     fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
         slices.as_mut_ptr()
+    }
+
+    #[inline]
+    fn mut_slices_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::NonNullPtrs<'a> {
+        NonNull::from_mut(slices).cast() // should be `slices.as_non_null_ptr()` but it's unstable
     }
 
     #[inline]

@@ -643,7 +643,7 @@ where
     fn slices_upcast<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
         let (keys, values) = from.into_parts();
         let values = V::Context::slices_upcast(values);
-        unsafe { KeyValueSlices::new_unchecked(keys, values) }
+        unsafe { KeyValueSlices::from_parts(keys, values) }
     }
 
     #[inline]
@@ -655,13 +655,31 @@ where
     }
 
     #[inline]
+    unsafe fn slices_from_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::Slices<'a> {
+        unsafe { slices.as_ref(self) }
+    }
+
+    #[inline]
     unsafe fn slices_from_raw_parts<'a>(
         &'a self,
         data: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::Slices<'a> {
         let context = self.as_inner();
-        unsafe { KeyValueSlices::from_raw_parts(context, data, len) }
+        unsafe { KeyValueSlices::from_ptrs(context, data, len) }
+    }
+
+    #[inline]
+    unsafe fn slices_from_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::Slices<'a> {
+        let context = self.as_inner();
+        unsafe { KeyValueSlices::from_nonnull_ptrs(context, data, len) }
     }
 
     #[inline]
@@ -670,8 +688,21 @@ where
     }
 
     #[inline]
+    fn slices_as_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::Slices<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        slices.into_nonnull_slice_ptrs(self)
+    }
+
+    #[inline]
     fn slices_as_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::Ptrs<'a> {
         slices.into_ptrs(self)
+    }
+
+    #[inline]
+    fn slices_as_nonnull_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::NonNullPtrs<'a> {
+        slices.into_nonnull_ptrs(self)
     }
 
     #[inline]
@@ -687,7 +718,7 @@ where
     ) -> Self::SlicesMut<'short> {
         let (keys, values) = from.into_parts();
         let values = V::Context::mut_slices_upcast(values);
-        unsafe { KeyValueMutSlices::new_unchecked(keys, values) }
+        unsafe { KeyValueMutSlices::from_parts(keys, values) }
     }
 
     #[inline]
@@ -699,13 +730,31 @@ where
     }
 
     #[inline]
+    unsafe fn mut_slices_from_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SliceNonNullPtrs<'a>,
+    ) -> Self::SlicesMut<'a> {
+        unsafe { slices.as_mut(self) }
+    }
+
+    #[inline]
     unsafe fn mut_slices_from_raw_parts<'a>(
         &'a self,
         data: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SlicesMut<'a> {
         let context = self.as_inner();
-        unsafe { KeyValueMutSlices::from_raw_parts(context, data, len) }
+        unsafe { KeyValueMutSlices::from_mut_ptrs(context, data, len) }
+    }
+
+    #[inline]
+    unsafe fn mut_slices_from_parts<'a>(
+        &'a self,
+        data: Self::NonNullPtrs<'a>,
+        len: usize,
+    ) -> Self::SlicesMut<'a> {
+        let context = self.as_inner();
+        unsafe { KeyValueMutSlices::from_nonnull_ptrs(context, data, len) }
     }
 
     #[inline]
@@ -722,6 +771,14 @@ where
     }
 
     #[inline]
+    fn mut_slices_as_nonnull_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::SliceNonNullPtrs<'a> {
+        slices.into_nonnull_slice_ptrs(self)
+    }
+
+    #[inline]
     fn mut_slices_as_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Ptrs<'a> {
         slices.into_ptrs(self)
     }
@@ -729,6 +786,14 @@ where
     #[inline]
     fn mut_slices_as_mut_ptrs<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::MutPtrs<'a> {
         slices.into_mut_ptrs(self)
+    }
+
+    #[inline]
+    fn mut_slices_as_nonnull_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::NonNullPtrs<'a> {
+        slices.into_nonnull_ptrs(self)
     }
 
     #[inline]

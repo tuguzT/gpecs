@@ -63,6 +63,13 @@ where
     type Item = T;
 
     #[inline]
+    fn dangling() -> Self {
+        let data = ptr::dangling();
+        let slice = ptr::slice_from_raw_parts(data, 0);
+        Self { index: 0, slice }
+    }
+
+    #[inline]
     fn index(self) -> usize {
         self.index
     }
@@ -112,6 +119,13 @@ where
     T: Copy,
 {
     type Item = T;
+
+    #[inline]
+    fn dangling() -> Self {
+        let data = ptr::dangling_mut();
+        let slice = ptr::slice_from_raw_parts_mut(data, 0);
+        Self { index: 0, slice }
+    }
 
     #[inline]
     fn index(self) -> usize {
@@ -183,7 +197,7 @@ where
     unsafe fn copy_from(self, src: GpuSliceItemPtr<*const [T]>, count: usize) {
         // Assuming slices do not overlap or are pointing to the same memory region
         // because they can only be obtained from storage buffers / shared memory on Rust-GPU backend...
-        // And if they do overlap, this is a UB by Rust definitions even when using safe code!
+        // And if they do overlap, this is an UB by Rust definitions even when using safe code!
         if self.index <= src.index {
             // Copy forwards, as `self` starts before `src`
             unsafe { ordered_copy(src, self, 0..count) }
@@ -218,6 +232,13 @@ where
     T: Copy,
 {
     type Item = T;
+
+    #[inline]
+    fn dangling() -> Self {
+        let data = NonNull::dangling();
+        let slice = NonNull::slice_from_raw_parts(data, 0);
+        Self { index: 0, slice }
+    }
 
     #[inline]
     fn index(self) -> usize {

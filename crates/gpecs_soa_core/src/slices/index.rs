@@ -1,7 +1,7 @@
 use core::ops;
 
 use crate::{
-    ptrs::{SlicePtrsIndex, get, get_mut, index, index_mut},
+    ptrs::{SlicePtrsIndex, get_nonnull, index_nonnull},
     traits::{Refs, RefsMut, Slices, SlicesMut, Soa, SoaContext},
 };
 
@@ -46,17 +46,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let ptrs = get::<T, _>(context, slices, self)?;
-        let refs = unsafe { context.refs_from_ptrs(ptrs) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let ptrs = get_nonnull::<T, _>(context, slices, self)?;
+        let refs = unsafe { context.refs_from_nonnull_ptrs(ptrs) };
         Some(refs)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let ptrs = index::<T, _>(context, slices, self);
-        unsafe { context.refs_from_ptrs(ptrs) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let ptrs = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.refs_from_nonnull_ptrs(ptrs) }
     }
 
     type RefsMut<'a> = RefsMut<'a, 'data, T>;
@@ -67,9 +67,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let ptrs = get_mut::<T, _>(context, slices, self)?;
-        let refs = unsafe { context.mut_refs_from_mut_ptrs(ptrs) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let ptrs = get_nonnull::<T, _>(context, slices, self)?;
+        let refs = unsafe { context.mut_refs_from_nonnull_ptrs(ptrs) };
         Some(refs)
     }
 
@@ -79,9 +79,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let ptrs = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_refs_from_mut_ptrs(ptrs) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let ptrs = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_refs_from_nonnull_ptrs(ptrs) }
     }
 }
 
@@ -97,17 +97,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = get::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = index::<T, _>(context, slices, self);
-        unsafe { context.slices_from_slice_ptrs(slices) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
     }
 
     type RefsMut<'a> = SlicesMut<'a, 'data, T>;
@@ -118,9 +118,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = get_mut::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
@@ -130,9 +130,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
     }
 }
 
@@ -148,17 +148,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = get::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = index::<T, _>(context, slices, self);
-        unsafe { context.slices_from_slice_ptrs(slices) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
     }
 
     type RefsMut<'a> = SlicesMut<'a, 'data, T>;
@@ -169,9 +169,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = get_mut::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
@@ -181,9 +181,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
     }
 }
 
@@ -199,17 +199,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = get::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = index::<T, _>(context, slices, self);
-        unsafe { context.slices_from_slice_ptrs(slices) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
     }
 
     type RefsMut<'a> = SlicesMut<'a, 'data, T>;
@@ -220,9 +220,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = get_mut::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
@@ -232,9 +232,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
     }
 }
 
@@ -291,17 +291,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = get::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = index::<T, _>(context, slices, self);
-        unsafe { context.slices_from_slice_ptrs(slices) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
     }
 
     type RefsMut<'a> = SlicesMut<'a, 'data, T>;
@@ -312,9 +312,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = get_mut::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
@@ -324,9 +324,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
     }
 }
 
@@ -342,17 +342,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = get::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = index::<T, _>(context, slices, self);
-        unsafe { context.slices_from_slice_ptrs(slices) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
     }
 
     type RefsMut<'a> = SlicesMut<'a, 'data, T>;
@@ -363,9 +363,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = get_mut::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
@@ -375,9 +375,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
     }
 }
 
@@ -393,17 +393,17 @@ where
         context: &'a T::Context,
         slices: Slices<'a, 'data, T>,
     ) -> Option<Self::Refs<'a>> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = get::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.slices_from_slice_ptrs(slices) };
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
     #[inline]
     fn index<'a>(self, context: &'a T::Context, slices: Slices<'a, 'data, T>) -> Self::Refs<'a> {
-        let slices = context.slices_as_slice_ptrs(slices);
-        let slices = index::<T, _>(context, slices, self);
-        unsafe { context.slices_from_slice_ptrs(slices) }
+        let slices = context.slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.slices_from_nonnull_slice_ptrs(slices) }
     }
 
     type RefsMut<'a> = SlicesMut<'a, 'data, T>;
@@ -414,9 +414,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Option<Self::RefsMut<'a>> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = get_mut::<T, _>(context, slices, self)?;
-        let slices = unsafe { context.mut_slices_from_mut_slice_ptrs(slices) };
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = get_nonnull::<T, _>(context, slices, self)?;
+        let slices = unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) };
         Some(slices)
     }
 
@@ -426,9 +426,9 @@ where
         context: &'a T::Context,
         slices: SlicesMut<'a, 'data, T>,
     ) -> Self::RefsMut<'a> {
-        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
-        let slices = index_mut::<T, _>(context, slices, self);
-        unsafe { context.mut_slices_from_mut_slice_ptrs(slices) }
+        let slices = context.mut_slices_as_nonnull_slice_ptrs(slices);
+        let slices = index_nonnull::<T, _>(context, slices, self);
+        unsafe { context.mut_slices_from_nonnull_slice_ptrs(slices) }
     }
 }
 

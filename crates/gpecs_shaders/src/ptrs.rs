@@ -1,4 +1,7 @@
 use core::{
+    any, cmp,
+    fmt::{self, Debug},
+    hash::{self, Hash},
     marker::PhantomData,
     ptr::{self, NonNull},
 };
@@ -8,9 +11,60 @@ use gpecs_soa_erased::ptr::slice::{
     ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct GpuSliceItemPtrs<T> {
-    phantom: PhantomData<T>,
+pub struct GpuSliceItemPtrs<T>(PhantomData<T>);
+
+impl<T> GpuSliceItemPtrs<T> {
+    #[inline]
+    pub const fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T> Debug for GpuSliceItemPtrs<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let type_name = any::type_name::<T>();
+        write!(f, "GpuSliceItemPtrs<{type_name}>")
+    }
+}
+
+impl<T> Default for GpuSliceItemPtrs<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Clone for GpuSliceItemPtrs<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for GpuSliceItemPtrs<T> {}
+
+impl<T> PartialEq for GpuSliceItemPtrs<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<T> Eq for GpuSliceItemPtrs<T> {}
+
+impl<T> PartialOrd for GpuSliceItemPtrs<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T> Ord for GpuSliceItemPtrs<T> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<T> Hash for GpuSliceItemPtrs<T> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
 }
 
 unsafe impl<T> SliceItemPtrs for GpuSliceItemPtrs<T>

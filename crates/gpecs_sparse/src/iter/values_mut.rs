@@ -3,7 +3,7 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 
 use crate::{
     iter::{IterMut, ValueMutPtrs, ValuePtrs},
@@ -13,10 +13,10 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub struct ValuesMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
+pub struct ValuesMut<'ctx, 'a, K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: IterMut<'ctx, 'a, K, V, P>,
 }
@@ -24,7 +24,7 @@ where
 impl<'ctx, 'a, K, V, P> ValuesMut<'ctx, 'a, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(super) unsafe fn from_inner(inner: IterMut<'ctx, 'a, K, V, P>) -> Self {
@@ -178,7 +178,7 @@ where
 impl<'ctx, 'a, K, V, P> ValuesMut<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn into_slices(self) -> SlicesMut<'ctx, 'a, V> {
@@ -198,7 +198,7 @@ where
 impl<'a, K, V, P> ValuesMut<'_, '_, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -218,7 +218,7 @@ where
 impl<K, V, P> Debug for ValuesMut<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -230,7 +230,7 @@ where
 impl<T, K, V, P> AsRef<[T]> for ValuesMut<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -242,7 +242,7 @@ where
 impl<'ctx, 'a, K, V, P> Iterator for ValuesMut<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = RefsMut<'ctx, 'a, V>;
 
@@ -262,7 +262,7 @@ where
 impl<'a, K, V, P> DoubleEndedIterator for ValuesMut<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -274,7 +274,7 @@ where
 impl<'a, K, V, P> ExactSizeIterator for ValuesMut<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -285,6 +285,6 @@ where
 impl<'a, K, V, P> FusedIterator for ValuesMut<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }

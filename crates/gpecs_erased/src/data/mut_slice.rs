@@ -11,12 +11,12 @@ use crate::{
         ErasedSlice, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError},
     },
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSlicePtrAtIndex, SlicePtrAtIndex},
 };
 
 pub struct ErasedMutSlice<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     ptr: ErasedNonNullSlicePtr<T>,
     phantom: PhantomData<&'a mut [T::Item]>,
@@ -24,7 +24,7 @@ where
 
 impl<'a, T> ErasedMutSlice<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_parts(ptr: ErasedNonNullPtr<T>, len: usize) -> Self {
@@ -88,7 +88,7 @@ where
 
 impl<'a, T> ErasedMutSlice<'a, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_mut_slice_ptr(ptr: ErasedMutSlicePtr<MutPtr<T::Ptrs>>) -> Option<Self> {
@@ -226,7 +226,7 @@ where
 
 impl<T> Debug for ErasedMutSlice<'_, T>
 where
-    T: NonNullSliceItemPtr<Item: Debug>,
+    T: NonNullSlicePtrAtIndex<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
@@ -242,7 +242,7 @@ where
 
 impl<T> AsRef<[T::Item]> for ErasedMutSlice<'_, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {
@@ -252,7 +252,7 @@ where
 
 impl<T> AsMut<[T::Item]> for ErasedMutSlice<'_, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T::Item] {

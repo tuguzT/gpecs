@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSlicePtrAtIndex, SlicePtrAtIndex},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -54,7 +54,7 @@ impl<T> ErasedNonNullSlicePtr<T> {
 
 impl<T> ErasedNonNullSlicePtr<T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn as_ref<'a>(self) -> ErasedSlice<'a, T> {
@@ -69,7 +69,7 @@ where
 
 impl<T> ErasedNonNullSlicePtr<T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub fn new(layout: Layout, items: NonNull<[T::Item]>, len: usize) -> Result<Self, DataError> {
@@ -134,7 +134,7 @@ where
         let slice_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
         let slice = NonNull::slice_from_raw_parts(ptr.cast(), slice_len);
 
-        let ptr = unsafe { NonNullSliceItemPtr::from_parts(slice, 0) };
+        let ptr = unsafe { NonNullSlicePtrAtIndex::from_parts(slice, 0) };
         let ptr = unsafe { ErasedNonNullPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)

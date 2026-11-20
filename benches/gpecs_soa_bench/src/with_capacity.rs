@@ -1,7 +1,7 @@
 use std::{hint::black_box, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    BoxedErasedSoa, ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, soa::prelude::*,
+    BoxedErasedSoa, ErasedSoaContext, ptr::slice::CoreSlicePtrsAtIndex, soa::prelude::*,
 };
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
@@ -16,7 +16,7 @@ pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
 
     fn soa_ser_with_capacity(
         capacity: usize,
-    ) -> SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>> {
+    ) -> SoaVec<BoxedErasedSoa<CoreSlicePtrsAtIndex<MaybeUninit<u8>>>> {
         let capacity = black_box(capacity);
         let context = Default::default();
         let context = ErasedSoaContext::of::<Self>(&context).expect("layouts should be valid");

@@ -5,7 +5,7 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 
 use crate::{
     item::{KeyValuePair, KeyValueRefs, KeyValueSlicePtrs, KeyValueSlices},
@@ -20,11 +20,11 @@ use crate::{
 type Inner<'ctx, 'a, K, V, P> = soa::slices::Iter<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct Iter<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
+pub struct Iter<'ctx, 'a, K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     K: 'a,
     V: SoaRaw<Context: 'ctx> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: Inner<'ctx, 'a, K, V, P>,
 }
@@ -32,7 +32,7 @@ where
 impl<'ctx, 'a, K, V, P> Iter<'ctx, 'a, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -147,7 +147,7 @@ where
 impl<'ctx, 'a, K, V, P> Iter<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -188,7 +188,7 @@ where
 impl<'a, K, V, P> Iter<'_, '_, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
@@ -210,7 +210,7 @@ impl<K, V, P> Debug for Iter<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -225,7 +225,7 @@ where
 impl<K, V, P> Clone for Iter<'_, '_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -239,7 +239,7 @@ where
 impl<T, K, V, P> AsRef<[T]> for Iter<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -252,7 +252,7 @@ where
 impl<'ctx, 'a, K, V, P> Iterator for Iter<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = (&'a K, Refs<'ctx, 'a, V>);
 
@@ -272,7 +272,7 @@ where
 impl<'a, K, V, P> DoubleEndedIterator for Iter<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -284,7 +284,7 @@ where
 impl<'a, K, V, P> ExactSizeIterator for Iter<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -295,6 +295,6 @@ where
 impl<'a, K, V, P> FusedIterator for Iter<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }

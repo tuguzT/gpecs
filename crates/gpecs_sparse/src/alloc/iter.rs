@@ -4,7 +4,7 @@ use core::{
     ptr,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 
 use crate::{
     item::KeyValuePair,
@@ -34,7 +34,7 @@ where
     #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
     pub(super) fn new<P>(vec: vec::SoaVec<KeyValuePair<K, V, P>>) -> Self
     where
-        P: SliceItemPtrs<Item = K>,
+        P: SlicePtrsAtIndex<Item = K>,
     {
         let (keys, _) = vec.as_slice_ptrs().into_parts();
         let keys = unsafe { keys.as_ref_unchecked() };
@@ -268,11 +268,11 @@ where
 impl<K, V> FusedIterator for IntoKeys<K, V> where V: SoaRaw + ?Sized {}
 
 #[repr(transparent)]
-pub struct IntoValues<K, V, R, P = CoreSliceItemPtrs<K>>
+pub struct IntoValues<K, V, R, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: vec::IntoIter<KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>,
 }
@@ -281,7 +281,7 @@ impl<K, V, R, P> IntoValues<K, V, R, P>
 where
     V: SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(super) fn new(inner: vec::IntoIter<KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>) -> Self {
@@ -370,7 +370,7 @@ impl<'a, K, V, R, P> IntoValues<K, V, R, P>
 where
     V: SoaAlloc + Soa<'a> + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -407,7 +407,7 @@ impl<K, V, R, P> Debug for IntoValues<K, V, R, P>
 where
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -421,7 +421,7 @@ where
     V: SoaAlloc + ?Sized,
     V::Context: Default,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn default() -> Self {
@@ -436,7 +436,7 @@ where
     V: SoaAlloc + SoaCloneToUninit + ?Sized,
     V::Context: Clone,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -450,7 +450,7 @@ impl<K, V, R, P, U> AsRef<[U]> for IntoValues<K, V, R, P>
 where
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [U]>,
 {
     #[inline]
@@ -463,7 +463,7 @@ impl<K, V, R, P, U> AsMut<[U]> for IntoValues<K, V, R, P>
 where
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [U]>,
 {
     #[inline]
@@ -475,7 +475,7 @@ where
 impl<K, V, R, P> Iterator for IntoValues<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = R;
 
@@ -514,7 +514,7 @@ where
 impl<K, V, R, P> DoubleEndedIterator for IntoValues<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -526,7 +526,7 @@ where
 impl<K, V, R, P> ExactSizeIterator for IntoValues<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -537,16 +537,16 @@ where
 impl<K, V, R, P> FusedIterator for IntoValues<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }
 
 #[repr(transparent)]
-pub struct IntoIter<K, V, R, P = CoreSliceItemPtrs<K>>
+pub struct IntoIter<K, V, R, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: vec::IntoIter<KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>,
 }
@@ -555,7 +555,7 @@ impl<K, V, R, P> IntoIter<K, V, R, P>
 where
     V: SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(super) fn new(inner: vec::IntoIter<KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>) -> Self {
@@ -672,7 +672,7 @@ impl<'a, K, V, R, P> IntoIter<K, V, R, P>
 where
     V: SoaAlloc + Soa<'a> + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_value_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -738,7 +738,7 @@ where
     K: Debug,
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -755,7 +755,7 @@ where
     V: SoaAlloc + ?Sized,
     V::Context: Default,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn default() -> Self {
@@ -770,7 +770,7 @@ where
     V: SoaAlloc + SoaCloneToUninit + ?Sized,
     V::Context: Clone,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -784,7 +784,7 @@ impl<K, V, R, P, U> AsRef<[U]> for IntoIter<K, V, R, P>
 where
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [U]>,
 {
     #[inline]
@@ -797,7 +797,7 @@ impl<K, V, R, P, U> AsMut<[U]> for IntoIter<K, V, R, P>
 where
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [U]>,
 {
     #[inline]
@@ -809,7 +809,7 @@ where
 impl<K, V, R, P> Iterator for IntoIter<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = (K, R);
 
@@ -838,7 +838,7 @@ where
 impl<K, V, R, P> DoubleEndedIterator for IntoIter<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -850,7 +850,7 @@ where
 impl<K, V, R, P> ExactSizeIterator for IntoIter<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -861,17 +861,17 @@ where
 impl<K, V, R, P> FusedIterator for IntoIter<K, V, R, P>
 where
     V: SoaAlloc + SoaReadOwned<R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }
 
 #[repr(transparent)]
-pub struct Drain<'a, K, V, R, P = CoreSliceItemPtrs<K>>
+pub struct Drain<'a, K, V, R, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaAlloc + ?Sized,
     V::Context: 'a,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: vec::Drain<'a, KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>,
 }
@@ -880,7 +880,7 @@ impl<'a, K, V, R, P> Drain<'a, K, V, R, P>
 where
     V: SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(super) fn new(inner: vec::Drain<'a, KeyValuePair<K, V, P>, KeyValuePair<K, R, P>>) -> Self {
@@ -952,7 +952,7 @@ impl<'a, K, V, R, P> Drain<'_, K, V, R, P>
 where
     V: SoaAlloc + Soa<'a> + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_value_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -987,7 +987,7 @@ where
     K: Debug,
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1003,7 +1003,7 @@ impl<K, V, R, P, U> AsRef<[U]> for Drain<'_, K, V, R, P>
 where
     V: SoaOwned + SoaAlloc + ?Sized,
     R: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [U]>,
 {
     #[inline]
@@ -1015,7 +1015,7 @@ where
 impl<'a, K, V, R, P> Iterator for Drain<'a, K, V, R, P>
 where
     V: SoaAlloc + SoaRead<'a, R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = (K, R);
 
@@ -1035,7 +1035,7 @@ where
 impl<'a, K, V, R, P> DoubleEndedIterator for Drain<'a, K, V, R, P>
 where
     V: SoaAlloc + SoaRead<'a, R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -1047,7 +1047,7 @@ where
 impl<'a, K, V, R, P> ExactSizeIterator for Drain<'a, K, V, R, P>
 where
     V: SoaAlloc + SoaRead<'a, R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -1059,6 +1059,6 @@ where
 impl<'a, K, V, R, P> FusedIterator for Drain<'a, K, V, R, P>
 where
     V: SoaAlloc + SoaRead<'a, R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }

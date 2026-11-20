@@ -1,7 +1,7 @@
 use std::{mem::MaybeUninit, ptr::NonNull};
 
 use gpecs_archetype::bundle::erased::{self, traits::MustDrop};
-use gpecs_soa_erased::{ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage};
+use gpecs_soa_erased::{ptr::slice::CoreSlicePtrsAtIndex, storage::BoxedAlignedUninitStorage};
 
 pub use erased::*;
 
@@ -16,4 +16,4 @@ pub type ErasedBorrowedViewBundle<'a, Meta> =
     erased::ErasedBorrowedViewBundle<'a, Meta, MustDrop, Storage, SlicePtrs>;
 
 type Storage = BoxedAlignedUninitStorage;
-type SlicePtrs = CoreSliceItemPtrs<MaybeUninit<u8>>;
+type SlicePtrs = CoreSlicePtrsAtIndex<MaybeUninit<u8>>;

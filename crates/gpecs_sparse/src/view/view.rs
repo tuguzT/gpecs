@@ -8,7 +8,7 @@ use core::{
     ptr,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 
 use crate::{
     algo::{
@@ -29,14 +29,14 @@ use crate::{
     view::EpochSparseViewPtrs,
 };
 
-pub type SparseView<'ctx, 'a, T, S = DefaultSparseItem<usize>, P = CoreSliceItemPtrs<usize>> =
+pub type SparseView<'ctx, 'a, T, S = DefaultSparseItem<usize>, P = CoreSlicePtrsAtIndex<usize>> =
     EpochSparseView<'ctx, 'a, usize, T, S, P>;
 
-pub struct EpochSparseView<'ctx, 'a, K, V, S = DefaultSparseItem<K>, P = CoreSliceItemPtrs<K>>
+pub struct EpochSparseView<'ctx, 'a, K, V, S = DefaultSparseItem<K>, P = CoreSlicePtrsAtIndex<K>>
 where
     K: Key + 'a,
     V: SoaRaw<Context: 'ctx> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     dense: SoaView<'ctx, 'a, KeyValuePair<K, V, P>>,
@@ -47,7 +47,7 @@ impl<'ctx, 'a, K, V, S, P> EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -697,7 +697,7 @@ impl<'ctx, 'a, K, V, S, P> EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -868,7 +868,7 @@ impl<'a, K, V, S, P> EpochSparseView<'_, '_, K, V, S, P>
 where
     K: Key,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -1045,7 +1045,7 @@ impl<'ctx, 'a, K, V, S, P> Debug for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Debug,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: Debug,
 {
@@ -1063,7 +1063,7 @@ impl<K, V, S, P> Clone for EpochSparseView<'_, '_, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -1079,7 +1079,7 @@ impl<'ctx, 'a, K, V, S, P> Copy for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: Copy,
 {
@@ -1089,7 +1089,7 @@ impl<'ctx, 'a, K, V, S, P> PartialEq for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + PartialEq,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: PartialEq,
 {
@@ -1105,7 +1105,7 @@ impl<'ctx, 'a, K, V, S, P> Eq for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Eq,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: Eq,
 {
@@ -1115,7 +1115,7 @@ impl<'ctx, 'a, K, V, S, P> PartialOrd for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + PartialOrd,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: PartialOrd,
 {
@@ -1131,7 +1131,7 @@ impl<'ctx, 'a, K, V, S, P> Ord for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Ord,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: Ord,
 {
@@ -1147,7 +1147,7 @@ impl<'ctx, 'a, K, V, S, P> Hash for EpochSparseView<'ctx, 'a, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch> + Hash,
     SoaView<'ctx, 'a, KeyValuePair<K, V, P>>: Hash,
 {
@@ -1161,7 +1161,7 @@ impl<T, K, V, S, P> Index<K> for EpochSparseView<'_, '_, K, V, S, P>
 where
     K: Key + Debug,
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> V::Context: SoaContext<'a, V, Refs<'ctx> = &'a T>,
 {
@@ -1177,7 +1177,7 @@ impl<T, K, V, S, P> AsRef<[T]> for EpochSparseView<'_, '_, K, V, S, P>
 where
     K: Key,
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
@@ -1191,7 +1191,7 @@ impl<K, V, S, P> AsRef<Self> for EpochSparseView<'_, '_, K, V, S, P>
 where
     K: Key,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]
@@ -1204,7 +1204,7 @@ impl<'a, K, V, S, P> IntoIterator for &'a EpochSparseView<'_, '_, K, V, S, P>
 where
     K: Key,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (&'a K, Refs<'a, 'a, V>);
@@ -1220,7 +1220,7 @@ impl<'ctx, 'a, K, V, S, P> IntoIterator for EpochSparseView<'ctx, 'a, K, V, S, P
 where
     K: Key,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     type Item = (&'a K, Refs<'ctx, 'a, V>);
@@ -1238,7 +1238,7 @@ impl<'a, K, V, S, P> rayon::iter::IntoParallelIterator for &'a EpochSparseView<'
 where
     K: Key + Sync,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Sync,
     V::Fields: Sync,
@@ -1259,7 +1259,7 @@ impl<'ctx, 'a, K, V, S, P> rayon::iter::IntoParallelIterator
 where
     K: Key + Sync,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
     V::Context: Sync,
     V::Fields: Sync,

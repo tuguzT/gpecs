@@ -6,7 +6,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedMutSlicePtr,
-    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr},
+    ptr::slice::{ConstPtr, MutSlicePtrAtIndex, NonNullPtr},
 };
 
 use crate::{
@@ -90,7 +90,7 @@ impl<T> ErasedComponentMutSlicePtr<T> {
 
 impl<T> ErasedComponentMutSlicePtr<T>
 where
-    T: MutSliceItemPtr,
+    T: MutSlicePtrAtIndex,
 {
     #[inline]
     pub fn upcast<C, U>(

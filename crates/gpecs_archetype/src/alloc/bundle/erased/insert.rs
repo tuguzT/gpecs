@@ -6,7 +6,7 @@ use core::{
 };
 
 use gpecs_soa_erased::{
-    ErasedSoa, error::FromFieldsLayoutsError, ptr::slice::SliceItemPtrs,
+    ErasedSoa, error::FromFieldsLayoutsError, ptr::slice::SlicePtrsAtIndex,
     storage::AlignedStorageFromLayout,
 };
 
@@ -23,7 +23,7 @@ where
     T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]

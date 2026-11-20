@@ -10,7 +10,7 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
+    ptr::slice::{ConstSlicePtrAtIndex, MutSlicePtrAtIndex},
     soa::{
         identity::Identity,
         traits::{TupleHelper, count_idents},
@@ -65,7 +65,7 @@ where
     where
         I: IntoIterator<Item = ErasedComponentPtr<P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        P: ConstSliceItemPtr,
+        P: ConstSlicePtrAtIndex,
     {
         let component_id = components
             .component_id::<T>()
@@ -90,7 +90,7 @@ where
     where
         I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        P: MutSliceItemPtr,
+        P: MutSlicePtrAtIndex,
     {
         let component_id = components
             .component_id::<T>()
@@ -169,7 +169,7 @@ macro_rules! bundle_tuple_impl {
             where
                 Iter: IntoIterator<Item = ErasedComponentPtr<P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-                P: ConstSliceItemPtr,
+                P: ConstSlicePtrAtIndex,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
                 find_duplicate_components(&component_ids)?;
@@ -197,7 +197,7 @@ macro_rules! bundle_tuple_impl {
             where
                 Iter: IntoIterator<Item = ErasedComponentMutPtr<P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-                P: MutSliceItemPtr,
+                P: MutSlicePtrAtIndex,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
                 find_duplicate_components(&component_ids)?;

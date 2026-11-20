@@ -11,7 +11,7 @@ use gpecs_archetype::{
     storage::{self, error::IncompatibleBundleValueError},
 };
 use gpecs_entity::registry::EntityRegistry;
-use gpecs_soa_erased::{ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage};
+use gpecs_soa_erased::{ptr::slice::CoreSlicePtrsAtIndex, storage::BoxedAlignedUninitStorage};
 use gpecs_world::registry::WorldRegistry;
 
 use crate::common::{Components, ErasedDropMeta, Name, Position, Tag};
@@ -20,7 +20,7 @@ type ArchetypeStorage = storage::ArchetypeStorage<ErasedBundle<ErasedDropMeta>>;
 type ErasedBundle<Meta> = erased::ErasedBundle<Meta, MustDrop, Storage, SlicePtrs>;
 
 type Storage = BoxedAlignedUninitStorage;
-type SlicePtrs = CoreSliceItemPtrs<MaybeUninit<u8>>;
+type SlicePtrs = CoreSlicePtrsAtIndex<MaybeUninit<u8>>;
 
 #[test]
 fn storage_tag() {

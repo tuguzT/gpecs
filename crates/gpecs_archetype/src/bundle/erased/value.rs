@@ -18,7 +18,7 @@ use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts, ErasedSoa,
     ErasedSoaIntoFields,
     error::FromFieldsLayoutsError,
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput},
         traits::SoaReadContext,
@@ -48,7 +48,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     phantom: PhantomData<D>,
     inner: ErasedSoa<S, T, P>,
@@ -59,7 +59,7 @@ where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     pub unsafe fn from_inner(inner: ErasedSoa<S, T, P>) -> Self {
@@ -100,7 +100,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     pub fn layout(&self) -> Layout {
@@ -282,7 +282,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     pub fn iter(
@@ -315,7 +315,7 @@ where
     Other: ErasedArchetypeKind<Meta = Original::Meta>,
     D: ErasedBundleDrop<Original::Meta>,
     S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     Original(ErasedBundleKind<Original, D, S, P>),
     Other(ErasedBundleKind<Other, D, S, P>),
@@ -327,7 +327,7 @@ where
     Other: ErasedArchetypeKind<Meta = Original::Meta>,
     D: ErasedBundleDrop<Original::Meta>,
     S: AlignedStorageFromLayout<Item: Debug>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -342,7 +342,7 @@ where
     Original: ErasedArchetypeKind,
     D: ErasedBundleDrop<Original::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]
@@ -417,7 +417,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage<Item: Debug>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let components = &self.into_iter();
@@ -432,7 +432,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn as_ref(&self) -> &[P::Item] {
@@ -445,7 +445,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     fn drop(&mut self) {
         let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
@@ -460,7 +460,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Item = ErasedComponentRef<'a, P::NonNull>;
     type IntoIter = ErasedBundleRefsIter<
@@ -481,7 +481,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Item = ErasedComponentMutRef<'a, P::NonNull>;
     type IntoIter = ErasedBundleMutRefsIter<
@@ -502,7 +502,7 @@ where
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator<Item: BufferOffsetsFromSelf>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
     type Item = Result<ErasedComponent<S, P>, S::Error>;
@@ -522,7 +522,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Output = ErasedArchetypeView<'a, T::Meta>;
     type OutputIter = Iter<'a, T::Meta>;
@@ -539,7 +539,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -564,7 +564,7 @@ where
     S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     I: AlignedStorageFromLayout<Item = S::Item>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
     F: BufferOffsetsFrom<T::Item>,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
 {
@@ -609,7 +609,7 @@ where
     S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     I: AlignedStorageFromLayout<Item = S::Item>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
     F: BufferOffsetsFrom<T::Item>,
     T::IntoIter: ExactSizeIterator,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,
@@ -626,7 +626,7 @@ where
     S: AlignedStorage<Item: Clone>,
     T: ErasedArchetypeKind + IntoErasedArchetypeIterator,
     I: AlignedStorageFromLayout<Item = S::Item>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
     F: BufferOffsetsFrom<T::Item>,
     T::IntoIter: FusedIterator,
     for<'a> FieldLayoutsItem<'a, T::IntoIter>: WithErasedDrop,

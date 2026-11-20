@@ -10,12 +10,12 @@ use crate::{
         ErasedNonNullPtr, ErasedNonNullSlicePtr, ErasedPtr, ErasedSlicePtr,
         error::{DataError, DowncastError, UpcastSliceError},
     },
-    ptr::slice::{ConstPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, NonNullSlicePtrAtIndex, SlicePtrAtIndex},
 };
 
 pub struct ErasedSlice<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     ptr: ErasedNonNullSlicePtr<T>,
     phantom: PhantomData<&'a [T::Item]>,
@@ -23,7 +23,7 @@ where
 
 impl<T> ErasedSlice<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_parts(ptr: ErasedNonNullPtr<T>, len: usize) -> Self {
@@ -75,7 +75,7 @@ where
 
 impl<'a, T> ErasedSlice<'a, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_slice_ptr(ptr: ErasedSlicePtr<ConstPtr<T::Ptrs>>) -> Option<Self> {
@@ -173,7 +173,7 @@ where
 
 impl<T> Debug for ErasedSlice<'_, T>
 where
-    T: NonNullSliceItemPtr<Item: Debug>,
+    T: NonNullSlicePtrAtIndex<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
@@ -189,7 +189,7 @@ where
 
 impl<T> Clone for ErasedSlice<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -197,11 +197,11 @@ where
     }
 }
 
-impl<T> Copy for ErasedSlice<'_, T> where T: SliceItemPtr {}
+impl<T> Copy for ErasedSlice<'_, T> where T: SlicePtrAtIndex {}
 
 impl<T> AsRef<[T::Item]> for ErasedSlice<'_, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {

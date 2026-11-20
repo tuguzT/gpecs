@@ -4,7 +4,9 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use gpecs_ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtrs};
+use gpecs_ptr::slice::{
+    ConstSlicePtrAtIndex, MutSlicePtrAtIndex, NonNullSlicePtrAtIndex, SlicePtrsAtIndex,
+};
 use gpecs_soa::{
     field::{FieldLayouts, IntoFieldLayouts},
     identity::Identity,
@@ -23,7 +25,7 @@ use crate::{
 unsafe impl<K, V, P> SoaRawContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Ptrs<'a> = KeyValuePtrs<'a, K, V, P::Const>;
 
@@ -371,7 +373,7 @@ where
 unsafe impl<K, V, P> SoaRaw for KeyValuePair<K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Context = Identity<V::Context>;
     type Fields = (K, V::Fields);
@@ -381,7 +383,7 @@ unsafe impl<K, V, P> SoaCloneToUninitContext<KeyValuePair<K, V, P>> for Identity
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     unsafe fn ptrs_clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
@@ -402,7 +404,7 @@ unsafe impl<'a, K, V, P, R> SoaReadContext<'a, KeyValuePair<K, V, P>, KeyValuePa
     for Identity<V::Context>
 where
     V: SoaRead<'a, R> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> KeyValuePair<K, R, P> {
@@ -424,7 +426,7 @@ unsafe impl<K, V, P, W> SoaWriteContext<KeyValuePair<K, V, P>, KeyValuePair<K, W
     for Identity<V::Context>
 where
     V: SoaWrite<W>,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     unsafe fn ptrs_write(&self, dst: Self::MutPtrs<'_>, value: KeyValuePair<K, W, P>) {
@@ -440,7 +442,7 @@ where
 impl<'a, K, V, P, C> FieldLayouts<'a, KeyValuePair<K, V, P>> for Identity<C>
 where
     V: SoaRaw<Context = C> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     C: FieldLayouts<'a, V>,
 {
     type Output = KeyValueFieldLayouts<C::Output>;
@@ -457,7 +459,7 @@ where
 unsafe impl<K, V, P> SoaAllocContext<KeyValuePair<K, V, P>> for Identity<V::Context>
 where
     V: SoaRaw<Context: SoaAllocContext<V>> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
@@ -556,7 +558,7 @@ where
 unsafe impl<K, V, P> SoaAllocTrusted for KeyValuePair<K, V, P>
 where
     V: SoaAllocTrusted,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }
 
@@ -564,7 +566,7 @@ unsafe impl<'data, K, V, P> SoaContext<'data, KeyValuePair<K, V, P>> for Identit
 where
     K: 'data,
     V: SoaRaw<Context: SoaContext<'data, V>> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Refs<'a> = KeyValueRefs<'a, 'data, K, V, P::NonNull>;
 

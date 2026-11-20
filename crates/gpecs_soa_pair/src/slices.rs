@@ -5,7 +5,7 @@ use core::{
     ptr::NonNull,
 };
 
-use gpecs_ptr::slice::{ConstPtr, ConstSliceItemPtr, NonNullSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, ConstSlicePtrAtIndex, NonNullSlicePtrAtIndex};
 use gpecs_soa::{
     traits::{Slices, Soa, SoaContext, SoaOwned},
     wrapper,
@@ -17,7 +17,7 @@ pub struct KeyValueSlices<'ctx, 'a, K, V, P = *const K>
 where
     K: 'a,
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     key: P,
     len: usize,
@@ -27,7 +27,7 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueSlices<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -157,7 +157,7 @@ impl<K, V, P> Debug for KeyValueSlices<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -178,7 +178,7 @@ where
 impl<K, V, P> Default for KeyValueSlices<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Default,
 {
     #[inline]
@@ -193,7 +193,7 @@ impl<K, V, P> PartialEq for KeyValueSlices<'_, '_, K, V, P>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -215,7 +215,7 @@ impl<K, V, P> Eq for KeyValueSlices<'_, '_, K, V, P>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Eq,
 {
 }
@@ -224,7 +224,7 @@ impl<K, V, P> PartialOrd for KeyValueSlices<'_, '_, K, V, P>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -246,7 +246,7 @@ impl<K, V, P> Ord for KeyValueSlices<'_, '_, K, V, P>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -268,7 +268,7 @@ impl<K, V, P> Hash for KeyValueSlices<'_, '_, K, V, P>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -286,7 +286,7 @@ where
 impl<K, V, P> Clone for KeyValueSlices<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Clone,
 {
     #[inline]
@@ -305,7 +305,7 @@ where
 impl<K, V, P> Copy for KeyValueSlices<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Copy,
 {
 }

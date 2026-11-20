@@ -8,8 +8,8 @@ use gpecs_component::{
     registry::{ComponentIdMap, ComponentRegistry, traits::FromComponentType},
 };
 use gpecs_soa_erased::{
-    BufferOffsetsFromLayout, BufferOffsetsFromSelf, layout::WithLayout, ptr::slice::SliceItemPtrs,
-    storage::AlignedStorage,
+    BufferOffsetsFromLayout, BufferOffsetsFromSelf, layout::WithLayout,
+    ptr::slice::SlicePtrsAtIndex, storage::AlignedStorage,
 };
 
 #[derive(Debug, PartialEq, Clone, Copy, Pod, Zeroable)]
@@ -109,7 +109,7 @@ where
 impl<S, P> FromErasedComponent<S, P> for ErasedDropMeta
 where
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {

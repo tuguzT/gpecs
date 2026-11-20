@@ -8,7 +8,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr},
+    ptr::slice::{ConstPtr, MutSlicePtrAtIndex, NonNullPtr},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -55,7 +55,7 @@ impl<T> ErasedMutSlicePtr<T> {
 
 impl<T> ErasedMutSlicePtr<T>
 where
-    T: MutSliceItemPtr,
+    T: MutSlicePtrAtIndex,
 {
     #[inline]
     #[expect(
@@ -94,7 +94,7 @@ where
         let slice_len = bytes_to_items::<T::Item>(Layout::array::<V>(len)?.size());
         let slice = ptr::slice_from_raw_parts_mut(ptr.cast(), slice_len);
 
-        let ptr = unsafe { MutSliceItemPtr::from_parts(slice, 0) };
+        let ptr = unsafe { MutSlicePtrAtIndex::from_parts(slice, 0) };
         let ptr = unsafe { ErasedMutPtr::from_parts(layout, ptr) };
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)

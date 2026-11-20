@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedMutSlice,
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSlicePtrAtIndex, SlicePtrAtIndex},
 };
 use polonius_the_crab::{polonius, polonius_return};
 
@@ -27,7 +27,7 @@ use crate::{
 
 pub struct ErasedComponentMutSlice<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     component_id: ComponentId,
     erased: ErasedMutSlice<'a, T>,
@@ -35,7 +35,7 @@ where
 
 impl<'a, T> ErasedComponentMutSlice<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_parts(component_id: ComponentId, erased: ErasedMutSlice<'a, T>) -> Self {
@@ -109,7 +109,7 @@ where
 
 impl<'a, T> ErasedComponentMutSlice<'a, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_mut_slice_ptr(
@@ -295,7 +295,7 @@ where
 
 impl<T> Debug for ErasedComponentMutSlice<'_, T>
 where
-    T: NonNullSliceItemPtr<Item: Debug>,
+    T: NonNullSlicePtrAtIndex<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -312,8 +312,8 @@ where
 
 impl<T, U> PartialEq<ErasedComponentMutSlice<'_, U>> for ErasedComponentMutSlice<'_, T>
 where
-    T: SliceItemPtr,
-    U: SliceItemPtr,
+    T: SlicePtrAtIndex,
+    U: SlicePtrAtIndex,
 {
     #[inline]
     fn eq(&self, other: &ErasedComponentMutSlice<'_, U>) -> bool {
@@ -322,12 +322,12 @@ where
     }
 }
 
-impl<T> Eq for ErasedComponentMutSlice<'_, T> where T: SliceItemPtr {}
+impl<T> Eq for ErasedComponentMutSlice<'_, T> where T: SlicePtrAtIndex {}
 
 impl<T, U> PartialOrd<ErasedComponentMutSlice<'_, U>> for ErasedComponentMutSlice<'_, T>
 where
-    T: SliceItemPtr,
-    U: SliceItemPtr,
+    T: SlicePtrAtIndex,
+    U: SlicePtrAtIndex,
 {
     #[inline]
     fn partial_cmp(&self, other: &ErasedComponentMutSlice<'_, U>) -> Option<cmp::Ordering> {
@@ -338,7 +338,7 @@ where
 
 impl<T> Ord for ErasedComponentMutSlice<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -349,7 +349,7 @@ where
 
 impl<T> Hash for ErasedComponentMutSlice<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -360,7 +360,7 @@ where
 
 impl<T> Borrow<ComponentId> for ErasedComponentMutSlice<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn borrow(&self) -> &ComponentId {
@@ -371,7 +371,7 @@ where
 
 impl<T> AsRef<[T::Item]> for ErasedComponentMutSlice<'_, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {

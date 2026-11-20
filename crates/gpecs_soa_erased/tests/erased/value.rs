@@ -2,7 +2,7 @@ use std::{alloc::Layout, mem::MaybeUninit, ptr::NonNull};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    ErasedSoa, data::ErasedRef, ptr::slice::CoreSliceItemPtrs, soa::field::FieldLayouts,
+    ErasedSoa, data::ErasedRef, ptr::slice::CoreSlicePtrsAtIndex, soa::field::FieldLayouts,
     storage::AlignedStorageSlice,
 };
 
@@ -12,7 +12,7 @@ use gpecs_soa_erased::{data::BoxedErased, storage::BoxedAlignedUninitStorage};
 use crate::common::ArrayLayouts;
 
 type ArrayErasedSoa<T, const CAP: usize> =
-    ErasedSoa<T, ArrayLayouts<Layout, CAP>, CoreSliceItemPtrs<MaybeUninit<u8>>>;
+    ErasedSoa<T, ArrayLayouts<Layout, CAP>, CoreSlicePtrsAtIndex<MaybeUninit<u8>>>;
 
 #[test]
 #[cfg(feature = "alloc")]

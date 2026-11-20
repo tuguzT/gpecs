@@ -6,7 +6,7 @@ use gpecs_soa_bench::{
 };
 use gpecs_soa_erased::{
     BoxedErasedSoaContext,
-    ptr::slice::CoreSliceItemPtrs,
+    ptr::slice::CoreSlicePtrsAtIndex,
     soa::field::{FieldLayouts, IntoFieldLayoutsIter, buffer_layout},
 };
 
@@ -20,7 +20,7 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        let context = BoxedErasedSoaContext::<CoreSliceItemPtrs<MaybeUninit<u8>>>::of::<T>(
+        let context = BoxedErasedSoaContext::<CoreSlicePtrsAtIndex<MaybeUninit<u8>>>::of::<T>(
             &Default::default(),
         )
         .expect("layouts should be valid");

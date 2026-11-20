@@ -1,6 +1,6 @@
 use core::fmt::{self, Debug};
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 use rayon::iter::{
     IndexedParallelIterator, ParallelIterator,
     plumbing::{Consumer, Producer, ProducerCallback, UnindexedConsumer, bridge},
@@ -12,10 +12,10 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub struct ParValuesMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
+pub struct ParValuesMut<'ctx, 'a, K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: ParIterMut<'ctx, 'a, K, V, P>,
 }
@@ -23,7 +23,7 @@ where
 impl<'ctx, 'a, K, V, P> ParValuesMut<'ctx, 'a, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(crate) fn new(inner: ParIterMut<'ctx, 'a, K, V, P>) -> Self {
@@ -34,7 +34,7 @@ where
 impl<'a, K, V, P> ParValuesMut<'_, '_, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -68,7 +68,7 @@ where
 impl<K, V, P> Debug for ParValuesMut<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -81,7 +81,7 @@ impl<'ctx, 'a, K, V, P> ParallelIterator for ParValuesMut<'ctx, 'a, K, V, P>
 where
     K: Send + Sync + 'a,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     V::Context: Sync,
     V::Fields: Send,
     RefsMut<'ctx, 'a, V>: Send,
@@ -104,7 +104,7 @@ impl<'ctx, 'a, K, V, P> IndexedParallelIterator for ParValuesMut<'ctx, 'a, K, V,
 where
     K: Send + Sync + 'a,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     V::Context: Sync,
     V::Fields: Send,
     RefsMut<'ctx, 'a, V>: Send,
@@ -133,7 +133,7 @@ impl<'ctx, 'a, K, V, P> Producer for ParValuesMut<'ctx, 'a, K, V, P>
 where
     K: Send + Sync + 'a,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     V::Context: Sync,
     V::Fields: Send,
     RefsMut<'ctx, 'a, V>: Send,

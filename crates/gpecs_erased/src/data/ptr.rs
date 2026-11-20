@@ -7,7 +7,7 @@ use crate::{
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
+    ptr::slice::{ConstSlicePtrAtIndex, MutPtr, NonNullPtr, SlicePtrAtIndex},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -43,7 +43,7 @@ impl<T> ErasedPtr<T> {
 
 impl<T> ErasedPtr<T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     #[must_use]
@@ -70,7 +70,7 @@ where
 
 impl<T> ErasedPtr<T>
 where
-    T: ConstSliceItemPtr,
+    T: ConstSlicePtrAtIndex,
 {
     #[inline]
     #[expect(

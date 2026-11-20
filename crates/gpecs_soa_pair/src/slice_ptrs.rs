@@ -5,7 +5,7 @@ use core::{
     ptr,
 };
 
-use gpecs_ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr};
+use gpecs_ptr::slice::{ConstSlicePtrAtIndex, MutPtr, NonNullPtr};
 use gpecs_soa::{
     traits::{SlicePtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
@@ -16,7 +16,7 @@ use crate::{KeyValueMutSlicePtrs, KeyValuePtrs, KeyValueSlices};
 pub struct KeyValueSlicePtrs<'ctx, K, V, P = *const K>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: ConstSlicePtrAtIndex<Item = K>,
 {
     key: P,
     len: usize,
@@ -26,7 +26,7 @@ where
 impl<'ctx, K, V, P> KeyValueSlicePtrs<'ctx, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: ConstSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -112,7 +112,7 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueSlicePtrs<'ctx, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: ConstSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub unsafe fn as_ref_unchecked(
@@ -130,7 +130,7 @@ where
 impl<K, V, P> Debug for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: ConstSlicePtrAtIndex<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,7 +151,7 @@ where
 impl<K, V, P> PartialEq for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K> + PartialEq,
+    P: ConstSlicePtrAtIndex<Item = K> + PartialEq,
     for<'ctx> SlicePtrs<'ctx, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -165,7 +165,7 @@ where
 impl<K, V, P> Eq for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K> + Eq,
+    P: ConstSlicePtrAtIndex<Item = K> + Eq,
     for<'ctx> SlicePtrs<'ctx, V>: Eq,
 {
 }
@@ -173,7 +173,7 @@ where
 impl<K, V, P> PartialOrd for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K> + PartialOrd,
+    P: ConstSlicePtrAtIndex<Item = K> + PartialOrd,
     for<'ctx> SlicePtrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -187,7 +187,7 @@ where
 impl<K, V, P> Ord for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K> + Ord,
+    P: ConstSlicePtrAtIndex<Item = K> + Ord,
     for<'ctx> SlicePtrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -201,7 +201,7 @@ where
 impl<K, V, P> Hash for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K> + Hash,
+    P: ConstSlicePtrAtIndex<Item = K> + Hash,
     for<'ctx> SlicePtrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -213,7 +213,7 @@ where
 impl<K, V, P> Clone for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: ConstSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -231,7 +231,7 @@ where
 impl<K, V, P> Copy for KeyValueSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: ConstSliceItemPtr<Item = K>,
+    P: ConstSlicePtrAtIndex<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Copy,
 {
 }

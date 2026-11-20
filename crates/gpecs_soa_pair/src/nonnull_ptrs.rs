@@ -5,7 +5,7 @@ use core::{
     ptr::NonNull,
 };
 
-use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSlicePtrAtIndex};
 use gpecs_soa::{
     traits::{
         NonNullPtrs, Soa, SoaAllocContext, SoaCloneToUninit, SoaCloneToUninitContext, SoaContext,
@@ -19,7 +19,7 @@ use crate::{KeyValueMutPtrs, KeyValueMutRefs, KeyValuePair, KeyValuePtrs, KeyVal
 pub struct KeyValueNonNullPtrs<'ctx, K, V, P = NonNull<K>>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     key: P,
     value: wrapper::NonNullPtrs<'ctx, V>,
@@ -28,7 +28,7 @@ where
 impl<'ctx, K, V, P> KeyValueNonNullPtrs<'ctx, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub fn new(key: P, value: NonNullPtrs<'ctx, V>) -> Self {
@@ -193,7 +193,7 @@ impl<K, V, P> KeyValueNonNullPtrs<'_, K, V, P>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub unsafe fn clone_to_uninit(
@@ -214,7 +214,7 @@ where
 impl<K, V, P> KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw<Context: SoaAllocContext<V>> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub unsafe fn copy_from_forward(
@@ -252,7 +252,7 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueNonNullPtrs<'ctx, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub unsafe fn as_ref(self, context: &'ctx V::Context) -> KeyValueRefs<'ctx, 'a, K, V, P> {
@@ -274,7 +274,7 @@ where
 impl<K, V, P> Debug for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K> + Debug,
+    P: NonNullSlicePtrAtIndex<Item = K> + Debug,
     for<'ctx> NonNullPtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -290,7 +290,7 @@ where
 impl<K, V, P> PartialEq for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K> + PartialEq,
+    P: NonNullSlicePtrAtIndex<Item = K> + PartialEq,
     for<'ctx> NonNullPtrs<'ctx, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -304,7 +304,7 @@ where
 impl<K, V, P> Eq for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K> + Eq,
+    P: NonNullSlicePtrAtIndex<Item = K> + Eq,
     for<'ctx> NonNullPtrs<'ctx, V>: Eq,
 {
 }
@@ -312,7 +312,7 @@ where
 impl<K, V, P> PartialOrd for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K> + PartialOrd,
+    P: NonNullSlicePtrAtIndex<Item = K> + PartialOrd,
     for<'ctx> NonNullPtrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -326,7 +326,7 @@ where
 impl<K, V, P> Ord for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K> + Ord,
+    P: NonNullSlicePtrAtIndex<Item = K> + Ord,
     for<'ctx> NonNullPtrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -340,7 +340,7 @@ where
 impl<K, V, P> Hash for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K> + Hash,
+    P: NonNullSlicePtrAtIndex<Item = K> + Hash,
     for<'ctx> NonNullPtrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -352,7 +352,7 @@ where
 impl<K, V, P> Clone for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -366,7 +366,7 @@ where
 impl<K, V, P> Copy for KeyValueNonNullPtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx> NonNullPtrs<'ctx, V>: Copy,
 {
 }

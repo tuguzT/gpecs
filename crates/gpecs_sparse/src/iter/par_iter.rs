@@ -1,6 +1,6 @@
 use core::fmt::{self, Debug};
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 use rayon::iter::{
     IndexedParallelIterator, ParallelIterator,
     plumbing::{Consumer, Producer, ProducerCallback, UnindexedConsumer, bridge},
@@ -18,10 +18,10 @@ use crate::{
 type Inner<'ctx, 'a, K, V, P> = slices::ParIter<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct ParIter<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
+pub struct ParIter<'ctx, 'a, K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaRaw<Context: 'ctx> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: Inner<'ctx, 'a, K, V, P>,
 }
@@ -29,7 +29,7 @@ where
 impl<'ctx, 'a, K, V, P> ParIter<'ctx, 'a, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(crate) fn new(inner: Inner<'ctx, 'a, K, V, P>) -> Self {
@@ -40,7 +40,7 @@ where
 impl<'a, K, V, P> ParIter<'_, '_, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
@@ -62,7 +62,7 @@ impl<K, V, P> Debug for ParIter<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -77,7 +77,7 @@ where
 impl<K, V, P> Clone for ParIter<'_, '_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -92,7 +92,7 @@ impl<'ctx, 'a, K, V, P> ParallelIterator for ParIter<'ctx, 'a, K, V, P>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
@@ -115,7 +115,7 @@ impl<'ctx, 'a, K, V, P> IndexedParallelIterator for ParIter<'ctx, 'a, K, V, P>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,
@@ -144,7 +144,7 @@ impl<'ctx, 'a, K, V, P> Producer for ParIter<'ctx, 'a, K, V, P>
 where
     K: Sync + 'a,
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     V::Context: Sync,
     V::Fields: Sync,
     Refs<'ctx, 'a, V>: Send,

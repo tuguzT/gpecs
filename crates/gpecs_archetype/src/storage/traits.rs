@@ -1,7 +1,7 @@
 use core::ops::Deref;
 
 use gpecs_soa_erased::{
-    ptr::slice::{ConstPtr, MutPtr, NonNullPtr, SliceItemPtrs},
+    ptr::slice::{ConstPtr, MutPtr, NonNullPtr, SlicePtrsAtIndex},
     soa::traits::{SoaAlloc, SoaContext, SoaOwned},
     storage::AlignedStorage,
 };
@@ -38,7 +38,7 @@ pub trait ErasedArchetypeSoa:
     type Meta: ErasedArchetypeMeta;
     type Archetype<'a>: ErasedArchetypeKind<Meta = Self::Meta>;
     type DropKind: ErasedBundleDrop<Self::Meta>;
-    type Ptrs: SliceItemPtrs;
+    type Ptrs: SlicePtrsAtIndex;
 }
 
 pub type ErasedArchetypeSoaPtrs<'a, T> = ErasedBundlePtrs<
@@ -91,7 +91,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Meta = Meta;
     type Archetype<'a> = ErasedArchetypeView<'view, Meta>;

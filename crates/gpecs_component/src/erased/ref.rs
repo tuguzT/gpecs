@@ -7,7 +7,7 @@ use core::{
 
 use gpecs_erased::{
     data::ErasedRef,
-    ptr::slice::{ConstPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, NonNullSlicePtrAtIndex, SlicePtrAtIndex},
 };
 
 use crate::{
@@ -25,7 +25,7 @@ use crate::{
 #[derive(Clone, Copy)]
 pub struct ErasedComponentRef<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     component_id: ComponentId,
     erased: ErasedRef<'a, T>,
@@ -33,7 +33,7 @@ where
 
 impl<'a, T> ErasedComponentRef<'a, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_parts(component_id: ComponentId, erased: ErasedRef<'a, T>) -> Self {
@@ -85,7 +85,7 @@ where
 
 impl<'a, T> ErasedComponentRef<'a, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub fn upcast<C, U>(
@@ -164,7 +164,7 @@ where
 
 impl<T> Debug for ErasedComponentRef<'_, T>
 where
-    T: NonNullSliceItemPtr<Item: Debug>,
+    T: NonNullSlicePtrAtIndex<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -181,8 +181,8 @@ where
 
 impl<T, U> PartialEq<ErasedComponentRef<'_, U>> for ErasedComponentRef<'_, T>
 where
-    T: SliceItemPtr,
-    U: SliceItemPtr,
+    T: SlicePtrAtIndex,
+    U: SlicePtrAtIndex,
 {
     #[inline]
     fn eq(&self, other: &ErasedComponentRef<'_, U>) -> bool {
@@ -191,12 +191,12 @@ where
     }
 }
 
-impl<T> Eq for ErasedComponentRef<'_, T> where T: SliceItemPtr {}
+impl<T> Eq for ErasedComponentRef<'_, T> where T: SlicePtrAtIndex {}
 
 impl<T, U> PartialOrd<ErasedComponentRef<'_, U>> for ErasedComponentRef<'_, T>
 where
-    T: SliceItemPtr,
-    U: SliceItemPtr,
+    T: SlicePtrAtIndex,
+    U: SlicePtrAtIndex,
 {
     #[inline]
     fn partial_cmp(&self, other: &ErasedComponentRef<'_, U>) -> Option<cmp::Ordering> {
@@ -207,7 +207,7 @@ where
 
 impl<T> Ord for ErasedComponentRef<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -218,7 +218,7 @@ where
 
 impl<T> Hash for ErasedComponentRef<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -229,7 +229,7 @@ where
 
 impl<T> Borrow<ComponentId> for ErasedComponentRef<'_, T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     fn borrow(&self) -> &ComponentId {
@@ -240,7 +240,7 @@ where
 
 impl<T> AsRef<[T::Item]> for ErasedComponentRef<'_, T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {

@@ -7,7 +7,7 @@ use core::{
 use gpecs_erased::{
     data::ErasedMutPtr,
     layout::WithLayout,
-    ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutSlicePtrAtIndex, NonNullPtr, SlicePtrAtIndex},
 };
 
 use crate::{
@@ -62,7 +62,7 @@ impl<T> ErasedComponentMutPtr<T> {
 
 impl<T> ErasedComponentMutPtr<T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     #[must_use]
@@ -88,7 +88,7 @@ where
 
 impl<T> ErasedComponentMutPtr<T>
 where
-    T: MutSliceItemPtr,
+    T: MutSlicePtrAtIndex,
 {
     #[inline]
     pub fn dangling(

@@ -1,19 +1,19 @@
 use core::{ptr::NonNull, slice};
 
-pub type ConstPtr<T> = <T as SliceItemPtrs>::Const;
-pub type MutPtr<T> = <T as SliceItemPtrs>::Mut;
-pub type NonNullPtr<T> = <T as SliceItemPtrs>::NonNull;
-pub type PtrsItem<T> = <T as SliceItemPtrs>::Item;
+pub type ConstPtr<T> = <T as SlicePtrsAtIndex>::Const;
+pub type MutPtr<T> = <T as SlicePtrsAtIndex>::Mut;
+pub type NonNullPtr<T> = <T as SlicePtrsAtIndex>::NonNull;
+pub type PtrsItem<T> = <T as SlicePtrsAtIndex>::Item;
 
-pub unsafe trait SliceItemPtrs {
+pub unsafe trait SlicePtrsAtIndex {
     type Item;
 
-    type Const: ConstSliceItemPtr<Item = Self::Item, Ptrs = Self>;
-    type Mut: MutSliceItemPtr<Item = Self::Item, Ptrs = Self>;
-    type NonNull: NonNullSliceItemPtr<Item = Self::Item, Ptrs = Self>;
+    type Const: ConstSlicePtrAtIndex<Item = Self::Item, Ptrs = Self>;
+    type Mut: MutSlicePtrAtIndex<Item = Self::Item, Ptrs = Self>;
+    type NonNull: NonNullSlicePtrAtIndex<Item = Self::Item, Ptrs = Self>;
 }
 
-pub unsafe trait SliceItemPtr: Copy {
+pub unsafe trait SlicePtrAtIndex: Copy {
     type Item;
 
     fn dangling() -> Self;
@@ -28,8 +28,8 @@ pub unsafe trait SliceItemPtr: Copy {
     unsafe fn read(self) -> Self::Item;
 }
 
-pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
-    type Ptrs: SliceItemPtrs<Item = Self::Item, Const = Self>;
+pub unsafe trait ConstSlicePtrAtIndex: SlicePtrAtIndex {
+    type Ptrs: SlicePtrsAtIndex<Item = Self::Item, Const = Self>;
 
     unsafe fn from_parts(slice: *const [Self::Item], index: usize) -> Self;
 
@@ -55,20 +55,20 @@ pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
     fn cast_mut(self) -> MutPtr<Self::Ptrs> {
         let (slice, index) = self.into_parts();
         let slice = slice.cast_mut();
-        unsafe { MutSliceItemPtr::from_parts(slice, index) }
+        unsafe { MutSlicePtrAtIndex::from_parts(slice, index) }
     }
 
     fn cast_nonnull(self) -> Option<NonNullPtr<Self::Ptrs>> {
-        NonNullSliceItemPtr::from_ptr(self)
+        NonNullSlicePtrAtIndex::from_ptr(self)
     }
 
     unsafe fn cast_nonnull_unchecked(self) -> NonNullPtr<Self::Ptrs> {
-        unsafe { NonNullSliceItemPtr::from_ptr_unchecked(self) }
+        unsafe { NonNullSlicePtrAtIndex::from_ptr_unchecked(self) }
     }
 }
 
-pub unsafe trait MutSliceItemPtr: SliceItemPtr {
-    type Ptrs: SliceItemPtrs<Item = Self::Item, Mut = Self>;
+pub unsafe trait MutSlicePtrAtIndex: SlicePtrAtIndex {
+    type Ptrs: SlicePtrsAtIndex<Item = Self::Item, Mut = Self>;
 
     unsafe fn from_parts(slice: *mut [Self::Item], index: usize) -> Self;
 
@@ -106,15 +106,15 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
     fn cast_const(self) -> ConstPtr<Self::Ptrs> {
         let (slice, index) = self.into_parts();
         let slice = slice.cast_const();
-        unsafe { ConstSliceItemPtr::from_parts(slice, index) }
+        unsafe { ConstSlicePtrAtIndex::from_parts(slice, index) }
     }
 
     fn cast_nonnull(self) -> Option<NonNullPtr<Self::Ptrs>> {
-        NonNullSliceItemPtr::from_mut_ptr(self)
+        NonNullSlicePtrAtIndex::from_mut_ptr(self)
     }
 
     unsafe fn cast_nonnull_unchecked(self) -> NonNullPtr<Self::Ptrs> {
-        unsafe { NonNullSliceItemPtr::from_mut_ptr_unchecked(self) }
+        unsafe { NonNullSlicePtrAtIndex::from_mut_ptr_unchecked(self) }
     }
 
     unsafe fn drop_in_place(self) {
@@ -132,8 +132,8 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
     unsafe fn copy_from_nonoverlapping(self, src: ConstPtr<Self::Ptrs>, count: usize);
 }
 
-pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
-    type Ptrs: SliceItemPtrs<Item = Self::Item, NonNull = Self>;
+pub unsafe trait NonNullSlicePtrAtIndex: SlicePtrAtIndex {
+    type Ptrs: SlicePtrsAtIndex<Item = Self::Item, NonNull = Self>;
 
     unsafe fn from_parts(slice: NonNull<[Self::Item]>, index: usize) -> Self;
 
@@ -189,13 +189,13 @@ pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
     fn cast_const(self) -> ConstPtr<Self::Ptrs> {
         let (slice, index) = self.into_parts();
         let slice = slice.as_ptr().cast_const();
-        unsafe { ConstSliceItemPtr::from_parts(slice, index) }
+        unsafe { ConstSlicePtrAtIndex::from_parts(slice, index) }
     }
 
     fn cast_mut(self) -> MutPtr<Self::Ptrs> {
         let (slice, index) = self.into_parts();
         let slice = slice.as_ptr();
-        unsafe { MutSliceItemPtr::from_parts(slice, index) }
+        unsafe { MutSlicePtrAtIndex::from_parts(slice, index) }
     }
 
     unsafe fn as_ref<'a>(self) -> &'a Self::Item {

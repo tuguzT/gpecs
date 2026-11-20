@@ -5,7 +5,7 @@ use core::{
     mem, ptr,
 };
 
-use gpecs_ptr::slice::{ConstPtr, MutSliceItemPtr, NonNullPtr};
+use gpecs_ptr::slice::{ConstPtr, MutSlicePtrAtIndex, NonNullPtr};
 use gpecs_soa::{
     traits::{SliceMutPtrs, Soa, SoaContext, SoaRaw, SoaRawContext},
     wrapper,
@@ -16,7 +16,7 @@ use crate::{KeyValueMutPtrs, KeyValueMutSlices, KeyValuePtrs, KeyValueSlicePtrs,
 pub struct KeyValueMutSlicePtrs<'ctx, K, V, P = *mut K>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
+    P: MutSlicePtrAtIndex<Item = K>,
 {
     key: P,
     len: usize,
@@ -26,7 +26,7 @@ where
 impl<'ctx, K, V, P> KeyValueMutSlicePtrs<'ctx, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
+    P: MutSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -136,7 +136,7 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueMutSlicePtrs<'ctx, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
+    P: MutSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub unsafe fn as_ref_unchecked(
@@ -162,7 +162,7 @@ where
 impl<K, V, P> Debug for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
+    P: MutSlicePtrAtIndex<Item = K>,
     for<'ctx> SliceMutPtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -183,7 +183,7 @@ where
 impl<K, V, P> PartialEq for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K> + PartialEq,
+    P: MutSlicePtrAtIndex<Item = K> + PartialEq,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -197,7 +197,7 @@ where
 impl<K, V, P> Eq for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K> + Eq,
+    P: MutSlicePtrAtIndex<Item = K> + Eq,
     for<'ctx> SliceMutPtrs<'ctx, V>: Eq,
 {
 }
@@ -205,7 +205,7 @@ where
 impl<K, V, P> PartialOrd for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K> + PartialOrd,
+    P: MutSlicePtrAtIndex<Item = K> + PartialOrd,
     for<'ctx> SliceMutPtrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -219,7 +219,7 @@ where
 impl<K, V, P> Ord for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K> + Ord,
+    P: MutSlicePtrAtIndex<Item = K> + Ord,
     for<'ctx> SliceMutPtrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -233,7 +233,7 @@ where
 impl<K, V, P> Hash for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K> + Hash,
+    P: MutSlicePtrAtIndex<Item = K> + Hash,
     for<'ctx> SliceMutPtrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -245,7 +245,7 @@ where
 impl<K, V, P> Clone for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
+    P: MutSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -263,7 +263,7 @@ where
 impl<K, V, P> Copy for KeyValueMutSlicePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: MutSliceItemPtr<Item = K>,
+    P: MutSlicePtrAtIndex<Item = K>,
     for<'ctx> SliceMutPtrs<'ctx, V>: Copy,
 {
 }

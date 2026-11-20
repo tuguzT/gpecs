@@ -6,13 +6,13 @@ use core::{
     marker::PhantomData,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 use gpecs_soa::layout::WithLayout;
 
-pub struct KeyValuePair<K, V, P = CoreSliceItemPtrs<K>>
+pub struct KeyValuePair<K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     V: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     phantom: PhantomData<P>,
     key: K,
@@ -21,7 +21,7 @@ where
 
 impl<K, V, P> KeyValuePair<K, V, P>
 where
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub const fn new(key: K, value: V) -> Self {
@@ -36,7 +36,7 @@ where
     #[inline]
     pub fn map_key<N, NP>(self, f: impl FnOnce(K) -> N) -> KeyValuePair<N, V, NP>
     where
-        NP: SliceItemPtrs<Item = N>,
+        NP: SlicePtrsAtIndex<Item = N>,
     {
         let Self { key, value, .. } = self;
 
@@ -74,7 +74,7 @@ where
 impl<K, V, P> KeyValuePair<K, V, P>
 where
     V: ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub const fn as_key(&self) -> &K {
@@ -105,7 +105,7 @@ impl<K, V, P> Debug for KeyValuePair<K, V, P>
 where
     K: Debug,
     V: Debug + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value, .. } = self;
@@ -121,7 +121,7 @@ impl<K, V, P> Clone for KeyValuePair<K, V, P>
 where
     K: Clone,
     V: Clone,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -137,7 +137,7 @@ impl<K, V, P> Copy for KeyValuePair<K, V, P>
 where
     K: Copy,
     V: Copy,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }
 
@@ -145,7 +145,7 @@ impl<K, V, P> PartialEq for KeyValuePair<K, V, P>
 where
     K: PartialEq,
     V: PartialEq + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value, .. } = self;
@@ -159,7 +159,7 @@ impl<K, V, P> Eq for KeyValuePair<K, V, P>
 where
     K: Eq,
     V: Eq + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }
 
@@ -167,7 +167,7 @@ impl<K, V, P> PartialOrd for KeyValuePair<K, V, P>
 where
     K: PartialOrd,
     V: PartialOrd + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value, .. } = self;
@@ -181,7 +181,7 @@ impl<K, V, P> Ord for KeyValuePair<K, V, P>
 where
     K: Ord,
     V: Ord + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value, .. } = self;
@@ -195,7 +195,7 @@ impl<K, V, P> Hash for KeyValuePair<K, V, P>
 where
     K: Hash,
     V: Hash + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value, .. } = self;
@@ -206,7 +206,7 @@ where
 impl<K, V, P> WithLayout for KeyValuePair<K, V, P>
 where
     V: WithLayout + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn layout(&self) -> Layout {

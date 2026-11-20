@@ -6,7 +6,7 @@ use core::{
 use gpecs_soa_erased::{
     ErasedSoa,
     error::FromFieldsLayoutsError,
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 use itertools::zip_eq;
@@ -24,7 +24,7 @@ where
     ToRemove: ErasedArchetypeKind,
     D: ErasedBundleDrop<ToRemove::Meta>,
     S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     pub retained: ErasedBundle<ToRemove::Meta, D, S, P>,
     pub removed: ErasedBundleKind<ToRemove, D, S, P>,
@@ -35,7 +35,7 @@ where
     ToRemove: ErasedArchetypeKind,
     D: ErasedBundleDrop<ToRemove::Meta>,
     S: AlignedStorageFromLayout<Item: Debug>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { retained, removed } = self;
@@ -51,7 +51,7 @@ where
     T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]
@@ -115,7 +115,7 @@ where
     T: ErasedArchetypeKind<Meta: Clone>,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     #[expect(clippy::type_complexity)]
@@ -162,7 +162,7 @@ where
     T: ErasedArchetypeKind,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn check_remove<E>(

@@ -1,6 +1,6 @@
 use core::{borrow::Borrow, fmt::Debug};
 
-use gpecs_ptr::slice::SliceItemPtrs;
+use gpecs_ptr::slice::SlicePtrsAtIndex;
 
 use crate::{
     assert::{
@@ -248,7 +248,7 @@ where
 pub fn dense_keys<'a, K, V, P>(dense: SoaView<'_, 'a, KeyValuePair<K, V, P>>) -> &'a [K]
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     let (_, keys) = dense_keys_with_context(dense);
     keys
@@ -260,7 +260,7 @@ pub fn dense_keys_with_context<'ctx, 'a, K, V, P>(
 ) -> (&'ctx V::Context, &'a [K])
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     let (context, slices) = dense.into_slice_ptrs_with_context();
 
@@ -277,7 +277,7 @@ pub fn check_parts<'a, K, V, P, S>(
 where
     K: Key + 'a,
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     let dense = dense_keys(dense);

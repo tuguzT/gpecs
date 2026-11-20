@@ -3,7 +3,7 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 
 use crate::{
     item::KeyValuePair,
@@ -17,10 +17,10 @@ use crate::{
 type Inner<'ctx, K, V, P> = soa::ptrs::IterPtrs<'ctx, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct ValuePtrs<'ctx, K, V, P = CoreSliceItemPtrs<K>>
+pub struct ValuePtrs<'ctx, K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: IterPtrs<'ctx, K, V, P>,
 }
@@ -28,7 +28,7 @@ where
 impl<'ctx, K, V, P> ValuePtrs<'ctx, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub(crate) fn from_inner(inner: Inner<'ctx, K, V, P>) -> Self {
@@ -132,7 +132,7 @@ where
 impl<K, V, P> Debug for ValuePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx> SlicePtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -144,7 +144,7 @@ where
 impl<K, V, P> Clone for ValuePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -158,7 +158,7 @@ where
 impl<'ctx, K, V, P> Iterator for ValuePtrs<'ctx, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = Ptrs<'ctx, V>;
 
@@ -178,7 +178,7 @@ where
 impl<K, V, P> DoubleEndedIterator for ValuePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -190,7 +190,7 @@ where
 impl<K, V, P> ExactSizeIterator for ValuePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -201,6 +201,6 @@ where
 impl<K, V, P> FusedIterator for ValuePtrs<'_, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }

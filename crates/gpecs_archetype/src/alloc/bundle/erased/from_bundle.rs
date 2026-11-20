@@ -11,7 +11,7 @@ use gpecs_component::registry::{
 use gpecs_soa_erased::{
     ErasedSoa,
     error::{FromLayoutsValueError, FromLayoutsValueErrorKind, InsufficientAlignError},
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     storage::AlignedStorageFromLayout,
 };
 
@@ -31,7 +31,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     pub fn from_bundle<'a, B, M, T>(

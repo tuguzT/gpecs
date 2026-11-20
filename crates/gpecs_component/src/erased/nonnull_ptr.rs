@@ -8,7 +8,7 @@ use core::{
 use gpecs_erased::{
     data::ErasedNonNullPtr,
     layout::WithLayout,
-    ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr, SliceItemPtr},
+    ptr::slice::{ConstPtr, MutPtr, NonNullSlicePtrAtIndex, SlicePtrAtIndex},
 };
 
 use crate::{
@@ -62,7 +62,7 @@ impl<T> ErasedComponentNonNullPtr<T> {
 
 impl<T> ErasedComponentNonNullPtr<T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     #[must_use]
@@ -98,7 +98,7 @@ where
 
 impl<T> ErasedComponentNonNullPtr<T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub fn from_ptr(ptr: ErasedComponentPtr<ConstPtr<T::Ptrs>>) -> Option<Self> {

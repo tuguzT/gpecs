@@ -1,6 +1,6 @@
 use core::{convert::Infallible, mem, ptr};
 
-use gpecs_erased::ptr::slice::MutSliceItemPtr;
+use gpecs_erased::ptr::slice::MutSlicePtrAtIndex;
 
 use crate::{
     Component,
@@ -43,7 +43,7 @@ impl ErasedDrop {
     #[track_caller]
     pub unsafe fn drop_in_place<T>(self, to_drop: ErasedComponentMutPtr<T>)
     where
-        T: MutSliceItemPtr,
+        T: MutSlicePtrAtIndex,
     {
         let Self(inner) = self;
 
@@ -55,7 +55,7 @@ impl ErasedDrop {
     #[track_caller]
     pub unsafe fn drop_in_place_slice<T>(self, to_drop: ErasedComponentMutSlicePtr<T>)
     where
-        T: MutSliceItemPtr,
+        T: MutSlicePtrAtIndex,
     {
         for i in 0..to_drop.len() {
             let to_drop = unsafe { to_drop.as_mut_ptr().add(i) };

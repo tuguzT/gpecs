@@ -11,7 +11,7 @@ use core::{
 use crate::{
     CovariantFieldLayouts, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs, ErasedSoaPtrs,
     error::{InsufficientAlignError, check_sufficient_align},
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     soa::{
         field::{
             BufferLayout, FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned,
@@ -28,7 +28,7 @@ pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[Layout]>
 pub struct ErasedSoaContext<D, P>
 where
     D: ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     phantom: PhantomData<P>,
     layouts: D,
@@ -36,7 +36,7 @@ where
 
 impl<D, P> ErasedSoaContext<D, P>
 where
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub const unsafe fn from_inner(layouts: D) -> Self {
@@ -56,7 +56,7 @@ where
 impl<D, P> ErasedSoaContext<D, P>
 where
     D: FieldLayoutsOwned,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub fn new(layouts: D) -> Result<Self, InsufficientAlignError> {
@@ -73,7 +73,7 @@ where
 impl<D, P> ErasedSoaContext<D, P>
 where
     D: ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub const fn as_inner(&self) -> &D {
@@ -90,7 +90,7 @@ where
 
 impl<D, P> ErasedSoaContext<D, P>
 where
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub fn of<'a, T>(context: &'a T::Context) -> Result<Self, InsufficientAlignError>
@@ -115,7 +115,7 @@ where
 impl<'a, D, P> ErasedSoaContext<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub fn field_layouts(&'a self) -> D::Output {
@@ -169,7 +169,7 @@ where
 impl<D, P> Debug for ErasedSoaContext<D, P>
 where
     D: Debug + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { layouts, .. } = self;
@@ -180,7 +180,7 @@ where
 impl<D, P> Clone for ErasedSoaContext<D, P>
 where
     D: Clone,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -194,14 +194,14 @@ where
 impl<D, P> Copy for ErasedSoaContext<D, P>
 where
     D: Copy,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
 }
 
 impl<D, P> PartialEq for ErasedSoaContext<D, P>
 where
     D: PartialEq + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { layouts, .. } = self;
@@ -212,14 +212,14 @@ where
 impl<D, P> Eq for ErasedSoaContext<D, P>
 where
     D: Eq + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
 }
 
 impl<D, P> PartialOrd for ErasedSoaContext<D, P>
 where
     D: PartialOrd + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { layouts, .. } = self;
@@ -230,7 +230,7 @@ where
 impl<D, P> Ord for ErasedSoaContext<D, P>
 where
     D: Ord + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { layouts, .. } = self;
@@ -241,7 +241,7 @@ where
 impl<D, P> Hash for ErasedSoaContext<D, P>
 where
     D: Hash + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { layouts, .. } = self;
@@ -252,7 +252,7 @@ where
 impl<D, P> Deref for ErasedSoaContext<D, P>
 where
     D: ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     type Target = D;
 
@@ -265,7 +265,7 @@ where
 impl<D, P> DerefMut for ErasedSoaContext<D, P>
 where
     D: ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -276,7 +276,7 @@ where
 impl<'a, D, P> FieldLayouts<'a> for ErasedSoaContext<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -291,7 +291,7 @@ where
 impl<D, P> CovariantFieldLayouts for ErasedSoaContext<D, P>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

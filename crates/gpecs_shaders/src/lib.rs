@@ -11,14 +11,14 @@ use self::convert::u32_to_usize;
 
 pub use self::{
     layouts::{GpuFieldLayout, GpuFieldLayouts, GpuLayout},
-    ptrs::{GpuSliceItemPtr, GpuSliceItemPtrs},
+    ptrs::{GpuSlicePtrAtIndex, GpuSlicePtrsAtIndex},
 };
 
 mod convert;
 mod layouts;
 mod ptrs;
 
-pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSliceItemPtrs<u32>>;
+pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSlicePtrsAtIndex<u32>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Pod, Zeroable)]
 #[repr(C)]

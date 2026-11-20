@@ -6,7 +6,7 @@ use gpecs_component::{
     },
 };
 use gpecs_soa_erased::{
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
+    ptr::slice::{ConstSlicePtrAtIndex, MutSlicePtrAtIndex},
     soa::traits::{
         MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SliceNonNullPtrs, SlicePtrs,
         Slices, SlicesMut, SoaAlloc, SoaOwned, SoaReadOwned, SoaWrite,
@@ -93,7 +93,7 @@ pub unsafe trait Bundle:
     where
         I: IntoIterator<Item = ErasedComponentPtr<P>>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        P: ConstSliceItemPtr;
+        P: ConstSlicePtrAtIndex;
 
     /// Attempts to downcast input collection of erased mutable component pointers
     /// into the collection of mutable pointers to components of this bundle.
@@ -113,5 +113,5 @@ pub unsafe trait Bundle:
     where
         I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-        P: MutSliceItemPtr;
+        P: MutSlicePtrAtIndex;
 }

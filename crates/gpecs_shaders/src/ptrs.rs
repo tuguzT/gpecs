@@ -8,79 +8,80 @@ use core::{
 use spirv_std::arch::IndexUnchecked;
 
 use gpecs_soa_erased::ptr::slice::{
-    ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
+    ConstSlicePtrAtIndex, MutSlicePtrAtIndex, NonNullSlicePtrAtIndex, SlicePtrAtIndex,
+    SlicePtrsAtIndex,
 };
 
-pub struct GpuSliceItemPtrs<T>(PhantomData<T>);
+pub struct GpuSlicePtrsAtIndex<T>(PhantomData<T>);
 
-impl<T> GpuSliceItemPtrs<T> {
+impl<T> GpuSlicePtrsAtIndex<T> {
     #[inline]
     pub const fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<T> Debug for GpuSliceItemPtrs<T> {
+impl<T> Debug for GpuSlicePtrsAtIndex<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let type_name = any::type_name::<T>();
         write!(f, "GpuSliceItemPtrs<{type_name}>")
     }
 }
 
-impl<T> Default for GpuSliceItemPtrs<T> {
+impl<T> Default for GpuSlicePtrsAtIndex<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> Clone for GpuSliceItemPtrs<T> {
+impl<T> Clone for GpuSlicePtrsAtIndex<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T> Copy for GpuSliceItemPtrs<T> {}
+impl<T> Copy for GpuSlicePtrsAtIndex<T> {}
 
-impl<T> PartialEq for GpuSliceItemPtrs<T> {
+impl<T> PartialEq for GpuSlicePtrsAtIndex<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<T> Eq for GpuSliceItemPtrs<T> {}
+impl<T> Eq for GpuSlicePtrsAtIndex<T> {}
 
-impl<T> PartialOrd for GpuSliceItemPtrs<T> {
+impl<T> PartialOrd for GpuSlicePtrsAtIndex<T> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T> Ord for GpuSliceItemPtrs<T> {
+impl<T> Ord for GpuSlicePtrsAtIndex<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.0.cmp(&other.0)
     }
 }
 
-impl<T> Hash for GpuSliceItemPtrs<T> {
+impl<T> Hash for GpuSlicePtrsAtIndex<T> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-unsafe impl<T> SliceItemPtrs for GpuSliceItemPtrs<T>
+unsafe impl<T> SlicePtrsAtIndex for GpuSlicePtrsAtIndex<T>
 where
     T: Copy,
 {
     type Item = T;
 
-    type Const = GpuSliceItemPtr<*const [T]>;
-    type Mut = GpuSliceItemPtr<*mut [T]>;
-    type NonNull = GpuSliceItemPtr<NonNull<[T]>>;
+    type Const = GpuSlicePtrAtIndex<*const [T]>;
+    type Mut = GpuSlicePtrAtIndex<*mut [T]>;
+    type NonNull = GpuSlicePtrAtIndex<NonNull<[T]>>;
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(C)]
-pub struct GpuSliceItemPtr<T>
+pub struct GpuSlicePtrAtIndex<T>
 where
     T: ?Sized,
 {
@@ -88,7 +89,7 @@ where
     pub slice: T,
 }
 
-impl<T> GpuSliceItemPtr<T>
+impl<T> GpuSlicePtrAtIndex<T>
 where
     T: ?Sized,
 {
@@ -100,7 +101,7 @@ where
     }
 }
 
-impl<T> GpuSliceItemPtr<T> {
+impl<T> GpuSlicePtrAtIndex<T> {
     #[inline]
     #[must_use = "returns a new pointer rather than modifying its argument"]
     pub unsafe fn add(self, count: usize) -> Self {
@@ -110,7 +111,7 @@ impl<T> GpuSliceItemPtr<T> {
     }
 }
 
-unsafe impl<T> SliceItemPtr for GpuSliceItemPtr<*const [T]>
+unsafe impl<T> SlicePtrAtIndex for GpuSlicePtrAtIndex<*const [T]>
 where
     T: Copy,
 {
@@ -130,12 +131,12 @@ where
 
     #[inline]
     unsafe fn add(self, count: usize) -> Self {
-        unsafe { GpuSliceItemPtr::add(self, count) }
+        unsafe { GpuSlicePtrAtIndex::add(self, count) }
     }
 
     #[inline]
     unsafe fn offset_from(self, origin: Self) -> isize {
-        unsafe { GpuSliceItemPtr::offset_from(&self, &origin) }
+        unsafe { GpuSlicePtrAtIndex::offset_from(&self, &origin) }
     }
 
     #[inline]
@@ -144,11 +145,11 @@ where
     }
 }
 
-unsafe impl<T> ConstSliceItemPtr for GpuSliceItemPtr<*const [T]>
+unsafe impl<T> ConstSlicePtrAtIndex for GpuSlicePtrAtIndex<*const [T]>
 where
     T: Copy,
 {
-    type Ptrs = GpuSliceItemPtrs<T>;
+    type Ptrs = GpuSlicePtrsAtIndex<T>;
 
     #[inline]
     unsafe fn from_parts(slice: *const [T], index: usize) -> Self {
@@ -168,7 +169,7 @@ where
     }
 }
 
-unsafe impl<T> SliceItemPtr for GpuSliceItemPtr<*mut [T]>
+unsafe impl<T> SlicePtrAtIndex for GpuSlicePtrAtIndex<*mut [T]>
 where
     T: Copy,
 {
@@ -188,12 +189,12 @@ where
 
     #[inline]
     unsafe fn add(self, count: usize) -> Self {
-        unsafe { GpuSliceItemPtr::add(self, count) }
+        unsafe { GpuSlicePtrAtIndex::add(self, count) }
     }
 
     #[inline]
     unsafe fn offset_from(self, origin: Self) -> isize {
-        unsafe { GpuSliceItemPtr::offset_from(&self, &origin) }
+        unsafe { GpuSlicePtrAtIndex::offset_from(&self, &origin) }
     }
 
     #[inline]
@@ -202,11 +203,11 @@ where
     }
 }
 
-unsafe impl<T> MutSliceItemPtr for GpuSliceItemPtr<*mut [T]>
+unsafe impl<T> MutSlicePtrAtIndex for GpuSlicePtrAtIndex<*mut [T]>
 where
     T: Copy,
 {
-    type Ptrs = GpuSliceItemPtrs<T>;
+    type Ptrs = GpuSlicePtrsAtIndex<T>;
 
     #[inline]
     unsafe fn from_parts(slice: *mut [T], index: usize) -> Self {
@@ -248,7 +249,7 @@ where
     }
 
     #[inline]
-    unsafe fn copy_from(self, src: GpuSliceItemPtr<*const [T]>, count: usize) {
+    unsafe fn copy_from(self, src: GpuSlicePtrAtIndex<*const [T]>, count: usize) {
         // Assuming slices do not overlap or are pointing to the same memory region
         // because they can only be obtained from storage buffers / shared memory on Rust-GPU backend...
         // And if they do overlap, this is an UB by Rust definitions even when using safe code!
@@ -262,7 +263,7 @@ where
     }
 
     #[inline]
-    unsafe fn copy_from_nonoverlapping(self, src: GpuSliceItemPtr<*const [T]>, count: usize) {
+    unsafe fn copy_from_nonoverlapping(self, src: GpuSlicePtrAtIndex<*const [T]>, count: usize) {
         // Always copy forwards for non-overlapping slices
         unsafe { ordered_copy(src, self, 0..count) }
     }
@@ -271,8 +272,8 @@ where
 #[inline]
 unsafe fn ordered_copy<T, S, D, I>(src: S, dst: D, indices: I)
 where
-    S: ConstSliceItemPtr<Item = T>,
-    D: MutSliceItemPtr<Item = T>,
+    S: ConstSlicePtrAtIndex<Item = T>,
+    D: MutSlicePtrAtIndex<Item = T>,
     I: IntoIterator<Item = usize>,
 {
     for i in indices {
@@ -281,7 +282,7 @@ where
     }
 }
 
-unsafe impl<T> SliceItemPtr for GpuSliceItemPtr<NonNull<[T]>>
+unsafe impl<T> SlicePtrAtIndex for GpuSlicePtrAtIndex<NonNull<[T]>>
 where
     T: Copy,
 {
@@ -301,12 +302,12 @@ where
 
     #[inline]
     unsafe fn add(self, count: usize) -> Self {
-        unsafe { GpuSliceItemPtr::add(self, count) }
+        unsafe { GpuSlicePtrAtIndex::add(self, count) }
     }
 
     #[inline]
     unsafe fn offset_from(self, origin: Self) -> isize {
-        unsafe { GpuSliceItemPtr::offset_from(&self, &origin) }
+        unsafe { GpuSlicePtrAtIndex::offset_from(&self, &origin) }
     }
 
     #[inline]
@@ -315,11 +316,11 @@ where
     }
 }
 
-unsafe impl<T> NonNullSliceItemPtr for GpuSliceItemPtr<NonNull<[T]>>
+unsafe impl<T> NonNullSlicePtrAtIndex for GpuSlicePtrAtIndex<NonNull<[T]>>
 where
     T: Copy,
 {
-    type Ptrs = GpuSliceItemPtrs<T>;
+    type Ptrs = GpuSlicePtrsAtIndex<T>;
 
     #[inline]
     unsafe fn from_parts(slice: NonNull<[T]>, index: usize) -> Self {

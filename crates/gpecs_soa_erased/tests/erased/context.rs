@@ -1,10 +1,10 @@
 use std::alloc::Layout;
 
-use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::CoreSliceItemPtrs};
+use gpecs_soa_erased::{ErasedSoaContext, ptr::slice::CoreSlicePtrsAtIndex};
 
 use crate::common::ArrayLayouts;
 
-type Ptrs = CoreSliceItemPtrs<u8>;
+type Ptrs = CoreSlicePtrsAtIndex<u8>;
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -4,7 +4,7 @@ use gpecs_component::registry::ComponentId;
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
     ErasedSoaNonNullPtrs, ErasedSoaPtrs,
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         traits::{
@@ -32,7 +32,7 @@ where
     T: ErasedArchetypeKind + ?Sized,
     D: ErasedBundleDrop<T::Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Ptrs<'a> = ErasedBundlePtrs<&'a ErasedArchetype<T::Meta>, P::Const>;
 
@@ -392,7 +392,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Context = ErasedSoaContext<ErasedArchetype<Meta>, P>;
     type Fields = ErasedSoaFields<P::Item>;
@@ -405,7 +405,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta, D, S, P> {
@@ -438,7 +438,7 @@ where
     Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone, Error: Debug>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     unsafe fn ptrs_read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta, D, S, P> {
@@ -472,7 +472,7 @@ where
     N: ErasedBundleDrop<W::Meta>,
     S: AlignedStorage,
     U: AlignedStorage<Item = S::Item>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     unsafe fn ptrs_write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<W, N, U, P>) {
@@ -495,7 +495,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Output = &'a ErasedArchetype<Meta>;
     type OutputIter = Iter<'a, Meta>;
@@ -513,7 +513,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -529,7 +529,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
@@ -603,7 +603,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'data>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Refs<'a> = ErasedBundleRefs<'data, &'a ErasedArchetype<Meta>, P::NonNull>;
 

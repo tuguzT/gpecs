@@ -4,7 +4,7 @@ use gpecs_component::{
 };
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf,
-    ptr::slice::MutSliceItemPtr,
+    ptr::slice::MutSlicePtrAtIndex,
     soa::{field::FieldLayouts, identity::Identity, layout::WithLayout},
 };
 
@@ -77,7 +77,7 @@ pub unsafe trait ErasedBundleDrop<Meta> {
     #[inline]
     unsafe fn drop_in_place_with<P>(to_drop: ErasedComponentMutPtr<P>, meta: &Meta)
     where
-        P: MutSliceItemPtr,
+        P: MutSlicePtrAtIndex,
     {
         let _ = (to_drop, meta);
     }
@@ -85,7 +85,7 @@ pub unsafe trait ErasedBundleDrop<Meta> {
     #[inline]
     unsafe fn drop_in_place_slice_with<P>(to_drop: ErasedComponentMutSlicePtr<P>, meta: &Meta)
     where
-        P: MutSliceItemPtr,
+        P: MutSlicePtrAtIndex,
     {
         let _ = (to_drop, meta);
     }
@@ -106,7 +106,7 @@ where
     #[inline]
     unsafe fn drop_in_place_with<P>(to_drop: ErasedComponentMutPtr<P>, meta: &Meta)
     where
-        P: MutSliceItemPtr,
+        P: MutSlicePtrAtIndex,
     {
         let Some(erased_drop) = meta.erased_drop() else {
             return;
@@ -117,7 +117,7 @@ where
     #[inline]
     unsafe fn drop_in_place_slice_with<P>(to_drop: ErasedComponentMutSlicePtr<P>, meta: &Meta)
     where
-        P: MutSliceItemPtr,
+        P: MutSlicePtrAtIndex,
     {
         let Some(erased_drop) = meta.erased_drop() else {
             return;

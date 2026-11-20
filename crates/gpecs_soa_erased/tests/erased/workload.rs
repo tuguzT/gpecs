@@ -3,13 +3,13 @@
 use std::{alloc::Layout, iter, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa, ptr::slice::CoreSliceItemPtrs,
+    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa, ptr::slice::CoreSlicePtrsAtIndex,
     soa::vec::SoaVec, storage::BoxedAlignedUninitStorage,
 };
 
-type Item = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+type Item = BoxedErasedSoa<CoreSlicePtrsAtIndex<MaybeUninit<u8>>>;
 type ReadItem<'a> =
-    ErasedSoa<BoxedAlignedUninitStorage, &'a [Layout], CoreSliceItemPtrs<MaybeUninit<u8>>>;
+    ErasedSoa<BoxedAlignedUninitStorage, &'a [Layout], CoreSlicePtrsAtIndex<MaybeUninit<u8>>>;
 
 #[test]
 fn new() {

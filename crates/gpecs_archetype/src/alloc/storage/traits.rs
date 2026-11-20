@@ -1,4 +1,4 @@
-use gpecs_soa_erased::{ptr::slice::SliceItemPtrs, storage::AlignedStorage};
+use gpecs_soa_erased::{ptr::slice::SlicePtrsAtIndex, storage::AlignedStorage};
 
 use crate::{
     bundle::erased::{
@@ -14,7 +14,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     type Meta = Meta;
     type Archetype<'a> = &'a ErasedArchetype<Meta>;

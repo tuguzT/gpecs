@@ -9,7 +9,7 @@ use gpecs_component::registry::{
 use gpecs_entity::{Entity, NoEpochEntity, NoEpochEntitySparseItem};
 use gpecs_soa_erased::{
     ErasedSoaContext,
-    ptr::slice::{PtrsItem, SliceItemPtrs},
+    ptr::slice::{PtrsItem, SlicePtrsAtIndex},
     soa::{
         self,
         field::FieldLayouts,
@@ -791,7 +791,7 @@ where
     Meta: ErasedArchetypeMeta,
     D: ErasedBundleDrop<Meta>,
     A: AlignedStorage<Item: 'static>,
-    P: SliceItemPtrs<Item = A::Item>,
+    P: SlicePtrsAtIndex<Item = A::Item>,
     S: SparseItem<Index = u32, Epoch = ()>,
 {
     #[inline]

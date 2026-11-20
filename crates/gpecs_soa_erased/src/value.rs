@@ -25,7 +25,7 @@ use crate::{
     },
     layout::{WithLayout, bytes_to_items},
     offsets::{BufferOffsetsFromSelf, BufferOffsetsOf},
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     soa::{
         field::{
             BufferLayout, BufferOffset, FieldLayouts, FieldLayoutsItem, FieldLayoutsIter,
@@ -195,7 +195,7 @@ impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldLayouts<'a> + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     #[inline]
     pub fn as_ptrs(&'a self) -> ErasedSoaPtrs<D::Output, P::Const> {
@@ -298,7 +298,7 @@ impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     #[inline]
     pub fn iter(
@@ -319,7 +319,7 @@ impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldLayouts<'a, Output: FieldLayoutsOwned> + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     #[inline]
     pub unsafe fn downcast_ref<'ctx, V>(
@@ -528,7 +528,7 @@ impl<T, D, P> ErasedSoa<T, D, P>
 where
     T: AlignedStorage<Item: Clone>,
     D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     #[inline]
     pub fn into_fields<F>(
@@ -553,7 +553,7 @@ where
                 BufferOffsets: BufferOffsetsFrom<FieldLayoutsItem<'a, FieldLayoutsIter<'b, D>>>,
             >,
         > + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = &self.iter();
@@ -587,7 +587,7 @@ impl<'a, T, D, P> IntoIterator for &'a ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     type Item = ErasedRef<'a, P::NonNull>;
     type IntoIter =
@@ -603,7 +603,7 @@ impl<'a, T, D, P> IntoIterator for &'a mut ErasedSoa<T, D, P>
 where
     T: AlignedStorage,
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf> + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     type Item = ErasedMutRef<'a, P::NonNull>;
     type IntoIter =
@@ -619,7 +619,7 @@ impl<T, D, P> IntoIterator for ErasedSoa<T, D, P>
 where
     T: AlignedStorageFromLayout<Item: Clone>,
     D: IntoIterator<Item: WithLayout + BufferOffsetsFromSelf>,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     type Item = Result<Erased<T, P>, FromLayoutDataError<T::Error>>;
     type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P, BufferOffsetsOf<D::Item>>;
@@ -735,7 +735,7 @@ where
     T: AlignedStorage<Item: Clone>,
     D: Iterator<Item: WithLayout> + ?Sized,
     I: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
     F: BufferOffsetsFrom<D::Item>,
 {
     type Item = Result<Erased<I, P>, FromLayoutDataError<I::Error>>;
@@ -774,7 +774,7 @@ where
     T: AlignedStorage<Item: Clone>,
     D: ExactSizeIterator<Item: WithLayout> + ?Sized,
     I: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
     F: BufferOffsetsFrom<D::Item>,
 {
     #[inline]
@@ -789,7 +789,7 @@ where
     T: AlignedStorage<Item: Clone>,
     D: FusedIterator<Item: WithLayout> + ?Sized,
     I: AlignedStorageFromLayout<Item = T::Item>,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
     F: BufferOffsetsFrom<D::Item>,
 {
 }

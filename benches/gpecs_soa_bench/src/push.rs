@@ -4,7 +4,7 @@ use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
     CovariantFieldLayouts, ErasedSoa,
     error::FromValueError,
-    ptr::slice::CoreSliceItemPtrs,
+    ptr::slice::CoreSlicePtrsAtIndex,
     soa::{
         field::{FieldLayouts, FieldLayoutsOutput},
         layout::WithLayout,
@@ -16,7 +16,7 @@ use gpecs_soa_erased::{
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
-type Ptrs = CoreSliceItemPtrs<MaybeUninit<u8>>;
+type Ptrs = CoreSlicePtrsAtIndex<MaybeUninit<u8>>;
 type BoxedErasedSoa = gpecs_soa_erased::BoxedErasedSoa<Ptrs>;
 type ArrayErasedSoa<T, const CAP: usize> = ErasedSoa<T, ArrayLayouts<Layout, CAP>, Ptrs>;
 

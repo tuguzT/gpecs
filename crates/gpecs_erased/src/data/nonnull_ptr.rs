@@ -8,7 +8,8 @@ use crate::{
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
     ptr::slice::{
-        ConstPtr, ConstSliceItemPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr,
+        ConstPtr, ConstSlicePtrAtIndex, MutPtr, MutSlicePtrAtIndex, NonNullSlicePtrAtIndex,
+        SlicePtrAtIndex,
     },
 };
 
@@ -45,7 +46,7 @@ impl<T> ErasedNonNullPtr<T> {
 
 impl<T> ErasedNonNullPtr<T>
 where
-    T: SliceItemPtr,
+    T: SlicePtrAtIndex,
 {
     #[inline]
     #[must_use]
@@ -82,7 +83,7 @@ where
 
 impl<T> ErasedNonNullPtr<T>
 where
-    T: NonNullSliceItemPtr,
+    T: NonNullSlicePtrAtIndex,
 {
     #[inline]
     pub fn new(layout: Layout, items: NonNull<[T::Item]>) -> Result<Self, DataError> {

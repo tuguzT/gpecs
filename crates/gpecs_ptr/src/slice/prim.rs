@@ -6,65 +6,68 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use super::{ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs};
+use crate::slice::{
+    ConstSlicePtrAtIndex, MutSlicePtrAtIndex, NonNullSlicePtrAtIndex, SlicePtrAtIndex,
+    SlicePtrsAtIndex,
+};
 
-pub struct CoreSliceItemPtrs<T>(PhantomData<T>);
+pub struct CoreSlicePtrsAtIndex<T>(PhantomData<T>);
 
-impl<T> CoreSliceItemPtrs<T> {
+impl<T> CoreSlicePtrsAtIndex<T> {
     #[inline]
     pub const fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<T> Debug for CoreSliceItemPtrs<T> {
+impl<T> Debug for CoreSlicePtrsAtIndex<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let type_name = any::type_name::<T>();
-        write!(f, "CoreSliceItemPtrs<{type_name}>")
+        write!(f, "CoreSlicePtrsAtIndex<{type_name}>")
     }
 }
 
-impl<T> Default for CoreSliceItemPtrs<T> {
+impl<T> Default for CoreSlicePtrsAtIndex<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> Clone for CoreSliceItemPtrs<T> {
+impl<T> Clone for CoreSlicePtrsAtIndex<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T> Copy for CoreSliceItemPtrs<T> {}
+impl<T> Copy for CoreSlicePtrsAtIndex<T> {}
 
-impl<T> PartialEq for CoreSliceItemPtrs<T> {
+impl<T> PartialEq for CoreSlicePtrsAtIndex<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<T> Eq for CoreSliceItemPtrs<T> {}
+impl<T> Eq for CoreSlicePtrsAtIndex<T> {}
 
-impl<T> PartialOrd for CoreSliceItemPtrs<T> {
+impl<T> PartialOrd for CoreSlicePtrsAtIndex<T> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T> Ord for CoreSliceItemPtrs<T> {
+impl<T> Ord for CoreSlicePtrsAtIndex<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.0.cmp(&other.0)
     }
 }
 
-impl<T> Hash for CoreSliceItemPtrs<T> {
+impl<T> Hash for CoreSlicePtrsAtIndex<T> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-unsafe impl<T> SliceItemPtrs for CoreSliceItemPtrs<T> {
+unsafe impl<T> SlicePtrsAtIndex for CoreSlicePtrsAtIndex<T> {
     type Item = T;
 
     type Const = *const T;
@@ -72,7 +75,7 @@ unsafe impl<T> SliceItemPtrs for CoreSliceItemPtrs<T> {
     type NonNull = NonNull<T>;
 }
 
-unsafe impl<T> SliceItemPtr for *const T {
+unsafe impl<T> SlicePtrAtIndex for *const T {
     type Item = T;
 
     #[inline]
@@ -101,8 +104,8 @@ unsafe impl<T> SliceItemPtr for *const T {
     }
 }
 
-unsafe impl<T> ConstSliceItemPtr for *const T {
-    type Ptrs = CoreSliceItemPtrs<T>;
+unsafe impl<T> ConstSlicePtrAtIndex for *const T {
+    type Ptrs = CoreSlicePtrsAtIndex<T>;
 
     #[inline]
     unsafe fn from_parts(slice: *const [T], index: usize) -> Self {
@@ -120,7 +123,7 @@ unsafe impl<T> ConstSliceItemPtr for *const T {
     }
 }
 
-unsafe impl<T> SliceItemPtr for *mut T {
+unsafe impl<T> SlicePtrAtIndex for *mut T {
     type Item = T;
 
     #[inline]
@@ -149,8 +152,8 @@ unsafe impl<T> SliceItemPtr for *mut T {
     }
 }
 
-unsafe impl<T> MutSliceItemPtr for *mut T {
-    type Ptrs = CoreSliceItemPtrs<T>;
+unsafe impl<T> MutSlicePtrAtIndex for *mut T {
+    type Ptrs = CoreSlicePtrsAtIndex<T>;
 
     #[inline]
     unsafe fn from_parts(slice: *mut [T], index: usize) -> Self {
@@ -193,7 +196,7 @@ unsafe impl<T> MutSliceItemPtr for *mut T {
     }
 }
 
-unsafe impl<T> SliceItemPtr for NonNull<T> {
+unsafe impl<T> SlicePtrAtIndex for NonNull<T> {
     type Item = T;
 
     #[inline]
@@ -222,8 +225,8 @@ unsafe impl<T> SliceItemPtr for NonNull<T> {
     }
 }
 
-unsafe impl<T> NonNullSliceItemPtr for NonNull<T> {
-    type Ptrs = CoreSliceItemPtrs<T>;
+unsafe impl<T> NonNullSlicePtrAtIndex for NonNull<T> {
+    type Ptrs = CoreSlicePtrsAtIndex<T>;
 
     #[inline]
     unsafe fn from_parts(slice: NonNull<[T]>, index: usize) -> Self {

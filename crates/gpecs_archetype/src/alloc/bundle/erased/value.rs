@@ -1,4 +1,4 @@
-use gpecs_soa_erased::{ErasedSoa, ptr::slice::SliceItemPtrs, storage::AlignedStorage};
+use gpecs_soa_erased::{ErasedSoa, ptr::slice::SlicePtrsAtIndex, storage::AlignedStorage};
 
 use crate::{
     bundle::erased::{
@@ -23,7 +23,7 @@ where
     Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedBundle<'a, Meta, D, S, P>) -> Self {
@@ -41,7 +41,7 @@ where
     Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedBundle<'a, Meta, D, S, P>) -> Self {
@@ -59,7 +59,7 @@ where
     Meta: ErasedArchetypeMeta + Clone,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedViewBundle<'a, Meta, D, S, P>) -> Self {

@@ -8,7 +8,7 @@ use gpecs_component::{erased::ErasedComponent, registry::ComponentRegistryView};
 use gpecs_soa_erased::{
     ErasedSoa,
     error::FromFieldsLayoutsError,
-    ptr::slice::SliceItemPtrs,
+    ptr::slice::SlicePtrsAtIndex,
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
@@ -23,7 +23,7 @@ use crate::{
 pub trait FromErasedComponent<S, P>: Sized
 where
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self;
 }
@@ -33,7 +33,7 @@ where
     Meta: ErasedArchetypeMeta + FromErasedComponent<S, P>,
     D: ErasedBundleDrop<Meta>,
     S: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     pub fn from_components<I>(

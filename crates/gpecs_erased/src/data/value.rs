@@ -16,7 +16,7 @@ use crate::{
     },
     error::{LenMismatchError, check_layout, check_len, check_sufficient_align},
     layout::bytes_to_items,
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
+    ptr::slice::{ConstSlicePtrAtIndex, MutSlicePtrAtIndex, SlicePtrsAtIndex},
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
@@ -37,7 +37,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage<Item: Clone>,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub fn try_from_storage_layout_data<V>(
@@ -106,7 +106,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub unsafe fn downcast<V>(self) -> Result<V, DowncastError<Self>> {
@@ -134,7 +134,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorageFromLayout<Item: Clone>,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub fn try_from_layout_data<V>(
@@ -189,7 +189,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     pub fn layout(&self) -> Layout {
@@ -245,7 +245,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs<Item = T::Item>,
+    P: SlicePtrsAtIndex<Item = T::Item>,
 {
     #[inline]
     pub fn as_ref(&self) -> ErasedRef<'_, P::NonNull> {
@@ -258,7 +258,7 @@ where
 
         let layout = storage.layout();
         let slice = storage.as_slice();
-        let ptr = unsafe { ConstSliceItemPtr::from_parts(slice, 0) };
+        let ptr = unsafe { ConstSlicePtrAtIndex::from_parts(slice, 0) };
         unsafe { ErasedPtr::from_parts(layout, ptr) }
     }
 
@@ -273,7 +273,7 @@ where
 
         let layout = storage.layout();
         let slice = storage.as_mut_slice();
-        let ptr = unsafe { MutSliceItemPtr::from_parts(slice, 0) };
+        let ptr = unsafe { MutSlicePtrAtIndex::from_parts(slice, 0) };
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 }
@@ -281,7 +281,7 @@ where
 impl<T, P> Debug for Erased<T, P>
 where
     T: AlignedStorage<Item: Debug> + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
@@ -296,7 +296,7 @@ where
 impl<T, P> AsRef<[T::Item]> for Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs,
+    P: SlicePtrsAtIndex,
 {
     #[inline]
     fn as_ref(&self) -> &[T::Item] {

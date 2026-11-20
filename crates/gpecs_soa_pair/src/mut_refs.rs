@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
 };
 
-use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutPtr, NonNullSlicePtrAtIndex};
 use gpecs_soa::{
     traits::{RefsMut, Soa, SoaContext, SoaOwned},
     wrapper,
@@ -16,7 +16,7 @@ pub struct KeyValueMutRefs<'ctx, 'a, K, V, P = *mut K>
 where
     K: 'a,
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     key: P,
     value: wrapper::RefsMut<'ctx, 'a, V>,
@@ -25,7 +25,7 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueMutRefs<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     pub fn new(key: &'a mut K, value: RefsMut<'ctx, 'a, V>) -> Self {
@@ -95,7 +95,7 @@ impl<K, V, P> Debug for KeyValueMutRefs<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -113,7 +113,7 @@ impl<K, V, P> PartialEq for KeyValueMutRefs<'_, '_, K, V, P>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -131,7 +131,7 @@ impl<K, V, P> Eq for KeyValueMutRefs<'_, '_, K, V, P>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Eq,
 {
 }
@@ -140,7 +140,7 @@ impl<K, V, P> PartialOrd for KeyValueMutRefs<'_, '_, K, V, P>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -158,7 +158,7 @@ impl<K, V, P> Ord for KeyValueMutRefs<'_, '_, K, V, P>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -176,7 +176,7 @@ impl<K, V, P> Hash for KeyValueMutRefs<'_, '_, K, V, P>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

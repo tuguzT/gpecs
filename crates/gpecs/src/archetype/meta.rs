@@ -1,7 +1,7 @@
 use std::alloc::Layout;
 
 use gpecs_soa_erased::{
-    BufferOffsetsFromLayout, BufferOffsetsFromSelf, ptr::slice::SliceItemPtrs,
+    BufferOffsetsFromLayout, BufferOffsetsFromSelf, ptr::slice::SlicePtrsAtIndex,
     storage::AlignedStorage,
 };
 
@@ -54,7 +54,7 @@ where
 impl<S, P> FromErasedComponent<S, P> for ErasedDropMeta
 where
     S: AlignedStorage,
-    P: SliceItemPtrs<Item = S::Item>,
+    P: SlicePtrsAtIndex<Item = S::Item>,
 {
     #[inline]
     fn from_erased_component(component: &ErasedComponent<S, P>) -> Self {

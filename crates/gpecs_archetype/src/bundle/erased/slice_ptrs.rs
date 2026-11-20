@@ -13,7 +13,7 @@ use gpecs_component::{
 use gpecs_soa_erased::{
     BufferOffsetsFrom, BufferOffsetsFromSelf, BufferOffsetsOf, CovariantFieldLayouts,
     ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
-    ptr::slice::{ConstSliceItemPtr, MutPtr, NonNullPtr, SliceItemPtr},
+    ptr::slice::{ConstSlicePtrAtIndex, MutPtr, NonNullPtr, SlicePtrAtIndex},
     soa::{
         field::{FieldLayouts, FieldLayoutsItem, FieldLayoutsOutput, FieldLayoutsOwned},
         traits::SoaRawContext,
@@ -35,14 +35,14 @@ use crate::{
 pub struct ErasedBundleSlicePtrs<D, P>
 where
     D: ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     inner: ErasedSoaSlicePtrs<D, P>,
 }
 
 impl<D, P> ErasedBundleSlicePtrs<D, P>
 where
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     pub unsafe fn from_inner(inner: ErasedSoaSlicePtrs<D, P>) -> Self {
@@ -74,7 +74,7 @@ where
 impl<D, P> ErasedBundleSlicePtrs<D, P>
 where
     D: ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     pub fn as_buffer(&self) -> *const [P::Item] {
@@ -115,7 +115,7 @@ where
 impl<D, P> ErasedBundleSlicePtrs<D, P>
 where
     D: ErasedArchetypeKind + ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     pub fn archetype(&self) -> ErasedArchetypeView<'_, D::Meta> {
@@ -125,7 +125,7 @@ where
 
 impl<D, P> ErasedBundleSlicePtrs<D, P>
 where
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
 {
     #[inline]
     pub fn cast_mut(self) -> ErasedBundleMutSlicePtrs<D, MutPtr<P::Ptrs>> {
@@ -150,7 +150,7 @@ impl<'a, D, P> ErasedBundleSlicePtrs<D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
         + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
 {
     #[inline]
     pub fn iter(
@@ -166,7 +166,7 @@ where
 impl<D, P> ErasedBundleSlicePtrs<D, P>
 where
     D: ErasedArchetypeKind,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
 {
     #[inline]
     pub fn downcast<B>(
@@ -194,7 +194,7 @@ where
 impl<D, P> ErasedBundleSlicePtrs<D, P>
 where
     D: ErasedArchetypeKind + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
 {
     #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlicePtr<P>> {
@@ -206,7 +206,7 @@ where
 impl<D, P> Debug for ErasedBundleSlicePtrs<D, P>
 where
     D: Debug + ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
@@ -219,7 +219,7 @@ where
 impl<D, P> Clone for ErasedBundleSlicePtrs<D, P>
 where
     D: Clone,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -233,7 +233,7 @@ where
 impl<D, P> Copy for ErasedBundleSlicePtrs<D, P>
 where
     D: Copy,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
 }
 
@@ -241,7 +241,7 @@ impl<'a, D, P> IntoIterator for &'a ErasedBundleSlicePtrs<D, P>
 where
     D: FieldLayouts<'a, OutputItem: BufferOffsetsFromSelf, OutputIter: ErasedArchetypeIterator>
         + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
 {
     type Item = ErasedComponentSlicePtr<P>;
     type IntoIter = ErasedBundleSlicePtrsIter<D::OutputIter, P, BufferOffsetsOf<D::OutputItem>>;
@@ -255,7 +255,7 @@ where
 impl<D, P> IntoIterator for ErasedBundleSlicePtrs<D, P>
 where
     D: IntoErasedArchetypeIterator<Item: BufferOffsetsFromSelf>,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
 {
     type Item = ErasedComponentSlicePtr<P>;
     type IntoIter = ErasedBundleSlicePtrsIter<D::IntoIter, P, BufferOffsetsOf<D::Item>>;
@@ -272,7 +272,7 @@ where
 impl<'a, D, P> FieldLayouts<'a> for ErasedBundleSlicePtrs<D, P>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -288,7 +288,7 @@ where
 impl<D, P> CovariantFieldLayouts for ErasedBundleSlicePtrs<D, P>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(
@@ -301,14 +301,14 @@ where
 pub struct ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     inner: ErasedSoaSlicePtrsIter<D, P, F>,
 }
 
 impl<D, P, F> ErasedBundleSlicePtrsIter<D, P, F>
 where
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     pub(super) unsafe fn from_inner(inner: ErasedSoaSlicePtrsIter<D, P, F>) -> Self {
@@ -319,7 +319,7 @@ where
 impl<D, P, F> ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     pub fn as_buffer(&self) -> *const [P::Item] {
@@ -355,7 +355,7 @@ where
 impl<'a, D, P, F> ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
     F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     #[inline]
@@ -370,7 +370,7 @@ where
 impl<'a, D, P, F> IntoIterator for &'a ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: FieldLayouts<'a, OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
     F: BufferOffsetsFrom<D::OutputItem> + Clone,
 {
     type Item = ErasedComponentSlicePtr<P>;
@@ -385,7 +385,7 @@ where
 impl<D, P, F> Debug for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: FieldLayoutsOwned<OutputIter: ErasedArchetypeIterator> + ?Sized,
-    P: ConstSliceItemPtr + Debug,
+    P: ConstSlicePtrAtIndex + Debug,
     F: for<'a> BufferOffsetsFrom<FieldLayoutsItem<'a, D>> + Clone,
 {
     #[inline]
@@ -397,7 +397,7 @@ where
 impl<D, P, F> Clone for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: Clone,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
     F: Clone,
 {
     #[inline]
@@ -412,7 +412,7 @@ where
 impl<D, P, F> Iterator for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: ErasedArchetypeIterator + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
     F: BufferOffsetsFrom<D::Item>,
 {
     type Item = ErasedComponentSlicePtr<P>;
@@ -437,7 +437,7 @@ where
 impl<D, P, F> ExactSizeIterator for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: ErasedArchetypeIterator + ExactSizeIterator + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
     F: BufferOffsetsFrom<D::Item>,
 {
     #[inline]
@@ -450,7 +450,7 @@ where
 impl<D, P, F> FusedIterator for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: ErasedArchetypeIterator + FusedIterator + ?Sized,
-    P: ConstSliceItemPtr,
+    P: ConstSlicePtrAtIndex,
     F: BufferOffsetsFrom<D::Item>,
 {
 }
@@ -458,7 +458,7 @@ where
 impl<'a, D, P, F> FieldLayouts<'a> for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: FieldLayouts<'a> + ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     type Output = D::Output;
     type OutputIter = D::OutputIter;
@@ -474,7 +474,7 @@ where
 impl<D, P, F> CovariantFieldLayouts for ErasedBundleSlicePtrsIter<D, P, F>
 where
     D: CovariantFieldLayouts + ?Sized,
-    P: SliceItemPtr,
+    P: SlicePtrAtIndex,
 {
     #[inline]
     fn upcast_field_layouts<'short, 'long: 'short>(

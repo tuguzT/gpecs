@@ -1,8 +1,8 @@
 pub use self::{
-    prim::CoreSliceItemPtrs,
+    prim::CoreSlicePtrsAtIndex,
     traits::{
-        ConstPtr, ConstSliceItemPtr, MutPtr, MutSliceItemPtr, NonNullPtr, NonNullSliceItemPtr,
-        PtrsItem, SliceItemPtr, SliceItemPtrs,
+        ConstPtr, ConstSlicePtrAtIndex, MutPtr, MutSlicePtrAtIndex, NonNullPtr,
+        NonNullSlicePtrAtIndex, PtrsItem, SlicePtrAtIndex, SlicePtrsAtIndex,
     },
 };
 

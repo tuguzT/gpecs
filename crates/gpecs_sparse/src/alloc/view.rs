@@ -1,6 +1,6 @@
 use core::cmp;
 
-use gpecs_ptr::slice::SliceItemPtrs;
+use gpecs_ptr::slice::SlicePtrsAtIndex;
 
 use crate::{
     assert::unwrap_dense_from_sparse_index,
@@ -14,7 +14,7 @@ impl<K, V, S, P> EpochSparseViewMut<'_, '_, K, V, S, P>
 where
     K: Key,
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     S: SparseItem<Index = K::SparseIndex, Epoch = K::Epoch>,
 {
     #[inline]

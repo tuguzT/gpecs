@@ -5,7 +5,7 @@ use core::{
     ptr::NonNull,
 };
 
-use gpecs_ptr::slice::{ConstPtr, MutPtr, MutSliceItemPtr, NonNullSliceItemPtr};
+use gpecs_ptr::slice::{ConstPtr, MutPtr, MutSlicePtrAtIndex, NonNullSlicePtrAtIndex};
 use gpecs_soa::{
     traits::{SlicesMut, Soa, SoaContext, SoaOwned},
     wrapper,
@@ -20,7 +20,7 @@ pub struct KeyValueMutSlices<'ctx, 'a, K, V, P = *mut K>
 where
     K: 'a,
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     key: P,
     len: usize,
@@ -30,7 +30,7 @@ where
 impl<'ctx, 'a, K, V, P> KeyValueMutSlices<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -196,7 +196,7 @@ impl<K, V, P> Debug for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -217,7 +217,7 @@ where
 impl<K, V, P> Default for KeyValueMutSlices<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Default,
 {
     #[inline]
@@ -232,7 +232,7 @@ impl<K, V, P> PartialEq for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: PartialEq,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -254,7 +254,7 @@ impl<K, V, P> Eq for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: Eq,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Eq,
 {
 }
@@ -263,7 +263,7 @@ impl<K, V, P> PartialOrd for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: PartialOrd,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -285,7 +285,7 @@ impl<K, V, P> Ord for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: Ord,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -307,7 +307,7 @@ impl<K, V, P> Hash for KeyValueMutSlices<'_, '_, K, V, P>
 where
     K: Hash,
     V: SoaOwned + ?Sized,
-    P: NonNullSliceItemPtr<Item = K>,
+    P: NonNullSlicePtrAtIndex<Item = K>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

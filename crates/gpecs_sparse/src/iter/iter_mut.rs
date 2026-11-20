@@ -3,7 +3,7 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs};
+use gpecs_ptr::slice::{CoreSlicePtrsAtIndex, SlicePtrsAtIndex};
 
 use crate::{
     item::{KeyValueMutSlicePtrs, KeyValueMutSlices, KeyValuePair},
@@ -21,11 +21,11 @@ use crate::{
 type Inner<'ctx, 'a, K, V, P> = soa::slices::IterMut<'ctx, 'a, KeyValuePair<K, V, P>>;
 
 #[repr(transparent)]
-pub struct IterMut<'ctx, 'a, K, V, P = CoreSliceItemPtrs<K>>
+pub struct IterMut<'ctx, 'a, K, V, P = CoreSlicePtrsAtIndex<K>>
 where
     K: 'a,
     V: SoaRaw<Context: 'ctx> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     inner: Inner<'ctx, 'a, K, V, P>,
 }
@@ -33,7 +33,7 @@ where
 impl<'ctx, 'a, K, V, P> IterMut<'ctx, 'a, K, V, P>
 where
     V: SoaRaw + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -218,7 +218,7 @@ where
 impl<'ctx, 'a, K, V, P> IterMut<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     #[track_caller]
@@ -263,7 +263,7 @@ where
 impl<'a, K, V, P> IterMut<'_, '_, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
@@ -285,7 +285,7 @@ impl<K, V, P> Debug for IterMut<'_, '_, K, V, P>
 where
     K: Debug,
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -300,7 +300,7 @@ where
 impl<T, K, V, P> AsRef<[T]> for IterMut<'_, '_, K, V, P>
 where
     V: SoaOwned + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -313,7 +313,7 @@ where
 impl<'ctx, 'a, K, V, P> Iterator for IterMut<'ctx, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     type Item = (&'a K, RefsMut<'ctx, 'a, V>);
 
@@ -336,7 +336,7 @@ where
 impl<'a, K, V, P> DoubleEndedIterator for IterMut<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -351,7 +351,7 @@ where
 impl<'a, K, V, P> ExactSizeIterator for IterMut<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -362,6 +362,6 @@ where
 impl<'a, K, V, P> FusedIterator for IterMut<'_, 'a, K, V, P>
 where
     V: Soa<'a> + ?Sized,
-    P: SliceItemPtrs<Item = K>,
+    P: SlicePtrsAtIndex<Item = K>,
 {
 }
